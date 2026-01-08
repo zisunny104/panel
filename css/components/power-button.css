@@ -1,0 +1,75 @@
+/* ================= 媒體電源按鈕 ================= */
+.media-power-btn {
+    min-width: 60px;
+    padding: 8px 18px;
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 20px;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+    transition: background 0.2s, box-shadow 0.2s;
+    outline: none;
+}
+
+.media-power-btn:disabled {
+    opacity: 0.5;
+    filter: grayscale(0.7);
+    cursor: not-allowed;
+}
+
+.media-power-btn.power-on {
+    background: #1ecb1e;
+    box-shadow: 0 0 8px #1ecb1e88;
+}
+
+.media-power-btn.power-on:active {
+    background: #0e9e0e;
+    box-shadow: 0 0 12px #1ecb1e;
+}
+
+.media-power-btn.power-off {
+    background: #e53935;
+    box-shadow: 0 0 8px #e5393588;
+}
+
+.media-power-btn.power-off:active {
+    background: #b71c1c;
+    box-shadow: 0 0 12px #e53935;
+}
+
+.media-power-btn.emergency-stop {
+    background: #ff5722;
+    box-shadow: 0 0 8px #ff572288;
+    border: 2px solid #ff3d00;
+}
+
+.media-power-btn.emergency-stop:hover {
+    background: #ff3d00;
+    box-shadow: 0 0 12px #ff3d0088;
+}
+
+.media-power-btn.emergency-stop:active {
+    background: #d32f2f;
+    box-shadow: 0 0 16px #ff3d00;
+    transform: scale(0.95);
+}
+
+.media-power-btn.quick-power {
+    background: linear-gradient(45deg, #ffa726, #ff9800);
+    box-shadow: 0 0 8px #ff980088;
+    border: 1px solid #f57c00;
+    min-width: 80px;
+}
+
+.media-power-btn.quick-power:hover {
+    background: linear-gradient(45deg, #ff9800, #f57c00);
+    box-shadow: 0 0 12px #ff980088;
+}
+
+.media-power-btn.quick-power:active {
+    background: linear-gradient(45deg, #f57c00, #ef6c00);
+    box-shadow: 0 0 16px #ff9800;
+    transform: scale(0.95);
+}

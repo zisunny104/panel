@@ -1,0 +1,315 @@
+/* ========== 按鈕樣式 ========== */
+/* 只對有明確按鈕類別的按鈕套用全域樣式，避免影響其他按鈕 */
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-info {
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5568d3;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+.btn-success:active {
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #da190b 0%, #c41a0a 100%);
+    box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4);
+}
+
+.btn-danger:active {
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+}
+
+.btn-secondary {
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-secondary:hover {
+    background: #e8e8e8;
+}
+
+.btn-secondary svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #ff9800 0%, #fb8c00 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #fb8c00 0%, #f57c00 100%);
+    box-shadow: 0 6px 16px rgba(255, 152, 0, 0.4);
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.btn-info:hover {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+    box-shadow: 0 6px 16px rgba(33, 150, 243, 0.4);
+}
+
+.control-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.navigation {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: space-between;
+}
+
+.nav-button {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #ddd;
+    background: white;
+    color: #333;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.nav-button:hover:not(:disabled) {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.nav-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 圖示按鈕 */
+.icon-btn {
+    padding: 8px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.icon-btn:hover {
+    background: #5568d3;
+    transform: rotate(10deg);
+}
+
+.icon-btn:active {
+    transform: rotate(10deg) scale(0.95);
+}
+
+.icon-btn svg {
+    display: block;
+}
+
+/* 重新產生實驗ID按鈕 */
+#regenerateIdBtn {
+    padding: 8px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+#regenerateIdBtn:hover {
+    background: #5568d3;
+}
+
+#regenerateIdBtn:active {
+    transform: scale(0.95);
+}
+
+/* 面板收合按鈕 - 圓形設計，與右側同步指示器對稱 */
+.panel-toggle-btn {
+    position: fixed;
+    left: 15px;
+    top: 15px;
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    z-index: 100;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.panel-toggle-btn:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #4757c3 100%);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 預設狀態（展開）：顯示 — 最小化圖示 */
+.panel-toggle-btn span {
+    width: 16px;
+    height: 2px;
+    background: white;
+    border-radius: 1px;
+    transition: all 0.3s ease;
+    display: block;
+}
+
+.panel-toggle-btn span:nth-child(1) {
+    transform: translateY(0);
+    opacity: 0;
+}
+
+.panel-toggle-btn span:nth-child(2) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.panel-toggle-btn span:nth-child(3) {
+    transform: translateY(0);
+    opacity: 0;
+}
+
+/* 收起狀態（.collapsed）：顯示 ☰ 漢堡包圖示 */
+.panel-toggle-btn.collapsed span:nth-child(1) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.panel-toggle-btn.collapsed span:nth-child(2) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.panel-toggle-btn.collapsed span:nth-child(3) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* ========== Action 按鈕樣式 ========== */
+/* Action 按鈕基礎樣式 */
+.action-button {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-width: fit-content;
+    width: auto;
+    height: auto;
+    padding: 8px 12px;
+}
+
+/* Action 按鈕已完成狀態 */
+.action-button[data-completed="true"] {
+    background: #c8e6c9 !important;
+    border-color: #4caf50 !important;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3) !important;
+}
+
+/* Action 按鈕已完成狀態 - 文字顏色調整 */
+.action-button[data-completed="true"]>div:first-child {
+    color: #2e7d32 !important;
+}
+
+.action-button[data-completed="true"]>div:last-child {
+    color: #1b5e20 !important;
+}
+
+/* Action 按鈕 hover 效果 */
+.action-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.action-button[data-completed="true"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 12px rgba(76, 175, 80, 0.4) !important;
+}
+
+/* Action 按鈕點擊動畫 */
+.action-button:active {
+    transform: translateY(0);
+}
+
+/* 完成標記動畫（可選的視覺增強） */
+@keyframes actionCompleted {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.action-button[data-completed="true"] {
+    animation: actionCompleted 0.3s ease-out;
+}

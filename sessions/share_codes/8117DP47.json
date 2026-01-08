@@ -1,0 +1,15 @@
+{
+    "code": "8117DP47",
+    "sessionId": "V0JHF3",
+    "createdAt": 1767850089,
+    "expiresAt": 1767850389,
+    "used": true,
+    "usedAt": 1767850095,
+    "usedBy": "client_695f3f2c7c5394.76910102",
+    "createdBy": null,
+    "checksumValid": true,
+    "singleUse": true,
+    "expired": true,
+    "expiredAt": 1767850261,
+    "expiredReason": "regenerated"
+}

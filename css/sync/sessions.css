@@ -1,0 +1,464 @@
+/**
+ * 同步工作階段管理樣式
+ * 包含工作階段列表、批量操作、狀態顯示等相關樣式
+ */
+
+.sync-sessions-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.sync-action-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 120px;
+    transition: all 0.2s ease;
+}
+
+.sync-action-btn:hover {
+    background: #0056b3;
+}
+
+.sync-action-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+.sync-action-btn-warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.sync-action-btn-warning:hover {
+    background: #e0a800;
+}
+
+.sync-action-btn-danger {
+    background: #dc3545;
+}
+
+.sync-action-btn-danger:hover {
+    background: #c82333;
+}
+
+/* 批量操作區域 */
+.sync-sessions-batch-actions {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sync-batch-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.sync-batch-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.sync-batch-checkbox:hover {
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.sync-batch-checkbox input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.sync-batch-select-btn {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.sync-batch-select-btn:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.sync-batch-operations {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px solid #dee2e6;
+    flex-wrap: wrap;
+}
+
+.sync-batch-op-btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 140px;
+    transition: all 0.2s ease;
+}
+
+.sync-batch-op-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.sync-batch-op-download {
+    background: #28a745;
+    color: white;
+}
+
+.sync-batch-op-download:hover {
+    background: #218838;
+}
+
+.sync-batch-op-delete {
+    background: #dc3545;
+    color: white;
+}
+
+.sync-batch-op-delete:hover {
+    background: #c82333;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .sync-sessions-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .sync-action-btn {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .sync-sessions-batch-actions {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .sync-batch-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .sync-batch-operations {
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 8px;
+    }
+
+    .sync-batch-op-btn {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .sync-batch-select-btn {
+        min-width: auto;
+        width: 100%;
+    }
+}
+
+.sync-sessions-list {
+    flex: 1;
+}
+
+.sync-session-card {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: white;
+    overflow: hidden;
+}
+
+.sync-session-header {
+    padding: 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sync-session-header:hover {
+    background: #f8f9fa;
+}
+
+.sync-session-selection {
+    margin-right: 12px;
+}
+
+.sync-session-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sync-session-checkbox input[type="checkbox"] {
+    margin: 0;
+}
+
+.sync-session-info {
+    flex: 1;
+}
+
+.sync-card-label {
+    font-weight: bold;
+    color: #333;
+}
+
+.sync-card-value {
+    color: #666;
+}
+
+.sync-card-hint {
+    font-size: 14px;
+    color: #999;
+}
+
+.sync-session-details {
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border-top: 1px solid #eee;
+}
+
+.sync-session-card.expanded .sync-session-details {
+    padding: 12px;
+    max-height: 800px;
+    background: white;
+    overflow-y: auto;
+}
+
+/* 新的按鈕佈局容器 */
+.sync-session-buttons-container {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+/* 分享按鈕獨立行 */
+.sync-session-share-row {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.sync-session-share-row .sync-share-session-btn {
+    width: 100%;
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.sync-session-share-row .sync-share-session-btn:hover {
+    background: #218838;
+}
+
+/* 其他按鈕行 */
+.sync-session-action-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+}
+
+.sync-session-action-row .sync-edit-session-btn {
+    background: #007bff;
+}
+
+.sync-session-action-row .sync-edit-session-btn:hover {
+    background: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.sync-session-action-row .sync-copy-session-btn {
+    background: #17a2b8;
+}
+
+.sync-session-action-row .sync-copy-session-btn:hover {
+    background: #138496;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+}
+
+.sync-session-action-row .sync-delete-session-btn {
+    background: #dc3545;
+}
+
+.sync-session-action-row .sync-delete-session-btn:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
+.sync-delete-session-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.sync-delete-session-btn:hover {
+    background: #c82333;
+}
+
+/* 空狀態樣式 */
+.sync-sessions-empty {
+    text-align: center;
+    color: #666;
+    padding: 20px 0;
+    font-style: italic;
+}
+
+/* 工作階段狀態標籤 */
+.sync-session-status {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 14px;
+    color: white;
+}
+
+.sync-session-status.active {
+    background: #28a745;
+}
+
+.sync-session-status.inactive {
+    background: #6c757d;
+}
+
+/* 工作階段卡片狀態區域 */
+.sync-session-card-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 展開/收起圖標 */
+.sync-session-expand-icon {
+    font-size: 18px;
+    color: #666;
+}
+
+/* 工作階段客戶端資訊 */
+.sync-session-client {
+    padding: 8px;
+    margin: 5px 0;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 2px solid #007bff;
+}
+
+.sync-session-client.operator {
+    border-color: #007bff;
+}
+
+.sync-session-client.viewer {
+    border-color: #28a745;
+}
+
+/* 工作階段詳細資訊區域 */
+.sync-session-info {
+    margin-bottom: 8px;
+}
+
+.sync-session-share-info {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    padding: 12px 15px;
+    margin-bottom: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+.sync-session-share-info strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #495057;
+    font-weight: 600;
+}
+
+.sync-session-share-info small {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.sync-session-info strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.sync-session-info-no-code {
+    color: #666;
+}
+
+.sync-session-info-no-state {
+    color: #666;
+}
+
+.sync-session-status-active {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.sync-session-status-inactive {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.sync-session-clients {
+    margin-top: 8px;
+}
+
+.sync-session-no-clients {
+    color: #666;
+    font-style: italic;
+}

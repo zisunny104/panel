@@ -1,0 +1,15 @@
+{
+    "code": "4924XZNB",
+    "sessionId": "V0JHF3",
+    "createdAt": 1767849765,
+    "expiresAt": 1767850065,
+    "used": true,
+    "usedAt": 1767849772,
+    "usedBy": "client_695f3f2c7c5394.76910102",
+    "createdBy": null,
+    "checksumValid": true,
+    "singleUse": true,
+    "expired": true,
+    "expiredAt": 1767850089,
+    "expiredReason": "regenerated"
+}

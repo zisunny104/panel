@@ -1,0 +1,15 @@
+{
+    "code": "8044HVJ8",
+    "sessionId": "DF2NKG",
+    "createdAt": 1767707810,
+    "expiresAt": 1767708110,
+    "used": false,
+    "usedAt": null,
+    "usedBy": null,
+    "createdBy": null,
+    "checksumValid": true,
+    "singleUse": true,
+    "expired": true,
+    "expiredAt": 1767708316,
+    "expiredReason": "regenerated"
+}

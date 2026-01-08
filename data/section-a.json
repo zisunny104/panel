@@ -1,0 +1,318 @@
+{
+    "title": "機台操作教學-0A",
+    "description": "四項主操作組合於20分鐘完成，若20分鐘內完成則適當加入額外作業直至20分鐘，若20分鐘內未完成，則完成四項主操作組合。",
+    "units": [
+        {
+            "title": "更改語言為英語",
+            "description": "進系統設定頁面",
+            "steps": [
+                {
+                    "description": "首頁按 [f3] 並使用按鍵輸入密碼：[orange]【２５８】[/orange]，\n接著按下 [enter] 進入「系統功能設定」",
+                    "buttons": [
+                        "f3",
+                        "num",
+                        "enter"
+                    ]
+                },
+                {
+                    "description": "按 [shift] + [f6] 進入「語言選擇」",
+                    "buttons": [
+                        "f6"
+                    ]
+                },
+                {
+                    "description": "請透過按鍵輸入數值[orange]【１】[/orange]，\n輸入完成後按下 [enter] 後再次確認完成更改為英文",
+                    "buttons": [
+                        "num",
+                        "enter",
+                        "enter"
+                    ]
+                },
+                {
+                    "description": "按兩次 [f3] 回首頁",
+                    "buttons": [
+                        "f3",
+                        "f3"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "送出過短設定(25)",
+            "description": "進參數設定頁面後 [f1] 上一頁、[f2] 下一頁",
+            "steps": [
+                {
+                    "description": "首頁按 [f1] 進入「車削參數設定」",
+                    "buttons": [
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "使用 [f2] 下一項 或 [f1] 上一項，\n尋找「送出過短設定」",
+                    "buttons": [
+                        "f2",
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "請透過按鍵輸入數值[orange]【２５】[/orange]，\n輸入完成後按下 [enter] 後再次確認完成更改",
+                    "buttons": [
+                        "num",
+                        "enter",
+                        "enter"
+                    ]
+                },
+                {
+                    "description": "按 [f3] 回到首頁",
+                    "buttons": [
+                        "f3"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "夾開力矩設定(30)",
+            "description": "進參數設定頁面後 [f1] 上一頁、[f2] 下一頁",
+            "steps": [
+                {
+                    "description": "首頁按 [f1] 進入「車削參數設定」",
+                    "buttons": [
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "使用 [f2] 下一項 或 [f1] 上一項，\n尋找「夾開力矩設定」",
+                    "buttons": [
+                        "f2",
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "請透過按鍵輸入數值[orange]【３０】[/orange]，\n輸入完成後按下 [enter] 後再次確認完成更改",
+                    "buttons": [
+                        "num",
+                        "enter",
+                        "enter"
+                    ]
+                },
+                {
+                    "description": "按 [f3] 回到首頁",
+                    "buttons": [
+                        "f3"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "推桿後退定點設定(400)",
+            "description": "進參數設定頁面後 [f1] 上一頁、[f2] 下一頁",
+            "steps": [
+                {
+                    "description": "首頁按 [f2] 並使用按鍵輸入密碼：[orange]【２５８】[/orange]，\n接著按下 [enter] 進入「機械參數設定」",
+                    "buttons": [
+                        "f2",
+                        "num",
+                        "enter"
+                    ]
+                },
+                {
+                    "description": "使用 [f2] 下一項 或 [f1] 上一項，\n尋找「推桿後退定點設定」",
+                    "buttons": [
+                        "f2",
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "請透過按鍵輸入數值[orange]【４００】[/orange]，\n輸入完成後按下 [enter] 後再次確認完成更改",
+                    "buttons": [
+                        "num",
+                        "enter",
+                        "enter"
+                    ]
+                },
+                {
+                    "description": "按 [f3] 回到首頁",
+                    "buttons": [
+                        "f3"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "關機並檢查機台",
+            "description": "關機檢查流程",
+            "steps": [
+                {
+                    "description": "將開關旋鈕轉向關機狀態",
+                    "buttons": [
+                        ""
+                    ]
+                },
+                {
+                    "description": "檢查機台外觀",
+                    "buttons": [
+                        "all"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "語言變更為繁體中文",
+            "description": "進系統設定頁面",
+            "steps": [
+                {
+                    "description": "首頁按 [f3] 進入「系統設定」",
+                    "buttons": [
+                        "f3"
+                    ]
+                },
+                {
+                    "description": "使用 [f1] 上一項，尋找「語言設定」",
+                    "buttons": [
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "按 [enter] 進入後，使用 [f1] 選擇「繁體中文」",
+                    "buttons": [
+                        "enter",
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "按 [enter] 確認後，按 [f3] 回到首頁",
+                    "buttons": [
+                        "enter",
+                        "f3"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "切端至主軸位置設定",
+            "description": "進機械參數設定頁面",
+            "steps": [
+                {
+                    "description": "首頁按 [f2] 並使用按鍵輸入密碼：[orange]【２５８】[/orange]，接著按下 [enter] 進入「機械參數設定」",
+                    "buttons": [
+                        "f2",
+                        "num",
+                        "enter"
+                    ]
+                },
+                {
+                    "description": "使用 [f1] 上一項 或 [f2] 下一項，尋找「切端至主軸位置設定」",
+                    "buttons": [
+                        "f1",
+                        "f2"
+                    ]
+                },
+                {
+                    "description": "查看並確認數值設定",
+                    "buttons": [
+                        "all"
+                    ]
+                },
+                {
+                    "description": "按 [f3] 回到首頁",
+                    "buttons": [
+                        "f3"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "棒材機開機介面",
+            "description": "介面操作檢查",
+            "steps": [
+                {
+                    "description": "在首頁觀察主畫面各項資訊",
+                    "buttons": [
+                        "all"
+                    ]
+                },
+                {
+                    "description": "按 [f1] 進入「車削參數設定」並檢查",
+                    "buttons": [
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "按 [f3] 回到首頁",
+                    "buttons": [
+                        "f3"
+                    ]
+                },
+                {
+                    "description": "按 [f2] 進入密碼頁面並檢查界面",
+                    "buttons": [
+                        "f2"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "夾開力矩設定(40)",
+            "description": "進參數設定頁面後 [f1] 上一頁、[f2] 下一頁",
+            "steps": [
+                {
+                    "description": "首頁按 [f1] 進入「車削參數設定」",
+                    "buttons": [
+                        "f1"
+                    ]
+                },
+                {
+                    "description": "使用 [f1] 上一項 或 [f2] 下一項，尋找「夾開力矩設定」",
+                    "buttons": [
+                        "f1",
+                        "f2"
+                    ]
+                },
+                {
+                    "description": "請透過按鍵輸入數值[orange]【４０】[/orange]，輸入完成後按下 [enter] 後再次確認完成更改",
+                    "buttons": [
+                        "num",
+                        "enter",
+                        "enter"
+                    ]
+                },
+                {
+                    "description": "按 [f3] 回到首頁",
+                    "buttons": [
+                        "f3"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "關機並檢查機台電控箱",
+            "description": "電控箱檢查流程",
+            "steps": [
+                {
+                    "description": "檢查電控箱外觀",
+                    "buttons": [
+                        "all"
+                    ]
+                },
+                {
+                    "description": "檢查電控箱內部",
+                    "buttons": [
+                        "all"
+                    ]
+                },
+                {
+                    "description": "確認電控箱狀態正常",
+                    "buttons": [
+                        "all"
+                    ]
+                },
+                {
+                    "description": "完成檢查程序",
+                    "buttons": [
+                        "all"
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,88 @@
+/* ========== 組合選擇器區塊樣式 ========== */
+.combination-selector-section {
+    padding: 12px;
+    background: #f9f9f9;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+
+.combination-selector-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    color: #333;
+    font-weight: 600;
+}
+
+/* ========== 組合選擇器樣式 ========== */
+.experiment-default-list {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    margin-bottom: 0px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px 0;
+    list-style: none;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+    scroll-behavior: smooth;
+    /* 隱藏滾動條但保留滾動功能 */
+    scrollbar-width: thin;
+    scrollbar-color: #ccc transparent;
+}
+
+.experiment-default-list::-webkit-scrollbar {
+    height: 6px;
+}
+
+.experiment-default-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.experiment-default-list::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 3px;
+}
+
+.experiment-default-list::-webkit-scrollbar-thumb:hover {
+    background-color: #999;
+}
+
+.combination-item {
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: white;
+    font-size: 13px;
+    flex-shrink: 0;
+    min-width: 160px;
+    white-space: normal;
+}
+
+.combination-item:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.combination-item.active {
+    border-color: #667eea;
+    background: #e8eeff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.combination-item .combo-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 3px;
+}
+
+.combination-item .combo-desc {
+    font-size: 11px;
+    color: #666;
+}

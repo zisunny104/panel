@@ -1,0 +1,603 @@
+/* ================= 實驗面板 ================= */
+.experiment-panel {
+    position: fixed;
+    right: 5.5rem;
+    bottom: 4.5rem;
+    width: 23.75rem;
+    max-height: 85vh;
+    min-height: 20rem;
+    background: rgba(0, 0, 0, 0.92);
+    color: #fff;
+    border-radius: 0.875rem;
+    z-index: 29;
+    box-shadow: 0 0 1rem rgba(0, 0, 0, 0.35);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.experiment-panel-header {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.experiment-divider {
+    border: none;
+    border-top: 0.0625rem solid #666;
+    margin: 0.75rem 0;
+    flex-shrink: 0;
+}
+
+.experiment-panel-defaults {
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.experiment-panel-units {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    padding-bottom: 0.5rem;
+}
+
+.units-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 0.0625rem solid #444;
+    flex-shrink: 0;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.units-list-container {
+    flex: 1 1 0;
+    min-height: 12rem;
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+    margin: 0;
+    padding-right: 0.5rem;
+}
+
+.select-all-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    color: #ff8c00;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.select-all-checkbox:hover {
+    background: rgba(255, 140, 0, 0.1);
+    transition: background 0.2s ease;
+}
+
+.select-all-checkbox input[type="checkbox"],
+.unit-checkbox input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: #ff8c00;
+    width: 16px;
+    height: 16px;
+}
+
+.unit-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.unit-sort {
+    font-size: 0.9em;
+    color: #ffcc00;
+    margin-left: 6px;
+    flex: 1;
+}
+
+.experiment-units-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    font-size: 0.98rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: auto;
+    overflow: visible;
+}
+
+.experiment-units-list li,
+.power-option-card {
+    padding: 0.5rem 0.625rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #2a2a2a;
+    border-radius: 0.375rem;
+    border: 0.0625rem solid #444;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.experiment-units-list li:hover,
+.power-option-card:hover {
+    background: #333;
+    border-color: #555;
+}
+
+.power-option-card {
+    margin: 0 0 0.375rem 0;
+}
+
+.startup-card {
+    background: rgba(76, 175, 80, 0.1);
+    border: 0.0625rem solid rgba(76, 175, 80, 0.3);
+}
+
+.startup-card:hover {
+    background: rgba(76, 175, 80, 0.15);
+    border-color: rgba(76, 175, 80, 0.5);
+}
+
+.shutdown-card {
+    background: rgba(244, 67, 54, 0.1);
+    border: 0.0625rem solid rgba(244, 67, 54, 0.3);
+}
+
+.shutdown-card:hover {
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.5);
+}
+
+/* 電源選項卡片文字樣式 */
+.power-option-title {
+    font-weight: bold;
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.power-option-subtitle {
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+/* 單元資訊文字樣式 */
+.unit-info-title {
+    font-weight: bold;
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.unit-info-subtitle {
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+.experiment-default-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0.5rem 0 0 0;
+    font-size: 0.98rem;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+    padding-right: 0.5rem;
+}
+
+.experiment-default-list li {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    min-width: 120px;
+}
+
+/* ================= 實驗面板分頁 ================= */
+.experiment-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0.75rem;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.experiment-tab {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: #333;
+    color: #ccc;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border-radius: 0.375rem 0.375rem 0 0;
+    border-bottom: 0.125rem solid transparent;
+}
+
+.experiment-tab:first-child {
+    border-radius: 0.375rem 0 0 0;
+}
+
+.experiment-tab:last-child {
+    border-radius: 0 0.375rem 0 0;
+}
+
+.experiment-tab.active {
+    background: #ff8c00;
+    color: #fff;
+    border-bottom-color: #ff8c00;
+}
+
+.experiment-tab:hover:not(.active) {
+    background: #444;
+    color: #fff;
+}
+
+.experiment-tab-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+    height: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.experiment-content-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    margin-left: 0;
+    margin-right: 0;
+    scrollbar-width: thin;
+    scrollbar-color: #ff8c00 #333;
+}
+
+.experiment-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #333;
+    color: #fff;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    margin-left: 8px;
+}
+
+.experiment-close-btn:hover {
+    background: #ff8c00;
+    color: #fff;
+    transition: background 0.2s ease;
+}
+
+.experiment-panel-actions {
+    flex-shrink: 0;
+    flex-grow: 0;
+    height: auto;
+    padding: 0.5rem 0 0 0;
+    border-top: 0.0625rem solid #444;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* ================= 實驗 ID 及控制 ================= */
+.experiment-id-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 0.5rem;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.experiment-id-input-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.experiment-id-input-group label {
+    color: #ccc;
+    white-space: nowrap;
+}
+
+.experiment-id-input {
+    width: 120px;
+    flex: none;
+    padding: 8px 12px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #fff;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.experiment-id-input:focus {
+    border-color: #ff8c00;
+}
+
+.experiment-id-input::placeholder {
+    color: #888;
+}
+
+.regenerate-id-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #3a3a3a;
+    color: #ff8c00;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.regenerate-id-btn:hover {
+    background: #4a4a4a;
+    border-color: #ff8c00;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.regenerate-id-btn:active {
+    background: #2a2a2a;
+}
+
+/* 受試者名稱欄位樣式 */
+.experiment-subject-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.experiment-subject-row label {
+    color: #ccc;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+.experiment-subject-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #fff;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.experiment-subject-input:focus {
+    border-color: #ff8c00;
+}
+
+.experiment-subject-input::placeholder {
+    color: #888;
+}
+
+/* 受試者名稱儲存按鈕 */
+.save-subject-name-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #3a3a3a;
+    color: #4caf50;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.save-subject-name-btn:hover {
+    background: #4a4a4a;
+    border-color: #4caf50;
+    transform: scale(1.05);
+}
+
+.save-subject-name-btn:active {
+    transform: scale(0.95);
+}
+
+.experiment-start-btn {
+    flex-shrink: 0;
+    width: auto;
+    min-width: 120px;
+    height: 3rem;
+    font-size: 1.1rem;
+    background: #ff8c00;
+    color: #fff;
+    border: none;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.12);
+    transition: background 0.2s;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.experiment-start-btn:hover {
+    background: #ff9800;
+}
+
+.experiment-pause-btn,
+.experiment-stop-btn {
+    width: 48%;
+    padding: 12px 0;
+    font-size: 1.05rem;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: background 0.2s;
+}
+
+.experiment-pause-btn {
+    background: #888;
+    margin-right: 4%;
+}
+
+.experiment-pause-btn:hover {
+    background: #aaa;
+}
+
+.experiment-stop-btn {
+    background: #d32f2f;
+}
+
+.experiment-stop-btn:hover {
+    background: #e53935;
+}
+
+.experiment-timer {
+    font-size: 0.9rem;
+    color: #ffcc00;
+    white-space: nowrap;
+    margin: 0;
+    line-height: 1;
+    display: none;
+}
+
+/* ================= 預設組合 ================= */
+.default-combo-btn {
+    background: #222;
+    color: #ffcc00;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 0;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.default-combo-btn:hover {
+    background: #444;
+    border-color: #667eea;
+}
+
+/* ================= 排序按鈕 ================= */
+.unit-sort-btn {
+    background: #555;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 4px 8px;
+    margin: 0 2px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    min-width: 28px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.unit-sort-btn:hover {
+    background: #ff8c00;
+    transition: background 0.2s ease;
+}
+
+.unit-sort-btn.disabled,
+.unit-sort-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: #777 !important;
+    color: #ccc !important;
+    pointer-events: none;
+}
+
+/* 拖曳排序控制 */
+.unit-drag-handle {
+    cursor: grab;
+    font-size: 1.2em;
+    color: #aaa;
+    margin-left: auto;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.2s;
+    background: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.unit-drag-handle:hover {
+    color: #ff8c00;
+}
+
+.unit-drag-handle:active {
+    cursor: grabbing;
+}
+
+.experiment-units-list li.dragging {
+    opacity: 0.8;
+    transform: rotate(3deg);
+}

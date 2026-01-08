@@ -1,0 +1,36 @@
+/* ========== 基礎樣式 ========== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.experiment-page {
+    background: #f0f2f5;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 28px;
+    border-bottom: 3px solid #667eea;
+    padding-bottom: 15px;
+}
+
+h2 {
+    color: #555;
+    margin-top: 25px;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+/* ========== 統一卡片樣式 ========== */
+.card-border {
+    border: 2px solid #ddd;
+    border-radius: 6px;
+}

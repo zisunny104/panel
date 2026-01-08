@@ -1,0 +1,16 @@
+/* ================= SVG 面板 ================= */
+.svg-panel {
+    width: 17.5cm;
+    display: block;
+    margin: 0 auto;
+    max-width: 95vw;
+    height: auto;
+    touch-action: none;
+    /* 確保面板圖片在按鈕下方 */
+    position: relative;
+    z-index: 1;
+    /* 性能優化：告訴瀏覽器這是一個獨立的圖形元素，可以優化渲染 */
+    contain: layout style paint;
+    /* 避免子元素影響父元素的性能 */
+    will-change: auto;
+}

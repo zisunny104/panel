@@ -1,0 +1,39 @@
+{
+    "id": "88H9HR",
+    "created": 1767865983,
+    "lastUpdate": 1767865984,
+    "lastActivity": 1767866323,
+    "state": null,
+    "clients": [
+        {
+            "id": "client_695f7e7f214ec4.89731678",
+            "role": "viewer",
+            "joinedAt": 1767865983,
+            "lastActivity": 1767866314,
+            "deviceToken": "86d2ee8fcf68ff873e8eb21bb6b5832f"
+        }
+    ],
+    "maxClients": 6,
+    "shareCodes": [
+        {
+            "code": "7222SOL8",
+            "createdAt": 1767865983,
+            "createdBy": null,
+            "expiresAt": 1767866283,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "9521VEG7",
+            "createdAt": 1767865984,
+            "createdBy": null,
+            "expiresAt": 1767866284,
+            "used": true,
+            "usedAt": 1767865990,
+            "usedBy": "client_695f7e7f214ec4.89731678"
+        }
+    ],
+    "currentShareCode": "9521VEG7",
+    "shareCodeCreatedAt": 1767865984
+}

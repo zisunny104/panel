@@ -1,0 +1,114 @@
+/* ================= 操作日誌面板 ================= */
+.logger-output {
+    position: fixed;
+    bottom: 4.5rem;
+    left: 5.5rem;
+    width: 300px;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    z-index: 10;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+    display: none;
+    flex-direction: column;
+    touch-action: auto;
+    user-select: none;
+    gap: 0;
+}
+
+.logger-panel-header {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    font-weight: bold;
+    gap: 8px;
+    position: relative;
+}
+
+.logger-panel-header strong {
+    flex: 1;
+    text-align: left;
+}
+
+.logger-panel-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #333;
+    color: #fff;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    margin-left: 6px;
+}
+
+.logger-panel-btn:hover {
+    background: #ff8c00;
+    color: #fff;
+}
+
+.logger-fab {
+    position: fixed;
+    left: 1.2rem;
+    bottom: 1.2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #ff8c00;
+    color: #fff;
+    border: none;
+    font-size: 1.5rem;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.logger-fab:hover {
+    background: #ffa733;
+}
+
+.logger-output button {
+    background-color: #555;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+    touch-action: manipulation;
+}
+
+.logger-output button:hover {
+    background-color: #777;
+}
+
+.logger-output button:active {
+    background-color: #333;
+}
+
+.logger-output .log-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 5px;
+    padding-right: 5px;
+    touch-action: pan-y;
+}
+
+.logger-output a {
+    color: #ffcc00;
+}

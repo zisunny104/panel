@@ -1,0 +1,123 @@
+{
+    "id": "DF2NKG",
+    "created": 1767705798,
+    "lastUpdate": 1767711765,
+    "lastActivity": 1767712642,
+    "state": null,
+    "clients": [
+        {
+            "id": "client_695d0cc62d2394.40560668",
+            "role": "operator",
+            "joinedAt": 1767705798,
+            "lastActivity": 1767712612,
+            "deviceToken": "51574a20c8f23546bdc551b5c6b71096"
+        },
+        {
+            "id": "client_695d119a712f94.59652359",
+            "role": "operator",
+            "joinedAt": 1767707034,
+            "lastActivity": 1767707034,
+            "deviceToken": "fccbc72ae17176664adfd35982f76f8f"
+        },
+        {
+            "id": "client_695d130c06a008.93554988",
+            "role": "operator",
+            "joinedAt": 1767707404,
+            "lastActivity": 1767707404,
+            "deviceToken": "d12a070fbfc09496f28a44f114487128"
+        },
+        {
+            "id": "client_695d1700d2e5b2.88879854",
+            "role": "operator",
+            "joinedAt": 1767708416,
+            "lastActivity": 1767708416,
+            "deviceToken": "529141261dd87232ef5875fc654e9b37"
+        }
+    ],
+    "maxClients": 6,
+    "shareCodes": [
+        {
+            "code": "6837HRI8",
+            "createdAt": 1767705798,
+            "createdBy": null,
+            "expiresAt": 1767706098,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "1540UDZ6",
+            "createdAt": 1767706184,
+            "createdBy": "client_695d0cc62d2394.40560668",
+            "expiresAt": 1767706484,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "6308OA86",
+            "createdAt": 1767707024,
+            "createdBy": "client_695d0cc62d2394.40560668",
+            "expiresAt": 1767707324,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "9823SAR6",
+            "createdAt": 1767707388,
+            "createdBy": "client_695d0cc62d2394.40560668",
+            "expiresAt": 1767707688,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "9904XNM9",
+            "createdAt": 1767707392,
+            "createdBy": null,
+            "expiresAt": 1767707692,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "2044GAQ4",
+            "createdAt": 1767707546,
+            "createdBy": null,
+            "expiresAt": 1767707846,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "8044HVJ8",
+            "createdAt": 1767707810,
+            "createdBy": null,
+            "expiresAt": 1767708110,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "8202IYQ8",
+            "createdAt": 1767708316,
+            "createdBy": "client_695d0cc62d2394.40560668",
+            "expiresAt": 1767708616,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "7224LNO7",
+            "createdAt": 1767711765,
+            "createdBy": null,
+            "expiresAt": 1767712065,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        }
+    ],
+    "currentShareCode": "7224LNO7",
+    "shareCodeCreatedAt": 1767711765
+}

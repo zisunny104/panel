@@ -1,0 +1,15 @@
+{
+    "code": "2738IGR6",
+    "sessionId": "0I5VB7",
+    "createdAt": 1767689537,
+    "expiresAt": 1767689837,
+    "used": true,
+    "usedAt": 1767689537,
+    "usedBy": "client_695ccd41cd8d24.56652154",
+    "createdBy": null,
+    "checksumValid": true,
+    "singleUse": true,
+    "expired": true,
+    "expiredAt": 1767689666,
+    "expiredReason": "regenerated"
+}

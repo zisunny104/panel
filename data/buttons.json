@@ -1,0 +1,131 @@
+{
+    "buttons": [
+        {
+            "button_id": "B1",
+            "button_functions": [
+                "shift"
+            ],
+            "button_file_name": "button_shift"
+        },
+        {
+            "button_id": "B2",
+            "button_functions": [
+                "f1",
+                "f4"
+            ],
+            "button_file_name": "button_f4_f1"
+        },
+        {
+            "button_id": "B3",
+            "button_functions": [
+                "f2",
+                "f5"
+            ],
+            "button_file_name": "button_f5_f2"
+        },
+        {
+            "button_id": "B4",
+            "button_functions": [
+                "f3",
+                "f6"
+            ],
+            "button_file_name": "button_f6_f3"
+        },
+        {
+            "button_id": "B5",
+            "button_functions": [
+                "7",
+                "a"
+            ],
+            "button_file_name": "button_a_7"
+        },
+        {
+            "button_id": "B6",
+            "button_functions": [
+                "8",
+                "b"
+            ],
+            "button_file_name": "button_b_8"
+        },
+        {
+            "button_id": "B7",
+            "button_functions": [
+                "9",
+                "c"
+            ],
+            "button_file_name": "button_c_9"
+        },
+        {
+            "button_id": "B8",
+            "button_functions": [
+                "4",
+                "d"
+            ],
+            "button_file_name": "button_d_4"
+        },
+        {
+            "button_id": "B9",
+            "button_functions": [
+                "5",
+                "e"
+            ],
+            "button_file_name": "button_e_5"
+        },
+        {
+            "button_id": "B10",
+            "button_functions": [
+                "6",
+                "f"
+            ],
+            "button_file_name": "button_f_6"
+        },
+        {
+            "button_id": "B11",
+            "button_functions": [
+                "1",
+                "dot"
+            ],
+            "button_file_name": "button_dot_1"
+        },
+        {
+            "button_id": "B12",
+            "button_functions": [
+                "2",
+                "f7"
+            ],
+            "button_file_name": "button_f7_2"
+        },
+        {
+            "button_id": "B13",
+            "button_functions": [
+                "3",
+                "dash"
+            ],
+            "button_file_name": "button_dash_3"
+        },
+        {
+            "button_id": "B14",
+            "button_functions": [
+                "esc",
+                "f8"
+            ],
+            "button_file_name": "button_f8_esc"
+        },
+        {
+            "button_id": "B15",
+            "button_functions": [
+                "0",
+                "bs"
+            ],
+            "button_file_name": "button_bs_0"
+        },
+        {
+            "button_id": "B16",
+            "button_functions": [
+                "enter",
+                "f9"
+            ],
+            "button_file_name": "button_f9_enter"
+        }
+    ]
+}

@@ -1,0 +1,15 @@
+{
+    "code": "7222SOL8",
+    "sessionId": "88H9HR",
+    "createdAt": 1767865983,
+    "expiresAt": 1767866283,
+    "used": true,
+    "usedAt": 1767865983,
+    "usedBy": "client_695f7e7f214ec4.89731678",
+    "createdBy": null,
+    "checksumValid": true,
+    "singleUse": true,
+    "expired": true,
+    "expiredAt": 1767865984,
+    "expiredReason": "regenerated"
+}

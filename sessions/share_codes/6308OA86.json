@@ -1,0 +1,15 @@
+{
+    "code": "6308OA86",
+    "sessionId": "DF2NKG",
+    "createdAt": 1767707024,
+    "expiresAt": 1767707324,
+    "used": true,
+    "usedAt": 1767707034,
+    "usedBy": "client_695d119a712f94.59652359",
+    "createdBy": "client_695d0cc62d2394.40560668",
+    "checksumValid": true,
+    "singleUse": true,
+    "expired": true,
+    "expiredAt": 1767707388,
+    "expiredReason": "regenerated"
+}

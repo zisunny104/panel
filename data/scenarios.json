@@ -1,0 +1,843 @@
+{
+    "unit_combinations": [
+        {
+            "combination_id": "random_core",
+            "combination_name": "指定隨機",
+            "description": "[實驗用]部分隨機排序與部分單元固定",
+            "units": {
+                "randomizable": [
+                    "SA03",
+                    "SA04",
+                    "SA02"
+                ],
+                "fixed": [
+                    {
+                        "unit_id": "SA01",
+                        "position": "last"
+                    }
+                ]
+            },
+            "is_randomizable": true
+        },
+        {
+            "combination_id": "standard",
+            "combination_name": "標準順序",
+            "description": "依照單元順序執行所有教學內容",
+            "units": [
+                "SA04",
+                "SA03",
+                "SA02",
+                "SA01"
+            ],
+            "is_randomizable": false
+        },
+        {
+            "combination_id": "quick_test",
+            "combination_name": "快速測試單元",
+            "description": "僅包含最少步驟的單元進行快速測試",
+            "units": [
+                "SA03"
+            ],
+            "is_randomizable": false
+        }
+    ],
+    "gesture_list": [
+        {
+            "gesture_id": "home",
+            "gesture_name": "首頁",
+            "gesture_description": "Home/回到系統最初層級",
+            "gesture_key": "Keypad0",
+            "media_path": null
+        },
+        {
+            "gesture_id": "open",
+            "gesture_name": "開啟",
+            "gesture_description": "開啟機台教學維護系統",
+            "gesture_key": "Keypad1 + Keypad2",
+            "media_path": null
+        },
+        {
+            "gesture_id": "close",
+            "gesture_name": "關閉",
+            "gesture_description": "關閉機台教學維護系統",
+            "gesture_key": "Keypad1 + Keypad3",
+            "media_path": null
+        },
+        {
+            "gesture_id": "prev",
+            "gesture_name": "上一步",
+            "gesture_description": "回到前一步驟/層級",
+            "gesture_key": "Keypad4",
+            "media_path": null
+        },
+        {
+            "gesture_id": "reload",
+            "gesture_name": "重新載入",
+            "gesture_description": "Reload/重新整理/重新開始目前步驟",
+            "gesture_key": "Keypad5",
+            "media_path": null
+        },
+        {
+            "gesture_id": "next",
+            "gesture_name": "下一步",
+            "gesture_description": "進入下一步驟/層級",
+            "gesture_key": "Keypad6",
+            "media_path": null
+        },
+        {
+            "gesture_id": "zoom_out",
+            "gesture_name": "縮小",
+            "gesture_description": "縮小說明文字",
+            "gesture_key": "Keypad7",
+            "media_path": null
+        },
+        {
+            "gesture_id": "capture",
+            "gesture_name": "拍攝",
+            "gesture_description": "進行畫面拍攝",
+            "gesture_key": "Keypad8",
+            "media_path": null
+        },
+        {
+            "gesture_id": "zoom_in",
+            "gesture_name": "放大",
+            "gesture_description": "放大說明文字",
+            "gesture_key": "Keypad9",
+            "media_path": null
+        },
+        {
+            "gesture_id": "confirm",
+            "gesture_name": "確認",
+            "gesture_description": "Enter/確認選項",
+            "gesture_key": "Enter",
+            "media_path": null
+        }
+    ],
+    "sections": [
+        {
+            "section_id": "section_a",
+            "section_name": "機台操作教學-0A",
+            "section_description": "四項主操作組合於20分鐘完成，若20分鐘內完成則適當加入額外作業直至20分鐘，若20分鐘內未完成，則完成四項主操作組合。",
+            "units": [
+                {
+                    "unit_id": "SA01",
+                    "unit_name": "更改語言為英語",
+                    "unit_description": "更改棒材機系統語言為英語",
+                    "steps": [
+                        {
+                            "step_id": "SA01_1",
+                            "step_name": "首頁按 [f3] 並使用按鍵輸入密碼：[orange]【２５８】[/orange]，接著按下 [enter] 進入「系統功能設定」",
+                            "step_buttons": [
+                                "f3",
+                                "num",
+                                "enter"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A004_1",
+                                    "action_name": "首頁按 [f3] 準備輸入密碼，進入「系統功能設定」",
+                                    "action_buttons": "f3",
+                                    "media_file": null,
+                                    "interactions": {
+                                        "f3": {
+                                            "next_action_id": "A004_2"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A004_2",
+                                    "action_name": "進入【密碼輸入區】",
+                                    "action_buttons": "2",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0068.webp",
+                                    "interactions": {
+                                        "2": {
+                                            "next_action_id": "A004_3"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A004_3",
+                                    "action_name": "密碼輸入區，輸入數值【2】",
+                                    "action_buttons": "5",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0118.webp",
+                                    "interactions": {
+                                        "5": {
+                                            "next_action_id": "A004_4"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A004_4",
+                                    "action_name": "密碼輸入區，輸入數值【5】",
+                                    "action_buttons": "8",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0133.webp",
+                                    "interactions": {
+                                        "8": {
+                                            "next_action_id": "A004_5"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A004_5",
+                                    "action_name": "密碼輸入區，輸入數值【8】",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0174.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A004_6"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A004_6",
+                                    "action_name": "進入【系統功能設定】",
+                                    "action_buttons": "f6",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0225.webp",
+                                    "interactions": {
+                                        "f6": {
+                                            "next_action_id": "A004_7"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA01_2",
+                            "step_name": "按 [shift] + [f6] 進入「語言選擇」",
+                            "step_buttons": [
+                                "f6"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A004_7",
+                                    "action_name": "進入【語言切換設定】",
+                                    "action_buttons": "1",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0514.webp",
+                                    "interactions": {
+                                        "1": {
+                                            "next_action_id": "A004_8"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA01_3",
+                            "step_name": "請透過按鍵輸入數值[orange]【１】[/orange]，輸入完成後按下 [enter] 後再次確認完成更改為英文",
+                            "step_buttons": [
+                                "num",
+                                "enter",
+                                "enter"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A004_8",
+                                    "action_name": "輸入數值【1】",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0655.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A004_9"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A004_9",
+                                    "action_name": "再次確認數值修改",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0711.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A004_10"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A004_10",
+                                    "action_name": "進入英文版的【系統功能設定】",
+                                    "action_buttons": "f3",
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語0797.webp",
+                                    "interactions": {
+                                        "f3": {
+                                            "next_action_id": "A004_11"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA01_4",
+                            "step_name": "按兩次 [f3] 回首頁",
+                            "step_buttons": [
+                                "f3",
+                                "f3"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A004_11",
+                                    "action_name": "回到英文版的首頁",
+                                    "action_buttons": null,
+                                    "media_file": "assets/units/A004-更改語言為英語/更改語言為英語1003.webp",
+                                    "interactions": {}
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "unit_id": "SA02",
+                    "unit_name": "送出過短設定(25)",
+                    "unit_description": "進參數設定頁面後 [f1] 上一頁、[f2] 下一頁",
+                    "steps": [
+                        {
+                            "step_id": "SA02_1",
+                            "step_name": "首頁按 [f1] 進入「車削參數設定」",
+                            "step_buttons": [
+                                "f1"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A003_1",
+                                    "action_name": "首頁按 [f1] 進入「車削參數設定」",
+                                    "action_buttons": "f1",
+                                    "media_file": null,
+                                    "interactions": {
+                                        "f1": {
+                                            "next_action_id": "A003_2"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA02_2",
+                            "step_name": "使用 [f2] 下一項 或 [f1] 上一項，尋找「送出過短設定」",
+                            "step_buttons": [
+                                "f2",
+                                "f1"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A003_2",
+                                    "action_name": "進入【車削參數設定】",
+                                    "action_buttons": "f2",
+                                    "media_file": "assets/units/A003-送出過短設定(25)/送出過短設定0224.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A003_3"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A003_3",
+                                    "action_name": "進入【成品長度設定】",
+                                    "action_buttons": "f2,f1",
+                                    "media_file": "assets/units/A003-送出過短設定(25)/送出過短設定0276.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A003_4"
+                                        },
+                                        "f1": {
+                                            "next_action_id": "A003_2"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A003_4",
+                                    "action_name": "進入【送出過長設定】",
+                                    "action_buttons": "f2,f1",
+                                    "media_file": "assets/units/A003-送出過短設定(25)/送出過短設定0323.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A003_5"
+                                        },
+                                        "f1": {
+                                            "next_action_id": "A003_3"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A003_5",
+                                    "action_name": "進入【送出過短設定】",
+                                    "action_buttons": "2,f1",
+                                    "media_file": "assets/units/A003-送出過短設定(25)/送出過短設定0378.webp",
+                                    "interactions": {
+                                        "2": {
+                                            "next_action_id": "A003_6"
+                                        },
+                                        "f1": {
+                                            "next_action_id": "A003_4"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA02_3",
+                            "step_name": "請透過按鍵輸入數值[orange]【２５】[/orange]，輸入完成後按下 [enter] 後再次確認完成更改",
+                            "step_buttons": [
+                                "num",
+                                "enter",
+                                "enter"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A003_6",
+                                    "action_name": "輸入數值【2】",
+                                    "action_buttons": "5",
+                                    "media_file": "assets/units/A003-送出過短設定(25)/送出過短設定0752.webp",
+                                    "interactions": {
+                                        "5": {
+                                            "next_action_id": "A003_7"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A003_7",
+                                    "action_name": "輸入數值【5】",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A003-送出過短設定(25)/送出過短設定0846.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A003_8"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A003_8",
+                                    "action_name": "再次確認數值修改",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A003-送出過短設定(25)/送出過短設定0905.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A003_9"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A003_9",
+                                    "action_name": "確認修改並回到首頁",
+                                    "action_buttons": "f3",
+                                    "media_file": "assets/units/A003-送出過短設定(25)/送出過短設定1037.webp",
+                                    "interactions": {
+                                        "f3": {
+                                            "next_action_id": "A003_10"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA02_4",
+                            "step_name": "按 [f3] 回到首頁",
+                            "step_buttons": [
+                                "f3"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A003_10",
+                                    "action_name": "回到首頁",
+                                    "action_buttons": null,
+                                    "media_file": null,
+                                    "interactions": {}
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "unit_id": "SA03",
+                    "unit_name": "夾開力矩設定(30)",
+                    "unit_description": "進參數設定頁面後 [f1] 上一頁、[f2] 下一頁",
+                    "steps": [
+                        {
+                            "step_id": "SA03_1",
+                            "step_name": "首頁按 [f1] 進入「車削參數設定」",
+                            "step_buttons": [
+                                "f1"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A001_1",
+                                    "action_name": "首頁按 [f1] 進入「車削參數設定」",
+                                    "action_buttons": "f1",
+                                    "media_file": null,
+                                    "interactions": {
+                                        "f1": {
+                                            "next_action_id": "A001_2"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA03_2",
+                            "step_name": "使用 [f2] 下一項 或 [f1] 上一項，尋找「夾開力矩設定」",
+                            "step_buttons": [
+                                "f2",
+                                "f1"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A001_2",
+                                    "action_name": "進入【車削參數設定】",
+                                    "action_buttons": "f2",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0167.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A001_3"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A001_3",
+                                    "action_name": "進入【成品長度設定】",
+                                    "action_buttons": "f2,f1",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0255.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A001_4"
+                                        },
+                                        "f1": {
+                                            "next_action_id": "A001_2"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A001_4",
+                                    "action_name": "進入【送出過長設定】",
+                                    "action_buttons": "f2,f1",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0313.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A001_5"
+                                        },
+                                        "f1": {
+                                            "next_action_id": "A001_3"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A001_5",
+                                    "action_name": "進入【送出過短設定】",
+                                    "action_buttons": "f2,f1",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0341.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A001_6"
+                                        },
+                                        "f1": {
+                                            "next_action_id": "A001_4"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A001_6",
+                                    "action_name": "進入【夾開速度設定】",
+                                    "action_buttons": "f2,f1",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0369.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A001_7"
+                                        },
+                                        "f1": {
+                                            "next_action_id": "A001_5"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A001_7",
+                                    "action_name": "進入【夾開力矩設定】",
+                                    "action_buttons": "3",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0400.webp",
+                                    "interactions": {
+                                        "3": {
+                                            "next_action_id": "A001_8"
+                                        },
+                                        "f1": {
+                                            "next_action_id": "A001_6"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA03_3",
+                            "step_name": "請透過按鍵輸入數值[orange]【３０】[/orange]，輸入完成後按下 [enter] 後再次確認完成更改",
+                            "step_buttons": [
+                                "num",
+                                "enter",
+                                "enter"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A001_8",
+                                    "action_name": "輸入數值【3】",
+                                    "action_buttons": "0",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0841.webp",
+                                    "interactions": {
+                                        "0": {
+                                            "next_action_id": "A001_9"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A001_9",
+                                    "action_name": "輸入數值【0】",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0891.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A001_10"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A001_10",
+                                    "action_name": "再次確認數值修改",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0931.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A001_11"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A001_11",
+                                    "action_name": "確認修改並回到首頁",
+                                    "action_buttons": "f3",
+                                    "media_file": "assets/units/A001-夾開力矩設定(30)/夾開力矩設定0971.webp",
+                                    "interactions": {
+                                        "f3": {
+                                            "next_action_id": "A001_12"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA03_4",
+                            "step_name": "按 [f3] 回到首頁",
+                            "step_buttons": [
+                                "f3"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A001_12",
+                                    "action_name": "回到首頁",
+                                    "action_buttons": null,
+                                    "media_file": null,
+                                    "interactions": {}
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "unit_id": "SA04",
+                    "unit_name": "推桿後退定點設定(400)",
+                    "unit_description": "進參數設定頁面後 [f1] 上一頁、[f2] 下一頁",
+                    "steps": [
+                        {
+                            "step_id": "SA04_1",
+                            "step_name": "首頁按 [f2] 並使用按鍵輸入密碼：[orange]【２５８】[/orange]，接著按下 [enter] 進入「機械參數設定」",
+                            "step_buttons": [
+                                "f2",
+                                "num",
+                                "enter"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A002_1",
+                                    "action_name": "首頁按 [f2] 準備輸入密碼，進入「機械參數設定」",
+                                    "action_buttons": "f2",
+                                    "media_file": null,
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A002_2"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_2",
+                                    "action_name": "進入【密碼輸入區】",
+                                    "action_buttons": "2",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定0080.webp",
+                                    "interactions": {
+                                        "2": {
+                                            "next_action_id": "A002_3"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_3",
+                                    "action_name": "密碼輸入區，輸入數值【2】",
+                                    "action_buttons": "5",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定0136.webp",
+                                    "interactions": {
+                                        "5": {
+                                            "next_action_id": "A002_4"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_4",
+                                    "action_name": "密碼輸入區，輸入數值【5】",
+                                    "action_buttons": "8",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定0162.webp",
+                                    "interactions": {
+                                        "8": {
+                                            "next_action_id": "A002_5"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_5",
+                                    "action_name": "密碼輸入區，輸入數值【8】",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定0207.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A002_6"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_6",
+                                    "action_name": "進入【推桿後退行程設定】",
+                                    "action_buttons": "f2",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定0243.webp",
+                                    "interactions": {
+                                        "f2": {
+                                            "next_action_id": "A002_7"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA04_2",
+                            "step_name": "使用 [f2] 下一項 或 [f1] 上一項，尋找「推桿後退定點設定」",
+                            "step_buttons": [
+                                "f2",
+                                "f1"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A002_7",
+                                    "action_name": "進入【推桿後退定點設定】",
+                                    "action_buttons": "4",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定1960.webp",
+                                    "interactions": {
+                                        "4": {
+                                            "next_action_id": "A002_8"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA04_3",
+                            "step_name": "請透過按鍵輸入數值[orange]【４００】[/orange]，輸入完成後按下 [enter] 後再次確認完成更改",
+                            "step_buttons": [
+                                "num",
+                                "enter",
+                                "enter"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A002_8",
+                                    "action_name": "輸入數值【4】",
+                                    "action_buttons": "0",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定2066.webp",
+                                    "interactions": {
+                                        "0": {
+                                            "next_action_id": "A002_9"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_9",
+                                    "action_name": "輸入數值【0】",
+                                    "action_buttons": "0",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定2087.webp",
+                                    "interactions": {
+                                        "0": {
+                                            "next_action_id": "A002_10"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_10",
+                                    "action_name": "輸入數值【0】",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定2116.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A002_11"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_11",
+                                    "action_name": "再次確認數值修改",
+                                    "action_buttons": "enter",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定2141.webp",
+                                    "interactions": {
+                                        "enter": {
+                                            "next_action_id": "A002_12"
+                                        }
+                                    }
+                                },
+                                {
+                                    "action_id": "A002_12",
+                                    "action_name": "確認修改並回到首頁",
+                                    "action_buttons": "f3",
+                                    "media_file": "assets/units/A002-推桿後退定點設定(400)/推桿後退定點設定2171.webp",
+                                    "interactions": {
+                                        "f3": {
+                                            "next_action_id": "A002_13"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "step_id": "SA04_4",
+                            "step_name": "按 [f3] 回到首頁",
+                            "step_buttons": [
+                                "f3"
+                            ],
+                            "gesture": null,
+                            "actions": [
+                                {
+                                    "action_id": "A002_13",
+                                    "action_name": "回到首頁",
+                                    "action_buttons": null,
+                                    "media_file": null,
+                                    "interactions": {}
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

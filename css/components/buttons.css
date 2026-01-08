@@ -1,0 +1,111 @@
+/* ================= 按鈕群組 ================= */
+.button-group-container {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    transform-origin: top left;
+    transform: translate(1px, 0px) scale(1.33);
+    touch-action: none;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.button-overlay {
+    position: absolute;
+    width: 41.1px;
+    height: 41.1px;
+    background-color: rgba(255, 140, 0, 0.4);
+    border: 1px solid rgba(255, 140, 0, 0.8);
+    border-radius: 4px;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 3;
+    transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    touch-action: manipulation;
+}
+
+.button-overlay:hover {
+    background-color: rgba(255, 140, 0, 0.7);
+}
+
+.button-overlay:active,
+.button-overlay.touch-active {
+    background-color: rgba(255, 100, 0, 0.8);
+    transform: scale(0.98);
+}
+
+.button-overlay.touch-active {
+    box-shadow: 0 0 0 4px #00eaff88;
+}
+
+.button-overlay.no-color {
+    background-color: transparent;
+    border-color: rgba(255, 140, 0, 0.2);
+}
+
+.button-overlay.no-color:hover {
+    background-color: rgba(255, 140, 0, 0.1);
+}
+
+.button-overlay.no-color:active,
+.button-overlay.no-color.touch-active {
+    background-color: rgba(255, 100, 0, 0.2);
+    transform: scale(0.98);
+}
+
+.button-overlay.shift-active {
+    border: 3px solid #00f;
+    box-shadow: 0 0 8px rgba(0, 0, 255, 0.7);
+    background-color: rgba(0, 0, 255, 0.3) !important;
+    animation: pulse-blue 1.5s infinite;
+}
+
+/* 功能性按鈕動畫 */
+.button-overlay.experiment-functional {
+    background-color: rgba(0, 255, 127, 0.6) !important;
+    border-color: rgba(0, 255, 127, 0.9) !important;
+    box-shadow: 0 0 12px rgba(0, 255, 127, 0.5);
+    animation: pulse-green 2s infinite;
+}
+
+.button-overlay.experiment-functional:hover {
+    background-color: rgba(0, 255, 127, 0.8) !important;
+    box-shadow: 0 0 16px rgba(0, 255, 127, 0.7);
+}
+
+.button-overlay.experiment-functional.no-color {
+    background-color: rgba(0, 255, 127, 0.3) !important;
+    border-color: rgba(0, 255, 127, 0.7) !important;
+}
+
+.button-overlay.experiment-functional.no-color:hover {
+    background-color: rgba(0, 255, 127, 0.5) !important;
+}
+
+/* 確保實驗功能按鈕的高亮效果不會被 disabled 樣式覆蓋 */
+.button-overlay.experiment-functional.disabled {
+    filter: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+.button-overlay.disabled {
+    filter: grayscale(0.7) brightness(1.2);
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.button-label-text {
+    color: white;
+    font-weight: bold;
+    font-size: 0.8rem;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.button-label-text.hidden {
+    display: none;
+}

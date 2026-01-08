@@ -1,0 +1,435 @@
+/* ============================================
+   加入同步工作階段確認窗口 - 使用通用模態視窗框架
+   ============================================ */
+
+/* 對話框整體容器 - 使用通用模態視窗框架 */
+.sync-confirm-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1500;
+  /* 層級（低高）: 經確認對話框(1500) > QR描描器(1400) > 同步面板描(1300) > 蠝臓(1250) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  animation: fadeIn 0.3s ease;
+  isolation: isolate;
+}
+
+/* 內容區域 - 使用通用模態視窗容器樣式 */
+.sync-confirm-content {
+  position: relative;
+  background: white;
+  border-radius: 0.75rem;
+  /* 統一的模態視窗圓角 */
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  /* 與同步面板一致 */
+  width: 90%;
+  max-width: 500px;
+  /* 與同步面板一致 */
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease;
+  /* 與同步面板一致 */
+  margin: 0;
+  box-sizing: border-box;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 標題欄 - 使用統一面板標題樣式 */
+.sync-confirm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 15px 20px;
+  border-bottom: 2px solid #e9ecef;
+  flex-shrink: 0;
+}
+
+.sync-confirm-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 20px;
+  font-weight: 600;
+  flex: 1;
+}
+
+/* 說明文字 */
+.sync-confirm-subtitle {
+  margin: 0;
+  padding: 20px 20px 16px 20px;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* 資訊項目容器 */
+.sync-confirm-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 20px 20px 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 單一資訊項目 */
+.sync-confirm-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  border: 2px solid #ddd;
+  margin-bottom: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sync-confirm-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 資訊標籤 */
+.sync-confirm-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  text-align: left;
+  flex-shrink: 0;
+  /* 防止標籤被壓縮 */
+}
+
+/* 標籤行容器 - 標籤和狀態在同一行 */
+.sync-confirm-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+/* 代碼顯示 */
+.sync-confirm-code {
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #667eea;
+  letter-spacing: 2px;
+  text-align: left;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+  border: 2px solid #e0e0e0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 代碼輸入框容器 */
+.sync-confirm-code-container {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+}
+
+/* 代碼輸入框 */
+.sync-confirm-code-input {
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #667eea;
+  letter-spacing: 2px;
+  text-align: left;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+  border: 2px solid #e0e0e0;
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.sync-confirm-code-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+/* 還原按鈕 */
+.sync-confirm-code-reset {
+  padding: 0;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  width: 38px;
+  height: 38px;
+}
+
+.sync-confirm-code-reset:hover {
+  border-color: #999;
+  background: #f5f5f5;
+  color: #333;
+}
+
+.sync-confirm-code-reset:active {
+  background: #e8e8e8;
+}
+
+/* 檢查碼驗證狀態 */
+.sync-confirm-checksum-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: #e0e7ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  /* 防止壓縮 */
+}
+
+.sync-confirm-checksum-status.valid {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.sync-confirm-checksum-status.invalid {
+  background: #fecaca;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.sync-confirm-checksum-icon {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  animation: spin 1s linear infinite;
+}
+
+.sync-confirm-checksum-status.valid .sync-confirm-checksum-icon,
+.sync-confirm-checksum-status.invalid .sync-confirm-checksum-icon {
+  animation: none;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.sync-confirm-checksum-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 模式選擇器 */
+.sync-confirm-mode-selector {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+/* 模式按鈕 */
+.sync-confirm-mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.sync-confirm-mode-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.sync-confirm-mode-btn.sync-confirm-mode-active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+/* 通用按鈕樣式 */
+.sync-confirm-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  text-transform: none;
+}
+
+/* 取消按鈕 */
+.sync-confirm-btn-cancel {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.sync-confirm-btn-cancel:hover {
+  background: #dee2e6;
+  color: #212529;
+}
+
+.sync-confirm-btn-cancel:active {
+  background: #d3d7df;
+}
+
+/* 確認按鈕 */
+.sync-confirm-btn-confirm {
+  background: #667eea;
+  color: white;
+}
+
+.sync-confirm-btn-confirm:hover {
+  background: #5568d3;
+  color: white;
+}
+
+.sync-confirm-btn-confirm:active {
+  background: #4555bd;
+}
+
+/* 小螢幕適配 */
+@media (max-width: 500px) {
+  .sync-confirm-content {
+    width: 95%;
+    max-width: calc(100vw - 30px);
+  }
+
+  .sync-confirm-header {
+    padding: 14px;
+  }
+
+  .sync-confirm-header h2 {
+    font-size: 16px;
+  }
+
+  .sync-confirm-subtitle {
+    font-size: 13px;
+    padding: 14px 14px 10px 14px;
+  }
+
+  .sync-confirm-items {
+    padding: 0 14px 14px 14px;
+  }
+
+  .sync-confirm-item {
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+
+  .sync-confirm-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .sync-confirm-label {
+    font-size: 11px;
+  }
+
+  .sync-confirm-code-input {
+    font-size: 14px;
+    padding: 6px;
+    height: 34px;
+    letter-spacing: 1px;
+  }
+
+  .sync-confirm-code-reset {
+    width: 34px;
+    height: 34px;
+  }
+
+  .sync-confirm-code-reset svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .sync-confirm-mode-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .sync-confirm-btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .sync-confirm-checksum-status {
+    font-size: 10px;
+    padding: 3px 6px;
+    margin-left: 8px;
+  }
+}
+
+/* ============================================
+   同步面板通用樣式 - 供 indicator.css 共用
+   ============================================ */
+
+/* 同步面板標題容器 - 統一標題樣式 */
+.sync-panel-title-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+  padding: 20px 20px 15px 20px;
+  border-bottom: 2px solid #e9ecef;
+  flex-shrink: 0;
+}
+
+/* 同步面板標題 */
+.sync-panel-title {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 20px;
+  font-weight: 600;
+  flex: 1;
+}

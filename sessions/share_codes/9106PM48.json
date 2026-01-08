@@ -1,0 +1,15 @@
+{
+    "code": "9106PM48",
+    "sessionId": "V0JHF3",
+    "createdAt": 1767849762,
+    "expiresAt": 1767850062,
+    "used": true,
+    "usedAt": 1767849762,
+    "usedBy": "client_695f3f227994a6.82842088",
+    "createdBy": null,
+    "checksumValid": true,
+    "singleUse": true,
+    "expired": true,
+    "expiredAt": 1767849765,
+    "expiredReason": "regenerated"
+}

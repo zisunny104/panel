@@ -1,0 +1,94 @@
+/* ================= 通用按鈕樣式 ================= */
+.btn-base {
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-round {
+    border-radius: 50%;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* 圖標按鈕 - 正常尺寸 */
+.btn.btn-icon-only {
+    min-width: 40px !important;
+    height: 40px !important;
+    padding: 8px 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    border: none !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: all 0.2s !important;
+    white-space: nowrap !important;
+}
+
+/* SVG 圖標樣式 */
+.icon-view svg,
+.icon-download svg,
+.icon-delete svg {
+    width: 0.6rem;
+    height: 0.6rem;
+}
+
+/* 檢視圖標 - 輪廓樣式 */
+.icon-view svg {
+    stroke: currentColor;
+    fill: none;
+}
+
+/* 下載圖標 - 輪廓樣式 */
+.icon-download svg {
+    stroke: currentColor;
+    fill: none;
+}
+
+/* 刪除圖標 - 實心樣式 */
+.icon-delete svg {
+    fill: currentColor;
+    stroke: currentColor;
+}
+
+.btn-medium {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.btn-large {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.reference-card {
+    width: 8.56cm;
+    height: 5.398cm;
+    background: #999;
+    text-align: center;
+    color: transparent;
+    margin-top: 1rem;
+    border-radius: 0.318cm;
+}
+
+/* ================= 控制群組 ================= */
+.control-group {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.control-group span {
+    margin-right: 5px;
+}

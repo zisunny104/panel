@@ -1,0 +1,193 @@
+/* ================= 單元維護介面 ================= */
+.maintenance-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.625rem;
+}
+
+.maintenance-btn {
+    padding: 0.375rem 0.75rem;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.maintenance-btn-add {
+    background: #4CAF50;
+    color: white;
+}
+
+.maintenance-btn-add:hover {
+    background: #45a049;
+}
+
+.maintenance-btn-refresh {
+    background: #2196F3;
+    color: white;
+}
+
+.maintenance-btn-refresh:hover {
+    background: #1976D2;
+}
+
+.maintenance-btn-import {
+    background: #FF9800;
+    color: white;
+}
+
+.maintenance-btn-import:hover {
+    background: #F57C00;
+}
+
+.maintenance-btn-export {
+    background: #4CAF50;
+    color: white;
+}
+
+.maintenance-btn-export:hover {
+    background: #388E3C;
+}
+
+.maintenance-units-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-height: 18.75rem;
+}
+
+.maintenance-units-header {
+    position: sticky;
+    top: 0;
+    background: #1a1a1a;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.375rem 0;
+    font-size: 0.9rem;
+    color: #ccc;
+    border-bottom: 0.0625rem solid #444;
+    margin-bottom: 0.5rem;
+}
+
+.maintenance-status {
+    font-size: 0.8rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.75rem;
+    background: #4CAF50;
+    color: white;
+}
+
+.maintenance-units-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: #555 #2a2a2a;
+}
+
+.maintenance-unit-item {
+    background: #2a2a2a;
+    border-radius: 0.375rem;
+    padding: 0.625rem;
+    border: 0.0625rem solid #444;
+    transition: all 0.2s;
+}
+
+.maintenance-unit-item:hover {
+    background: #333;
+    border-color: #555;
+}
+
+.maintenance-unit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.375rem;
+}
+
+.maintenance-unit-title {
+    font-weight: bold;
+    color: #fff;
+    font-size: 0.95rem;
+}
+
+.maintenance-unit-id {
+    font-size: 0.8rem;
+    color: #ff8c00;
+    background: rgba(255, 140, 0, 0.1);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+}
+
+/* 實驗ID徽章樣式（仿照單元ID） */
+.experiment-id-badge {
+    font-size: 0.9rem;
+    color: #ff8c00;
+    background: rgba(255, 140, 0, 0.15);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    border: 2px solid rgba(255, 140, 0, 0.3);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    min-width: 80px;
+    text-align: center;
+    display: inline-block;
+}
+
+.maintenance-unit-info {
+    font-size: 0.8rem;
+    color: #ccc;
+    margin-bottom: 0.5rem;
+}
+
+.maintenance-unit-actions {
+    display: flex;
+    gap: 0.375rem;
+}
+
+.maintenance-action-btn {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.maintenance-edit-btn {
+    background: #ff8c00;
+    color: white;
+}
+
+.maintenance-edit-btn:hover {
+    background: #ff9800;
+}
+
+.maintenance-delete-btn {
+    background: #f44336;
+    color: white;
+}
+
+.maintenance-delete-btn:hover {
+    background: #d32f2f;
+}
+
+.maintenance-media-btn {
+    background: #9C27B0;
+    color: white;
+}
+
+.maintenance-media-btn:hover {
+    background: #7B1FA2;
+}

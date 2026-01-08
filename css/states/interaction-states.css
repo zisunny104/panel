@@ -1,0 +1,113 @@
+/* ================= 隱藏影片控制項 ================= */
+video {
+    outline: none !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+video::-webkit-media-controls,
+video::-webkit-media-controls-panel,
+video::-webkit-media-controls-loading-panel,
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-play-button,
+video::-webkit-media-controls-timeline,
+video::-webkit-media-controls-volume-slider,
+video::-webkit-media-controls-mute-button,
+video::-webkit-media-controls-fullscreen-button,
+video::-webkit-media-controls-current-time-display,
+video::-webkit-media-controls-time-remaining-display,
+video::-webkit-media-controls-loading-panel,
+video::-webkit-media-controls-overlay-play-button {
+    display: none !important;
+}
+
+#mediaArea video {
+    background: #000 !important;
+}
+
+#mediaArea video::before {
+    display: none !important;
+}
+
+/* ================= 實驗面板分頁 ================= */
+.experiment-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0.75rem;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.experiment-tab {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: #333;
+    color: #ccc;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border-radius: 0.375rem 0.375rem 0 0;
+    border-bottom: 0.125rem solid transparent;
+}
+
+.experiment-tab:first-child {
+    border-radius: 0.375rem 0 0 0;
+}
+
+.experiment-tab:last-child {
+    border-radius: 0 0.375rem 0 0;
+}
+
+.experiment-tab.active {
+    background: #ff8c00;
+    color: #fff;
+    border-bottom-color: #ff8c00;
+}
+
+.experiment-tab:hover:not(.active) {
+    background: #444;
+    color: #fff;
+}
+
+.experiment-tab-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+    height: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.experiment-content-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* ================= 實驗面板按鈕狀態 ================= */
+.control-button#experimentPanelButton {
+    transition: background 0.3s, color 0.3s;
+}
+
+.control-button.experiment-running {
+    background: #4CAF50 !important;
+    color: #fff !important;
+}
+
+.control-button.experiment-paused {
+    background: #FF9800 !important;
+    color: #fff !important;
+}
+
+.control-button.experiment-stopped {
+    background: #BDBDBD !important;
+    color: #333 !important;
+}

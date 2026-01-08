@@ -1,0 +1,2139 @@
+/**
+ * 多螢幕同步 - 使用通用模態視窗框架
+ */
+
+/* ============================================
+   統一面板框架 - 使用通用模態視窗框架
+   ============================================ */
+/* 膠囊背景已移至通用 modal 框架中 */
+/* 統一的面板內容容器 - 使用通用模態視窗框架 */
+.sync-panel-container {
+    background: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+}
+
+/* 統一的面板標題容器 - 使用通用模態視窗框架 */
+.sync-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 20px 15px 20px;
+    border-bottom: 2px solid #e9ecef;
+    flex-shrink: 0;
+}
+
+.sync-panel-header h2,
+.sync-panel-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 20px;
+    font-weight: 600;
+    flex: 1;
+}
+
+/* 統一的可滾動內容區域 */
+.sync-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 20px 20px 20px;
+}
+
+/* 統一的面板控制區域 */
+.sync-panel-footer {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 20px 20px 20px 20px;
+    border-top: 1px solid #e9ecef;
+    flex-shrink: 0;
+}
+
+/* ============================================
+   舊有樣式 - 保持向後相容
+   ============================================ */
+
+/* 膠囊狀態指示器 */
+.sync-capsule-indicator {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1250;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    user-select: none;
+}
+
+.sync-capsule-indicator:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 狀態指示器 */
+.sync-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 狀態燈號 */
+.sync-status-light {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.sync-status-text {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* === 線上狀態樣式 === */
+.sync-capsule-indicator.online {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.9), rgba(22, 163, 74, 0.9));
+    color: #fff;
+}
+
+.sync-capsule-indicator.online .sync-status-light {
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+}
+
+/* === 離線狀態樣式 === */
+.sync-capsule-indicator.offline {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.9), rgba(75, 85, 99, 0.9));
+    color: #fff;
+}
+
+.sync-capsule-indicator.offline .sync-status-light {
+    background: #ef4444;
+    animation: none;
+    opacity: 0.6;
+}
+
+/* 未同步狀態 */
+.sync-capsule-indicator.idle {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: #fff;
+}
+
+.sync-capsule-indicator.idle .sync-status-light {
+    background: #fff;
+}
+
+/* 僅檢視狀態 */
+.sync-capsule-indicator.viewer {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+}
+
+.sync-capsule-indicator.viewer .sync-status-light {
+    background: #00d4ff;
+}
+
+/* 同步中狀態 */
+.sync-capsule-indicator.operator {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.sync-capsule-indicator.operator .sync-status-light {
+    background: #00ff7f;
+    animation: pulse 1s infinite;
+}
+
+/* 同步面板標題 */
+.sync-panel-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+}
+
+/* 同步面板內容區域 */
+.sync-panel-content {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* UI 分隔線 */
+.sync-ui-divider {
+    text-align: center;
+    margin: 8px 0 12px 0;
+    color: #6c757d;
+    font-size: 13px;
+}
+
+/* 連線/斷線區段容器 */
+.sync-connection-section,
+.sync-connected-section {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 建立/加入工作階段外層卡片容器 */
+.sync-create-join-container {
+    border: 2px solid #d0d0d0;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 0 0 12px 0;
+    background: #f9f9f9;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 建立/加入工作階段內部區塊 - 各自有邊框 */
+.sync-create-section,
+.sync-join-section {
+    border: 2px solid #999;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 0;
+    background: transparent;
+}
+
+.sync-create-section {
+    margin-bottom: 0;
+}
+
+.sync-create-section h3,
+.sync-join-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #333;
+    font-weight: 600;
+}
+
+/* 分隔線 - 還原「或」 */
+.sync-create-join-container>div[style*="text-align"] {
+    display: block !important;
+    text-align: center;
+    margin: 12px 0;
+    color: #6c757d;
+    font-size: 13px;
+}
+
+/* 已連線狀態 - 工作階段資訊整體卡片包裝 */
+.sync-session-info-container {
+    border: 2px solid #d0d0d0;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    background: #f9f9f9;
+}
+
+.sync-page-toggle-group {
+    display: inline-flex;
+    border: 2px solid #e0e0e0;
+    border-radius: 0.375rem;
+    background: white;
+    gap: 0;
+    overflow: hidden;
+}
+
+.sync-page-toggle-btn {
+    background: white;
+    border: none;
+    color: #666;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+    min-width: auto;
+    flex-shrink: 0;
+}
+
+.sync-page-toggle-btn:not(:last-child) {
+    border-right: 1px solid #e0e0e0;
+}
+
+.sync-page-toggle-btn:hover:not(.active) {
+    background: #f5f5f5;
+    color: #333;
+}
+
+.sync-page-toggle-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+.sync-page-toggle-btn.active:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #4555bd 100%);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.sync-close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #6c757d;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.sync-close-btn:hover {
+    background: #f8f9fa;
+    color: #343a40;
+}
+
+/* 建立工作階段區塊 */
+.sync-create-section {
+    margin-bottom: 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 15px;
+}
+
+.sync-create-section h3 {
+    margin: 0 0 15px 0;
+    color: #495057;
+    font-size: 18px;
+}
+
+.sync-code-input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 46px;
+}
+
+/* 建立代碼輸入容器 */
+.sync-create-input-container {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.sync-create-input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    font-size: 16px;
+    text-align: left;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.sync-create-input:focus {
+    outline: none;
+    border-color: #28a745;
+}
+
+/* 代碼驗證指示器 - 圓形，在輸入框內右側 */
+.sync-code-validation-indicator {
+    position: absolute;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.sync-code-validation-indicator.valid {
+    color: white;
+    background: #28a745;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.sync-code-validation-indicator.invalid {
+    color: white;
+    background: #dc3545;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
+/* 建立按鈕 */
+.sync-create-btn {
+    padding: 12px 20px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+    white-space: nowrap;
+    min-width: 70px;
+    flex-shrink: 0;
+}
+
+.sync-create-btn:hover:not(:disabled) {
+    background: #218838;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.sync-create-btn:disabled {
+    background: #ccc;
+    color: #999;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/*  QR code 區塊 */
+.sync-qr-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: white;
+    border: 2px solid #28a745;
+    border-radius: 15px;
+}
+
+/*  QR code 預設模式選擇 */
+.sync-qr-role-selector {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.sync-qr-role-selector label {
+    display: block;
+    font-size: 13px;
+    font-weight: bold;
+    color: #495057;
+    margin-bottom: 8px;
+}
+
+.sync-qr-role-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.sync-qr-role-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: 2px solid #dee2e6;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.2s;
+    color: #495057;
+}
+
+.sync-qr-role-btn:hover {
+    border-color: #28a745;
+    color: #28a745;
+}
+
+.sync-qr-role-btn.active {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.sync-qr-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.sync-qr-countdown {
+    font-size: 13px;
+    font-weight: bold;
+    color: #28a745;
+}
+
+.sync-qr-expired {
+    color: #dc3545 !important;
+}
+
+.sync-regenerate-qr-btn {
+    padding: 8px 12px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.sync-regenerate-qr-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.sync-regenerate-qr-btn:hover {
+    background: #218838;
+    transform: scale(1.05);
+}
+
+.sync-regenerate-qr-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.sync-qr-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 加入工作階段區塊 */
+.sync-join-section {
+    margin-bottom: 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 15px;
+}
+
+.sync-join-section h3 {
+    margin: 0 0 15px 0;
+    color: #495057;
+    font-size: 18px;
+}
+
+.sync-role-selector {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.sync-role-btn {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #dee2e6;
+    background: white;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: bold;
+}
+
+.sync-role-btn:hover {
+    border-color: #adb5bd;
+}
+
+.sync-role-btn.active {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.sync-role-btn.viewer.active {
+    background: #17a2b8;
+    border-color: #17a2b8;
+}
+
+.sync-join-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.sync-join-input-group input {
+    flex: 1;
+    padding: 12px 15px;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    font-size: 16px;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.sync-join-input-group button,
+.sync-code-input-group button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    background: #28a745;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: auto;
+}
+
+.sync-join-input-group button:hover,
+.sync-code-input-group button:hover {
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.sync-scan-btn {
+    width: 100%;
+    padding: 12px 16px;
+    margin-top: 10px;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sync-scan-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 6px rgba(108, 117, 125, 0.3);
+}
+
+.sync-scan-hint {
+    font-size: 12px;
+    color: #6c757d;
+    text-align: center;
+    margin-top: 8px;
+}
+
+.sync-scan-btn:active {
+    transform: translateY(0);
+}
+
+.sync-qr-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+    padding: 20px;
+    background: #fff;
+    border-radius: 15px;
+    margin-top: 20px;
+}
+
+.sync-qr-code-text {
+    margin-top: 15px;
+    font-size: 16px;
+    color: #495057;
+}
+
+.sync-qr-code-text strong {
+    font-size: 24px;
+    color: #28a745;
+    letter-spacing: 3px;
+}
+
+/* QR code fallback 顯示 */
+.sync-qr-fallback {
+    padding: 20px;
+    text-align: center;
+}
+
+.sync-qr-fallback h3 {
+    color: #28a745;
+}
+
+.sync-qr-fallback p {
+    color: #6c757d;
+    font-size: 12px;
+    margin-top: 10px;
+    word-break: break-all;
+}
+
+.sync-qr-fallback a {
+    color: #007bff;
+}
+
+/* QR code 角色文字 */
+.sync-qr-role-text {
+    font-size: 11px;
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+/* QR code 過期訊息 */
+.sync-qr-expired {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+}
+
+/* 狀態訊息 */
+.sync-status-message {
+    padding: 12px 20px;
+    border-radius: 10px;
+    margin-top: 15px;
+    text-align: center;
+    font-weight: bold;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.sync-status-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 2px solid #c3e6cb;
+}
+
+.sync-status-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 2px solid #f5c6cb;
+}
+
+.sync-status-message.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 2px solid #bee5eb;
+}
+
+/* 工作階段資訊 */
+.sync-session-info {
+    padding: 15px;
+    background: #e9ecef;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.sync-session-info p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #495057;
+}
+
+.sync-session-info strong {
+    color: #212529;
+}
+
+.sync-btn-cancel:hover {
+    background: #5a6268;
+}
+
+/* ========== 加入代碼顯示和複製功能 ========== */
+.sync-join-code-display {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f0f8ff;
+    border-radius: 10px;
+    text-align: center;
+    border: 2px solid #b3d9ff;
+}
+
+.sync-join-code-display label {
+    display: block;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.sync-join-code-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.sync-join-code {
+    font-family: 'Courier New', monospace;
+    font-size: 24px;
+    font-weight: bold;
+    color: #0066cc;
+    letter-spacing: 2px;
+    padding: 10px 15px;
+    background: white;
+    border-radius: 8px;
+    border: 2px solid #0066cc;
+    min-width: 180px;
+    text-align: center;
+}
+
+.sync-copy-code-btn {
+    background: #17a2b8;
+    color: white;
+}
+
+.sync-copy-qr-link-btn {
+    background: #6c757d;
+    color: white;
+}
+
+.sync-copy-code-btn:hover {
+    background: #138496;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+}
+
+.sync-copy-qr-link-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+}
+
+.sync-copy-code-btn.copied {
+    background: #28a745;
+    animation: pulse-success 0.6s;
+}
+
+.sync-copy-qr-link-btn.copied {
+    background: #28a745;
+    animation: pulse-success 0.6s;
+}
+
+/* 分享代碼按鈕群組 */
+.sync-share-code-buttons {
+    display: flex;
+    gap: 8px;
+    margin-left: 8px;
+}
+
+.sync-copy-link-btn {
+    background: #6c757d;
+    color: white;
+}
+
+.sync-copy-link-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+}
+
+.sync-copy-link-btn.copied {
+    background: #28a745;
+    animation: pulse-success 0.6s;
+}
+
+/* 通用同步按鈕樣式 */
+.sync-btn-base {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+}
+
+.sync-regenerate-code-btn {
+    background: #ffc107;
+    color: #212529;
+}
+
+.sync-regenerate-code-btn:hover {
+    background: #e0a800;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+}
+
+.sync-regenerate-code-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    opacity: 0.6;
+}
+
+.sync-icon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.5;
+}
+
+.sync-icon-checkmark {
+    width: 18px;
+    height: 18px;
+}
+
+@keyframes pulse-success {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* 未連線狀態的面板 - 預設顯示 */
+.sync-connection-section {
+    display: block;
+}
+
+/* 已連線時隱藏未連線區塊 */
+.sync-connection-section.hidden {
+    display: none !important;
+}
+
+/* 已連線狀態的面板 - 預設隱藏 */
+.sync-connected-section {
+    display: none !important;
+    padding: 20px 0;
+}
+
+/* 當已連線時顯示已連線部分 */
+.sync-connected-section.show {
+    display: block !important;
+}
+
+/* 已連線時隱藏加入卡片 */
+.sync-connected-section.show .sync-join-section {
+    display: none !important;
+}
+
+/* 新的按鈕佈局容器 */
+.sync-session-buttons-container {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* 分享按鈕獨立行 */
+.sync-session-share-row {
+    margin-bottom: 10px;
+}
+
+.sync-session-share-row .sync-share-toggle-btn {
+    width: 100%;
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.sync-session-share-row .sync-share-toggle-btn:hover {
+    background: #138496;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+}
+
+/* 其他按鈕行 */
+.sync-session-action-row {
+    display: flex;
+    gap: 8px;
+}
+
+.sync-session-action-row button {
+    flex: 1;
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    word-wrap: break-word;
+    hyphens: auto;
+}
+
+.sync-session-action-row .sync-disconnect-btn {
+    background: #dc3545;
+}
+
+.sync-session-action-row .sync-disconnect-btn:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
+.sync-session-action-row .sync-clear-session-btn {
+    background: #e63946;
+}
+
+.sync-session-action-row .sync-clear-session-btn:hover {
+    background: #d62839;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(230, 57, 70, 0.3);
+}
+
+.sync-session-action-row .sync-manage-sessions-btn {
+    background: #6c757d;
+}
+
+.sync-session-action-row .sync-manage-sessions-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+}
+
+.sync-share-section {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 0;
+    margin: 12px 0 0 0;
+}
+
+/* 分享展開/隱藏按鈕 */
+.sync-share-toggle-btn {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.sync-share-toggle-btn:hover {
+    background: #138496;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+}
+
+.sync-share-toggle-btn:active {
+    transform: translateY(0);
+}
+
+/* 分享內容（展開狀態） */
+.sync-share-content {
+    background: #f0f7ff;
+    border: 2px solid #17a2b8;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 10px;
+    animation: slideDown 0.3s ease;
+}
+
+.sync-share-content h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #138496;
+    font-size: 16px;
+}
+
+.sync-share-code-display {
+    margin-bottom: 15px;
+}
+
+.sync-share-code-display label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 13px;
+}
+
+.sync-share-code-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sync-regenerate-inline-btn {
+    flex-shrink: 0;
+}
+
+.sync-share-code-container {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.sync-share-code {
+    flex: 1;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid #17a2b8;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-align: center;
+    color: #138496;
+}
+
+/* 分享 QR code 區塊 */
+.sync-share-qr-section {
+    margin-top: 15px;
+}
+
+/* 分享折疊按鈕 */
+.sync-share-collapse-btn {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+    width: 100%;
+    margin-top: 15px;
+}
+
+.sync-share-collapse-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.sync-share-collapse-btn:active {
+    transform: translateY(0);
+}
+
+/* 斷開連線按鈕 */
+.sync-disconnect-section {
+    margin-top: 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 清除 Session 按鈕 */
+.sync-clear-session-btn {
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.sync-clear-session-btn:hover {
+    background: #e63946;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
+.sync-clear-session-btn:active {
+    transform: translateY(0);
+}
+
+/* 連線狀態的工作階段資訊 */
+#connectedSessionInfo {
+    background: #e8f4f8;
+    border-left: 4px solid #17a2b8;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+#connectedSessionInfo p {
+    margin: 6px 0;
+    font-size: 13px;
+}
+
+#connectedSessionInfo strong {
+    color: #138496;
+}
+
+/* ========== 工作階段資訊卡片容器 ========== */
+.sync-session-info-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+/* 響應式：當寬度足夠時，顯示為3等份一行 */
+@media (min-width: 400px) {
+    .sync-session-info-cards {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* 工作階段資訊卡片 */
+.sync-info-card {
+    background: #f0f0f0;
+    border: 2px solid #d0d0d0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.sync-info-card:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    background: #e8e8e8;
+}
+
+.sync-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.sync-card-value {
+    font-size: 13px;
+    font-weight: bold;
+    color: #333;
+    word-break: break-all;
+    line-height: 1.3;
+}
+
+/* 角色卡片特殊樣式 */
+.sync-role-card {
+    cursor: pointer;
+    position: relative;
+}
+
+.sync-role-card:hover {
+    background: #e8e8e8;
+    border-color: #b0b0b0;
+}
+
+.sync-card-hint {
+    font-size: 10px;
+    color: #999;
+    margin-top: 2px;
+    font-style: italic;
+}
+
+/* ========== 行動裝置最佳化 ========== */
+
+/* 超小螢幕（< 360px） */
+@media (max-width: 359px) {
+    .sync-panel-content {
+        width: 95%;
+        border-radius: 12px;
+    }
+
+    .sync-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .sync-panel-header h2 {
+        font-size: 18px;
+        margin: 0;
+        flex: 1;
+    }
+
+    .sync-page-toggle-group {
+        flex: 1;
+        margin-right: 8px;
+    }
+
+    .sync-page-toggle-btn {
+        padding: 6px 10px;
+        font-size: 10px;
+        min-width: auto;
+        flex: 1;
+    }
+
+    .sync-close-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 24px;
+        flex-shrink: 0;
+    }
+
+    h3 {
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+
+    .sync-code-input-group {
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .sync-create-input-container {
+        flex: 0 0 100%;
+        min-width: 0;
+    }
+
+    .sync-create-input {
+        font-size: 13px;
+        padding: 10px 12px;
+        padding-right: 40px;
+    }
+
+    .sync-code-validation-indicator {
+        width: 26px;
+        height: 26px;
+        font-size: 14px;
+    }
+
+    .sync-create-btn {
+        padding: 10px 16px;
+        font-size: 12px;
+        min-width: 60px;
+        flex: 0 0 auto;
+    }
+
+    .sync-role-btn {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+
+    .sync-session-info-cards {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .sync-card-label {
+        font-size: 10px;
+    }
+
+    .sync-card-value {
+        font-size: 12px;
+    }
+}
+
+/* 小螢幕（360px - 600px） */
+@media (max-width: 600px) {
+    .sync-panel-content {
+        width: 92%;
+        max-width: 90vw;
+        max-height: 85vh;
+        border-radius: 12px;
+    }
+
+    .sync-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .sync-panel-header h2 {
+        font-size: 20px;
+        margin: 0;
+        flex: 1;
+    }
+
+    .sync-page-toggle-group {
+        flex: 1;
+        min-width: 0;
+        margin-right: 8px;
+    }
+
+    .sync-page-toggle-btn {
+        padding: 6px 8px;
+        font-size: 11px;
+        min-width: auto;
+        flex: 1;
+        white-space: normal;
+        line-height: 1.3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .sync-page-toggle-btn .btn-text-split {
+        display: inline;
+        word-break: break-all;
+        max-width: 2em;
+    }
+
+    .sync-close-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 24px;
+        flex-shrink: 0;
+    }
+
+    /* 建立區塊 */
+    .sync-create-section h3,
+    .sync-join-section h3 {
+        font-size: 15px;
+        margin-bottom: 12px;
+    }
+
+    /* 輸入框和按鈕組 */
+    .sync-code-input-group {
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+
+    .sync-create-input-container {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sync-create-input {
+        font-size: 14px;
+        padding: 10px 12px;
+        padding-right: 40px;
+    }
+
+    .sync-code-validation-indicator {
+        width: 26px;
+        height: 26px;
+        font-size: 14px;
+    }
+
+    .sync-create-btn {
+        padding: 10px 16px;
+        font-size: 13px;
+        min-width: 65px;
+        flex-shrink: 0;
+    }
+
+    .sync-join-input-group {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .sync-join-input-group input {
+        flex: 1;
+        font-size: 14px;
+        padding: 10px 12px;
+    }
+
+    .sync-join-input-group button {
+        min-width: 60px;
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+
+    /* 角色選擇 */
+    .sync-role-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .sync-role-btn {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    /* 掃描按鈕 */
+    .sync-scan-btn {
+        width: 100%;
+        padding: 10px 14px;
+        font-size: 13px;
+        margin: 8px 0;
+    }
+
+    /* QR 相關 */
+    .sync-share-qr-section {
+        margin: 12px 0;
+    }
+
+    .sync-qr-display {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 16px;
+        min-height: auto;
+    }
+
+    .sync-qr-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 120px;
+    }
+
+    .sync-qr-display canvas,
+    .sync-qr-display img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+    }
+
+    .sync-qr-code-text {
+        font-size: 14px;
+        margin-top: 10px;
+    }
+
+    .sync-qr-code-text strong {
+        font-size: 18px;
+        letter-spacing: 2px;
+    }
+
+    /* 工作階段資訊卡片 */
+    .sync-session-info-cards {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .sync-info-card {
+        padding: 12px 14px;
+    }
+
+    .sync-card-label {
+        font-size: 11px;
+    }
+
+    .sync-card-value {
+        font-size: 13px;
+    }
+
+    /* 分享按鈕 */
+    .sync-share-toggle-btn,
+    .sync-disconnect-btn,
+    .sync-clear-session-btn,
+    .sync-manage-sessions-btn {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 13px;
+        margin-bottom: 8px;
+        white-space: normal;
+        /* 允許文字換行 */
+        word-wrap: break-word;
+        /* 長單詞換行 */
+        text-align: center;
+    }
+
+    /* 程式碼顯示 */
+    .sync-share-code-container {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .sync-share-code {
+        flex: 1;
+        word-break: break-all;
+        font-size: 13px;
+        font-weight: bold;
+        padding: 10px;
+        background: #f5f5f5;
+        border-radius: 6px;
+    }
+
+    .sync-copy-code-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .sync-share-code-buttons {
+        gap: 6px;
+        margin-left: 6px;
+    }
+
+    /* 響應式通用按鈕樣式 */
+    .sync-btn-base {
+        padding: 8px 10px;
+        font-size: 12px;
+        min-width: 36px;
+        height: 36px;
+    }
+
+    .sync-share-code-display {
+        gap: 8px;
+    }
+
+    .sync-regenerate-inline-btn {
+        width: 36px;
+        height: 36px;
+        padding: 8px;
+    }
+
+    /* 狀態訊息 */
+    #syncStatusMessage {
+        padding: 12px;
+        font-size: 12px;
+        border-radius: 6px;
+        margin-top: 12px;
+    }
+
+    /* 分隔線 */
+    .sync-control-panel .sync-panel-content>div[style*="text-align: center"] {
+        margin: 16px 0;
+        font-size: 12px;
+    }
+
+    /* 折疊按鈕 */
+    .sync-share-collapse-btn {
+        width: 100%;
+        padding: 10px 14px;
+        font-size: 12px;
+    }
+}
+
+/* 中等螢幕（600px - 900px） */
+@media (min-width: 600px) {
+    .sync-panel-content {
+        width: 85%;
+        max-width: 550px;
+    }
+}
+
+/* 大螢幕（900px 以上） */
+@media (min-width: 900px) {
+    .sync-panel-content {
+        width: 80%;
+        max-width: 600px;
+    }
+}
+
+/* 工作階段管理樣式 */
+.sync-sessions-panel {
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.sync-sessions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.sync-sessions-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.sync-sessions-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sync-sessions-list {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.sync-sessions-empty {
+    text-align: center;
+    color: #6c757d;
+    padding: 2rem;
+    font-style: italic;
+}
+
+/* 工作階段卡片樣式 */
+.sync-session-card {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 0.5rem;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.sync-session-card:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+}
+
+.sync-session-card.expanded {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+}
+
+.sync-session-header {
+    padding: 1rem;
+    background: #f8f9fa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.sync-session-header:hover {
+    background: #e9ecef;
+}
+
+.sync-card-label {
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.sync-card-hint {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin: 0.25rem 0 0 0;
+}
+
+.sync-session-card-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sync-session-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.sync-session-status.active {
+    background: #28a745;
+    color: #ffffff;
+    font-size: 0.85rem;
+}
+
+.sync-session-status.inactive {
+    background: #ffe6e6;
+    color: #8b2d2d;
+}
+
+.sync-session-expand-icon {
+    font-size: 0.875rem;
+    color: #6c757d;
+    transition: transform 0.2s ease;
+}
+
+.sync-session-card.expanded .sync-session-expand-icon {
+    transform: rotate(90deg);
+}
+
+/* 工作階段詳細資訊 */
+.sync-session-details {
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.sync-session-card.expanded .sync-session-details {
+    padding: 1rem;
+    max-height: 500px;
+}
+
+.sync-session-info {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 0.375rem;
+}
+
+.sync-session-info-no-code,
+.sync-session-info-no-state {
+    background: #fff3cd;
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+.sync-session-share-info {
+    background: #d1ecf1;
+    border-left-color: #17a2b8;
+    color: #0c5460;
+}
+
+/* 同步狀態展開/收合 */
+.sync-session-state-toggle {
+    margin-bottom: 1rem;
+}
+
+.sync-session-state-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sync-session-state-header:hover {
+    background: #e9ecef;
+    border-color: #007bff;
+}
+
+.sync-state-expand-icon {
+    font-size: 0.875rem;
+    color: #6c757d;
+    transition: transform 0.2s ease;
+}
+
+.sync-session-state-details {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.sync-state-json {
+    background: #ffffff;
+    border: 2px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 300px;
+    overflow-y: auto;
+    color: #495057;
+}
+
+/* 裝置列表 */
+.sync-session-clients {
+    margin-top: 0.5rem;
+}
+
+.sync-session-client {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 0.25rem;
+    border: 2px solid #28a745;
+    font-size: 0.875rem;
+}
+
+.sync-session-client.operator {
+    border-color: #007bff;
+}
+
+.sync-session-client.viewer {
+    border-color: #6c757d;
+}
+
+.sync-session-client div {
+    margin-bottom: 0.25rem;
+}
+
+.sync-session-client div:last-child {
+    margin-bottom: 0;
+}
+
+.sync-session-no-clients {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 1rem;
+}
+
+/* 刪除按鈕 */
+.sync-delete-session-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.sync-delete-session-btn:hover {
+    background: #c82333;
+}
+
+.sync-delete-session-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+/* 格式化同步狀態樣式 */
+.sync-state-formatted {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.sync-state-null {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.sync-state-boolean {
+    color: #007bff;
+    font-weight: bold;
+}
+
+.sync-state-number {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.sync-state-string {
+    color: #dc3545;
+}
+
+.sync-state-key {
+    color: #495057;
+    font-weight: bold;
+}
+
+.sync-state-array {
+    color: #6f42c1;
+}
+
+.sync-state-object {
+    color: #fd7e14;
+}
+
+.sync-state-empty {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.sync-state-unknown {
+    color: #6c757d;
+    font-style: italic;
+    background: #fff3cd;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.125rem;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .sync-sessions-panel {
+        max-height: 90vh;
+    }
+
+    .sync-sessions-list {
+        max-height: 70vh;
+    }
+
+    .sync-session-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .sync-session-card-status {
+        align-self: flex-end;
+    }
+
+    .sync-session-state-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .sync-state-formatted {
+        font-size: 0.75rem;
+        padding: 0.75rem;
+    }
+
+    /* 優化按鈕在小螢幕上的佈局 */
+    .sync-session-action-row {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .sync-session-action-row button {
+        flex: 1;
+        min-width: 120px;
+        font-size: 14px;
+        padding: 8px 10px;
+    }
+}
+
+/* 極小螢幕的額外優化 */
+@media (max-width: 480px) {
+    .sync-session-action-row {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .sync-session-action-row button {
+        width: 100%;
+        min-width: auto;
+        font-size: 14px;
+        padding: 10px 12px;
+    }
+
+    /* 優化工作階段資訊容器的間距 */
+    .sync-session-info-container {
+        padding: 12px;
+        margin-bottom: 8px;
+    }
+
+    /* 優化 QR 顯示在小螢幕上的樣式 */
+    .sync-qr-display {
+        padding: 12px;
+        gap: 6px;
+    }
+
+    .sync-qr-code-text {
+        font-size: 13px;
+        margin-top: 8px;
+    }
+
+    .sync-qr-code-text strong {
+        font-size: 16px;
+        letter-spacing: 1px;
+    }
+}
+
+/* 分享代碼歷史樣式 */
+.sync-session-share-codes {
+    margin-bottom: 15px;
+}
+
+.sync-share-codes-list {
+    margin-top: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.sync-share-code-item {
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: #f8f9fa;
+    transition: all 0.2s;
+}
+
+.sync-share-code-item.active {
+    border-color: #28a745;
+    background: #d4edda;
+}
+
+.sync-share-code-item.used {
+    border-color: #6c757d;
+    background: #e9ecef;
+    opacity: 0.7;
+}
+
+.sync-share-code-item.expired {
+    border-color: #dc3545;
+    background: #f8d7da;
+}
+
+.sync-share-code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.sync-share-code-status {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+
+.sync-share-code-status.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.sync-share-code-status.used {
+    background: #6c757d;
+    color: white;
+}
+
+.sync-share-code-status.expired {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.sync-share-code-details {
+    color: #666;
+    line-height: 1.4;
+}

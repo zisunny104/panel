@@ -1,0 +1,26 @@
+/* ========== 多螢幕同步容器定位 ========== */
+#syncCapsuleContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 200;
+    pointer-events: none;
+}
+
+#syncCapsuleContainer>* {
+    pointer-events: auto;
+}
+
+#syncControlPanelContainer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 800;
+    pointer-events: none;
+}
+
+#syncControlPanelContainer>* {
+    pointer-events: auto;
+}

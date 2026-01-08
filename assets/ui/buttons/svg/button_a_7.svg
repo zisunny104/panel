@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_圖層_2" data-name="圖層 2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 56.69 56.69">
+  <defs>
+    <clipPath id="clippath">
+      <rect width="56.69" height="56.69" rx="3.12" ry="3.12" style="fill: none;"/>
+    </clipPath>
+  </defs>
+  <g id="_圖層_1-2" data-name="圖層 1">
+    <g style="clip-path: url(#clippath);">
+      <rect x="0" width="56.69" height="56.69" style="fill: #45505e;"/>
+      <polygon points="56.69 .63 56.69 .13 0 .13 0 28.35 56.69 .63" style="fill: #efb418;"/>
+      <polygon points="0 36.78 0 56.82 56.69 56.82 56.69 9.06 0 36.78" style="fill: #c2b9b8;"/>
+      <path d="M23.73,37.58v-1.69h9.27v1.37c-.91.97-1.81,2.26-2.71,3.87s-1.59,3.26-2.08,4.96c-.35,1.2-.58,2.51-.67,3.94h-1.81c.02-1.13.24-2.49.66-4.08s1.03-3.13,1.82-4.61,1.63-2.73,2.52-3.75h-7.01Z" style="fill: #231815;"/>
+      <path d="M4.97,14.24l3.3-8.59h1.22l3.52,8.59h-1.29l-1-2.6h-3.59l-.94,2.6h-1.21ZM7.45,10.71h2.91l-.9-2.38c-.27-.72-.48-1.32-.61-1.78-.11.55-.26,1.1-.46,1.64l-.94,2.52Z" style="fill: #231815;"/>
+    </g>
+  </g>
+</svg>

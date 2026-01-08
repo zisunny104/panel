@@ -1,0 +1,57 @@
+{
+    "waiting_experiment": {
+        "zh": "等待實驗開始",
+        "en": "Waiting for experiment...",
+        "vi": "Chờ thí nghiệm bắt đầu..."
+    },
+    "home": {
+        "zh": "首頁",
+        "en": "Home",
+        "vi": "Trang chủ"
+    },
+    "open": {
+        "zh": "開啟",
+        "en": "Open",
+        "vi": "Mở"
+    },
+    "close": {
+        "zh": "關閉",
+        "en": "Close",
+        "vi": "Đóng"
+    },
+    "prev": {
+        "zh": "上一步",
+        "en": "Previous",
+        "vi": "Bước trước"
+    },
+    "reload": {
+        "zh": "重新載入",
+        "en": "Reload",
+        "vi": "Tải lại"
+    },
+    "next": {
+        "zh": "下一步",
+        "en": "Next",
+        "vi": "Bước tiếp theo"
+    },
+    "zoom_out": {
+        "zh": "縮小",
+        "en": "Zoom Out",
+        "vi": "Thu nhỏ"
+    },
+    "capture": {
+        "zh": "拍攝",
+        "en": "Capture",
+        "vi": "Chụp ảnh"
+    },
+    "zoom_in": {
+        "zh": "放大",
+        "en": "Zoom In",
+        "vi": "Phóng to"
+    },
+    "confirm": {
+        "zh": "確認",
+        "en": "Confirm",
+        "vi": "Xác nhận"
+    }
+}

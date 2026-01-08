@@ -1,0 +1,46 @@
+{
+    "id": "0I5VB7",
+    "created": 1767689537,
+    "lastUpdate": 1767689666,
+    "lastActivity": 1767689704,
+    "state": null,
+    "clients": [
+        {
+            "id": "client_695ccd41cd8d24.56652154",
+            "role": "operator",
+            "joinedAt": 1767689537,
+            "lastActivity": 1767689661,
+            "deviceToken": "fb7f62b535fe52dbdee42e1731b27bcc"
+        },
+        {
+            "id": "client_695ccdd2e281b5.93437004",
+            "role": "operator",
+            "joinedAt": 1767689682,
+            "lastActivity": 1767689682,
+            "deviceToken": "a0f12ba7a7baa328844b955f97045357"
+        }
+    ],
+    "maxClients": 6,
+    "shareCodes": [
+        {
+            "code": "2738IGR6",
+            "createdAt": 1767689537,
+            "createdBy": null,
+            "expiresAt": 1767689837,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        },
+        {
+            "code": "8885ZX9C",
+            "createdAt": 1767689666,
+            "createdBy": null,
+            "expiresAt": 1767689966,
+            "used": false,
+            "usedAt": null,
+            "usedBy": null
+        }
+    ],
+    "currentShareCode": "8885ZX9C",
+    "shareCodeCreatedAt": 1767689666
+}

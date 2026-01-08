@@ -1,0 +1,15 @@
+{
+    "code": "5547NL88",
+    "sessionId": "QX2EVX",
+    "createdAt": 1767874668,
+    "expiresAt": 1767874968,
+    "used": true,
+    "usedAt": 1767874668,
+    "usedBy": "client_695fa06c2823c0.65838127",
+    "createdBy": null,
+    "checksumValid": true,
+    "singleUse": true,
+    "expired": true,
+    "expiredAt": 1767874698,
+    "expiredReason": "regenerated"
+}

@@ -1,0 +1,31 @@
+/* ================= 全域設定 ================= */
+/* 頁面基本樣式與防止選取 */
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-text-size-adjust: none;
+    -webkit-tap-highlight-color: transparent;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    /* 啟用多點觸控支援 */
+    touch-action: manipulation;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: #ddd;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+    /* 確保多點觸控可以正常工作 */
+    touch-action: manipulation;
+    /* 設置為非襯線字體 */
+    font-family: sans-serif;
+}

@@ -1,0 +1,15 @@
+/* ================= 面板縮放與頂部空間 ================= */
+.top-spacer-placeholder {
+    flex-shrink: 0;
+    width: 100%;
+}
+
+.scalable-area {
+    transform-origin: center top;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    transform: scale(1.29);
+    touch-action: pan-x pan-y;
+}
