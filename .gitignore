@@ -34,3 +34,5 @@ temp/
 # OS
 Thumbs.db
 .DS_Store
+# Sessions (user data, should not be tracked)
+sessions/
