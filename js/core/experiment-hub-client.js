@@ -97,12 +97,19 @@ class ExperimentHubClient {
     const sessionId = this.getSessionId();
     const clientId = this.getClientId();
 
+    Logger.debug("[ExperimentHubClient] 檢查連接先決條件", {
+      hasSessionId: !!sessionId,
+      hasClientId: !!clientId,
+      syncClientReady: this.syncClientReady,
+      reconnectAttempts: this.reconnectAttempts
+    });
+
     // 先檢查是否已經有session信息
     if (sessionId && clientId) {
       this.syncClientReady = true;
       this.reconnectAttempts = 0;
       Logger.debug(
-        `[ExperimentHubClient] 已獲得sessionId: ${sessionId.substring(0, 8)}...`
+        `[ExperimentHubClient] 先決條件已滿足，準備連接到 SSE`
       );
       this.connectToStream();
       return;
@@ -112,14 +119,14 @@ class ExperimentHubClient {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       Logger.debug(
-        `[ExperimentHubClient] ⏳ 等待sessionId/clientId準備完成 (嘗試 ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+        `[ExperimentHubClient] sessionId/clientId 尚未準備，繼續等待 (嘗試 ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
       );
       setTimeout(() => {
         this.initializeConnection();
       }, 500);
     } else {
-      Logger.debug(
-        "[ExperimentHubClient] 超過重試次數限制，SSE連接將在檢測到session後自動建立"
+      Logger.warn(
+        "[ExperimentHubClient] 已達最大重試次數，SSE 連接將在檢測到 session 後自動建立"
       );
     }
   }
@@ -135,9 +142,15 @@ class ExperimentHubClient {
     const sessionId = this.getSessionId();
     const clientId = this.getClientId();
 
+    Logger.debug("[ExperimentHubClient] 驗證 SSE 連接先決條件", {
+      hasSessionId: !!sessionId,
+      hasClientId: !!clientId,
+      apiUrl: this.apiUrl
+    });
+
     if (!sessionId || !clientId) {
-      Logger.debug(
-        `[ExperimentHubClient] ⏳ sessionId/clientId 尚未準備 (sessionId: ${
+      Logger.warn(
+        `[ExperimentHubClient] 缺少必要資訊，無法建立 SSE 連接 (sessionId: ${
           sessionId ? "✓" : "✗"
         }, clientId: ${clientId ? "✓" : "✗"})`
       );
@@ -153,7 +166,7 @@ class ExperimentHubClient {
       sessionId
     )}&clientId=${encodeURIComponent(clientId)}`;
 
-    Logger.debug(`[ExperimentHubClient] 正在連接到SSE流...`);
+    Logger.debug(`[ExperimentHubClient] 正在連接到 SSE 流: ${this.apiUrl}...`);
 
     this.eventSource = new EventSource(streamUrl);
 

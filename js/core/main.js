@@ -73,21 +73,44 @@ class MainApp {
       // 不需要在此重複建立，直接使用全局的 window.syncManager
       Logger.debug("SyncManager 已由 sync-manager.js 自動初始化");
 
-      // 初始化新的Experiment Hub Manager - 非關鍵路徑，異步執行
+      // 初始化 Experiment Hub Manager - 非關鍵路徑，異步執行但帶超時
       if (!window.experimentHubManager) {
         (async () => {
           try {
+            Logger.debug("[MainApp] 開始初始化 ExperimentHubManager...");
             const { initializeExperimentHub } = await import(
               "../sync/experiment-hub-manager.js"
             );
-            window.experimentHubManager = await initializeExperimentHub();
-            Logger.info("Experiment Hub Manager 已初始化（全域單一實例）");
+            
+            // 設置初始化超時（5秒）
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => {
+                reject(new Error("ExperimentHubManager 初始化超時 (5秒)"));
+              }, 5000)
+            );
+
+            window.experimentHubManager = await Promise.race([
+              initializeExperimentHub(),
+              timeoutPromise,
+            ]);
+            
+            Logger.info("ExperimentHubManager 已初始化（全域單一實例）", {
+              syncMode: window.experimentHubManager.isInSyncMode(),
+            });
           } catch (error) {
-            Logger.warn("Experiment Hub Manager 初始化失敗:", error);
+            Logger.warn("ExperimentHubManager 初始化失敗或超時:", error.message);
+            // 建立備用實例，以保證系統繼續運作
+            if (!window.experimentHubManager) {
+              Logger.debug("[MainApp] 建立備用 ExperimentHubManager 實例");
+              const { ExperimentHubManager } = await import(
+                "../sync/experiment-hub-manager.js"
+              );
+              window.experimentHubManager = new ExperimentHubManager();
+            }
           }
         })();
       } else {
-        Logger.debug("Experiment Hub Manager 已存在，使用現有實例");
+        Logger.debug("ExperimentHubManager 已存在，使用現有實例");
       }
 
       this.initializationComplete = true;

@@ -12,16 +12,28 @@ export class SyncManagerUI {
     this.currentQRRole = "viewer"; //  QR code 的目前預設模式
     this.currentShareCode = null; // 目前連線的分享代碼
     this.qrCountdownInterval = null; //  QR code 計時器
+    this.initialized = false; // 初始化標誌，防止重複初始化
   }
 
   /**
    * 初始化UI
    */
   initialize() {
+    // 防止重複初始化
+    if (this.initialized) {
+      Logger.debug("[SyncManagerUI] UI 已初始化，跳過重複動作");
+      return;
+    }
+    
+    Logger.info("[SyncManagerUI] 開始初始化 UI");
     try {
+      Logger.debug("[SyncManagerUI] 步驟 1/4: 建立膠囊指示器...");
       this.createCapsuleIndicator();
+      Logger.debug("[SyncManagerUI] 步驟 2/4: 建立控制面板...");
       this.createControlPanel();
+      Logger.debug("[SyncManagerUI] 步驟 3/4: 設置事件監聽...");
       this.setupEventListeners();
+      Logger.debug("[SyncManagerUI] 步驟 4/4: 更新指示器...");
       this.updateIndicator();
 
       // 使用 setTimeout 確保 DOM 已完全渲染後再更新 UI 狀態
@@ -29,8 +41,13 @@ export class SyncManagerUI {
         this.updateUIState();
       }, 0);
 
+      // 標記為已初始化
+      this.initialized = true;
+      
       // 註：工作階段還原由 SyncManager 統一負責，不在此執行
+      Logger.info("[SyncManagerUI] UI 初始化完成");
     } catch (error) {
+      Logger.error("[SyncManagerUI] UI 初始化失敗", error);
       // Initialize failed, will create new session on demand
     }
   }
@@ -60,6 +77,7 @@ export class SyncManagerUI {
    * 建立膠囊狀態指示器
    */
   createCapsuleIndicator() {
+    Logger.debug("[SyncManagerUI] 開始建立膠囊指示器");
     this.capsuleIndicator = document.createElement("div");
     this.capsuleIndicator.className = "sync-capsule-indicator offline";
 
@@ -79,6 +97,7 @@ export class SyncManagerUI {
 
     // 將膠囊指示器附加到 body
     document.body.appendChild(this.capsuleIndicator);
+    Logger.debug("[SyncManagerUI] 膠囊指示器已成功建立並附加到 DOM");
   }
 
   /**
@@ -852,7 +871,10 @@ export class SyncManagerUI {
   updateIndicator() {
     // 安全檢查 capsuleIndicator 是否存在
     if (!this.capsuleIndicator) {
-      Logger.debug("[SyncManagerUI] capsuleIndicator 不存在");
+      Logger.warn("[SyncManagerUI] capsuleIndicator 不存在，UI 初始化可能失敗或未執行", {
+        hasCore: !!this.core,
+        timestamp: new Date().toISOString()
+      });
       return;
     }
 

@@ -24,17 +24,26 @@ class SyncManager {
   }
 
   initialize() {
+    Logger.debug("[SyncManager] 開始初始化");
+    
     // 先嘗試還原工作階段，判斷是本機模式還是同步模式
     this.attemptSessionRestore().then((isSync) => {
+      Logger.debug("[SyncManager] 工作階段還原檢查完成", {
+        isSync,
+        hasSessionId: !!this.core.syncClient.getSessionId?.(),
+      });
+      
       // 只在同步模式下初始化重型功能
       if (isSync) {
-        Logger.debug("[SyncManager] 同步模式 - 初始化 UI、QR、Sessions");
+        Logger.info("[SyncManager] 進入同步模式 - 初始化 UI、QR、Sessions");
         this.ui.initialize();
         this.qr.initialize();
         this.sessions.initialize();
       } else {
-        Logger.debug("[SyncManager] 本機模式 - 跳過 UI、QR、Sessions 初始化");
+        Logger.info("[SyncManager] 進入本機模式 - 跳過 UI、QR、Sessions 初始化");
       }
+    }).catch((error) => {
+      Logger.warn("[SyncManager] 工作階段還原過程中發生錯誤", error);
     });
 
     this.setupEventListeners();
@@ -42,10 +51,14 @@ class SyncManager {
     // 初始化時執行一次健康檢查並設定初始狀態
     this.core.checkServerHealth().then((online) => {
       this.serverOnline = online;
+      Logger.debug("[SyncManager] 伺服器健康檢查完成", { online });
 
-      // 只在 UI 已初始化時更新（同步模式）
-      if (this.ui) {
+      // 只在 UI 已初始化且存在時更新（同步模式）
+      if (this.ui && this.ui.initialized) {
+        Logger.debug("[SyncManager] UI 已初始化，更新指示器");
         this.ui.updateIndicator();
+      } else if (this.ui && !this.ui.initialized) {
+        Logger.debug("[SyncManager] UI 尚未初始化，暫不更新指示器");
       }
 
       // 初始化完成後，觸發事件讓日誌管理器知道 syncClient 已就緒
@@ -54,6 +67,8 @@ class SyncManager {
           detail: { serverOnline: online },
         })
       );
+    }).catch((error) => {
+      Logger.warn("[SyncManager] 伺服器健康檢查失敗", error);
     });
 
     // 當工作階段加入時，通知 ExperimentHubClient 可以連接

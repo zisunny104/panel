@@ -407,7 +407,20 @@ export function getExperimentHubManager() {
 }
 
 export async function initializeExperimentHub() {
-  globalHubManager = await ExperimentHubManager.initialize();
+  Logger.debug("[initializeExperimentHub] 開始初始化");
+  
+  if (!globalHubManager) {
+    Logger.debug("[initializeExperimentHub] 建立新的 ExperimentHubManager");
+    globalHubManager = new ExperimentHubManager();
+  } else {
+    Logger.debug("[initializeExperimentHub] ExperimentHubManager 已存在，使用現有實例");
+  }
+  
+  Logger.debug("[initializeExperimentHub] 初始化完成", {
+    hasSyncClient: !!globalHubManager.hubClient,
+    isInSyncMode: globalHubManager.isInSyncMode(),
+  });
+  
   return globalHubManager;
 }
 
