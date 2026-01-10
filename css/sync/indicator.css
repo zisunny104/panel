@@ -1131,6 +1131,49 @@
     color: #138496;
 }
 
+/* 分享代碼狀態樣式 */
+.sync-share-code.share-code-valid {
+    border-color: #28a745;
+    color: #155724;
+}
+
+.sync-share-code.share-code-used {
+    border-color: #dc3545;
+    color: #721c24;
+    background: #f8d7da;
+}
+
+.sync-share-code.share-code-expired {
+    border-color: #ffc107;
+    color: #856404;
+    background: #fff3cd;
+}
+
+/* 分享代碼狀態指示器 */
+.share-code-status-indicator {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.share-code-status-indicator.status-valid {
+    background: #d4edda;
+    color: #155724;
+}
+
+.share-code-status-indicator.status-used {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.share-code-status-indicator.status-expired {
+    background: #fff3cd;
+    color: #856404;
+}
+
 /* 分享 QR code 區塊 */
 .sync-share-qr-section {
     margin-top: 15px;

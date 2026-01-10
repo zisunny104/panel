@@ -7,7 +7,7 @@ class PanelExperimentLog {
     this.logs = [];
     this.startExperimentId = null;
     this.experimentStartTime = null;
-    this.participantName = null;
+    this.subjectName = null;
     this.combinationName = null;
     this.isRecording = false;
     this.syncDevices = new Map();
@@ -17,13 +17,13 @@ class PanelExperimentLog {
   /**
    * 開始記錄實驗
    * @param {string} experimentId - 實驗 ID
-   * @param {string} participantName - 受試者名稱
+   * @param {string} subjectName - 受試者名稱
    * @param {string} combinationName - 組合名稱
    */
-  startRecording(experimentId, participantName = "", combinationName = "") {
+  startRecording(experimentId, subjectName = "", combinationName = "") {
     // 儲存開始實驗時的 ID（這個 ID 不會改變）
     this.startExperimentId = experimentId;
-    this.participantName = participantName || `受試者_${experimentId}`;
+    this.subjectName = subjectName || `受試者_${experimentId}`;
     this.combinationName = combinationName;
     this.experimentStartTime = Date.now();
     this.isRecording = true;
@@ -34,7 +34,7 @@ class PanelExperimentLog {
     this._addLog({
       type: "experiment_start",
       experiment_id: experimentId,
-      participant: this.participantName,
+      subject_name: this.subjectName,
       combination: combinationName,
       device: "panel",
     });

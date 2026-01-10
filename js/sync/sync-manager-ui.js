@@ -13,10 +13,11 @@ export class SyncManagerUI {
     this.currentShareCode = null; // 目前連線的分享代碼
     this.qrCountdownInterval = null; //  QR code 計時器
     this.initialized = false; // 初始化標誌，防止重複初始化
+    this.sharePanelOpened = false; // 分享面板是否已經打開過
   }
 
   /**
-   * 初始化UI
+   * 初始化UI - 僅初始化控制面板和事件監聽（膠囊由 SyncManager 單獨建立）
    */
   initialize() {
     // 防止重複初始化
@@ -24,16 +25,14 @@ export class SyncManagerUI {
       Logger.debug("[SyncManagerUI] UI 已初始化，跳過重複動作");
       return;
     }
-    
+
     Logger.info("[SyncManagerUI] 開始初始化 UI");
     try {
-      Logger.debug("[SyncManagerUI] 步驟 1/4: 建立膠囊指示器...");
-      this.createCapsuleIndicator();
-      Logger.debug("[SyncManagerUI] 步驟 2/4: 建立控制面板...");
+      Logger.debug("[SyncManagerUI] 步驟 1/3: 建立控制面板...");
       this.createControlPanel();
-      Logger.debug("[SyncManagerUI] 步驟 3/4: 設置事件監聽...");
+      Logger.debug("[SyncManagerUI] 步驟 2/3: 設置事件監聽...");
       this.setupEventListeners();
-      Logger.debug("[SyncManagerUI] 步驟 4/4: 更新指示器...");
+      Logger.debug("[SyncManagerUI] 步驟 3/3: 更新指示器...");
       this.updateIndicator();
 
       // 使用 setTimeout 確保 DOM 已完全渲染後再更新 UI 狀態
@@ -43,61 +42,64 @@ export class SyncManagerUI {
 
       // 標記為已初始化
       this.initialized = true;
-      
+
+      // 註：膠囊指示器由 SyncManager.initialize() 建立
       // 註：工作階段還原由 SyncManager 統一負責，不在此執行
-      Logger.info("[SyncManagerUI] UI 初始化完成");
+      Logger.info("[SyncManagerUI] UI 初始化完成（不包括膠囊）");
     } catch (error) {
       Logger.error("[SyncManagerUI] UI 初始化失敗", error);
       // Initialize failed, will create new session on demand
     }
   }
 
-  /**
-   * 儲存Session資訊到localStorage
-   */
-  saveSessionBackup(sessionId, role, clientId = null) {
-    const sessionData = {
-      sessionId,
-      role,
-      clientId: clientId || this.core?.syncClient?.clientId || null, // 安全存取
-      deviceToken: this.core?.syncClient?.deviceToken || null, // 新增：儲存裝置簽章
-      createdAt: Date.now(),
-    };
-    localStorage.setItem("sync_session_backup", JSON.stringify(sessionData));
-  }
-
-  /**
-   * 清空已儲存的Session資訊
-   */
-  clearSessionBackup() {
-    localStorage.removeItem("sync_session_backup");
-  }
+  // 注意：工作階段恢復使用 sessionStorage（分頁級），不使用 localStorage
+  // sessionStorage 由 SyncClient.saveState() 管理
 
   /**
    * 建立膠囊狀態指示器
    */
   createCapsuleIndicator() {
-    Logger.debug("[SyncManagerUI] 開始建立膠囊指示器");
-    this.capsuleIndicator = document.createElement("div");
-    this.capsuleIndicator.className = "sync-capsule-indicator offline";
+    // 防止重複建立
+    if (this.capsuleIndicator) {
+      Logger.debug("[SyncManagerUI] 膠囊指示器已存在，跳過重複建立");
+      return;
+    }
 
-    this.capsuleIndicator.innerHTML = `
+    try {
+      Logger.debug("[SyncManagerUI] 開始建立膠囊指示器");
+      this.capsuleIndicator = document.createElement("div");
+      this.capsuleIndicator.className = "sync-capsule-indicator offline";
+
+      this.capsuleIndicator.innerHTML = `
             <div class="sync-status-indicator">
                 <div class="sync-status-light"></div>
                 <span class="sync-status-text">離線</span>
             </div>
         `;
 
-    // 點擊膠囊打開面板
-    this.capsuleIndicator
-      .querySelector(".sync-status-indicator")
-      .addEventListener("click", () => {
-        this.showPanel();
-      });
+      // 點擊膠囊打開面板（只在 UI 初始化後有效）
+      const indicator = this.capsuleIndicator.querySelector(
+        ".sync-status-indicator"
+      );
+      if (indicator) {
+        indicator.addEventListener("click", () => {
+          // 如果 UI 未初始化，不執行 showPanel
+          if (this.initialized) {
+            this.showPanel();
+          }
+        });
+      }
 
-    // 將膠囊指示器附加到 body
-    document.body.appendChild(this.capsuleIndicator);
-    Logger.debug("[SyncManagerUI] 膠囊指示器已成功建立並附加到 DOM");
+      // 將膠囊指示器附加到 body
+      document.body.appendChild(this.capsuleIndicator);
+      Logger.debug("[SyncManagerUI] 膠囊指示器已成功建立並附加到 DOM");
+
+      // 建立後立即根據 SyncClient 狀態更新膠囊顯示
+      // 本機模式會顯示 "未同步"（idle），同步模式會顯示連線狀態
+      this.updateIndicator();
+    } catch (error) {
+      Logger.error("[SyncManagerUI] 膠囊指示器建立失敗", error);
+    }
   }
 
   /**
@@ -285,6 +287,42 @@ export class SyncManagerUI {
    */
   setupEventListeners() {
     try {
+      // 監聽工作階段成功加入/建立事件 - 更新 shareCode
+      window.addEventListener("sync_session_joined", (event) => {
+        const detail = event.detail || {};
+        const { sessionId, shareCode, role } = detail;
+        Logger.debug("[SyncUI] 收到 SESSION_JOINED 事件，更新 shareCode", {
+          sessionId,
+          shareCode,
+          role,
+        });
+        if (shareCode) {
+          this.currentShareCode = shareCode;
+        }
+      });
+
+      // 監聽 WebSocket 連線成功事件（認證完成）
+      window.addEventListener("sync_connected", (event) => {
+        Logger.debug(
+          "[SyncUI] 收到 SYNC_CONNECTED 事件，更新面板狀態",
+          event.detail
+        );
+
+        // 更新 UI 狀態（切換到已連線面板）
+        this.updateUIState();
+        this.updateIndicator();
+        this.updateConnectedSessionInfo();
+      });
+
+      // 監聽 WebSocket 斷線事件
+      window.addEventListener("sync_disconnected", (event) => {
+        Logger.debug("[SyncUI] 收到 SYNC_DISCONNECTED 事件，更新面板狀態");
+
+        // 更新 UI 狀態（切換回未連線面板）
+        this.updateUIState();
+        this.updateIndicator();
+      });
+
       // 監聽伺服器狀態變化事件
       window.addEventListener("sync_server_status_changed", (event) => {
         const { online, previousOnline, error } = event.detail;
@@ -598,8 +636,14 @@ export class SyncManagerUI {
           try {
             Logger.debug("[SyncUI] 呼叫後端API重新產生分享代碼");
             const result = await this.core.syncClient.regenerateShareCode();
+            Logger.debug("[SyncUI] regenerateShareCode() 返回結果", {
+              result,
+              type: typeof result,
+              keys: result ? Object.keys(result) : "null",
+            });
             if (result) {
               const newShareCode = result.shareCode;
+              Logger.debug("[SyncUI] 從結果中提取新分享代碼", { newShareCode });
               this.currentShareCode = newShareCode;
 
               // 立即更新 UI（不等待其他操作）
@@ -611,12 +655,12 @@ export class SyncManagerUI {
 
               Logger.debug("[SyncUI] 重新產生分享代碼成功", { newShareCode });
 
-              // 並行執行：倒計時和 QR 生成
+              // 並行執行：倒計時和 QR 產生
               // 1. 倒計時使用預設值（回應中可能包含剩餘時間）
               const remainingTime = result.remainingTime || 300;
               this.startShareQRCountdown(remainingTime);
 
-              // 2. 非同步生成 QR code（不阻擋 UI）
+              // 2. 非同步產生 QR code（不阻擋 UI）
               window.dispatchEvent(
                 new CustomEvent("sync_generate_qr", {
                   detail: {
@@ -651,7 +695,7 @@ export class SyncManagerUI {
           }
 
           try {
-            // 生成完整的分享連結
+            // 產生完整的分享連結
             const shareUrl = this.core.generateQRContent(
               shareCode,
               this.core.syncClient?.role || "viewer"
@@ -710,7 +754,7 @@ export class SyncManagerUI {
   }
 
   /**
-   * 處理建立工作階段
+   * 處理建立工作階段（建立者直接加入，不自動產生分享代碼）
    */
   async handleCreateSession() {
     const input = document.getElementById("createCodeInput");
@@ -724,49 +768,62 @@ export class SyncManagerUI {
     this.showStatus("info", "正在建立工作階段...");
 
     try {
+      // 建立工作階段（建立者直接加入為 operator）
       const result = await this.core.createSession(code);
       const sessionId = result.sessionId;
-      const shareCode = result.shareCode;
 
-      // 建立成功後，建立者自動用分享代碼加入（以便取得 clientId）
-      // 這是必要的，因為建立者需要連線到工作階段才能使用同步功能
-      try {
-        await this.core.joinSessionByShareCode(shareCode, "operator");
-        const clientId = this.core.syncClient.clientId;
-        this.saveSessionBackup(sessionId, "operator", clientId);
-      } catch (joinError) {
-        Logger.error("自動加入工作階段失敗:", joinError);
-        // 如果自動加入失敗，這意味著建立者無法使用同步功能
-        // 應該顯示錯誤而不是成功
-        this.showStatus(
-          "error",
-          `工作階段建立成功但無法加入: ${joinError.message}`
-        );
-        return;
-      }
-
-      this.currentShareCode = shareCode;
+      // sessionStorage 由 SyncClient.saveState() 自動管理
 
       this.showStatus("success", "工作階段建立成功！");
       this.updateIndicator();
       this.updateUIState();
       this.updateConnectedSessionInfo();
 
-      // 更新連線後的分享代碼顯示（但暫不生成 QR code）
+      // 清空分享代碼顯示（尚未產生）
       const shareDisplayCode = document.getElementById("shareDisplayCode");
       if (shareDisplayCode) {
-        shareDisplayCode.textContent = shareCode;
+        shareDisplayCode.textContent = "點擊「產生分享代碼」按鈕";
       }
 
       // 重置預設模式為僅檢視
       this.currentQRRole = "viewer";
 
-      // 通知工作階段管理面板有新的工作階段
+      // 通知工作階段管理面板
       window.dispatchEvent(
         new CustomEvent("sync_session_created", {
-          detail: { sessionId, shareCode },
+          detail: { sessionId },
         })
       );
+
+      // 清除輸入框
+      input.value = "";
+
+      Logger.info("[SyncManagerUI] 工作階段建立成功", { sessionId });
+    } catch (error) {
+      this.showStatus("error", `建立失敗: ${error.message}`);
+      Logger.error("[SyncManagerUI] 建立工作階段失敗:", error);
+    }
+  }
+
+  /**
+   * 處理產生分享代碼（在工作階段建立後）
+   */
+  async handleGenerateShareCode() {
+    this.showStatus("info", "正在產生分享代碼...");
+
+    try {
+      const result = await this.core.generateShareCode();
+      this.currentShareCode = result.shareCode;
+
+      this.showStatus("success", "分享代碼已產生！");
+
+      // 更新分享代碼顯示
+      const shareDisplayCode = document.getElementById("shareDisplayCode");
+      if (shareDisplayCode) {
+        shareDisplayCode.textContent = result.shareCode;
+      }
+
+      // 啟用 QR code 按鈕
       const qrRoleButtons =
         this.controlPanel.querySelectorAll(".sync-qr-role-btn");
       qrRoleButtons.forEach((btn) => {
@@ -777,13 +834,12 @@ export class SyncManagerUI {
         }
       });
 
-      //改善：不在此處生成 QR code，而是等待使用者展開分享內容時再生成
-      // 使用者點擊「展開分享」按鈕時會調用 initializeShareCode()
-
-      input.value = "";
-      this.validateCreateCode("");
+      Logger.info("[SyncManagerUI] 分享代碼已產生", {
+        shareCode: result.shareCode,
+      });
     } catch (error) {
-      this.showStatus("error", error.message || "建立工作階段失敗");
+      this.showStatus("error", `產生分享代碼失敗: ${error.message}`);
+      Logger.error("[SyncManagerUI] 產生分享代碼失敗:", error);
     }
   }
 
@@ -812,10 +868,8 @@ export class SyncManagerUI {
       // 使用分享代碼加入（唯一的加入方式）
       await this.core.joinSessionByShareCode(code, role);
       const actualSessionId = this.core.syncClient.getSessionId(); // 取得真實的 sessionId
-      const clientId = this.core.syncClient.clientId; // 取得 clientId
 
-      // 儲存Session資訊（使用真實的 sessionId，而不是分享代碼）
-      this.saveSessionBackup(actualSessionId, role, clientId);
+      // sessionStorage 由 SyncClient.saveState() 自動管理
 
       const roleText = role === "viewer" ? "僅檢視" : "同步操作";
       this.showStatus("success", `成功加入工作階段！模式: ${roleText}`);
@@ -871,10 +925,13 @@ export class SyncManagerUI {
   updateIndicator() {
     // 安全檢查 capsuleIndicator 是否存在
     if (!this.capsuleIndicator) {
-      Logger.warn("[SyncManagerUI] capsuleIndicator 不存在，UI 初始化可能失敗或未執行", {
-        hasCore: !!this.core,
-        timestamp: new Date().toISOString()
-      });
+      Logger.warn(
+        "[SyncManagerUI] capsuleIndicator 不存在，UI 初始化可能失敗或未執行",
+        {
+          hasCore: !!this.core,
+          timestamp: new Date().toISOString(),
+        }
+      );
       return;
     }
 
@@ -1061,116 +1118,151 @@ export class SyncManagerUI {
   async initializeShareCode() {
     Logger.debug("[SyncUI] 開始初始化分享代碼和QR code");
 
+    // 標記分享面板已經打開過
+    this.sharePanelOpened = true;
+
     // 取得目前分享代碼
     let shareCode = this.currentShareCode;
     Logger.debug("[SyncUI] 目前分享代碼", { shareCode });
 
-    // 檢查現有分享代碼是否仍然有效
-    let needNewShareCode = !shareCode;
-    let shareCodeInfo = null;
-
+    // 如果已有分享代碼，立即使用它產生 QR（加快響應速度）
     if (shareCode) {
-      try {
-        Logger.debug("[SyncUI] 檢查現有分享代碼狀態", { shareCode });
-        shareCodeInfo = await this.core.getShareCodeInfo(shareCode);
+      Logger.debug("[SyncUI] 使用現有分享代碼立即產生QR", { shareCode });
 
-        // 如果分享代碼已被使用或已過期，需要重新產生
-        if (shareCodeInfo.used || shareCodeInfo.expired) {
-          Logger.debug("[SyncUI] 現有分享代碼已無效，需要重新產生", {
+      // 更新分享代碼顯示
+      const shareDisplayCode = document.getElementById("shareDisplayCode");
+      if (shareDisplayCode) {
+        shareDisplayCode.textContent = shareCode;
+      }
+
+      // 立即發送 QR 產生事件（不等待驗證）
+      Logger.debug("[SyncUI] 並行啟動QR code產生", { shareCode });
+      window.dispatchEvent(
+        new CustomEvent("sync_generate_qr", {
+          detail: {
+            shareCode: shareCode,
+            role: this.core.syncClient?.role || "viewer",
+            isShareCode: true,
+          },
+        })
+      );
+
+      // 在背景非同步驗證分享代碼（不阻塞UI）
+      this.validateAndRefreshShareCodeInBackground(shareCode);
+    } else {
+      // 沒有分享代碼，需要產生新的
+      Logger.debug("[SyncUI] 無現有分享代碼，需要產生新的");
+      await this.regenerateAndDisplayShareCode();
+    }
+  }
+
+  /**
+   * 在背景驗證分享代碼，如果無效則重新產生（非同步，不阻塞UI）
+   */
+  async validateAndRefreshShareCodeInBackground(shareCode) {
+    try {
+      Logger.debug("[SyncUI] 背景驗證分享代碼", { shareCode });
+      const shareCodeInfo = await this.core.getShareCodeInfo(shareCode);
+
+      // 檢查代碼是否有效（未使用且未過期）
+      const isValid = !shareCodeInfo.used && !shareCodeInfo.expired;
+
+      if (isValid) {
+        Logger.debug("[SyncUI] 分享代碼驗證有效，啟動倒計時", {
+          remainingTime: shareCodeInfo.remainingTime,
+        });
+        this.startShareQRCountdown(shareCodeInfo.remainingTime);
+      } else {
+        Logger.debug(
+          "[SyncUI] 分享代碼無效（已使用或已過期），重新產生新的代碼",
+          {
             used: shareCodeInfo.used,
             expired: shareCodeInfo.expired,
-          });
-          needNewShareCode = true;
-        }
-      } catch (error) {
-        Logger.warn("[SyncUI] 無法檢查分享代碼狀態，將重新產生", error);
-        needNewShareCode = true;
-      }
-    }
-
-    if (needNewShareCode) {
-      Logger.debug("[SyncUI] 需要重新產生分享代碼");
-      try {
-        const sessionId = this.core.getSessionId();
-        if (!sessionId) {
-          throw new Error("未設定工作階段 ID");
-        }
-
-        Logger.debug("[SyncUI] 向伺服器請求重新產生分享代碼", { sessionId });
-        const response = await fetch("php/sync-api.php", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: `action=regenerate_share_code&sessionId=${encodeURIComponent(
-            sessionId
-          )}`,
-        });
-
-        const result = await response.json();
-        if (result.success && result.data) {
-          shareCode = result.data.shareCode || result.data.newShareCode;
-          this.currentShareCode = shareCode;
-          Logger.debug("[SyncUI] 成功重新產生分享代碼", { shareCode });
-          // 已獲得新代碼，直接設定 shareCodeInfo 中的餘時（來自回應）
-          if (result.data.remainingTime !== undefined) {
-            shareCodeInfo = {
-              remainingTime: result.data.remainingTime,
-              createdAt: result.data.createdAt,
-              expiresAt: result.data.expiresAt,
-              used: false,
-              expired: false,
-            };
           }
-        } else {
-          throw new Error("無法產生新的分享代碼");
-        }
-      } catch (error) {
-        Logger.error("[SyncUI] 無法產生分享代碼:", error);
-        shareCode = this.core.getSessionId();
-        this.currentShareCode = shareCode;
-        Logger.warn("[SyncUI] 使用工作階段ID作為分享代碼", { shareCode });
+        );
+        await this.regenerateAndDisplayShareCode();
       }
+    } catch (error) {
+      Logger.warn("[SyncUI] 背景驗證分享代碼失敗，將重新產生", error);
+      await this.regenerateAndDisplayShareCode();
     }
+  }
 
-    // 更新分享代碼顯示
+  /**
+   * 更新分享代碼狀態顯示
+   * @param {string} statusText - 狀態文字
+   * @param {string} statusClass - CSS類別 (valid, used, expired)
+   */
+  updateShareCodeStatus(statusText, statusClass) {
     const shareDisplayCode = document.getElementById("shareDisplayCode");
     if (shareDisplayCode) {
-      shareDisplayCode.textContent = shareCode;
+      // 移除之前的狀態類別
+      shareDisplayCode.classList.remove(
+        "share-code-valid",
+        "share-code-used",
+        "share-code-expired"
+      );
+      // 添加新的狀態類別
+      shareDisplayCode.classList.add(`share-code-${statusClass}`);
+      // 更新文字（保留代碼，但添加狀態）
+      const code =
+        this.currentShareCode ||
+        shareDisplayCode.textContent.replace(/\s*\([^)]*\)$/, "");
+      shareDisplayCode.textContent = `${code} (${statusText})`;
     }
 
-    // 如果還沒有 shareCodeInfo，取得一次
-    if (!shareCodeInfo) {
-      try {
-        Logger.debug("[SyncUI] 取得分享代碼資訊", { shareCode });
-        shareCodeInfo = await this.core.getShareCodeInfo(shareCode);
-      } catch (error) {
-        Logger.warn("[SyncUI] 無法取得分享代碼資訊", error);
-        shareCodeInfo = { remainingTime: null };
+    // 更新狀態指示器
+    const statusIndicator = document.getElementById("shareCodeStatusIndicator");
+    if (statusIndicator) {
+      statusIndicator.className = `share-code-status-indicator status-${statusClass}`;
+      statusIndicator.textContent = statusText;
+    }
+  }
+
+  /**
+   * 重新產生分享代碼並顯示（含倒計時）
+   */
+  async regenerateAndDisplayShareCode() {
+    try {
+      // 使用 sync-client 的標準 API 方法
+      if (!this.core.syncClient) {
+        throw new Error("SyncClient 未初始化");
       }
+
+      Logger.debug("[SyncUI] 透過 SyncClient 請求產生新分享代碼");
+
+      // 首次產生使用 generateShareCode()，重新產生使用 regenerateShareCode()
+      const result = await this.core.generateShareCode();
+
+      const shareCode = result.shareCode;
+      Logger.debug("[SyncUI] 成功產生新分享代碼", { shareCode });
+
+      this.currentShareCode = shareCode;
+
+      // 更新分享代碼顯示
+      const shareDisplayCode = document.getElementById("shareDisplayCode");
+      if (shareDisplayCode) {
+        shareDisplayCode.textContent = shareCode;
+      }
+
+      // 發送 QR 產生事件
+      Logger.debug("[SyncUI] 並行啟動QR code產生（新代碼）", { shareCode });
+      window.dispatchEvent(
+        new CustomEvent("sync_generate_qr", {
+          detail: {
+            shareCode: shareCode,
+            role: this.core.syncClient?.role || "viewer",
+            isShareCode: true,
+          },
+        })
+      );
+
+      // 啟動倒計時（固定 300 秒）
+      this.startShareQRCountdown(300);
+    } catch (error) {
+      Logger.error("[SyncUI] 產生新分享代碼失敗:", error);
+      throw error; // 不再使用 fallback，直接拋出錯誤
     }
-
-    const remainingTime = shareCodeInfo?.remainingTime;
-
-    // 並行執行：生成 QR code 和啟動倒計時
-    Logger.debug("[SyncUI] 並行啟動QR code生成和倒數計時", {
-      shareCode,
-      remainingTime,
-    });
-
-    // 立即啟動倒計時
-    this.startShareQRCountdown(remainingTime);
-
-    // 異步生成 QR code（不等待）
-    window.dispatchEvent(
-      new CustomEvent("sync_generate_qr", {
-        detail: {
-          shareCode: shareCode,
-          role: this.core.syncClient?.role || "viewer",
-          isShareCode: true,
-        },
-      })
-    );
   }
 
   /**
@@ -1199,29 +1291,30 @@ export class SyncManagerUI {
     });
 
     const updateCountdown = async () => {
-      // 每10秒檢查一次分享代碼狀態（減少伺服器負擔）
-      if (currentTime % 10 === 0 && this.currentShareCode) {
-        try {
-          const shareCodeInfo = await this.core.getShareCodeInfo(
-            this.currentShareCode
-          );
-          if (shareCodeInfo.used) {
-            Logger.debug("[SyncUI] 分享代碼已被使用，更新顯示狀態");
-            countdownElement.textContent = "分享代碼已使用";
-            if (this.qrCountdownInterval) {
-              clearInterval(this.qrCountdownInterval);
-              this.qrCountdownInterval = null;
-            }
-            return;
-          }
-        } catch (error) {
-          // 忽略檢查錯誤，繼續倒數
-          Logger.debug(
-            "[SyncUI] 檢查分享代碼狀態失敗，繼續倒數",
-            error.message
-          );
-        }
-      }
+      // 禁用動態檢查（避免 API 延遲），直接使用倒計時
+      // 原本每10秒檢查一次分享代碼狀態，現在改為只看倒時數
+      // if (currentTime % 10 === 0 && this.currentShareCode) {
+      //   try {
+      //     const shareCodeInfo = await this.core.getShareCodeInfo(
+      //       this.currentShareCode
+      //     );
+      //     if (shareCodeInfo.used) {
+      //       Logger.debug("[SyncUI] 分享代碼已被使用，更新顯示狀態");
+      //       countdownElement.textContent = "分享代碼已使用";
+      //       if (this.qrCountdownInterval) {
+      //         clearInterval(this.qrCountdownInterval);
+      //         this.qrCountdownInterval = null;
+      //       }
+      //       return;
+      //     }
+      //   } catch (error) {
+      //     // 忽略檢查錯誤，繼續倒數
+      //     Logger.debug(
+      //       "[SyncUI] 檢查分享代碼狀態失敗，繼續倒數",
+      //       error.message
+      //     );
+      //   }
+      // }
 
       if (currentTime <= 0) {
         Logger.debug("[SyncUI] 分享QR倒數結束，已過期");

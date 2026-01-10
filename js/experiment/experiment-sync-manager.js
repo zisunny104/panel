@@ -60,7 +60,11 @@ class ExperimentSyncManager {
         this.handleRemoteActionCancelled(state);
       } else if (state?.type === "gesture_step_completed") {
         this.handleRemoteStepCompleted(state);
+      } else if (state?.type === "button_action") {
+        // 處理按鈕動作（來自面板或實驗頁面）
+        this.handleRemoteButtonAction(state);
       }
+      // 注意：已移除 panel_action 相容處理，統一使用 button_action
     });
 
     // 監聽 experiment page manager 的事件
@@ -104,7 +108,7 @@ class ExperimentSyncManager {
         this.broadcastExperimentIdUpdate(event.detail);
       }
       // 處理按鈕動作廣播
-      if (event.detail?.type === "buttonAction") {
+      if (event.detail?.type === "button_action") {
         this.broadcastButtonAction(event.detail);
       }
     });
@@ -138,7 +142,7 @@ class ExperimentSyncManager {
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗開始失敗: ${error.message}，但本地實驗繼續進行`
+        `[ExperimentSyncManager] 廣播實驗開始失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -162,7 +166,7 @@ class ExperimentSyncManager {
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗暫停失敗: ${error.message}，但本地實驗繼續進行`
+        `[ExperimentSyncManager] 廣播實驗暫停失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -186,7 +190,7 @@ class ExperimentSyncManager {
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗還原失敗: ${error.message}，但本地實驗繼續進行`
+        `[ExperimentSyncManager] 廣播實驗還原失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -248,7 +252,7 @@ class ExperimentSyncManager {
   async broadcastExperimentIdUpdate(updateData) {
     try {
       Logger.debug(
-        `[ExperimentSyncManager] 📢 廣播實驗ID更新開始: ${updateData?.experimentId}`
+        `[ExperimentSyncManager] 廣播實驗ID更新開始: ${updateData?.experimentId}`
       );
 
       const syncData = {
@@ -276,7 +280,7 @@ class ExperimentSyncManager {
    */
   async broadcastButtonAction(buttonData) {
     const syncData = {
-      type: "buttonAction",
+      type: "button_action",
       device_id: this.deviceId,
       experimentId: buttonData?.experimentId,
       experiment_id: buttonData?.experimentId,
@@ -394,7 +398,7 @@ class ExperimentSyncManager {
   handleRemoteStateChange(syncData) {
     if (syncData.device_id === this.deviceId) return;
 
-    if (syncData.type === "buttonAction") {
+    if (syncData.type === "button_action") {
       this.handleRemoteButtonAction(syncData);
       return;
     }

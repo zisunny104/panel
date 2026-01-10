@@ -54,7 +54,7 @@ class ExperimentActionManager {
     return false;
   }
 
-  // 📡 監聽來自其他裝置的遠端按鈕動作
+  // 監聽來自其他裝置的遠端按鈕動作
   setupRemoteButtonListener() {
     // 移除舊的監聽器以防重複
     window.removeEventListener(

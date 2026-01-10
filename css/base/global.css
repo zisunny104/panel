@@ -29,3 +29,118 @@ body {
     /* 設置為非襯線字體 */
     font-family: sans-serif;
 }
+
+/* ================= 全域 SVG 樣式 ================= */
+/* 基礎SVG屬性 - 不包含具體尺寸和顏色 */
+svg {
+    box-sizing: border-box;
+}
+
+/* SVG圖標統一基礎樣式 */
+.svg-icon {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    margin: 0;
+    padding: 0;
+    display: block;
+}
+
+.svg-outline {
+    fill: none;
+    stroke: currentColor;
+}
+
+/* ================= 共用佈局類別 ================= */
+/* Flexbox 共用類別 */
+.flex {
+    display: flex;
+}
+
+.flex-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.flex-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.flex-column-center {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flex-wrap {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* 間距共用類別 */
+.gap-sm {
+    gap: 0.5rem;
+}
+
+.gap-md {
+    gap: 1rem;
+}
+
+.gap-lg {
+    gap: 1.5rem;
+}
+
+/* 文字對齊共用類別 */
+.text-center {
+    text-align: center;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.text-right {
+    text-align: right;
+}
+
+/* ================= 共用外觀類別 ================= */
+/* 圓角共用類別 */
+.rounded {
+    border-radius: 4px;
+}
+
+.rounded-sm {
+    border-radius: 2px;
+}
+
+.rounded-lg {
+    border-radius: 8px;
+}
+
+.rounded-full {
+    border-radius: 50%;
+}
+
+/* 陰影共用類別 */
+.shadow {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-md {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.shadow-lg {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}

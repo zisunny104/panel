@@ -135,18 +135,13 @@ class SyncConfirmDialogManager {
       validationTimeout = setTimeout(async () => {
         Logger.debug("[Dialog] 開始驗證分享代碼:", editedCode);
         try {
-          const response = await fetch("php/sync-api.php", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: `action=validate_share_code&shareCode=${encodeURIComponent(
-              editedCode
-            )}`,
-          });
+          // 使用 SyncClient 的方法驗證
+          const syncClient = window.syncManager?.core?.syncClient;
+          if (!syncClient) {
+            throw new Error("SyncClient 未初始化");
+          }
 
-          Logger.debug("[Dialog] 驗證請求發送完成，等待回應");
-          const result = await response.json();
+          const result = await syncClient.getShareCodeInfo(editedCode);
           Logger.debug("[Dialog] 收到驗證回應:", result);
 
           // 確保元素仍存在且對話框未關閉
@@ -155,7 +150,8 @@ class SyncConfirmDialogManager {
           );
           if (!currentStatus) return;
 
-          if (result.success && result.isValid) {
+          // 有結果且未過期、未使用
+          if (result && !result.expired && !result.used) {
             Logger.debug("[Dialog] 分享代碼驗證成功");
             currentStatus.classList.add("valid");
             currentStatus.classList.remove("invalid");
@@ -229,23 +225,27 @@ class SyncConfirmDialogManager {
         confirmBtn.disabled = true;
         confirmBtn.textContent = "驗證中...";
 
-        // 調用伺服器驗證檢查碼
-        const response = await fetch("php/sync-api.php", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: `action=validate_share_code&shareCode=${encodeURIComponent(
-            editedCode
-          )}`,
-        });
+        // 使用 SyncClient 驗證分享代碼
+        const syncClient = window.syncManager?.core?.syncClient;
+        if (!syncClient) {
+          alert("同步服務未初始化");
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = originalText;
+          return;
+        }
 
-        const result = await response.json();
+        const result = await syncClient.getShareCodeInfo(editedCode);
 
         // 還原按鈕狀態
         confirmBtn.disabled = false;
         confirmBtn.textContent = originalText;
 
-        if (!result.success || !result.isValid) {
-          alert(`分享代碼無效或檢查碼驗證失敗\n請檢查代碼是否正確`);
+        // 檢查代碼是否有效（未過期且未使用）
+        if (!result || result.expired || result.used) {
+          let reason = "代碼無效";
+          if (result?.expired) reason = "代碼已過期";
+          if (result?.used) reason = "代碼已被使用";
+          alert(`分享代碼無效\n${reason}\n請檢查代碼是否正確`);
           Logger.error("分享代碼驗證失敗:", result);
           return;
         }

@@ -1,4 +1,4 @@
-// config.js - 配置與設定管理模塊
+// config.js - 設定與設定管理模塊
 
 // ========== 全域除錯開關 ==========
 // 注意：DEBUG_MODE、debugLog、toggleDebugMode 現在由 ConsoleManager 管理
@@ -99,7 +99,6 @@ class ConfigManager {
     );
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
-    const mediaLanguageSelect = document.getElementById("mediaLanguageSelect");
 
     // 主縮放設定
     if (settings.mainScale !== undefined && scaleRange) {
@@ -141,18 +140,6 @@ class ConfigManager {
     // 蜂鳴聲播放
     if (settings.playBeepSound !== undefined && toggleBeepSound)
       toggleBeepSound.checked = settings.playBeepSound;
-
-    // 語言設定：每次載入都重置為中文，但如果是從設定中載入則使用設定值
-    if (mediaLanguageSelect) {
-      if (this.resetLanguageOnLoad) {
-        mediaLanguageSelect.value = "zh"; // 強制重置為中文
-        this.resetLanguageOnLoad = false; // 避免重複重置
-      } else if (settings.mediaLanguage !== undefined) {
-        mediaLanguageSelect.value = settings.mediaLanguage;
-      } else {
-        mediaLanguageSelect.value = "zh"; // 預設中文
-      }
-    }
   }
 
   /**
@@ -169,7 +156,6 @@ class ConfigManager {
     );
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
-    const mediaLanguageSelect = document.getElementById("mediaLanguageSelect");
 
     this.userSettings = {
       mainScale: scaleRange ? Number(scaleRange.value) : 1.29,
@@ -182,7 +168,6 @@ class ConfigManager {
         : true,
       showMediaContent: toggleMediaContent ? toggleMediaContent.checked : true,
       playBeepSound: toggleBeepSound ? toggleBeepSound.checked : true,
-      mediaLanguage: mediaLanguageSelect ? mediaLanguageSelect.value : "zh",
     };
     localStorage.setItem("userSettings", JSON.stringify(this.userSettings));
   }
@@ -205,7 +190,6 @@ class ConfigManager {
     );
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
-    const mediaLanguageSelect = document.getElementById("mediaLanguageSelect");
 
     // 監聽所有設定相關元素的 input 事件
     [
@@ -225,17 +209,6 @@ class ConfigManager {
     // 蜂鳴聲獨立監聽
     if (toggleBeepSound) {
       toggleBeepSound.addEventListener("input", () => this.saveUserSettings());
-    }
-
-    // 語言選擇監聽
-    if (mediaLanguageSelect) {
-      mediaLanguageSelect.addEventListener("change", () => {
-        this.saveUserSettings();
-        // 觸發語言變更事件
-        if (window.mediaManager && window.mediaManager.onLanguageChange) {
-          window.mediaManager.onLanguageChange(mediaLanguageSelect.value);
-        }
-      });
     }
   }
 
@@ -270,7 +243,7 @@ class ConfigManager {
     const major = parseInt(versionParts[0]) || 1;
     const minor = parseInt(versionParts[1]) || 1;
 
-    // 產生基於時間戳的短代碼 (5位字符)
+    // 產生基於時間戳的短代碼 (7位字符)
     const timestamp = Date.now();
     const shortCode = this.timestampToShortCode(timestamp);
 
@@ -278,12 +251,37 @@ class ConfigManager {
   }
 
   /**
-   * 將時間戳轉換為5位短代碼
+   * 將時間戳轉換為7位短代碼
+   * 優先使用 git commit hash，如果無法取得則使用時間戳
    */
   timestampToShortCode(timestamp) {
-    // 取時間戳的後8位，轉為36進制，取前5位
-    const shortened = timestamp.toString(36).slice(-5);
+    try {
+      // 嘗試取得 git commit hash
+      const gitHash = this.getGitCommitHash();
+      if (gitHash && gitHash.length >= 7) {
+        return gitHash.substring(0, 7);
+      }
+    } catch (error) {
+      // git 不可用時記錄但不中斷
+      if (window.Logger) {
+        Logger.debug("無法取得 git commit hash，使用時間戳:", error.message);
+      }
+    }
+
+    // 回退到時間戳轉換（原邏輯）
+    const shortened = timestamp.toString(36).slice(-7);
     return shortened;
+  }
+
+  /**
+   * 取得 git commit hash
+   */
+  getGitCommitHash() {
+    // 從 config 中讀取 git commit hash
+    if (this.configData && this.configData.git_commit_hash) {
+      return this.configData.git_commit_hash;
+    }
+    return null;
   }
 
   /**
@@ -336,9 +334,9 @@ class ConfigManager {
 // 匯出單例
 window.configManager = new ConfigManager();
 
-// 立即載入配置
+// 立即載入設定
 window.configManager.loadConfigSettings().catch((err) => {
-  Logger.error("配置載入失敗:", err);
+  Logger.error("設定載入失敗:", err);
 });
 
 // 全域版本管理函數
@@ -362,7 +360,7 @@ window.getAppVersionInfo = function () {
 // 測試版本功能
 window.testVersionSystem = function () {
   if (window.Logger) {
-    Logger.debug("🧪 測試版本系統...");
+    Logger.debug("測試版本系統...");
     const versionElement = document.getElementById("appVersion");
     Logger.debug("版本元素:", versionElement);
     Logger.debug(

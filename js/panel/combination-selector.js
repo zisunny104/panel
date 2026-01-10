@@ -114,7 +114,7 @@ class CombinationSelector {
       return;
     }
 
-    // 2. 如果無本機快取，嘗試使用配置的預設組合
+    // 2. 如果無本機快取，嘗試使用設定的預設組合
     const defaultCombinationId =
       window.CONFIG?.experiment?.defaultCombinationId;
     if (defaultCombinationId) {
@@ -127,7 +127,7 @@ class CombinationSelector {
         return;
       } else {
         Logger.warn(
-          "[CombinationSelector] 配置的預設組合找不到:",
+          "[CombinationSelector] 設定的預設組合找不到:",
           defaultCombinationId
         );
       }
@@ -170,7 +170,7 @@ class CombinationSelector {
     // 3. 更新實驗面板的單元列表
     this.updateUnitListForCombination(combination, experimentId);
 
-    // 4. 如果在同步中且在線，廣播此選擇
+    // 4. 如果在同步中且線上，廣播此選擇
     if (this.isInSyncSession() && this.isOnline()) {
       this.broadcastCombinationSelection(combination);
     }
@@ -355,7 +355,7 @@ class CombinationSelector {
   }
 
   /**
-   * 檢查是否在線（有網絡連線）
+   * 檢查是否線上（有網絡連線）
    */
   isOnline() {
     return navigator.onLine;
@@ -417,7 +417,7 @@ class CombinationSelector {
    * 當收到同步狀態更新時調用
    */
   handleRemoteCombinationSelected(combination) {
-    // 必須在線才能接收遠端組合選擇
+    // 必須線上才能接收遠端組合選擇
     if (!this.isOnline()) {
       return;
     }

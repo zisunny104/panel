@@ -48,17 +48,15 @@ class PanelSyncOperator {
         this.handleRemoteExperimentStart(state);
       } else if (state && state.type === "experiment_stopped") {
         this.handleRemoteExperimentStop(state);
-      } else if (state && state.type === "panel_action") {
-        // 接收面板的 action
-        this.handleRemotePanelAction(state);
       }
+      // 注意：按鈕動作已改用 button_action，透過 panel-experiment-manager 處理
     });
 
     // 監聽本機按鈕按下事件（來自 button-manager）
+    // 注意：按鈕同步已改由 panel-experiment-manager.broadcastButtonAction() 處理
+    // 此處只保留本機日誌記錄
     document.addEventListener("buttonPressed", (event) => {
       if (this.experimentRunning && this.syncControlsEnabled) {
-        this.syncPanelAction("button_pressed", event.detail);
-
         // 記錄到實驗日誌
         if (
           window.experimentLogManager &&
@@ -278,12 +276,7 @@ class PanelSyncOperator {
         const sessionId = window.syncManager.core.syncClient.sessionId;
         try {
           const response = await fetch(
-            "php/sync-api.php?action=getSessionClients",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ session_id: sessionId }),
-            }
+            `http://localhost:7645/api/sync/session/${sessionId}/clients`
           );
 
           if (response.ok) {
@@ -360,36 +353,13 @@ class PanelSyncOperator {
   }
 
   /**
-   * 同步面板的 action 到實驗管理
-   * @param {string} action - 操作名稱（如 "button_pressed", "gesture_complete"）
-   * @param {object} actionData - 操作資料
+   * [已移除] syncPanelAction - 改用 panel-experiment-manager.broadcastButtonAction()
+   * [已移除] handleRemotePanelAction - 統一使用 button_action 事件
+   *
+   * 按鈕動作同步流程已統一為：
+   * buttonPressed 事件 → panel-experiment-manager.broadcastButtonAction()
+   * → button_action 事件 → WebSocket 廣播
    */
-  syncPanelAction(action, actionData) {
-    if (!this.experimentRunning || !this.syncControlsEnabled) {
-      return; // 實驗未執行或無同步權限時不發送
-    }
-
-    const syncData = {
-      type: "panel_action",
-      source: "panel",
-      device_id: this.deviceId,
-      action: action,
-      actionData: actionData,
-      timestamp: new Date().toISOString(),
-    };
-
-    window.syncManager.core.syncState(syncData).catch((error) => {
-      Logger.warn("[PanelSyncOp] 同步 action 失敗:", error);
-    });
-  }
-
-  /**
-   * 處理來自面板的 action
-   */
-  handleRemotePanelAction(syncData) {
-    Logger.info("[PanelSyncOp] 接收到面板 action:", syncData);
-    // 這會在實驗管理端被記錄
-  }
 }
 
 // 初始化

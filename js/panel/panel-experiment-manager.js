@@ -118,7 +118,7 @@ class PanelExperimentManager {
     // 監聽來自新實驗中樞的廣播事件
     window.addEventListener("experiment_id_broadcasted", (e) => {
       Logger.debug(
-        `[PanelExperimentManager] 📨 收到 experiment_id_broadcasted 事件:`,
+        `[PanelExperimentManager] 收到 experiment_id_broadcasted 事件:`,
         e.detail
       );
       if (e.detail && e.detail.experimentId) {
@@ -202,7 +202,7 @@ class PanelExperimentManager {
     if (data.type === "experimentInitialize") {
       // 所有角色都應接收實驗初始化資訊
       this.handleRemoteExperimentInit(data);
-    } else if (data.type === "buttonAction") {
+    } else if (data.type === "button_action") {
       // 只有 Viewer 角色接收並套用按鈕動作
       if (role === "viewer") {
         this.handleRemoteButtonAction(data);
@@ -308,7 +308,7 @@ class PanelExperimentManager {
         } (來源: ${data?.source || "unknown"})`
       );
       Logger.debug(
-        `[PanelExperimentManager] 📨 收到遠端實驗ID更新事件詳情:`,
+        `[PanelExperimentManager] 收到遠端實驗ID更新事件詳情:`,
         data
       );
 
@@ -453,7 +453,7 @@ class PanelExperimentManager {
     try {
       const { step_index, gesture_name, mark_status } = data;
       Logger.debug(
-        `📍 遠端手勢標記: 步驟${step_index} - ${gesture_name} 標記為 ${mark_status}`
+        `遠端手勢標記: 步驟${step_index} - ${gesture_name} 標記為 ${mark_status}`
       );
 
       // 在卡片上顯示標記指示（可選：在對應卡片上顯示標記顏色）
@@ -518,7 +518,7 @@ class PanelExperimentManager {
       // 在控制面板上顯示遠端動作回饋
       const actionDisplay = document.getElementById("remoteActionDisplay");
       if (actionDisplay) {
-        actionDisplay.innerHTML = `🎬 遠端動作: ${action_id}`;
+        actionDisplay.innerHTML = `遠端動作: ${action_id}`;
         actionDisplay.style.display = "block";
         setTimeout(() => {
           actionDisplay.style.display = "none";
@@ -649,7 +649,7 @@ class PanelExperimentManager {
     }
 
     const actionData = {
-      type: "buttonAction",
+      type: "button_action",
       experimentId: this.getCurrentExperimentId(),
       action_id: buttonData.action_id, // 傳遞 action_id 給實驗頁面
       buttonData: buttonData,
@@ -733,7 +733,7 @@ class PanelExperimentManager {
   broadcastExperimentIdUpdate(experimentId) {
     try {
       Logger.debug(
-        `[PanelExperimentManager] 📢 開始廣播實驗ID更新: ${experimentId}`
+        `[PanelExperimentManager] 開始廣播實驗ID更新: ${experimentId}`
       );
 
       const syncIdData = {
@@ -921,36 +921,45 @@ class PanelExperimentManager {
    */
   async initializeExperimentId() {
     try {
-      // 等待 ExperimentHubClient 初始化（最多等 5 秒）
+      // 等待 ExperimentHubManager 初始化（最多等 5 秒）
       let attempts = 0;
       const maxAttempts = 50;
 
-      while (!window.experimentHubClient && attempts < maxAttempts) {
+      while (!window.experimentHubManager && attempts < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         attempts++;
       }
 
-      if (!window.experimentHubClient) {
+      if (!window.experimentHubManager) {
         Logger.warn(
-          "[PanelExperimentManager] ExperimentHubClient 初始化超時，產生新ID"
+          "[PanelExperimentManager] ExperimentHubManager 初始化超時，產生新ID"
         );
         this.generateNewExperimentId();
         return;
       }
 
-      const experimentId = await window.experimentHubClient.getExperimentId();
-      if (experimentId) {
-        this.currentExperimentId = experimentId;
-        this.updateExperimentIdDisplay();
-        if (window.experimentStateManager) {
-          window.experimentStateManager.setExperimentId(experimentId, "hub");
+      // 檢查是否處於同步模式且有客戶端
+      if (window.experimentHubManager.hubClient) {
+        const experimentId =
+          await window.experimentHubManager.hubClient.getExperimentId();
+        if (experimentId) {
+          this.currentExperimentId = experimentId;
+          this.updateExperimentIdDisplay();
+          if (window.experimentStateManager) {
+            window.experimentStateManager.setExperimentId(experimentId, "hub");
+          }
+          Logger.debug(
+            `[PanelExperimentManager] 從中樞讀取實驗ID: ${experimentId}`
+          );
+          return;
         }
-        Logger.debug(
-          `[PanelExperimentManager] 從中樞讀取實驗ID: ${experimentId}`
-        );
-      } else {
-        this.generateNewExperimentId();
       }
+
+      // 本機模式或無法從中樞取得 ID，產生新 ID
+      Logger.debug(
+        "[PanelExperimentManager] 本機模式或無法從中樞取得ID，產生新ID"
+      );
+      this.generateNewExperimentId();
     } catch (e) {
       Logger.warn("無法從中樞讀取ID，產生新ID:", e);
       this.generateNewExperimentId();
@@ -1019,14 +1028,14 @@ class PanelExperimentManager {
 
     //開始 JSONL 實驗日誌記錄
     const experimentId = this.getCurrentExperimentId();
-    const participantName =
+    const subjectName =
       document.getElementById("subjectNameInput")?.value || "";
     const combinationName = this.currentCombination?.combination_name || "";
 
     if (window.panelExperimentLog) {
       window.panelExperimentLog.startRecording(
         experimentId,
-        participantName,
+        subjectName,
         combinationName
       );
     }
@@ -1073,14 +1082,16 @@ class PanelExperimentManager {
     //立即廣播實驗開始訊號到其他裝置（不管是否需要開機）
     Logger.debug("廣播實驗開始訊號到其他裝置（experiment.html 自動開始）");
 
-    // 確保實驗ID被註冊到中樞系統
+    // 只在同步模式下註冊實驗ID到中樞系統
     const finalExperimentId = this.getCurrentExperimentId();
-    if (window.experimentHubManager && finalExperimentId) {
-      Logger.debug(`註冊實驗ID到中樞: ${finalExperimentId}`);
+    if (window.experimentHubManager?.isInSyncMode?.() && finalExperimentId) {
+      Logger.debug(`[同步模式] 註冊實驗ID到中樞: ${finalExperimentId}`);
       window.experimentHubManager.registerExperimentId(
         finalExperimentId,
         "panel_start"
       );
+    } else if (finalExperimentId) {
+      Logger.debug(`[獨立模式] 實驗ID僅存本機: ${finalExperimentId}`);
     }
 
     this.broadcastExperimentInitialization();
@@ -1089,7 +1100,7 @@ class PanelExperimentManager {
     if (this.includeStartup) {
       // 如果包含開機且機器目前是關閉的，等待使用者開機
       if (window.powerControl && !window.powerControl.isPowerOn) {
-        Logger.debug("⚡ 等待開機：呼叫 highlightPowerSwitch(true)");
+        Logger.debug("等待開機：呼叫 highlightPowerSwitch(true)");
         this.waitingForPowerOn = true;
         this.highlightPowerSwitch(true);
         if (window.logger) {
@@ -1623,18 +1634,18 @@ class PanelExperimentManager {
         Logger.debug("[PanelExperimentManager]已產生新的實驗ID:", newId);
 
         // 廣播新的實驗ID到同步工作階段
-        Logger.debug(`[PanelExperimentManager] 📢 廣播新的實驗ID: ${newId}`);
+        Logger.debug(`[PanelExperimentManager] 廣播新的實驗ID: ${newId}`);
         this.broadcastExperimentIdUpdate(newId);
 
-        // 同時註冊到新的實驗中樞系統
-        if (window.experimentHubManager) {
-          Logger.debug(
-            `[PanelExperimentManager] 📝 註冊實驗ID到中樞: ${newId}`
-          );
+        // 只在同步模式下註冊到實驗中樞系統
+        if (window.experimentHubManager?.isInSyncMode?.()) {
+          Logger.debug(`[同步模式] 註冊實驗ID到中樞: ${newId}`);
           window.experimentHubManager.registerExperimentId(
             newId,
             "panel_auto_generate"
           );
+        } else {
+          Logger.debug(`[獨立模式] 實驗ID僅存本機: ${newId}`);
         }
 
         // 更新受試者名稱為新的預設值
@@ -1654,20 +1665,18 @@ class PanelExperimentManager {
               "[PanelExperimentManager]同步完成，已產生新的實驗ID:",
               newId
             );
-            Logger.debug(
-              `[PanelExperimentManager] 📢 廣播新的實驗ID: ${newId}`
-            );
+            Logger.debug(`[PanelExperimentManager] 廣播新的實驗ID: ${newId}`);
             this.broadcastExperimentIdUpdate(newId);
 
-            // 同時註冊到新的實驗中樞系統
-            if (window.experimentHubManager) {
-              Logger.debug(
-                `[PanelExperimentManager] 📝 註冊實驗ID到中樞: ${newId}`
-              );
+            // 只在同步模式下註冊到實驗中樞系統
+            if (window.experimentHubManager?.isInSyncMode?.()) {
+              Logger.debug(`[同步模式] 註冊實驗ID到中樞: ${newId}`);
               window.experimentHubManager.registerExperimentId(
                 newId,
                 "panel_sync_complete"
               );
+            } else {
+              Logger.debug(`[獨立模式] 實驗ID僅存本機: ${newId}`);
             }
 
             const subjectNameInput =
@@ -1924,7 +1933,7 @@ class PanelExperimentManager {
       window.logger.logAction("實驗結束");
     }
 
-    // 🧹 清除預先載入的媒體
+    // 清除預先載入的媒體
     if (window.mediaManager) {
       window.mediaManager.clearPreloadedMedia();
     }
@@ -2045,7 +2054,7 @@ class PanelExperimentManager {
       }
     }
 
-    // 🎬 預先載入下一個步驟的媒體（如果存在）
+    // 預先載入下一個步驟的媒體（如果存在）
     this.preloadNextStepMedia(unit);
 
     // 更新按鈕高亮樣式
@@ -2127,7 +2136,7 @@ class PanelExperimentManager {
       }
     }
 
-    // 批量預先載入媒體檔案
+    // 批次預先載入媒體檔案
     if (mediaFilesToPreload.length > 0) {
       window.mediaManager.preloadMediaBatch(mediaFilesToPreload);
     }
@@ -2213,21 +2222,18 @@ class PanelExperimentManager {
     } else {
       // 實驗結束時，還原輸入框
       if (experimentIdInputGroup) {
-        //console.log("解鎖實驗ID - 還原輸入框");
         experimentIdInputGroup.innerHTML = `
                     <label for="experimentIdInput">實驗ID</label>
                     <input type="text" id="experimentIdInput" class="experiment-id-input" maxlength="10" placeholder="載入中...">
-                    <button id="regenerateIdButton" class="regenerate-id-btn" title="重新產生ID">🔄</button>
+                    <button id="regenerateIdButton" class="regenerate-id-btn" title="重新產生ID">重新產生</button>
                     <div id="experimentTimer" class="experiment-timer">花費時間：00:00</div>
                 `;
         // 重新設定事件監聽器
-        //console.log("呼叫 setupExperimentIdEvents()");
         this.setupExperimentIdEvents();
         // 保持目前實驗ID，不要重新產生
         const newInput = document.getElementById("experimentIdInput");
         if (newInput && this.currentExperimentId) {
           newInput.value = this.currentExperimentId;
-          //console.log("還原實驗ID值：", this.currentExperimentId);
         }
       }
     }
@@ -2237,13 +2243,6 @@ class PanelExperimentManager {
   setupExperimentIdEvents() {
     const experimentIdInput = document.getElementById("experimentIdInput");
     const regenerateIdButton = document.getElementById("regenerateIdButton");
-
-    // console.log(
-    //   "🔧 setupExperimentIdEvents - Input found:",
-    //   !!experimentIdInput,
-    //   "Button found:",
-    //   !!regenerateIdButton
-    // );
 
     if (experimentIdInput) {
       experimentIdInput.addEventListener("input", (e) => {

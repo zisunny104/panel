@@ -1,6 +1,6 @@
 /**
  * 同步工作階段管理樣式
- * 包含工作階段列表、批量操作、狀態顯示等相關樣式
+ * 包含工作階段列表、批次操作、狀態顯示等相關樣式
  */
 
 .sync-sessions-actions {
@@ -51,7 +51,7 @@
     background: #c82333;
 }
 
-/* 批量操作區域 */
+/* 批次操作區域 */
 .sync-sessions-batch-actions {
     margin-bottom: 20px;
     padding: 16px;

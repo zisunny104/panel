@@ -421,13 +421,13 @@ class MediaManager {
       preloadElement.setAttribute("data-preload", "true");
       document.body.appendChild(preloadElement);
 
-      Logger.debug(`🎬 預先載入影片: ${mediaFile}`);
+      Logger.debug(`預先載入影片: ${mediaFile}`);
     }
 
     return preloadElement;
   }
 
-  // 批量預先載入多個媒體檔案
+  // 批次預先載入多個媒體檔案
   preloadMediaBatch(mediaFiles) {
     if (!Array.isArray(mediaFiles)) {
       return;
@@ -439,7 +439,7 @@ class MediaManager {
       }
     });
 
-    Logger.debug(`📦 批量預先載入 ${mediaFiles.length} 個媒體檔案`);
+    Logger.debug(`批次預先載入 ${mediaFiles.length} 個媒體檔案`);
   }
 
   // 清除預先載入的媒體
@@ -449,7 +449,7 @@ class MediaManager {
       element.remove();
     });
 
-    Logger.debug(`🧹 已清除預先載入的媒體`);
+    Logger.debug(`已清除預先載入的媒體`);
   }
 
   // 顯示媒體（實驗模式用的別名方法）
@@ -499,7 +499,7 @@ class MediaManager {
     const timestamp = window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(Date.now())
       : new Date().toLocaleString("zh-TW", {
-          timeZone: window.timeSyncManager?.timezone || "Asia/Taipei",
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
         });
 
     const errorInfo = {
@@ -818,7 +818,7 @@ class MediaManager {
         return;
       }
 
-      Logger.debug(`📦 需要預先載入 ${newFiles.length} 個新媒體檔案`);
+      Logger.debug(`需要預先載入 ${newFiles.length} 個新媒體檔案`);
 
       // 按優先級排序
       const sortedFiles = this.sortMediaByPriority(newFiles);

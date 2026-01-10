@@ -1,4 +1,4 @@
-// main.js - 套用程式主初始化與協調模組
+// main.js - 應用程式主初始化與協調模組
 
 class MainApp {
   constructor() {
@@ -23,29 +23,57 @@ class MainApp {
       }
 
       // 第一優先級：確保 SyncManager 完全初始化
-      // SyncManager 在 sync-manager.js 底部自動初始化，但需要等待 Session 準備完成
-      Logger.debug("[MainApp] 等待 SyncManager 和 Session 準備完成...");
+      // SyncManager 在 sync-manager.js 底部自動初始化，但需要等待初始化完成
+      Logger.debug("[MainApp] 等待 SyncManager 初始化完成...");
 
       await new Promise((resolve) => {
-        const checkReady = () => {
-          if (window.syncManager?.core?.syncClient?.sessionId) {
-            Logger.debug("[MainApp] SyncManager 已就緒，sessionId 可用");
+        let resolved = false;
+
+        // 先檢查是否已經初始化（避免錯過事件觸發）
+        if (window.syncManager?.initialized) {
+          Logger.debug(
+            "[MainApp] SyncManager 已初始化（檢查標記）",
+            window.syncManager?.core?.syncClient?.sessionId
+              ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
+              : "本機模式"
+          );
+          resolve();
+          return;
+        }
+
+        // 監聽 CLIENT_INITIALIZED 事件（SyncManager 初始化完成後觸發）
+        const handleClientInit = (event) => {
+          if (!resolved) {
+            resolved = true;
+            Logger.debug(
+              "[MainApp] SyncManager 已就緒（收到 CLIENT_INITIALIZED 事件）",
+              window.syncManager?.core?.syncClient?.sessionId
+                ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
+                : "本機模式"
+            );
             resolve();
-          } else {
-            setTimeout(checkReady, 100);
           }
         };
 
-        // 設置超時保護（最多等 10 秒）
-        const timeoutId = setTimeout(() => {
-          Logger.warn("[MainApp] 等待 SyncManager 超時（10秒），繼續初始化");
-          resolve();
-        }, 10000);
+        window.addEventListener("sync:client-initialized", handleClientInit, {
+          once: true,
+        });
 
-        checkReady();
+        // 設置超時保護（最多等 10 秒）
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            Logger.warn("[MainApp] 等待 SyncManager 超時（10秒），繼續初始化");
+            window.removeEventListener(
+              "sync:client-initialized",
+              handleClientInit
+            );
+            resolve();
+          }
+        }, 10000);
       });
 
-      // 並行初始化時間同步和配置（相互獨立，可提前完成）
+      // 並行初始化時間同步和設定（相互獨立，可提前完成）
       const timeSyncPromise = window.timeSyncManager
         ? (async () => {
             Logger.debug("開始時間同步初始化...");
@@ -55,13 +83,11 @@ class MainApp {
         : Promise.resolve();
 
       const configPromise = (async () => {
-        if (!window.configManager) {
-          window.configManager = new ConfigManager();
-        }
+        // ConfigManager 已在 config.js 中初始化，這裡只需要載入初始設定
         await this.loadInitialSettings();
       })();
 
-      // 等待時間同步和配置完成
+      // 等待時間同步和設定完成
       await Promise.all([timeSyncPromise, configPromise]);
 
       // 初始化各個模組
@@ -73,42 +99,40 @@ class MainApp {
       // 不需要在此重複建立，直接使用全局的 window.syncManager
       Logger.debug("SyncManager 已由 sync-manager.js 自動初始化");
 
-      // 初始化 Experiment Hub Manager - 非關鍵路徑，異步執行但帶超時
+      // 初始化 Experiment Hub Manager - 等待完成以避免後續模組等待超時
       if (!window.experimentHubManager) {
-        (async () => {
-          try {
-            Logger.debug("[MainApp] 開始初始化 ExperimentHubManager...");
-            const { initializeExperimentHub } = await import(
+        try {
+          Logger.debug("[MainApp] 開始初始化 ExperimentHubManager...");
+          const { initializeExperimentHub } = await import(
+            "../sync/experiment-hub-manager.js"
+          );
+
+          // 設置初始化超時（5秒）
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => {
+              reject(new Error("ExperimentHubManager 初始化超時 (5秒)"));
+            }, 5000)
+          );
+
+          window.experimentHubManager = await Promise.race([
+            initializeExperimentHub(),
+            timeoutPromise,
+          ]);
+
+          Logger.info("ExperimentHubManager 已初始化（全域單一實例）", {
+            syncMode: window.experimentHubManager.isInSyncMode(),
+          });
+        } catch (error) {
+          Logger.warn("ExperimentHubManager 初始化失敗或超時:", error.message);
+          // 建立備用實例，以保證系統繼續運作
+          if (!window.experimentHubManager) {
+            Logger.debug("[MainApp] 建立備用 ExperimentHubManager 實例");
+            const { ExperimentHubManager } = await import(
               "../sync/experiment-hub-manager.js"
             );
-            
-            // 設置初始化超時（5秒）
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => {
-                reject(new Error("ExperimentHubManager 初始化超時 (5秒)"));
-              }, 5000)
-            );
-
-            window.experimentHubManager = await Promise.race([
-              initializeExperimentHub(),
-              timeoutPromise,
-            ]);
-            
-            Logger.info("ExperimentHubManager 已初始化（全域單一實例）", {
-              syncMode: window.experimentHubManager.isInSyncMode(),
-            });
-          } catch (error) {
-            Logger.warn("ExperimentHubManager 初始化失敗或超時:", error.message);
-            // 建立備用實例，以保證系統繼續運作
-            if (!window.experimentHubManager) {
-              Logger.debug("[MainApp] 建立備用 ExperimentHubManager 實例");
-              const { ExperimentHubManager } = await import(
-                "../sync/experiment-hub-manager.js"
-              );
-              window.experimentHubManager = new ExperimentHubManager();
-            }
+            window.experimentHubManager = new ExperimentHubManager();
           }
-        })();
+        }
       } else {
         Logger.debug("ExperimentHubManager 已存在，使用現有實例");
       }
@@ -169,7 +193,7 @@ class MainApp {
 
   // 初始化各個模組
   async initializeModules() {
-    // 配置管理器
+    // 設定管理器
     if (this.modules.config) {
       await this.modules.config.loadConfigSettings();
       this.modules.config.setupEventListeners();
@@ -487,14 +511,14 @@ class MainApp {
     return this.initializationComplete;
   }
 
-  // 重新載入配置
+  // 重新載入設定
   async reloadConfig() {
     if (this.modules.config) {
       await this.modules.config.loadConfigSettings();
     }
   }
 
-  // 重設套用程式狀態
+  // 重設應用程式狀態
   reset() {
     if (this.modules.logger) this.modules.logger.clearLog();
     if (this.modules.mediaManager) this.modules.mediaManager.reset();
@@ -536,7 +560,7 @@ class MainApp {
   }
 }
 
-// 建立並初始化主套用程式
+// 建立並初始化主應用程式
 const mainApp = new MainApp();
 
 // DOM 載入完成時初始化
@@ -546,5 +570,5 @@ if (document.readyState === "loading") {
   mainApp.initialize();
 }
 
-// 匯出主套用程式實例
+// 匯出主應用程式實例
 window.mainApp = mainApp;

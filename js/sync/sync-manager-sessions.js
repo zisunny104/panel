@@ -21,7 +21,7 @@ export class SyncManagerSessions {
       this.showSessionsPanel();
     });
 
-    // 監聽工作階段創建事件，自動重新整理列表
+    // 監聽工作階段建立事件，自動重新整理列表
     window.addEventListener("sync_session_created", () => {
       // 如果面板正在顯示，自動重新整理
       if (this.sessionsPanel && document.body.contains(this.sessionsPanel)) {
@@ -58,7 +58,7 @@ export class SyncManagerSessions {
             <button id="clearAllSessionsBtn" class="sync-action-btn sync-action-btn-danger">刪除所有工作階段</button>
           </div>
 
-          <!-- 批量操作區域 -->
+          <!-- 批次操作區域 -->
           <div class="sync-sessions-batch-actions">
             <div class="sync-batch-controls">
               <label class="sync-batch-checkbox">
@@ -92,7 +92,7 @@ export class SyncManagerSessions {
    */
   async loadSessionsData() {
     try {
-      const response = await fetch("./php/sync-api.php?action=list_sessions");
+      const response = await fetch("http://localhost:7645/api/sync/sessions");
       const data = await response.json();
 
       if (data.success) {
@@ -147,12 +147,12 @@ export class SyncManagerSessions {
     const createdTime = window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(session.created * 1000)
       : new Date(session.created * 1000).toLocaleString("zh-TW", {
-          timeZone: window.timeSyncManager?.timezone || "Asia/Taipei",
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
         });
     const lastActivity = window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(session.lastActivity * 1000)
       : new Date(session.lastActivity * 1000).toLocaleString("zh-TW", {
-          timeZone: window.timeSyncManager?.timezone || "Asia/Taipei",
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
         });
     const isActive = Date.now() / 1000 - session.lastActivity < 600; // 10分鐘內有活動
 
@@ -309,18 +309,18 @@ ${indentStr}}</span>`;
           const createdTime = window.timeSyncManager
             ? window.timeSyncManager.formatDateTime(code.createdAt * 1000)
             : new Date(code.createdAt * 1000).toLocaleString("zh-TW", {
-                timeZone: window.timeSyncManager?.timezone || "Asia/Taipei",
+                timeZone: window.CONFIG?.timezone || "Asia/Taipei",
               });
           const expiresTime = window.timeSyncManager
             ? window.timeSyncManager.formatDateTime(code.expiresAt * 1000)
             : new Date(code.expiresAt * 1000).toLocaleString("zh-TW", {
-                timeZone: window.timeSyncManager?.timezone || "Asia/Taipei",
+                timeZone: window.CONFIG?.timezone || "Asia/Taipei",
               });
           const usedTime = code.usedAt
             ? window.timeSyncManager
               ? window.timeSyncManager.formatDateTime(code.usedAt * 1000)
               : new Date(code.usedAt * 1000).toLocaleString("zh-TW", {
-                  timeZone: window.timeSyncManager?.timezone || "Asia/Taipei",
+                  timeZone: window.CONFIG?.timezone || "Asia/Taipei",
                 })
             : null;
 
@@ -365,14 +365,14 @@ ${indentStr}}</span>`;
               const joinedTime = window.timeSyncManager
                 ? window.timeSyncManager.formatDateTime(client.joinedAt * 1000)
                 : new Date(client.joinedAt * 1000).toLocaleString("zh-TW", {
-                    timeZone: window.timeSyncManager?.timezone || "Asia/Taipei",
+                    timeZone: window.CONFIG?.timezone || "Asia/Taipei",
                   });
               const lastActivityTime = window.timeSyncManager
                 ? window.timeSyncManager.formatDateTime(
                     client.lastActivity * 1000
                   )
                 : new Date(client.lastActivity * 1000).toLocaleString("zh-TW", {
-                    timeZone: window.timeSyncManager?.timezone || "Asia/Taipei",
+                    timeZone: window.CONFIG?.timezone || "Asia/Taipei",
                   });
               return `
         <div class="sync-session-client ${client.role}">
@@ -481,9 +481,10 @@ ${indentStr}}</span>`;
 
         try {
           const response = await fetch(
-            "./php/sync-api.php?action=clear_all_sessions",
+            "http://localhost:7645/api/sync/sessions/clear",
             {
               method: "POST",
+              headers: { "Content-Type": "application/json" },
             }
           );
           const data = await response.json();
@@ -682,12 +683,9 @@ ${indentStr}}</span>`;
         try {
           const deletePromises = Array.from(this.selectedSessions).map(
             (sessionId) =>
-              fetch(
-                `./php/sync-api.php?action=delete_session&sessionId=${sessionId}`,
-                {
-                  method: "POST",
-                }
-              ).then((response) => response.json())
+              fetch(`http://localhost:7645/api/sync/session/${sessionId}`, {
+                method: "DELETE",
+              }).then((response) => response.json())
           );
 
           const results = await Promise.all(deletePromises);
@@ -713,8 +711,8 @@ ${indentStr}}</span>`;
             alert(`刪除完成：成功 ${successCount} 個，失敗 ${failCount} 個`);
           }
         } catch (error) {
-          Logger.error("批量刪除工作階段錯誤:", error);
-          alert("批量刪除失敗: " + error.message);
+          Logger.error("批次刪除工作階段錯誤:", error);
+          alert("批次刪除失敗: " + error.message);
         }
 
         deleteSelectedBtn.disabled = false;
@@ -754,9 +752,9 @@ ${indentStr}}</span>`;
 
           try {
             const response = await fetch(
-              `./php/sync-api.php?action=delete_session&sessionId=${sessionId}`,
+              `http://localhost:7645/api/sync/session/${sessionId}`,
               {
-                method: "POST",
+                method: "DELETE",
               }
             );
             const data = await response.json();
@@ -823,7 +821,7 @@ ${indentStr}}</span>`;
               detailsElement.innerHTML = "";
             }
           } else {
-            // 展開：新增展開狀態，生成內容
+            // 展開：新增展開狀態，產生內容
             this.expandedCards.add(sessionId);
             card.classList.add("expanded");
             if (detailsElement) {
@@ -881,7 +879,7 @@ ${indentStr}}</span>`;
   }
 
   /**
-   * 更新批量操作按鈕狀態
+   * 更新批次操作按鈕狀態
    */
   updateBatchOperationButtons() {
     const downloadBtn = this.sessionsPanel?.querySelector(

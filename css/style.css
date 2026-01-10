@@ -11,12 +11,12 @@
 @import url('./components/svg-panel.css');
 @import url('./components/media-area.css');
 @import url('./components/buttons.css');
-@import url('./components/power-button.css');
 @import url('./components/button-styles.css');
+@import url('./components/power-button.css');
+@import url('./components/general-buttons.css');
+@import url('./components/ui-buttons.css');
 @import url('./components/control-panel.css');
 @import url('./components/toggle-switch.css');
-@import url('./components/circular-button.css');
-@import url('./components/language-selector.css');
 
 /* 面板 */
 @import url('./panels/experiment-panel.css');
@@ -44,11 +44,10 @@
 @import url('./experiment/base.css');
 @import url('./experiment/layout.css');
 @import url('./experiment/combinations.css');
-@import url('./experiment/forms.css');
+@import url('./experiment/experiment-forms.css');
 @import url('./experiment/cards.css');
 @import url('./experiment/gestures.css');
 @import url('./experiment/stats.css');
-@import url('./experiment/buttons.css');
 @import url('./experiment/units.css');
 @import url('./experiment/sync.css');
 @import url('./experiment/log-view-modal.css');

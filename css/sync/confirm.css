@@ -181,7 +181,7 @@
 
 /* 還原按鈕 */
 .sync-confirm-code-reset {
-  padding: 0;
+  padding: 0 !important;
   font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -195,6 +195,13 @@
   color: #666;
   width: 38px;
   height: 38px;
+  box-sizing: border-box;
+}
+
+.sync-confirm-code-reset svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
 }
 
 .sync-confirm-code-reset:hover {
@@ -391,6 +398,7 @@
   .sync-confirm-code-reset svg {
     width: 14px;
     height: 14px;
+    stroke-width: 2;
   }
 
   .sync-confirm-mode-btn {

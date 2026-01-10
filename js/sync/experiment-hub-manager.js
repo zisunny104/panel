@@ -8,11 +8,10 @@
  * - 向後相容：維持舊版 API 介面
  *
  * 運作模式：
- * 1. 本機模式：hubClient = null，所有操作使用本地邏輯
+ * 1. 本機模式：hubClient = null，所有操作使用本機邏輯
  * 2. 同步模式：hubClient = ExperimentHubClient 實例，啟用多裝置同步
  */
 
-import ExperimentHubClient from "../core/experiment-hub-client.js";
 import { SyncEvents } from "../core/sync-events-constants.js";
 
 export class ExperimentHubManager {
@@ -31,7 +30,7 @@ export class ExperimentHubManager {
   }
 
   /**
-   * 設置延遲初始化：等待工作階段可用時才創建 ExperimentHubClient
+   * 設置延遲初始化：等待工作階段可用時才建立 ExperimentHubClient
    * 只有在同步模式下才會建立實例，本機模式保持 null
    */
   setupLazyInitialization() {
@@ -40,7 +39,13 @@ export class ExperimentHubManager {
         Logger.debug(
           "[ExperimentHubManager] 工作階段可用，初始化 ExperimentHubClient"
         );
-        this.hubClient = new ExperimentHubClient();
+        // 使用全域物件而非 import
+        const ExperimentHubClient = window.ExperimentHubClient;
+        if (ExperimentHubClient) {
+          this.hubClient = new ExperimentHubClient();
+        } else {
+          Logger.error("[ExperimentHubManager] ExperimentHubClient 未載入");
+        }
       }
     };
 
@@ -264,7 +269,7 @@ export class ExperimentHubManager {
 
       // 觸發事件讓實驗頁面管理器更新UI
       Logger.debug(
-        `[ExperimentHubManager] 📢 轉發 experiment_id_broadcasted 事件`
+        `[ExperimentHubManager] 轉發 experiment_id_broadcasted 事件`
       );
       window.dispatchEvent(
         new CustomEvent("experiment_id_broadcasted", {
@@ -408,19 +413,21 @@ export function getExperimentHubManager() {
 
 export async function initializeExperimentHub() {
   Logger.debug("[initializeExperimentHub] 開始初始化");
-  
+
   if (!globalHubManager) {
     Logger.debug("[initializeExperimentHub] 建立新的 ExperimentHubManager");
     globalHubManager = new ExperimentHubManager();
   } else {
-    Logger.debug("[initializeExperimentHub] ExperimentHubManager 已存在，使用現有實例");
+    Logger.debug(
+      "[initializeExperimentHub] ExperimentHubManager 已存在，使用現有實例"
+    );
   }
-  
+
   Logger.debug("[initializeExperimentHub] 初始化完成", {
     hasSyncClient: !!globalHubManager.hubClient,
     isInSyncMode: globalHubManager.isInSyncMode(),
   });
-  
+
   return globalHubManager;
 }
 

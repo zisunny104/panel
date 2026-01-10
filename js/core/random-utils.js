@@ -4,9 +4,9 @@
  */
 
 /**
- * 基於種子建立可重現的隨機數生成器
+ * 基於種子建立可重現的隨機數產生器
  * @param {string|number} seed - 種子值（可以是字串或數字）
- * @returns {Function} 回傳一個隨機數生成函數（回傳 0-1 之間的數字）
+ * @returns {Function} 回傳一個隨機數產生函數（回傳 0-1 之間的數字）
  */
 function createSeededRandom(seed) {
   // 將字串種子轉換為數字種子
@@ -30,7 +30,7 @@ function createSeededRandom(seed) {
 /**
  * 使用 Fisher-Yates 演算法洗牌陣列
  * @param {Array} array - 要洗牌的陣列
- * @param {Function} randomFunc - 隨機數生成函數
+ * @param {Function} randomFunc - 隨機數產生函數
  * @returns {Array} 洗牌後的新陣列（不修改原陣列）
  */
 function shuffleArray(array, randomFunc) {
@@ -120,7 +120,7 @@ function getCombinationUnitIds(combination, experimentId = null) {
 
 /**
  * 產生新的實驗ID（6位字母數字隨機字串）
- * @returns {string} 生成的實驗ID
+ * @returns {string} 產生的實驗ID
  */
 function generateNewExperimentId() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

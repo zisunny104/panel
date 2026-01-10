@@ -1,0 +1,574 @@
+/* ================= 實驗表單樣式 ================= */
+
+/* ========== 表單樣式 ========== */
+.input-section {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    border: 2px solid #ddd;
+}
+
+.input-section h2 {
+    font-size: 18px;
+    color: #2c3e50;
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-weight: 700;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.3s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* 待處理更新指示器 */
+.form-input.pending-update {
+    border-color: #ffc107;
+    background-color: #fff3cd;
+    animation: pending-pulse 2s infinite;
+}
+
+@keyframes pending-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* 實驗日誌面板 */
+.log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.log-header label {
+    font-weight: 600;
+    margin: 0;
+}
+
+.log-download-buttons {
+    display: none;
+}
+
+.log-display {
+    font-size: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    border: 2px solid #ddd;
+    color: #666;
+}
+
+/* 實驗日誌列表 */
+.logs-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: #e8e8e8;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.logs-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+}
+
+.log-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    transition: background-color 0.2s;
+}
+
+.log-item:hover {
+    background: #f8f8f8;
+}
+
+.log-item:last-child {
+    border-bottom: none;
+}
+
+.log-timestamp {
+    color: #888;
+    font-size: 11px;
+    margin-right: 10px;
+}
+
+.log-content {
+    flex: 1;
+    word-break: break-word;
+}
+
+.log-actions {
+    display: flex;
+    gap: 4px;
+}
+
+/* 日誌過濾器 */
+.log-filter {
+    margin-bottom: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.log-filter select {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.log-filter input[type="text"] {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+    flex: 1;
+}
+
+/* 日誌統計 */
+.log-stats {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #666;
+}
+
+.log-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 日誌載入狀態 */
+.logs-list-loading {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+}
+
+.logs-list-error {
+    text-align: center;
+    padding: 20px;
+    color: #d32f2f;
+    background: #ffebee;
+    border-radius: 4px;
+    border: 1px solid #ffcdd2;
+}
+
+.logs-list-empty {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+}
+
+/* 日誌顯示區域的內容 */
+.log-display-empty,
+.logs-list-empty,
+.logs-list-loading,
+.logs-list-error {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+}
+
+.log-display-empty {
+    padding: 40px 10px;
+}
+
+/* SVG 圖示 */
+svg.icon-sm {
+    width: 14px;
+    height: 14px;
+}
+
+/* 組合選擇器樣式 */
+.combination-selector {
+    margin-bottom: 15px;
+}
+
+.combination-selector label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.combination-selector select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+}
+
+.combination-selector select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* 組合描述 */
+.combination-description {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #e8f4fd;
+    border-left: 4px solid #2196f3;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #1565c0;
+}
+
+/* 組合統計 */
+.combination-stats {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #666;
+}
+
+.combination-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 組合動作按鈕 */
+.combination-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* 組合項目樣式 */
+.combination-item {
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    background: white;
+    transition: all 0.3s;
+}
+
+.combination-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.combination-item.selected {
+    border-color: #4caf50;
+    background: #e8f5e8;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+.combination-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #333;
+}
+
+.combination-description {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.4;
+}
+
+/* 組合清單容器 */
+.combinations-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    padding: 10px;
+    background: #fafafa;
+}
+
+/* 組合搜尋 */
+.combination-search {
+    margin-bottom: 15px;
+}
+
+.combination-search input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.combination-search input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* 組合分頁 */
+.combination-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.combination-pagination button {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.combination-pagination button:hover:not(:disabled) {
+    background: #f0f0f0;
+}
+
+.combination-pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.combination-pagination button.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+/* 組合載入狀態 */
+.combinations-loading {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+.combinations-error {
+    text-align: center;
+    padding: 40px;
+    color: #d32f2f;
+    background: #ffebee;
+    border-radius: 4px;
+    border: 1px solid #ffcdd2;
+}
+
+.combinations-empty {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+/* 組合過濾器 */
+.combination-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.combination-filter {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.combination-filter select {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+/* 組合標籤 */
+.combination-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.combination-tag {
+    padding: 2px 6px;
+    background: #e0e0e0;
+    border-radius: 10px;
+    font-size: 11px;
+    color: #666;
+}
+
+/* 組合進度指示器 */
+.combination-progress {
+    margin-top: 10px;
+}
+
+.combination-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.combination-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50, #45a049);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+/* 組合狀態指示器 */
+.combination-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 6px;
+}
+
+.combination-status.ready {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.combination-status.running {
+    background: #fff3e0;
+    color: #ef6c00;
+}
+
+.combination-status.completed {
+    background: #e8f4fd;
+    color: #1565c0;
+}
+
+.combination-status.error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+/* 組合依賴圖 */
+.combination-dependencies {
+    margin-top: 12px;
+    padding: 8px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.combination-dependencies h4 {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+}
+
+.dependency-graph {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dependency-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #666;
+}
+
+.dependency-arrow {
+    color: #999;
+}
+
+/* 組合執行歷史 */
+.combination-history {
+    margin-top: 15px;
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.combination-history-item {
+    padding: 6px 10px;
+    border-bottom: 1px solid #eee;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.combination-history-item:last-child {
+    border-bottom: none;
+}
+
+.combination-history-time {
+    color: #888;
+}
+
+.combination-history-status {
+    font-weight: 600;
+}
+
+.combination-history-status.success {
+    color: #2e7d32;
+}
+
+.combination-history-status.error {
+    color: #c62828;
+}

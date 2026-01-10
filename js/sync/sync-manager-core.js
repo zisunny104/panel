@@ -3,14 +3,23 @@
  * 負責初始化、URL偵測、狀態管理、與sync-client通訊
  * 使用時間同步確保多裝置間的時序一致性
  */
-import SyncClient from "./sync-client.js";
-import TimeSyncManager from "../core/time-sync-manager.js";
+import { SyncEvents } from "../core/sync-events-constants.js";
 
 export class SyncManagerCore {
   constructor() {
+    // 使用全域物件而非 import（避免循環依賴）
+    const SyncClient = window.SyncClient;
+    const TimeSyncManager = window.TimeSyncManager;
+
+    if (!SyncClient) {
+      throw new Error("SyncClient 未載入，請確認 script 載入順序");
+    }
+
     this.syncClient = new SyncClient();
     this.currentRole = "viewer"; // 預設為僅檢視
-    this.timeSyncManager = window.timeSyncManager || new TimeSyncManager();
+    this.timeSyncManager =
+      window.timeSyncManager ||
+      (TimeSyncManager ? new TimeSyncManager() : null);
 
     // 自動偵測目前URL - 支援任何部署環境
     this.baseUrl = this.getBaseUrl();
@@ -56,7 +65,7 @@ export class SyncManagerCore {
       url += "/";
     }
 
-    // 生成完整URL（自動包含 index.html）
+    // 產生完整URL（自動包含 index.html）
     // 確保分享代碼正確進行 URL 編碼
     const encodedCode = encodeURIComponent(code);
     const qrUrl = `${url}index.html?shareCode=${encodedCode}&role=${encodeURIComponent(
@@ -67,7 +76,7 @@ export class SyncManagerCore {
   }
 
   /**
-   * 處理建立工作階段
+   * 處理建立工作階段（建立者直接加入）
    */
   async createSession(createCode) {
     Logger.debug("[Sync] 開始建立工作階段", { createCode });
@@ -76,21 +85,59 @@ export class SyncManagerCore {
       const result = await this.syncClient.createSession(createCode);
       Logger.debug("[Sync] 工作階段建立成功", {
         sessionId: result.sessionId,
-        shareCode: result.shareCode,
       });
 
       this.currentRole = "operator"; // 建立者預設為操作者
-
-      // result 是一個包含 sessionId 和 shareCode 的物件
       this.currentSessionId = result.sessionId;
-      this.currentShareCode = result.shareCode;
+      this.currentShareCode = null; // 尚未產生分享代碼
 
-      // 連線成功後，處理離線隊列
+      // 觸發工作階段加入事件
+      window.dispatchEvent(
+        new CustomEvent(SyncEvents.SESSION_JOINED, {
+          detail: {
+            sessionId: result.sessionId,
+            role: this.currentRole,
+          },
+        })
+      );
+
+      // 連線成功後，處理離線佇列
       setTimeout(() => this.processOfflineQueue(), 1000);
 
-      return result; // 回傳完整物件給調用者
+      return result; // 回傳結果給調用者
     } catch (error) {
       Logger.error("[Sync] 工作階段建立失敗", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 產生分享代碼（在工作階段建立後）
+   */
+  async generateShareCode() {
+    Logger.debug("[Sync] 開始產生分享代碼");
+
+    try {
+      const result = await this.syncClient.generateShareCode();
+      Logger.debug("[Sync] 分享代碼已產生", {
+        shareCode: result.shareCode,
+      });
+
+      this.currentShareCode = result.shareCode;
+
+      // 觸發分享代碼產生事件
+      window.dispatchEvent(
+        new CustomEvent("sync:share-code-generated", {
+          detail: {
+            shareCode: result.shareCode,
+            expiresAt: result.expiresAt,
+          },
+        })
+      );
+
+      return result;
+    } catch (error) {
+      Logger.error("[Sync] 產生分享代碼失敗", error);
       throw error;
     }
   }
@@ -106,6 +153,17 @@ export class SyncManagerCore {
 
       Logger.debug(
         `[SyncCore] 成功加入工作階段 - 代碼: ${shareCode}, 角色: ${role}, 工作階段ID: ${this.syncClient.sessionId}`
+      );
+
+      // 觸發工作階段加入事件
+      window.dispatchEvent(
+        new CustomEvent(SyncEvents.SESSION_JOINED, {
+          detail: {
+            sessionId: this.syncClient.sessionId,
+            shareCode: shareCode,
+            role: role,
+          },
+        })
       );
 
       // 連線成功後，處理離線隊列
@@ -200,17 +258,7 @@ export class SyncManagerCore {
    */
   disconnect() {
     this.syncClient.disconnect();
-    // 如果是主動中斷（非自動），清空session備份
-    // 注意：自動中斷時不清空，以便還原
-  }
-
-  /**
-   * 清空Session備份（主動中斷連線時呼叫）
-   */
-  clearSessionBackup() {
-    if (window.syncManager?.ui) {
-      window.syncManager.ui.clearSessionBackup();
-    }
+    // 注意：工作階段狀態由 SyncClient.clearState() 管理（sessionStorage）
   }
 
   /**
@@ -219,6 +267,12 @@ export class SyncManagerCore {
    * 優化：去重檢查確保不發送完全相同的狀態
    */
   async syncState(state) {
+    // 本機模式（無 sessionId）：直接忽略，不加入隊列
+    if (!this.getSessionId()) {
+      Logger.debug(`本機模式，忽略狀態同步 (type=${state.type})`);
+      return false;
+    }
+
     // 去重：檢查隊列中是否已有相同的狀態
     const isDuplicate = this._isDuplicateState(state);
     if (isDuplicate) {
@@ -299,6 +353,11 @@ export class SyncManagerCore {
    * 將狀態加入離線隊列
    */
   addToOfflineQueue(state) {
+    // 本機模式（無 sessionId）：不加入隊列
+    if (!this.getSessionId()) {
+      return;
+    }
+
     // 確保狀態有時間戳（使用同步的伺服器時間）
     if (!state.timestamp) {
       // 優先使用同步的伺服器時間，如果未初始化則使用本地時間
@@ -338,9 +397,7 @@ export class SyncManagerCore {
     // 按時間戳排序（較舊的在前）
     this.offlineQueue.sort((a, b) => a.state.timestamp - b.state.timestamp);
 
-    Logger.debug(
-      `📋 已加入離線隊列，目前隊列長度: ${this.offlineQueue.length}`
-    );
+    Logger.debug(`已加入離線隊列，目前隊列長度: ${this.offlineQueue.length}`);
   }
 
   /**

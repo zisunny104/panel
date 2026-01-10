@@ -1,5 +1,5 @@
 /**
- * Sync Events Constants - 同步事件名稱常量
+ * Sync Events Constants - 同步事件名稱常數
  * 統一定義所有同步事件名稱，確保發送端和接收端使用相同的事件名稱
  */
 

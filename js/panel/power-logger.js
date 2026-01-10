@@ -738,45 +738,6 @@ class LogPanel {
       this.handleExperimentMode();
     }, 100);
   }
-
-  /**
-   * 更新目前步驟顯示
-   */
-  updateCurrentStepDisplay() {
-    const currentStepDisplay = document.getElementById("currentStepDisplay");
-    if (!currentStepDisplay) return;
-
-    if (window.experiment && window.experiment.isExperimentRunning) {
-      const unitId =
-        window.experiment.loadedUnits[window.experiment.currentUnitIndex];
-      const unit = window._allUnits
-        ? window._allUnits.find((u) => u.unit_id === unitId)
-        : null;
-      const step =
-        unit && unit.steps
-          ? unit.steps[window.experiment.currentStepIndex]
-          : null;
-
-      if (step) {
-        currentStepDisplay.textContent = `[${step.step_id || "未知步驟"}]`;
-        currentStepDisplay.style.display = "inline";
-      } else {
-        currentStepDisplay.style.display = "none";
-      }
-    } else {
-      currentStepDisplay.style.display = "none";
-    }
-  }
-
-  /**
-   * 清除步驟顯示
-   */
-  clearInteractionButtons() {
-    const currentStepDisplay = document.getElementById("currentStepDisplay");
-    if (currentStepDisplay) {
-      currentStepDisplay.style.display = "none";
-    }
-  }
 }
 
 // 匯出單例

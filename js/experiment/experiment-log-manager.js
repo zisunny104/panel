@@ -9,21 +9,16 @@ class ExperimentLogManager {
     this.logs = [];
     this.pendingLogs = []; // 初始化為空陣列，防止事件監聽器訪問 undefined
     this.experimentId = null;
-    this.participantName = null;
+    this.subjectName = null;
     this.experimentStartTime = null;
-    this.apiUrl = "php/experiment-log-api.php";
-    this.syncEnabled = true; // 開關：是否即時同步到伺服器
-    this.bufferSize = 10; // 累積 10 條後批量發送
+    this.syncEnabled = false; // 關閉同步到伺服器
+    this.bufferSize = 10; // 累積 10 條後批次發送（本機儲存）
     this.maxPendingLogs = 100; // 最大待發送日誌數量，防止記憶體溢出
-    this.networkRecoveryAttempts = 0; // 網路恢復嘗試次數
-    this.maxRecoveryAttempts = 5; // 最大重試次數
-    this.baseRecoveryDelay = 1000; // 基礎延遲1秒
-    this.isRecoveringLogs = false; // 正在還原日誌中，防止重複發送
 
     // 時間同步管理器引用
     this.timeSyncManager = window.timeSyncManager;
 
-    // IndexedDB 配置
+    // IndexedDB 設定
     this.dbName = "ExperimentLogsDB";
     this.dbVersion = 1;
     this.pendingLogsStore = "pendingLogs";
@@ -44,164 +39,13 @@ class ExperimentLogManager {
     // 監聽輸入框變化來同步實驗ID
     this._setupExperimentIdSync();
 
-    // 設定網路恢復處理器
-    this._setupNetworkRecoveryHandler();
-
     // 記錄初始化狀態
     Logger.debug(
-      `日誌管理器建立完成，分頁ID: ${this.tabId}, 目前伺服器狀態: ${
-        window.syncClient?.serverOnline ?? "unknown"
-      }, IndexedDB 已初始化`
+      `日誌管理器建立完成，分頁ID: ${this.tabId}, 本機 IndexedDB 存儲`
     );
 
     // 標記初始化完成
     this.initialized = true;
-  }
-
-  /**
-   * 設定網路恢復處理器
-   * @private
-   */
-  _setupNetworkRecoveryHandler() {
-    // 監聽同步服務器狀態變化
-    window.addEventListener("sync_server_status_changed", (event) => {
-      // 防守檢查：確保 pendingLogs 存在
-      if (!this.pendingLogs) {
-        Logger.debug(`pendingLogs 還未初始化，忽略伺服器狀態變化事件`);
-        return;
-      }
-
-      const { online, previousOnline } = event.detail;
-      Logger.debug(
-        `伺服器狀態變化: ${previousOnline} → ${online}, 待發送日誌數量: ${this.pendingLogs.length}, 初始化完成: ${this.initialized}`
-      );
-
-      // 只有在初始化完成後，從離線變為線上時，才自動重新整理待發送的日誌
-      // 避免在應用程式啟動時的狀態變化觸發網路恢復
-      if (
-        this.initialized &&
-        online &&
-        !previousOnline &&
-        this.pendingLogs.length > 0
-      ) {
-        Logger.info(
-          `偵測到網路恢復，準備重新發送 ${this.pendingLogs.length} 條待發送日誌`
-        );
-        this.networkRecoveryAttempts = 0; // 重置嘗試次數
-        this._attemptNetworkRecovery();
-      } else if (!online && previousOnline) {
-        Logger.warn("偵測到伺服器離線，日誌將保留在本機");
-      }
-    });
-
-    // 也監聽原生網路事件作為備用
-    window.addEventListener("online", () => {
-      Logger.debug(`瀏覽器網路恢復事件觸發, 初始化完成: ${this.initialized}`);
-      if (this.initialized && this.pendingLogs.length > 0) {
-        this.networkRecoveryAttempts = 0; // 重置嘗試次數
-        this._attemptNetworkRecovery();
-      }
-    });
-
-    // 監聽 syncClient 初始化完成，此時可以開始發送日誌
-    window.addEventListener("sync_client_initialized", (event) => {
-      // 防守檢查：確保 pendingLogs 存在
-      if (!this.pendingLogs) {
-        Logger.debug(`pendingLogs 還未初始化，忽略 syncClient 初始化事件`);
-        return;
-      }
-
-      const { serverOnline } = event.detail;
-      Logger.debug(
-        `syncClient 已初始化完成，伺服器狀態: ${serverOnline}, 待發送日誌: ${this.pendingLogs.length}`
-      );
-
-      // 如果伺服器線上且有待發送的日誌，立即嘗試發送
-      if (
-        serverOnline &&
-        this.pendingLogs.length > 0 &&
-        !this.isRecoveringLogs
-      ) {
-        this.isRecoveringLogs = true; // 標記正在還原日誌
-        Logger.info(
-          `syncClient 就緒且伺服器線上，準備發送 ${this.pendingLogs.length} 條待發送日誌`
-        );
-        // 延遲一小段時間，確保其他初始化完成
-        setTimeout(() => {
-          this._flushLogs().finally(() => {
-            this.isRecoveringLogs = false; // 還原完成
-          });
-        }, 500);
-      }
-    });
-  }
-
-  /**
-   * 使用指數退避嘗試網路恢復
-   * @private
-   */
-  _attemptNetworkRecovery() {
-    if (this.networkRecoveryAttempts >= this.maxRecoveryAttempts) {
-      Logger.warn(
-        `網路恢復嘗試已達最大次數 (${this.maxRecoveryAttempts})，放棄自動同步`
-      );
-      return;
-    }
-
-    // 如果正在通過初始化事件還原日誌，跳過網路恢復機制
-    if (this.isRecoveringLogs) {
-      Logger.debug(`正在透過 syncClient 初始化事件還原日誌，跳過網路恢復機制`);
-      return;
-    }
-
-    this.networkRecoveryAttempts++;
-    const delay =
-      this.baseRecoveryDelay * Math.pow(2, this.networkRecoveryAttempts - 1); // 指數退避
-
-    Logger.info(
-      `網路恢復嘗試 ${this.networkRecoveryAttempts}/${this.maxRecoveryAttempts}，` +
-        `${this.pendingLogs.length} 條待發送日誌，延遲 ${delay}ms`
-    );
-
-    setTimeout(() => {
-      // 簡化狀態檢查：優先使用伺服器健康檢查結果
-      // 避免 navigator.onLine 的不準確和三態邏輯
-      const navigatorOnline = navigator.onLine;
-      const syncClientExists = !!window.syncClient;
-      const serverOnline = window.syncClient?.serverOnline ?? null; // 明確三態：true/false/null
-
-      Logger.debug(
-        `網路狀態檢查: navigator.onLine=${navigatorOnline}, syncClient存在=${syncClientExists}, serverOnline=${serverOnline}`
-      );
-
-      // 如果 syncClient 還沒準備好，延遲重試而不是放棄
-      if (!syncClientExists) {
-        Logger.debug(`syncClient 還未初始化，延遲 500ms 後重試`);
-        this.networkRecoveryAttempts--; // 不計入失敗次數
-        setTimeout(() => this._attemptNetworkRecovery(), 500);
-        return;
-      }
-
-      // 簡化邏輯：只有 serverOnline === true 才發送
-      if (serverOnline === true) {
-        Logger.info(
-          `網路恢復成功，開始發送 ${this.pendingLogs.length} 條待發送日誌`
-        );
-        this._flushLogs();
-        this.networkRecoveryAttempts = 0; // 成功後重置
-      } else if (serverOnline === false) {
-        // 明確的離線狀態
-        Logger.warn(
-          `網路仍不穩定: 嘗試 ${this.networkRecoveryAttempts} 次 (navigator.onLine=${navigatorOnline}, serverOnline=${serverOnline})`
-        );
-        this._attemptNetworkRecovery(); // 繼續嘗試
-      } else {
-        // serverOnline === null：未知狀態，嘗試健康檢查
-        Logger.debug(`伺服器狀態未知，嘗試執行健康檢查`);
-        this.networkRecoveryAttempts--; // 不計入失敗次數
-        setTimeout(() => this._attemptNetworkRecovery(), 500);
-      }
-    }, delay);
   }
 
   /**
@@ -247,7 +91,7 @@ class ExperimentLogManager {
       }
     }
 
-    // 監聽同步服務器的ID更新事件（備用）
+    // 監聽同步伺服器的ID更新事件（備用）
     document.addEventListener("experiment_id_updated", (event) => {
       const { experimentId } = event.detail;
       this.experimentId = experimentId;
@@ -430,7 +274,7 @@ class ExperimentLogManager {
     }
 
     this._addLog(logEntry);
-    Logger.info("記錄: 實驗開始", logEntry);
+    Logger.debug("記錄: 實驗開始", logEntry);
   }
 
   /**
@@ -462,7 +306,7 @@ class ExperimentLogManager {
     }
 
     this._addLog(logEntry);
-    Logger.info("記錄: 實驗結束", logEntry);
+    Logger.debug("記錄: 實驗結束", logEntry);
   }
 
   /**
@@ -491,7 +335,7 @@ class ExperimentLogManager {
     }
 
     this._addLog(logEntry);
-    Logger.info("記錄: 實驗暫停", logEntry);
+    Logger.debug("記錄: 實驗暫停", logEntry);
   }
 
   /**
@@ -520,7 +364,7 @@ class ExperimentLogManager {
     }
 
     this._addLog(logEntry);
-    Logger.info("記錄: 實驗還原", logEntry);
+    Logger.debug("記錄: 實驗還原", logEntry);
   }
 
   /**
@@ -570,7 +414,7 @@ class ExperimentLogManager {
       logEntry.d_id = deviceId;
     }
     this._addLog(logEntry);
-    Logger.info("記錄: 手勢步驟開始", logEntry);
+    Logger.debug("記錄: 手勢步驟開始", logEntry);
   }
 
   /**
@@ -617,7 +461,7 @@ class ExperimentLogManager {
       logEntry.d_id = deviceId;
     }
     this._addLog(logEntry);
-    Logger.info("記錄: 手勢步驟結束", logEntry);
+    Logger.debug("記錄: 手勢步驟結束", logEntry);
   }
 
   /**
@@ -651,7 +495,7 @@ class ExperimentLogManager {
     this._addLog(logEntry);
 
     const gestureNames = { t: "正確", f: "錯誤", n: "未分類" };
-    Logger.info(`記錄: 手勢嘗試 (${gestureNames[gestureType]})`, logEntry);
+    Logger.debug(`記錄: 手勢嘗試 (${gestureNames[gestureType]})`, logEntry);
   }
 
   /**
@@ -684,7 +528,7 @@ class ExperimentLogManager {
       logEntry.d_id = deviceId;
     }
     this._addLog(logEntry);
-    Logger.info("記錄: 按鈕動作", logEntry);
+    Logger.debug("記錄: 按鈕動作", logEntry);
   }
 
   /**
@@ -711,7 +555,7 @@ class ExperimentLogManager {
       );
     }
 
-    // 當累積達到 bufferSize 時，批量發送
+    // 當累積達到 bufferSize 時，批次發送
     if (this.pendingLogs.length >= this.bufferSize) {
       this._flushLogs();
     }
@@ -724,223 +568,175 @@ class ExperimentLogManager {
    * 發送待發送的日誌到伺服器
    * @private
    */
+  /**
+   * 將待處理日誌寫入 IndexedDB
+   * @private
+   */
   async _flushLogs() {
-    if (this.pendingLogs.length === 0 || !this.syncEnabled) {
-      Logger.debug(
-        `跳過發送日誌: pendingLogs=${this.pendingLogs.length}, syncEnabled=${this.syncEnabled}`
-      );
+    if (this.pendingLogs.length === 0) {
+      Logger.debug("[ExperimentLogManager] 沒有待處理的日誌");
       return;
     }
-
-    // 🔧 檢查伺服器連線狀態：只要伺服器線上就可以發送日誌
-    // 不需要檢查同步工作階段連線狀態
-    // 如果 serverOnline 是 null（未檢查），先執行健康檢查
-    if (!window.syncClient) {
-      Logger.debug("syncClient不存在，跳過發送日誌");
-      return;
-    }
-
-    if (window.syncClient.serverOnline === null) {
-      Logger.debug("伺服器狀態未檢查，先執行健康檢查");
-      try {
-        await window.syncClient.checkServerHealth();
-      } catch (error) {
-        Logger.warn("健康檢查失敗:", error);
-        window.syncClient.serverOnline = false;
-      }
-    }
-
-    if (window.syncClient.serverOnline !== true) {
-      Logger.debug(
-        `伺服器離線，跳過發送日誌 (serverOnline: ${
-          window.syncClient.serverOnline
-        }, isConnected: ${window.syncClient.isConnected?.()})`
-      );
-      return;
-    }
-
-    // 確保實驗ID存在
-    const experimentId = this._getCurrentExperimentId();
-    if (!experimentId) {
-      Logger.warn("實驗ID未設定，日誌將保留在本機");
-      return;
-    }
-
-    const logsToSend = [...this.pendingLogs];
-    this.pendingLogs = [];
 
     Logger.debug(
-      `準備發送 ${logsToSend.length} 條日誌到伺服器，實驗ID: ${experimentId}`
+      `[ExperimentLogManager] 將 ${this.pendingLogs.length} 條日誌寫入 IndexedDB`
     );
-    logsToSend.sort((a, b) => {
-      const timeA = a.ts || a.timestamp || 0;
-      const timeB = b.ts || b.timestamp || 0;
-      return timeA - timeB; // 較舊的在前
-    });
 
-    // 檢查時間戳一致性
-    const timeIssues = this._checkLogTimeConsistency(logsToSend);
-    if (timeIssues.hasIssues) {
-      Logger.warn("日誌時間戳偵測到問題:", timeIssues);
+    try {
+      await this._savePendingLogsToIndexedDB();
+      this.pendingLogs = [];
+      Logger.debug(`[ExperimentLogManager] 日誌已儲存到 IndexedDB`);
+    } catch (error) {
+      Logger.error("[ExperimentLogManager] 寫入 IndexedDB 失敗:", error);
+    }
+  }
+
+  /**
+   * 批次儲存待發送的日誌到 IndexedDB
+   * @private
+   */
+  async _savePendingLogsToIndexedDB() {
+    if (!this.db || this.pendingLogs.length === 0) {
+      return;
     }
 
     try {
-      const response = await fetch(this.apiUrl, {
+      const transaction = this.db.transaction(
+        [this.pendingLogsStore],
+        "readwrite"
+      );
+      const store = transaction.objectStore(this.pendingLogsStore);
+
+      // 批次新增所有待發送的日誌
+      const addPromises = this.pendingLogs.map((log) => {
+        return new Promise((resolve, reject) => {
+          // 確保日誌有必要的欄位
+          const logToSave = {
+            ...log,
+            // id 由 autoIncrement 自動產生
+            savedAt: Date.now(), // 記錄儲存時間
+          };
+
+          const request = store.add(logToSave);
+
+          request.onsuccess = () => resolve();
+          request.onerror = (event) => {
+            Logger.error("儲存單條日誌失敗:", event.target.error, log);
+            // 不要 reject，讓其他日誌繼續儲存
+            resolve();
+          };
+        });
+      });
+
+      await Promise.all(addPromises);
+
+      Logger.debug(
+        `[ExperimentLogManager] 成功儲存 ${this.pendingLogs.length} 條日誌到 IndexedDB`
+      );
+
+      // 廣播同步事件
+      this._broadcastMessage("logsSynced", { count: this.pendingLogs.length });
+    } catch (error) {
+      Logger.error("[ExperimentLogManager] 批次儲存日誌失敗:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 強制完成所有待處理的日誌 (實驗結束時呼叫)
+   * 確保所有日誌寫入 IndexedDB 並儲存為 JSONL 檔案
+   */
+  async flushAll() {
+    Logger.debug(
+      `[ExperimentLogManager] 完成實驗，確保 ${this.pendingLogs.length} 條待處理日誌寫入 IndexedDB`
+    );
+
+    try {
+      // 直接將 pendingLogs 寫入 IndexedDB
+      if (this.pendingLogs.length > 0) {
+        await this._savePendingLogsToIndexedDB();
+        this.pendingLogs = [];
+        Logger.info(
+          `[ExperimentLogManager] ${this.logs.length} 條日誌已全部儲存到 IndexedDB`
+        );
+      } else {
+        Logger.debug("[ExperimentLogManager] 沒有待處理的日誌");
+      }
+
+      // 同時儲存為 JSONL 檔案到 runtime 資料夾（使用 PHP API）
+      await this._saveToRuntimeFolder();
+    } catch (error) {
+      Logger.error("[ExperimentLogManager] flushAll 發生錯誤:", error);
+    }
+  }
+
+  /**
+   * 儲存日誌到 runtime/experiment-data 資料夾
+   * @private
+   */
+  async _saveToRuntimeFolder() {
+    if (this.logs.length === 0) {
+      Logger.debug("[ExperimentLogManager] 沒有日誌需要儲存");
+      return;
+    }
+
+    try {
+      // 產生 JSONL 格式
+      const jsonlContent = this.logs
+        .map((log) => JSON.stringify(log))
+        .join("\n");
+
+      // 使用「實驗 ID + 時間戳」作為檔案名稱
+      const timestamp = Date.now();
+      const filename = `${this.experimentId}_${timestamp}.jsonl`;
+
+      // 取得 API URL
+      const apiUrl = this._getApiUrl();
+
+      // 使用 Node.js API 儲存檔案
+      const response = await fetch(`${apiUrl}/api/experiment-logs/save`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: "log_batch",
-          exp_id: experimentId,
-          logs: logsToSend,
+          filename: filename,
+          content: jsonlContent,
         }),
       });
 
       if (response.ok) {
         const result = await response.json();
-        Logger.info(
-          `已同步 ${logsToSend.length} 條日誌到伺服器 (按時間戳排序)`,
-          result
-        );
-        // 成功後從 IndexedDB 刪除已發送的日誌
-        this._removeLogsFromIndexedDB(logsToSend);
-        // 通知其他分頁
-        this._broadcastMessage("logsSynced", {
-          syncedCount: logsToSend.length,
-        });
-      } else {
-        const errorText = await response.text().catch(() => "無法讀取錯誤回應");
-        Logger.warn(`日誌同步失敗 (HTTP ${response.status}): ${errorText}`);
-        Logger.debug(
-          `請求URL: ${this.apiUrl}, 請求大小: ${
-            JSON.stringify(logsToSend).length
-          } bytes`
-        );
-        // 發送失敗時，將伺服器狀態設置為離線
-        if (window.syncClient) {
-          window.syncClient.serverOnline = false;
-        }
-        // 失敗時不需要放回 pendingLogs，因為它們仍然在 IndexedDB 中
-        // 重新從 IndexedDB 還原到記憶體
-        this._restorePendingLogsFromIndexedDB();
-      }
-    } catch (error) {
-      Logger.error("日誌同步網路錯誤:", error);
-      Logger.debug(`網路錯誤詳情: ${error.message}, 請求URL: ${this.apiUrl}`);
-      // 網路錯誤時，將伺服器狀態設置為離線
-      if (window.syncClient) {
-        window.syncClient.serverOnline = false;
-      }
-      // 錯誤時不需要放回 pendingLogs，因為它們仍然在 IndexedDB 中
-      // 重新從 IndexedDB 還原到記憶體
-      this._restorePendingLogsFromIndexedDB();
-    }
-  }
-
-  /**
-   * 強制重新整理所有待發送的日誌 (實驗結束時呼叫)
-   * 注意：有 5 秒超時保護，確保不會無限期阻斷
-   */
-  async flushAll() {
-    const FLUSH_TIMEOUT = 5000; // 5 秒超時
-    Logger.debug(`正在發送最後的 ${this.pendingLogs.length} 條日誌...`);
-
-    // 檢查伺服器連線狀態：只要伺服器線上就可以發送最後的日誌
-    // 不需要檢查同步工作階段連線狀態
-    // 如果 serverOnline 是 null（未檢查），先執行健康檢查
-    if (!window.syncClient) {
-      Logger.info("syncClient不存在，跳過發送最後的日誌");
-      return;
-    }
-
-    if (window.syncClient.serverOnline === null) {
-      Logger.debug("伺服器狀態未檢查，先執行健康檢查");
-      try {
-        await window.syncClient.checkServerHealth();
-      } catch (error) {
-        Logger.warn("健康檢查失敗:", error);
-        window.syncClient.serverOnline = false;
-      }
-    }
-
-    if (window.syncClient.serverOnline !== true) {
-      Logger.debug("伺服器離線，跳過發送最後的日誌");
-      Logger.debug(
-        `serverOnline狀態: ${
-          window.syncClient.serverOnline
-        }, isConnected: ${window.syncClient.isConnected?.()}`
-      );
-      return;
-    }
-
-    // 新增超時保護，確保不會無限期阻斷實驗結束
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("flushAll 超時 (5秒)")), FLUSH_TIMEOUT)
-    );
-
-    const experimentId = this._getCurrentExperimentId();
-    if (!experimentId) {
-      Logger.warn("實驗ID未設定，無法完成日誌同步");
-      return;
-    }
-
-    Logger.debug(
-      `開始發送 ${this.pendingLogs.length} 條待發送日誌，實驗ID: ${experimentId}`
-    );
-
-    try {
-      // 包裹在超時承諾中
-      await Promise.race([this._flushLogsWithRetry(), timeoutPromise]);
-
-      Logger.debug("所有待發送日誌已處理完畢，發送終點標記");
-
-      // 最後發送一條終點標記
-      try {
-        const response = await fetch(this.apiUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "finalize_experiment",
-            exp_id: experimentId,
-            total_logs: this.logs.length,
-          }),
-        });
-
-        if (response.ok) {
-          Logger.info("實驗日誌已完整儲存到伺服器");
+        if (result.success) {
+          Logger.info(`[ExperimentLogManager] 日誌已儲存到 ${result.path}`);
         } else {
-          Logger.warn(
-            `實驗日誌最終化回應異常: ${response.status} ${response.statusText}`
-          );
+          Logger.warn(`[ExperimentLogManager] 儲存日誌失敗: ${result.error}`);
         }
-      } catch (error) {
-        Logger.error("實驗日誌最終化失敗:", error);
+      } else {
+        Logger.warn(
+          `[ExperimentLogManager] 無法連接到後端 API (${response.status})，日誌僅儲存於 IndexedDB`
+        );
       }
     } catch (error) {
-      if (error.message.includes("超時")) {
-        Logger.warn("flushAll 已超時，放棄發送剩餘日誌，實驗繼續進行");
-      } else {
-        Logger.error("flushAll 發生錯誤:", error);
-      }
+      Logger.warn(
+        `[ExperimentLogManager] 儲存到 runtime 資料夾失敗（僅儲存於 IndexedDB）:`,
+        error.message
+      );
     }
   }
 
   /**
-   * 內部方法：帶重試的日誌發送
+   * 取得 API URL
    * @private
    */
-  async _flushLogsWithRetry() {
-    while (this.pendingLogs.length > 0) {
-      Logger.debug(`剩餘 ${this.pendingLogs.length} 條日誌待發送`);
-      await this._flushLogs();
-      // 短暫延遲確保完成
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+  _getApiUrl() {
+    const protocol = window.location.protocol;
+    const host = window.location.hostname;
+    const port = "7645";
+    return `${protocol}//${host}:${port}`;
   }
 
+  /**
   /**
    * 更新 UI 中的日誌顯示
    * @private
@@ -1023,6 +819,277 @@ class ExperimentLogManager {
   }
 
   /**
+   * 列出所有已儲存的實驗（從 IndexedDB）
+   * @returns {Promise<Array>} 實驗列表
+   */
+  async listExperiments() {
+    try {
+      if (!this.db) {
+        Logger.warn("[ExperimentLogManager] IndexedDB 尚未初始化");
+        return [];
+      }
+
+      const transaction = this.db.transaction(
+        [this.pendingLogsStore],
+        "readonly"
+      );
+      const store = transaction.objectStore(this.pendingLogsStore);
+      const request = store.getAll();
+
+      return new Promise((resolve, reject) => {
+        request.onsuccess = (event) => {
+          const allLogs = event.target.result || [];
+
+          // 按實驗 ID 分組
+          const experimentsMap = new Map();
+
+          allLogs.forEach((log) => {
+            const expId = log.exp_id || log.experimentId || "unknown";
+
+            if (!experimentsMap.has(expId)) {
+              experimentsMap.set(expId, {
+                experimentId: expId,
+                participantName:
+                  log.participant || log.subject_name || `受試者_${expId}`,
+                logs: [],
+                startTime: null,
+                endTime: null,
+                logCount: 0,
+              });
+            }
+
+            const experiment = experimentsMap.get(expId);
+            experiment.logs.push(log);
+            experiment.logCount++;
+
+            // 更新參與者名稱（使用最新的非空值）
+            if (
+              log.participant &&
+              !experiment.participantName.startsWith("受試者_")
+            ) {
+              experiment.participantName = log.participant;
+            }
+
+            // 記錄開始和結束時間
+            if (log.type === "exp_start" && !experiment.startTime) {
+              experiment.startTime = log.ts;
+            }
+            if (log.type === "exp_end") {
+              experiment.endTime = log.ts;
+            }
+          });
+
+          // 轉換為陣列並排序（最新的在前）
+          const experiments = Array.from(experimentsMap.values());
+          experiments.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
+
+          Logger.debug(
+            `[ExperimentLogManager] 從 IndexedDB 載入 ${experiments.length} 個實驗`
+          );
+
+          // 調試信息：列出所有實驗ID
+          if (experiments.length > 0) {
+            Logger.debug(
+              `[ExperimentLogManager] 實驗ID列表: ${experiments
+                .map((e) => `${e.experimentId}(${e.logCount}條)`)
+                .join(", ")}`
+            );
+          }
+
+          resolve(experiments);
+        };
+
+        request.onerror = (event) => {
+          Logger.error(
+            "[ExperimentLogManager] 列出實驗失敗:",
+            event.target.error
+          );
+          reject(event.target.error);
+        };
+      });
+    } catch (error) {
+      Logger.error("[ExperimentLogManager] listExperiments 發生錯誤:", error);
+      return [];
+    }
+  }
+
+  /**
+   * 取得所有日誌（包含記憶體和 IndexedDB 的）
+   * @returns {Promise<Array>} 所有日誌
+   */
+  async getAllLogs() {
+    try {
+      if (!this.db) {
+        Logger.warn(
+          "[ExperimentLogManager] IndexedDB 尚未初始化，僅返回記憶體中的日誌"
+        );
+        return [...this.logs, ...this.pendingLogs];
+      }
+
+      const transaction = this.db.transaction(
+        [this.pendingLogsStore],
+        "readonly"
+      );
+      const store = transaction.objectStore(this.pendingLogsStore);
+      const request = store.getAll();
+
+      return new Promise((resolve, reject) => {
+        request.onsuccess = (event) => {
+          const storedLogs = event.target.result || [];
+          // 合併記憶體和儲存的日誌
+          const allLogs = [...this.logs, ...this.pendingLogs, ...storedLogs];
+          // 按時間戳排序
+          allLogs.sort((a, b) => a.ts - b.ts);
+          resolve(allLogs);
+        };
+
+        request.onerror = (event) => {
+          Logger.error(
+            "[ExperimentLogManager] 讀取所有日誌失敗:",
+            event.target.error
+          );
+          // 發生錯誤時至少返回記憶體中的日誌
+          resolve([...this.logs, ...this.pendingLogs]);
+        };
+      });
+    } catch (error) {
+      Logger.error("[ExperimentLogManager] getAllLogs 發生錯誤:", error);
+      return [...this.logs, ...this.pendingLogs];
+    }
+  }
+
+  /**
+   * 根據實驗 ID 取得日誌
+   * @param {string} experimentId - 實驗 ID
+   * @returns {Promise<Array>} 該實驗的所有日誌
+   */
+  async getLogsByExperimentId(experimentId) {
+    try {
+      const allLogs = await this.getAllLogs();
+      const filtered = allLogs.filter(
+        (log) =>
+          log.exp_id === experimentId || log.experimentId === experimentId
+      );
+
+      Logger.debug(
+        `[ExperimentLogManager] 取得實驗 ${experimentId} 的日誌: 找到 ${filtered.length} 條（總共 ${allLogs.length} 條）`
+      );
+
+      // 如果沒找到，輸出調試信息
+      if (filtered.length === 0 && allLogs.length > 0) {
+        const uniqueExpIds = [
+          ...new Set(allLogs.map((log) => log.exp_id || log.experimentId)),
+        ];
+        Logger.warn(
+          `[ExperimentLogManager] 未找到匹配的實驗ID。查找: "${experimentId}", 資料庫中的ID: ${uniqueExpIds.join(
+            ", "
+          )}`
+        );
+      }
+
+      return filtered;
+    } catch (error) {
+      Logger.error(
+        `[ExperimentLogManager] 取得實驗 ${experimentId} 的日誌失敗:`,
+        error
+      );
+      return [];
+    }
+  }
+
+  /**
+   * 根據實驗 ID 取得日誌（別名，供 UI 使用）
+   * @param {string} experimentId - 實驗 ID
+   * @returns {Promise<Array>} 該實驗的所有日誌
+   */
+  async getLogsByExperiment(experimentId) {
+    return this.getLogsByExperimentId(experimentId);
+  }
+
+  /**
+   * 刪除指定實驗的所有日誌（從 IndexedDB）
+   * @param {string} experimentId - 實驗 ID
+   * @returns {Promise<boolean>} 是否成功
+   */
+  async deleteExperiment(experimentId) {
+    try {
+      if (!this.db) {
+        Logger.warn("[ExperimentLogManager] IndexedDB 尚未初始化");
+        return false;
+      }
+
+      const transaction = this.db.transaction(
+        [this.pendingLogsStore],
+        "readwrite"
+      );
+      const store = transaction.objectStore(this.pendingLogsStore);
+
+      // 先取得所有日誌
+      const getAllRequest = store.getAll();
+
+      return new Promise((resolve, reject) => {
+        getAllRequest.onsuccess = (event) => {
+          const allLogs = event.target.result || [];
+
+          // 過濾出要刪除的日誌
+          const logsToDelete = allLogs.filter(
+            (log) =>
+              log.exp_id === experimentId || log.experimentId === experimentId
+          );
+
+          if (logsToDelete.length === 0) {
+            Logger.warn(
+              `[ExperimentLogManager] 沒有找到實驗 ${experimentId} 的日誌`
+            );
+            resolve(true);
+            return;
+          }
+
+          // 刪除每一條日誌
+          let deletedCount = 0;
+          logsToDelete.forEach((log, index) => {
+            const deleteRequest = store.delete(log.id || index);
+
+            deleteRequest.onsuccess = () => {
+              deletedCount++;
+              if (deletedCount === logsToDelete.length) {
+                Logger.info(
+                  `[ExperimentLogManager] 已刪除實驗 ${experimentId} 的 ${deletedCount} 條日誌`
+                );
+                // 廣播刪除事件
+                this._broadcastMessage("experimentDeleted", { experimentId });
+                resolve(true);
+              }
+            };
+
+            deleteRequest.onerror = (e) => {
+              Logger.error(
+                `[ExperimentLogManager] 刪除日誌失敗:`,
+                e.target.error
+              );
+              reject(e.target.error);
+            };
+          });
+        };
+
+        getAllRequest.onerror = (event) => {
+          Logger.error(
+            "[ExperimentLogManager] 讀取日誌失敗:",
+            event.target.error
+          );
+          reject(event.target.error);
+        };
+      });
+    } catch (error) {
+      Logger.error(
+        `[ExperimentLogManager] 刪除實驗 ${experimentId} 失敗:`,
+        error
+      );
+      return false;
+    }
+  }
+
+  /**
    * 記錄遠端按鈕動作
    * @param {string} button - 按鈕ID (如 B5, B7 等)
    * @param {string} buttonFunction - 按鈕功能 (如 7, 9 等)
@@ -1042,7 +1109,7 @@ class ExperimentLogManager {
     };
 
     this._addLog(logEntry);
-    Logger.info("記錄: 遠端按鈕動作", logEntry);
+    Logger.debug("記錄: 遠端按鈕動作", logEntry);
   }
 
   /**
@@ -1158,14 +1225,14 @@ class ExperimentLogManager {
       request.onupgradeneeded = (event) => {
         try {
           const db = event.target.result;
-          // 創建 pendingLogs 存儲對象
+          // 建立 pendingLogs 存儲對象
           if (!db.objectStoreNames.contains(this.pendingLogsStore)) {
             const store = db.createObjectStore(this.pendingLogsStore, {
               keyPath: "id",
               autoIncrement: true,
             });
             store.createIndex("timestamp", "timestamp", { unique: false });
-            Logger.info("創建 IndexedDB 存儲對象:", this.pendingLogsStore);
+            Logger.info("建立 IndexedDB 存儲對象:", this.pendingLogsStore);
           }
         } catch (error) {
           Logger.error("IndexedDB upgrade 失敗:", error);

@@ -1,11 +1,12 @@
 /**
  * 版本管理器
- * 用於管理和更新套用程式版本
+ * 已棄用：版本管理功能已移至 ConfigManager (config.js)
+ * 此檔案保留僅供參考，實際功能不再使用
  */
 class VersionManager {
   constructor() {
     this.configUrl = "./data/config.json";
-    this.apiUrl = "./php/api.php";
+    // this.apiUrl = "./php/api.php"; // 已棄用：PHP API 不再存在
   }
 
   /**
@@ -38,7 +39,7 @@ class VersionManager {
     try {
       const response = await fetch(this.configUrl);
       if (!response.ok) {
-        throw new Error("無法讀取配置檔案");
+        throw new Error("無法讀取設定檔案");
       }
       return await response.json();
     } catch (error) {
@@ -52,7 +53,7 @@ class VersionManager {
    */
   async updateVersion() {
     try {
-      // 讀取現有的配置
+      // 讀取現有的設定
       const configData = await this.getCurrentVersion();
 
       const currentVersion = configData.version || "1.5.0";
@@ -63,7 +64,9 @@ class VersionManager {
       configData.version = newVersion;
       configData.updated_at = updateTime;
 
-      // 使用 PHP API 儲存更新
+      // 已棄用：PHP API 不再存在，版本更新功能已移至 ConfigManager
+      // 實際應用中請使用 window.configManager.updateVersion()
+      /*
       const response = await fetch("api.php?action=update_config", {
         method: "POST",
         headers: {
@@ -73,10 +76,11 @@ class VersionManager {
       });
 
       if (!response.ok) {
-        throw new Error("儲存配置失敗");
+        throw new Error("儲存設定失敗");
       }
+      */
 
-      Logger.info(`版本更新成功:`);
+      Logger.info(`版本更新成功（僅供參考，請使用 ConfigManager）:`);
       Logger.info(`   舊版本: ${currentVersion}`);
       Logger.info(`   新版本: ${newVersion}`);
       Logger.info(`   更新時間: ${updateTime}`);

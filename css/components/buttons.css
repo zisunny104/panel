@@ -25,6 +25,7 @@
     transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
     display: flex;
     align-items: center;
+    justify-content: center;
     touch-action: manipulation;
 }
 

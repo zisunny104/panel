@@ -1,0 +1,26 @@
+{
+    "name": "panel-experiment",
+    "version": "2.0",
+    "description": "虛擬操作面板實驗設定範例 (多裝置同步系統優化版)",
+    "main": "index.html",
+    "scripts": {
+        "version:update": "node scripts/update-version.js all",
+        "version:status": "node scripts/update-version.js status",
+        "version:hash": "node scripts/update-version.js hash",
+        "version:version": "node scripts/update-version.js version",
+        "server": "cd server && node index.js",
+        "dev": "npm run server"
+    },
+    "keywords": [
+        "experiment",
+        "panel",
+        "sync",
+        "virtual-reality"
+    ],
+    "author": "謝祥紫、Github Copilot",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "."
+    }
+}

@@ -10,12 +10,19 @@ export class SyncManagerQR {
     this.countdownInterval = null;
     this.scanning = false;
     this.scanTimer = null;
+    this.initialized = false;
   }
 
   /**
    * 初始化QR處理
    */
   initialize() {
+    // 防止重複初始化
+    if (this.initialized) {
+      Logger.debug("[QR] 已初始化，跳過");
+      return;
+    }
+
     // 確保在 DOM 完全準備好後再檢查URL參數
     if (document.readyState === "loading") {
       document.addEventListener(
@@ -56,6 +63,8 @@ export class SyncManagerQR {
     window.addEventListener("sync_start_qr_scan", () => {
       this.startQRScanner();
     });
+
+    this.initialized = true;
   }
 
   /**
@@ -187,10 +196,7 @@ export class SyncManagerQR {
             throw lastError || new Error("無法加入工作階段");
           }
 
-          // 儲存Session資訊到localStorage（透過UI manager）
-          if (window.syncManager?.ui) {
-            window.syncManager.ui.saveSessionBackup(editedCode, selectedRole);
-          }
+          // sessionStorage 由 SyncClient.saveState() 自動管理
 
           //記錄此分享代碼已被處理過（防止頁面重新整理時重複顯示確認對話框）
           const processedShareCodes =
@@ -280,7 +286,7 @@ export class SyncManagerQR {
       shareCodeInfo = await this.core.getShareCodeInfo(code);
       Logger.debug("[QR] 分享代碼資訊取得成功", shareCodeInfo);
     } catch (error) {
-      Logger.warn("[QR] 無法取得分享代碼資訊，將使用預設倒數時間", error);
+      Logger.error("[QR] 取得分享代碼資訊失敗（將繼續產生QR）", error);
       // 如果無法取得資訊，繼續使用預設邏輯
     }
 
@@ -291,6 +297,12 @@ export class SyncManagerQR {
     // 檢查分享代碼是否已過期
     const isExpired = shareCodeInfo && shareCodeInfo.expired;
     const statusText = isExpired ? " (已過期)" : "";
+
+    // 檢查 QRCodeStyling 庫是否已載入
+    Logger.debug("[QR] QRCodeStyling 可用性", {
+      available: typeof QRCodeStyling !== "undefined",
+      globalType: typeof window.QRCodeStyling,
+    });
 
     if (typeof QRCodeStyling === "undefined") {
       // QR庫未載入，顯示文字URL
@@ -329,6 +341,7 @@ export class SyncManagerQR {
       });
 
       qrCode.append(container);
+      Logger.debug("[QR] QR code 已附加到容器");
 
       const roleText = role === "viewer" ? "僅檢視" : "同步操作";
       const codeText = document.createElement("div");
@@ -340,6 +353,7 @@ export class SyncManagerQR {
                 </p>
             `;
       container.appendChild(codeText);
+      Logger.info("[QR] QR code 產產生功", { code, role });
 
       // 不啟動倒數計時，因為這是由UI層負責的
     } catch (error) {

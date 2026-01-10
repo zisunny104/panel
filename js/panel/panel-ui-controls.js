@@ -165,6 +165,29 @@ class UIControlsManager {
     if (this.powerLightArea) this.powerLightArea.style.display = "block";
   }
 
+  // 更新全螢幕按鈕圖標
+  updateFullscreenButtonIcon() {
+    const fullscreenButton = document.getElementById("fullscreenButton");
+    if (!fullscreenButton) return;
+
+    const enterSvg = fullscreenButton.querySelector(".fullscreen-enter");
+    const exitSvg = fullscreenButton.querySelector(".fullscreen-exit");
+
+    if (!enterSvg || !exitSvg) return;
+
+    if (document.fullscreenElement) {
+      // 全螢幕狀態：顯示退出圖標
+      enterSvg.style.display = "none";
+      exitSvg.style.display = "block";
+      fullscreenButton.title = "退出全螢幕";
+    } else {
+      // 正常狀態：顯示進入圖標
+      enterSvg.style.display = "block";
+      exitSvg.style.display = "none";
+      fullscreenButton.title = "切換全螢幕";
+    }
+  }
+
   // 切換全螢幕
   toggleFullscreen() {
     if (document.fullscreenElement) {
@@ -263,6 +286,11 @@ class UIControlsManager {
     if (fullscreenButton)
       fullscreenButton.addEventListener("click", () => this.toggleFullscreen());
 
+    // 全螢幕狀態變化監聽器
+    document.addEventListener("fullscreenchange", () =>
+      this.updateFullscreenButtonIcon()
+    );
+
     // 防止右鍵選單
     document.addEventListener("contextmenu", (e) => e.preventDefault());
   }
@@ -270,6 +298,9 @@ class UIControlsManager {
   // 初始化 UI 狀態
   initializeUIState() {
     Logger.debug("初始化 UI 狀態，載入設定...");
+
+    // 初始化全螢幕按鈕圖標
+    this.updateFullscreenButtonIcon();
 
     // 從 configManager 或 localStorage 載入設定
     const configSettings = window.configManager?.userSettings || {};

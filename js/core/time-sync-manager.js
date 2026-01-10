@@ -19,8 +19,8 @@ class TimeSyncManager {
     this.syncCheckInterval = 5 * 60 * 1000; // 每 5 分鐘重新同步一次
     this.syncCheckTimer = null;
 
-    // 時區設定（從配置檔案取得）
-    this.timezone = window.CONFIG?.timezone?.default || "Asia/Taipei";
+    // 時區設定（從設定檔案取得）
+    this.timezone = window.CONFIG?.timezone || "Asia/Taipei";
 
     // 多次同步結果用於計算平均偏差（降低網路延遲影響）
     this.syncSamples = [];
@@ -36,7 +36,6 @@ class TimeSyncManager {
 
     try {
       await this.syncWithServer();
-      this.startPeriodicSync();
       Logger.debug("[TimeSyncManager] 時間同步初始化完成");
     } catch (error) {
       Logger.warn("[TimeSyncManager] 時間同步初始化失敗:", error);
@@ -52,106 +51,27 @@ class TimeSyncManager {
   static getTimezone() {
     return (
       window.timeSyncManager?.timezone ||
-      window.CONFIG?.timezone?.default ||
+      window.CONFIG?.timezone ||
       "Asia/Taipei"
     );
   }
 
   /**
    * 與伺服器同步時間
-   * 測量網路往返延遲並計算時間偏差
+   * 使用本地時間，時間偏差固定為 0
    */
   async syncWithServer() {
-    const clientTime1 = Date.now(); // 發送前的客戶端時間
-
     try {
-      const response = await fetch("php/sync-api.php?action=getServerTime", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const clientTime2 = Date.now(); // 接收後的客戶端時間
-
-      if (!response.ok) {
-        throw new Error(`伺服器回應異常: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.success || !data.serverTime) {
-        throw new Error("伺服器未返回有效的時間資料");
-      }
-
-      // 計算網路往返延遲（毫秒）
-      const roundTripDelay = clientTime2 - clientTime1;
-      const estimatedNetworkDelay = Math.round(roundTripDelay / 2);
-
-      // 估算伺服器回應時刻的客戶端時間
-      const estimatedServerResponseTime = clientTime1 + estimatedNetworkDelay;
-
-      // 計算時間偏差
-      // timeOffset = 本地時間 - 伺服器時間
-      const offset = estimatedServerResponseTime - data.serverTime;
-
-      // 記錄同步樣本
-      this.syncSamples.push({
-        offset: offset,
-        delay: roundTripDelay,
-        timestamp: clientTime2,
-      });
-
-      if (this.syncSamples.length > this.maxSamples) {
-        this.syncSamples.shift();
-      }
-
-      // 使用平均偏差降低單次測量誤差
-      this.timeOffset = Math.round(
-        this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
-          this.syncSamples.length
-      );
-
-      // 從伺服器取得時區設定
-      if (data.timezone) {
-        this.timezone = data.timezone;
-      }
-
+      // 不需要與伺服器同步
+      // 所有裝置使用各自的本地時間，透過 WebSocket 進行事件同步
+      this.timeOffset = 0;
       this.isSynced = true;
       this.lastSyncTime = Date.now();
 
-      Logger.debug(
-        `[TimeSyncManager] 時間同步成功: 偏差=${this.timeOffset}ms, ` +
-          `網路延遲=${roundTripDelay}ms, 樣本數=${this.syncSamples.length}`
-      );
+      Logger.debug("[TimeSyncManager] 使用本地時間，時間偏差 = 0ms");
     } catch (error) {
-      Logger.warn("[TimeSyncManager] 時間同步失敗:", error.message);
-      // 同步失敗時保持現有偏差或使用 0
+      Logger.warn("[TimeSyncManager] 時間初始化失敗:", error.message);
       this.isSynced = false;
-    }
-  }
-
-  /**
-   * 啟動定期時間同步
-   */
-  startPeriodicSync() {
-    // 清理舊的計時器
-    if (this.syncCheckTimer) {
-      clearInterval(this.syncCheckTimer);
-    }
-
-    // 定期重新同步
-    this.syncCheckTimer = setInterval(async () => {
-      Logger.debug("[TimeSyncManager] 執行定期時間重新同步...");
-      await this.syncWithServer();
-    }, this.syncCheckInterval);
-  }
-
-  /**
-   * 停止定期同步
-   */
-  stopPeriodicSync() {
-    if (this.syncCheckTimer) {
-      clearInterval(this.syncCheckTimer);
-      this.syncCheckTimer = null;
     }
   }
 
@@ -199,6 +119,232 @@ class TimeSyncManager {
   }
 
   /**
+   * 透過 WebSocket 進行一次性校時
+   * @param {number} serverTime - 伺服器時間戳（毫秒）
+   */
+  syncWithWebSocket(serverTime) {
+    const clientTime = Date.now();
+    const offset = clientTime - serverTime;
+
+    // 記錄樣本
+    this.syncSamples.push({
+      offset: offset,
+      delay: 0, // WebSocket 延遲忽略不計
+      timestamp: clientTime,
+    });
+
+    if (this.syncSamples.length > this.maxSamples) {
+      this.syncSamples.shift();
+    }
+
+    // 計算平均偏差
+    this.timeOffset = Math.round(
+      this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
+        this.syncSamples.length
+    );
+
+    this.isSynced = true;
+    this.lastSyncTime = Date.now();
+
+    Logger.debug(
+      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`
+    );
+  }
+
+  /**
+   * 格式化時間戳為可讀格式
+   * @param {Date|number|string} dateInput - 日期物件、時間戳或 ISO 字串
+   * @param {Object} options - 格式化選項
+   * @returns {string} 格式化後的時間字串
+   */
+  formatDateTime(dateInput, options = {}) {
+    const {
+      includeDate = true,
+      includeTime = true,
+      includeMilliseconds = false,
+      use24Hour = true,
+      separator = " ",
+    } = options;
+
+    let date;
+    if (dateInput instanceof Date) {
+      date = dateInput;
+    } else if (typeof dateInput === "number") {
+      date = new Date(dateInput);
+    } else if (typeof dateInput === "string") {
+      date = new Date(dateInput);
+    } else {
+      date = new Date();
+    }
+
+    const parts = [];
+
+    if (includeDate) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      parts.push(`${year}-${month}-${day}`);
+    }
+
+    if (includeTime) {
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const seconds = String(date.getSeconds()).padStart(2, "0");
+      let timePart = `${hours}:${minutes}:${seconds}`;
+
+      if (includeMilliseconds) {
+        const ms = String(date.getMilliseconds()).padStart(3, "0");
+        timePart += `.${ms}`;
+      }
+
+      parts.push(timePart);
+    }
+
+    return parts.join(separator);
+  }
+
+  /**
+   * 格式化為 ISO 8601 格式
+   * @param {Date|number} dateInput - 日期物件或時間戳
+   * @returns {string} ISO 格式字串
+   */
+  formatISO(dateInput) {
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    return date.toISOString();
+  }
+
+  /**
+   * 格式化時間長度（持續時間）
+   * @param {number} milliseconds - 毫秒數
+   * @returns {string} 格式化的時間長度 (HH:MM:SS)
+   */
+  formatDuration(milliseconds) {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [
+      String(hours).padStart(2, "0"),
+      String(minutes).padStart(2, "0"),
+      String(seconds).padStart(2, "0"),
+    ].join(":");
+  }
+
+  /**
+   * 透過 WebSocket 進行一次性校時
+   * @param {number} serverTime - 伺服器時間戳（毫秒）
+   */
+  syncWithWebSocket(serverTime) {
+    const clientTime = Date.now();
+    const offset = clientTime - serverTime;
+
+    // 記錄樣本
+    this.syncSamples.push({
+      offset: offset,
+      delay: 0, // WebSocket 延遲忽略不計
+      timestamp: clientTime,
+    });
+
+    if (this.syncSamples.length > this.maxSamples) {
+      this.syncSamples.shift();
+    }
+
+    // 計算平均偏差
+    this.timeOffset = Math.round(
+      this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
+        this.syncSamples.length
+    );
+
+    this.isSynced = true;
+    this.lastSyncTime = Date.now();
+
+    Logger.debug(
+      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`
+    );
+  }
+
+  /**
+   * 格式化時間戳為可讀格式
+   * @param {Date|number|string} dateInput - 日期物件、時間戳或 ISO 字串
+   * @param {Object} options - 格式化選項
+   * @returns {string} 格式化後的時間字串
+   */
+  formatDateTime(dateInput, options = {}) {
+    const {
+      includeDate = true,
+      includeTime = true,
+      includeMilliseconds = false,
+      use24Hour = true,
+      separator = " ",
+    } = options;
+
+    let date;
+    if (dateInput instanceof Date) {
+      date = dateInput;
+    } else if (typeof dateInput === "number") {
+      date = new Date(dateInput);
+    } else if (typeof dateInput === "string") {
+      date = new Date(dateInput);
+    } else {
+      date = new Date();
+    }
+
+    const parts = [];
+
+    if (includeDate) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      parts.push(`${year}-${month}-${day}`);
+    }
+
+    if (includeTime) {
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const seconds = String(date.getSeconds()).padStart(2, "0");
+      let timePart = `${hours}:${minutes}:${seconds}`;
+
+      if (includeMilliseconds) {
+        const ms = String(date.getMilliseconds()).padStart(3, "0");
+        timePart += `.${ms}`;
+      }
+
+      parts.push(timePart);
+    }
+
+    return parts.join(separator);
+  }
+
+  /**
+   * 格式化為 ISO 8601 格式
+   * @param {Date|number} dateInput - 日期物件或時間戳
+   * @returns {string} ISO 格式字串
+   */
+  formatISO(dateInput) {
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    return date.toISOString();
+  }
+
+  /**
+   * 格式化時間長度（持續時間）
+   * @param {number} milliseconds - 毫秒數
+   * @returns {string} 格式化的時間長度 (HH:MM:SS)
+   */
+  formatDuration(milliseconds) {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [
+      String(hours).padStart(2, "0"),
+      String(minutes).padStart(2, "0"),
+      String(seconds).padStart(2, "0"),
+    ].join(":");
+  }
+
+  /**
    * 格式化時間為東八區 YYYY-MM-DD HH:MM:SS 格式
    * @param {number|Date} timestamp - 毫秒級時間戳或 Date 物件
    * @param {Object} options - 選項
@@ -240,7 +386,7 @@ class TimeSyncManager {
 
       return result;
     } catch (error) {
-      console.error("[TimeSyncManager] 時間格式化失敗:", error);
+      Logger.error("[TimeSyncManager] 時間格式化失敗:", error);
       return "格式化錯誤";
     }
   }
@@ -259,7 +405,7 @@ class TimeSyncManager {
       const timeMatch = dateTime.match(/\s(.*)$/);
       return timeMatch ? timeMatch[1] : "無效時間";
     } catch (error) {
-      console.error("[TimeSyncManager] 時間格式化失敗:", error);
+      Logger.error("[TimeSyncManager] 時間格式化失敗:", error);
       return "格式化錯誤";
     }
   }
@@ -276,7 +422,7 @@ class TimeSyncManager {
       const dateMatch = dateTime.match(/^([^\s]+)/);
       return dateMatch ? dateMatch[1] : "無效日期";
     } catch (error) {
-      console.error("[TimeSyncManager] 日期格式化失敗:", error);
+      Logger.error("[TimeSyncManager] 日期格式化失敗:", error);
       return "格式化錯誤";
     }
   }
@@ -293,4 +439,12 @@ class TimeSyncManager {
 // 建立全局時間同步管理器實例
 window.timeSyncManager = window.timeSyncManager || new TimeSyncManager();
 
-export default TimeSyncManager;
+// UMD 模式：同時支援全域和 ES6 模組
+if (typeof window !== "undefined") {
+  window.TimeSyncManager = TimeSyncManager;
+}
+
+// 僅在模組環境中匯出（避免普通 script 語法錯誤）
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = TimeSyncManager;
+}

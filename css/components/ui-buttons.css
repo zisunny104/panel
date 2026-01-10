@@ -1,0 +1,154 @@
+/* ================= UI 按鈕樣式 ================= */
+/* 通用按鈕樣式 */
+.btn-base {
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-round {
+    border-radius: 50%;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.btn-medium {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.btn-large {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+/* 圖標按鈕 - 正常尺寸 */
+.btn.btn-icon-only {
+    min-width: 40px !important;
+    height: 40px !important;
+    padding: 8px 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    border: none !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: all 0.2s !important;
+    white-space: nowrap !important;
+}
+
+/* SVG 圖標樣式 */
+.icon-view svg,
+.icon-download svg,
+.icon-delete svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* 檢視圖標 - 輪廓樣式 */
+.icon-view svg {
+    stroke: currentColor;
+    fill: none;
+}
+
+/* 下載圖標 - 輪廓樣式 */
+.icon-download svg {
+    stroke: currentColor;
+    fill: none;
+}
+
+/* 刪除圖標 - 實心樣式 */
+.icon-delete svg {
+    fill: currentColor;
+    stroke: currentColor;
+}
+
+/* ================= 右下角圓形按鈕 ================= */
+.corner-buttons {
+    position: fixed;
+    right: 2rem;
+    bottom: 1rem;
+    display: grid;
+    grid-template-rows: repeat(3, 1fr);
+    gap: 1.2rem;
+    z-index: 20;
+}
+
+/* ================= 圓形按鈕基礎樣式 ================= */
+.circular-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    background: #444;
+    color: white;
+    border: none;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+.circular-button:hover {
+    background: #555;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.circular-button:active {
+    background: #333;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.circular-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+/* 圓形按鈕顏色變體 */
+.circular-button.accent {
+    background: #ff8c00;
+}
+
+.circular-button.accent:hover {
+    background: #ffaa33;
+}
+
+.circular-button.accent:active {
+    background: #cc7000;
+}
+
+.circular-button.success {
+    background: #28a745;
+}
+
+.circular-button.success:hover {
+    background: #3bb856;
+}
+
+.circular-button.success:active {
+    background: #1f7a34;
+}
+
+/* ================= 參考卡片 ================= */
+.reference-card {
+    width: 8.56cm;
+    height: 5.398cm;
+    background: #999;
+    text-align: center;
+    color: transparent;
+    margin-top: 1rem;
+    border-radius: 0.318cm;
+}

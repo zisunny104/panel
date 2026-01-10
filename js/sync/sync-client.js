@@ -1,440 +1,596 @@
 /**
- * SyncClient - 同步客戶端
- * 僅負責與PHP API通訊，不包含UI邏輯
+ * SyncClient - 同步客戶端 (WebSocket + REST API 混合架構)
+ *
+ * 架構說明：
+ * - REST API: 工作階段的建立、加入、查詢等操作
+ * - WebSocket: 即時狀態同步、客戶端上下線通知
+ * - sessionStorage: 用於同一分頁內的狀態恢復（重新整理後自動恢復連線）
+ *
+ * URL 自動偵測：
+ * - 測試環境: localhost
+ * - 生產環境: 自動使用目前網域
+ * - Port 固定: 7645
  */
+
 class SyncClient {
-  constructor() {
-    this.apiUrl = "./php/sync-api.php";
+  constructor(config = {}) {
+    // API 端點配置
+    this.apiBaseUrl = config.apiBaseUrl || this.getDefaultApiUrl();
+
+    // WebSocket 客戶端（延遲初始化）
+    this.wsClient = null;
+    this.wsConfig = {
+      url: config.wsUrl,
+      storagePrefix: "panel_sync_",
+      autoReconnect: true,
+    };
+
+    // 狀態
     this.sessionId = null;
-    this.clientId = this.loadClientId(); // 從本機儲存載入裝置ID
-    this.deviceToken = null; // 裝置驗證簽章
-    this.role = null; // 'viewer' 或 'operator'
-    this.lastUpdate = 0;
-    this.pollInterval = 2000; // 2秒輪詢一次（從1秒調整為2秒以提升效能）
-    this.minPollInterval = 2000; // 最小輪詢間隔（活躍時）
-    this.maxPollInterval = 10000; // 最大輪詢間隔（閒置時）
-    this.pollTimer = null;
-    this.lastActivityTime = Date.now(); // 最後活動時間
-    this.activityTimeout = 30000; // 30秒無活動視為閒置
-    this.connected = false;
-    this.serverOnline = null; // null=未檢查, true=線上, false=離線
-    this.previousServerOnline = null; // 追蹤前一個狀態，用於偵測變化
-    this.healthCheckInterval = 5000; // 5秒檢查一次伺服器（從3秒調整為5秒以提升效能）
-    this.healthCheckTimer = null;
-    this.pollFailureCount = 0; // 輪詢連續失敗計數
-    this.maxPollFailures = 5; // 最大連續失敗次數，超過則停止輪詢
-  }
-
-  /**
-   * 從本機儲存載入裝置ID
-   * 如果不存在，產生一個新的
-   */
-  loadClientId() {
-    const storedClientId = localStorage.getItem("sync_client_id");
-    if (storedClientId) {
-      return storedClientId;
-    }
-
-    // 產生新的裝置ID（基於時間戳 + 隨機數）
-    const newClientId = this.generateClientId();
-    this.saveClientId(newClientId);
-  }
-
-  /**
-   * 產生唯一的裝置ID
-   */
-  generateClientId() {
-    const timestamp = Date.now().toString(36); // 時間戳轉36進制
-    const random = Math.random().toString(36).substring(2, 8); // 6位隨機字符
-    return `D${timestamp}-${random}`.toUpperCase();
-  }
-
-  /**
-   * 儲存裝置ID到本機儲存
-   */
-  saveClientId(clientId) {
-    localStorage.setItem("sync_client_id", clientId);
-  }
-
-  /**
-   * 清除本機儲存的裝置ID（主動斷線時調用）
-   */
-  clearClientId() {
-    localStorage.removeItem("sync_client_id");
     this.clientId = null;
-  }
+    this.role = "viewer";
+    this.connected = false;
+    this.serverOnline = true;
+    this.previousServerOnline = true;
+    this.initialized = false; // 標記是否已初始化
 
-  /**
-   * 從本機儲存載入工作階段ID
-   */
-  loadSessionId() {
-    const sessionId = localStorage.getItem("sync_session_id");
-    Logger.debug("[SyncClient] 載入工作階段ID:", sessionId || "無");
-    return sessionId || null;
-  }
+    // 從 sessionStorage 載入狀態（如果有）
+    this.loadState();
 
-  /**
-   * 儲存工作階段ID到本機儲存
-   */
-  saveSessionId(sessionId) {
-    if (sessionId) {
-      localStorage.setItem("sync_session_id", sessionId);
-      Logger.debug("[SyncClient] 已儲存工作階段ID到 localStorage:", sessionId);
+    // 健康檢查定時器（本機模式也需要，用於指示器）
+    this.healthCheckTimer = null;
+    this.healthCheckInterval = 10000; // 10秒（輕量級即時檢查）
+    this.healthCheckMethod = "lightweight"; // "lightweight" 或 "websocket"
+
+    // 如果有儲存的 sessionId，代表之前加入過工作階段，需要恢復
+    if (this.sessionId) {
+      Logger.info("[SyncClient] 偵測到儲存的工作階段，準備恢復連線");
+      this.initializeSync();
     } else {
-      localStorage.removeItem("sync_session_id");
-      Logger.debug("[SyncClient] 已清除 localStorage 中的工作階段ID");
+      Logger.debug("[SyncClient] 本機模式，啟動輕量級健康檢查");
+      // 本機模式也啟動健康檢查，但使用輕量級方法
+      this.startLightweightHealthCheck();
     }
   }
 
   /**
-   * 從本機儲存載入角色
+   * 初始化同步功能（延遲初始化）
+   * 只在建立或加入工作階段時呼叫
    */
-  loadRole() {
-    const role = localStorage.getItem("sync_role");
-    Logger.debug("[SyncClient] 載入角色:", role || "無");
-    return role || null;
-  }
-
-  /**
-   * 儲存角色到本機儲存
-   */
-  saveRole(role) {
-    if (role) {
-      localStorage.setItem("sync_role", role);
-      Logger.debug("[SyncClient] 已儲存角色到 localStorage:", role);
-    } else {
-      localStorage.removeItem("sync_role");
-      Logger.debug("[SyncClient] 已清除 localStorage 中的角色");
+  initializeSync() {
+    if (this.initialized) {
+      Logger.debug("[SyncClient] 同步功能已初始化，跳過");
+      return;
     }
+
+    Logger.info("[SyncClient] 初始化同步功能...");
+
+    // 停止輕量級健康檢查（切換到 WebSocket 狀態監聆）
+    this.stopHealthCheck();
+
+    // 建立 WebSocket 客戶端
+    this.wsClient = new WebSocketClient(this.wsConfig);
+
+    // 設定 WebSocket 事件處理
+    this.setupWebSocketHandlers();
+
+    // 同步模式使用 WebSocket 狀態，不需要額外的 HTTP 健康檢查
+    this.healthCheckMethod = "websocket";
+
+    this.initialized = true;
+    Logger.info("[SyncClient] 同步功能初始化完成，切換到 WebSocket 狀態監聴");
   }
 
   /**
-   * 建立新的同步工作階段（需要建立代碼）
+   * 取得預設 API URL（自動偵測目前網域）
+   * 測試環境: http://localhost:7645/api
+   * 生產環境: http://yourdomain.com:7645/api 或 https://yourdomain.com:7645/api
+   */
+  getDefaultApiUrl() {
+    const protocol = window.location.protocol;
+    const host = window.location.hostname;
+    const port = "7645";
+    return `${protocol}//${host}:${port}/api`;
+  }
+
+  /**
+   * 設定 WebSocket 事件處理器
+   */
+  setupWebSocketHandlers() {
+    // 認證成功
+    this.wsClient.on("authenticated", (data) => {
+      Logger.debug("[SyncClient] WebSocket 認證成功", data);
+      this.connected = true;
+      this.sessionId = data.sessionId;
+      this.clientId = data.clientId;
+      this.role = data.role;
+      this.saveState();
+
+      // 觸發連線成功事件
+      window.dispatchEvent(
+        new CustomEvent("sync_connected", {
+          detail: data,
+        })
+      );
+    });
+
+    // 重新連接成功
+    this.wsClient.on("reconnected", (data) => {
+      Logger.debug("[SyncClient] WebSocket 重新連接成功", data);
+      this.connected = true;
+
+      window.dispatchEvent(
+        new CustomEvent("sync_reconnected", {
+          detail: data,
+        })
+      );
+    });
+
+    // 斷線
+    this.wsClient.on("disconnected", (data) => {
+      Logger.info("[SyncClient] WebSocket 已斷線", data);
+      this.connected = false;
+
+      window.dispatchEvent(
+        new CustomEvent("sync_disconnected", {
+          detail: data,
+        })
+      );
+    });
+
+    // 狀態更新
+    this.wsClient.on("state_update", (data) => {
+      Logger.debug("[SyncClient] 收到狀態更新", data);
+      this.triggerStateUpdate(data.state);
+    });
+
+    // 客戶端加入
+    this.wsClient.on("client_joined", (data) => {
+      Logger.debug("[SyncClient] 新客戶端加入", data);
+      window.dispatchEvent(
+        new CustomEvent("sync_client_joined", {
+          detail: data,
+        })
+      );
+    });
+
+    // 客戶端離開
+    this.wsClient.on("client_left", (data) => {
+      Logger.debug("[SyncClient] 客戶端離開", data);
+      window.dispatchEvent(
+        new CustomEvent("sync_client_left", {
+          detail: data,
+        })
+      );
+    });
+
+    // 客戶端重新連接
+    this.wsClient.on("client_reconnected", (data) => {
+      Logger.debug("[SyncClient] 客戶端重新連接", data);
+      window.dispatchEvent(
+        new CustomEvent("sync_client_reconnected", {
+          detail: data,
+        })
+      );
+    });
+
+    // 伺服器錯誤
+    this.wsClient.on("server_error", (data) => {
+      Logger.error("[SyncClient] 伺服器錯誤", data);
+      window.dispatchEvent(
+        new CustomEvent("sync_server_error", {
+          detail: data,
+        })
+      );
+    });
+
+    // 實驗事件 - experiment_started
+    this.wsClient.on("experiment_started", (data) => {
+      Logger.debug("[SyncClient] 收到實驗開始事件", data);
+      window.dispatchEvent(
+        new CustomEvent("remote_experiment_started", {
+          detail: data,
+        })
+      );
+    });
+
+    // 實驗事件 - experiment_paused
+    this.wsClient.on("experiment_paused", (data) => {
+      Logger.debug("[SyncClient] 收到實驗暫停事件", data);
+      window.dispatchEvent(
+        new CustomEvent("remote_experiment_paused", {
+          detail: data,
+        })
+      );
+    });
+
+    // 實驗事件 - experiment_resumed
+    this.wsClient.on("experiment_resumed", (data) => {
+      Logger.debug("[SyncClient] 收到實驗恢復事件", data);
+      window.dispatchEvent(
+        new CustomEvent("remote_experiment_resumed", {
+          detail: data,
+        })
+      );
+    });
+
+    // 實驗事件 - experiment_stopped
+    this.wsClient.on("experiment_stopped", (data) => {
+      Logger.debug("[SyncClient] 收到實驗停止事件", data);
+      window.dispatchEvent(
+        new CustomEvent("remote_experiment_stopped", {
+          detail: data,
+        })
+      );
+    });
+
+    // 實驗事件 - experiment_id_update
+    this.wsClient.on("experiment_id_update", (data) => {
+      Logger.debug("[SyncClient] 收到實驗ID更新事件", data);
+      window.dispatchEvent(
+        new CustomEvent("experiment_id_updated", {
+          detail: data,
+        })
+      );
+    });
+
+    // 工作階段狀態更新
+    this.wsClient.on("session_state", (data) => {
+      Logger.debug("[SyncClient] 收到工作階段狀態", data);
+      window.dispatchEvent(
+        new CustomEvent("sync_session_state", {
+          detail: data,
+        })
+      );
+    });
+  }
+
+  /**
+   * 建立新的工作階段（建立者直接加入）
+   * @param {string} createCode - 建立代碼（格式：A12B-C34D-E56F）
+   * @returns {Promise<{sessionId: string}>}
    */
   async createSession(createCode) {
     try {
-      // 先檢查伺服器是否線上
+      // 首次建立工作階段，初始化同步功能
+      this.initializeSync();
+
+      // 檢查伺服器狀態
       await this.checkServerHealth();
       if (!this.serverOnline) {
         throw new Error("伺服器離線，無法建立工作階段");
       }
 
-      const response = await this.sendRequest("create_session", { createCode });
-      if (response.success) {
-        this.sessionId = response.data.sessionId;
-        this.saveSessionId(this.sessionId);
-        this.connected = true;
-        this.role = "operator"; // 建立者預設為操作者
-        this.startPolling();
-        this.startHealthCheck();
+      // 調用 REST API 建立工作階段
+      const response = await fetch(`${this.apiBaseUrl}/sync/session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          createCode,
+        }),
+      });
 
-        // 回傳包含 sessionId 和 shareCode 的物件
-        return {
-          sessionId: response.data.sessionId,
-          shareCode: response.data.shareCode, // 新增：回傳分享代碼
-        };
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
       }
-      throw new Error(response.message);
+
+      const data = await response.json();
+
+      // 儲存工作階段資訊
+      this.sessionId = data.data.sessionId;
+      this.clientId = data.data.clientId;
+      this.role = data.data.role; // 伺服器回傳的角色（operator）
+      this.saveState();
+
+      // 連接到 WebSocket
+      await this.wsClient.connect({
+        sessionId: this.sessionId,
+        clientId: this.clientId,
+        role: this.role,
+      });
+
+      // 回傳工作階段ID（不包含分享代碼）
+      return {
+        sessionId: data.data.sessionId,
+      };
     } catch (error) {
-      // 此錯誤是正常情況（無痕視窗、首次存取、工作階段過期），不顯示錯誤
+      Logger.error("[SyncClient] 建立工作階段失敗:", error);
       throw error;
     }
   }
 
   /**
-   * 加入現有工作階段（支援角色選擇）
+   * 產生分享代碼（在工作階段建立後）
+   * @returns {Promise<{shareCode: string, expiresAt: string}>}
    */
+  async generateShareCode() {
+    try {
+      if (!this.sessionId || !this.clientId) {
+        throw new Error("尚未加入工作階段");
+      }
+
+      // 檢查伺服器狀態
+      await this.checkServerHealth();
+      if (!this.serverOnline) {
+        throw new Error("伺服器離線，無法產生分享代碼");
+      }
+
+      // 調用 REST API 產生分享代碼
+      const response = await fetch(
+        `${this.apiBaseUrl}/sync/generate_share_code`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId: this.sessionId,
+            clientId: this.clientId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      Logger.debug("[SyncClient] 分享代碼已產生:", data.data.share_code);
+
+      return {
+        shareCode: data.data.share_code,
+        expiresAt: data.data.expires_at,
+      };
+    } catch (error) {
+      Logger.error("[SyncClient] 產生分享代碼失敗:", error);
+      throw error;
+    }
+  }
 
   /**
-   * 通過分享代碼加入工作階段（一次性使用）
+   * 通過分享代碼加入工作階段
+   * @param {string} shareCode - 分享代碼（6位英數字）
+   * @param {string} role - 角色 ('viewer' 或 'operator')
+   * @returns {Promise<boolean>}
    */
   async joinSessionByShareCode(shareCode, role = "viewer") {
     try {
-      // 先檢查伺服器是否線上
+      // 首次加入工作階段，初始化同步功能
+      this.initializeSync();
+
+      // 檢查伺服器狀態
       await this.checkServerHealth();
       if (!this.serverOnline) {
         throw new Error("伺服器離線，無法加入工作階段");
       }
 
-      const response = await this.sendRequest("join_by_share_code", {
-        shareCode,
-        role,
-        clientId: this.clientId, // 新增：傳送本機裝置ID給伺服器
+      // 調用 REST API 加入工作階段
+      const response = await fetch(`${this.apiBaseUrl}/sync/join`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          shareCode,
+          role,
+          clientId: this.clientId,
+        }),
       });
-      if (response.success) {
-        this.sessionId = response.data.sessionId;
-        this.saveSessionId(this.sessionId);
-        // 如果伺服器回傳的 clientId 與本機不同，表示是新客戶端
-        if (
-          response.data.clientId &&
-          response.data.clientId !== this.clientId
-        ) {
-          this.clientId = response.data.clientId;
-          this.saveClientId(this.clientId); // 儲存新的 clientId
-        }
-        this.deviceToken = response.data.deviceToken; // 新增：儲存裝置簽章
-        this.role = response.data.role;
-        this.saveRole(this.role); // 新增：儲存角色
-        this.connected = true;
-        this.startPolling();
-        this.startHealthCheck();
 
-        // 如果有初始狀態，立即觸發更新事件
-        if (response.data.state) {
-          this.triggerStateUpdate(response.data.state);
-        }
-
-        return true;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
       }
-      throw new Error(response.message);
+
+      const data = await response.json();
+
+      // 儲存工作階段資訊
+      this.sessionId = data.data.sessionId;
+      this.clientId = data.data.clientId;
+      this.role = data.data.role;
+      this.saveState();
+
+      // 連接到 WebSocket
+      await this.wsClient.connect({
+        sessionId: this.sessionId,
+        clientId: this.clientId,
+        role: this.role,
+      });
+
+      // 如果有初始狀態，立即觸發更新事件
+      if (data.data.state) {
+        this.triggerStateUpdate(data.data.state);
+      }
+
+      return true;
     } catch (error) {
-      Logger.error("通過分享代碼加入工作階段失敗:", error);
+      Logger.error("[SyncClient] 加入工作階段失敗:", error);
       throw error;
     }
   }
 
   /**
-   * 取得分享代碼資訊（用於顯示剩餘有效時間）
+   * 還原工作階段（重新整理後自動恢復）
+   * 使用 sessionStorage 中的資訊
+   * @returns {Promise<boolean>}
    */
-  async getShareCodeInfo(shareCode) {
+  async restoreSession() {
     try {
-      const response = await this.sendRequest("get_share_code_info", {
-        shareCode,
-      });
-      if (response.success) {
-        return response.data;
+      // 檢查是否有儲存的狀態
+      if (!this.sessionId || !this.clientId) {
+        Logger.debug("[SyncClient] 沒有可還原的工作階段");
+        return false;
       }
-      throw new Error(response.message);
-    } catch (error) {
-      Logger.error("取得分享代碼資訊失敗:", error);
-      throw error;
-    }
-  }
 
-  /**
-   * 取得工作階段中的所有客戶端資訊
-   * 用於恢復連線時了解工作階段的完整狀態
-   */
-  async getSessionClients(sessionId) {
-    try {
-      const response = await this.sendRequest("get_session_clients", {
-        sessionId,
-      });
-      if (response.success) {
-        return response.data;
-      }
-      throw new Error(response.message);
-    } catch (error) {
-      Logger.error("取得工作階段客戶端資訊失敗:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 還原工作階段連線（用於同一裝置短期內重新連線）
-   * 驗證 sessionId 和 clientId，允許客戶端還原之前的連線
-   */
-  async restoreSession(sessionId, clientId, role = "viewer") {
-    try {
-      // 先檢查伺服器是否線上
+      // 檢查伺服器狀態
       await this.checkServerHealth();
       if (!this.serverOnline) {
         throw new Error("伺服器離線，無法還原工作階段");
       }
 
-      const response = await this.sendRequest("restore_session", {
-        sessionId,
-        clientId,
-        role,
-      });
-      if (response.success) {
-        this.sessionId = response.data.sessionId;
-        this.saveSessionId(this.sessionId);
-        this.clientId = response.data.clientId;
-        this.deviceToken = response.data.deviceToken; // 新增：還原裝置簽章
-        this.shareCode = response.data.shareCode; // 新增：還原分享代碼
-        this.role = response.data.role;
-        this.saveRole(this.role); // 新增：還原並儲存角色
-        this.connected = true;
-        this.startPolling();
-        this.startHealthCheck();
+      // 驗證工作階段是否仍然有效（調用 REST API）
+      const response = await fetch(
+        `${this.apiBaseUrl}/sync/session/${this.sessionId}/validate?clientId=${this.clientId}`
+      );
 
-        // 如果有初始狀態，立即觸發更新事件
-        if (response.data.state) {
-          this.triggerStateUpdate(response.data.state);
-        }
-
-        // 回傳完整的還原資訊（包括 shareCode）
-        return response.data;
+      if (!response.ok) {
+        Logger.info("[SyncClient] 工作階段已失效，清除狀態");
+        this.clearState();
+        return false;
       }
-      throw new Error(response.message);
+
+      const data = await response.json();
+
+      if (!data.data.valid) {
+        Logger.warn("[SyncClient] 工作階段驗證失敗，清除狀態");
+        this.clearState();
+        return false;
+      }
+
+      // 連接到 WebSocket
+      await this.wsClient.connect({
+        sessionId: this.sessionId,
+        clientId: this.clientId,
+        role: this.role,
+      });
+
+      Logger.info("[SyncClient] 工作階段還原成功");
+      return true;
     } catch (error) {
-      // 此錯誤是正常情況（無痕視窗、首次存取、工作階段過期），不顯示錯誤
+      Logger.error("[SyncClient] 還原工作階段失敗:", error);
+      this.clearState();
+      return false;
+    }
+  }
+
+  /**
+   * 取得分享代碼資訊
+   * @param {string} shareCode - 分享代碼
+   * @returns {Promise<Object>}
+   */
+  async getShareCodeInfo(shareCode) {
+    try {
+      const response = await fetch(
+        `${this.apiBaseUrl}/sync/share-code/${shareCode}`
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      Logger.error("[SyncClient] 取得分享代碼資訊失敗:", error);
       throw error;
     }
   }
 
   /**
-   * 同步狀態更新（只有operator角色可以發送）
+   * 重新產生分享代碼
+   * @returns {Promise<{shareCode: string, sessionId: string}>}
    */
-  async syncState(state) {
+  async regenerateShareCode() {
+    try {
+      if (!this.connected || !this.sessionId) {
+        throw new Error("未連線到工作階段");
+      }
+
+      if (this.role !== "operator") {
+        throw new Error("僅操作者可以重新產生分享代碼");
+      }
+
+      const response = await fetch(
+        `${this.apiBaseUrl}/sync/session/${this.sessionId}/share-code`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clientId: this.clientId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        shareCode: data.data.shareCode,
+        sessionId: data.data.sessionId,
+      };
+    } catch (error) {
+      Logger.error("[SyncClient] 重新產生分享代碼失敗:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 取得工作階段中的所有客戶端
+   * @returns {Promise<Array>}
+   */
+  async getSessionClients() {
+    try {
+      if (!this.sessionId) {
+        throw new Error("未連線到工作階段");
+      }
+
+      const response = await fetch(
+        `${this.apiBaseUrl}/sync/session/${this.sessionId}/clients`
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data.clients;
+    } catch (error) {
+      Logger.error("[SyncClient] 取得客戶端列表失敗:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 同步狀態更新（透過 WebSocket）
+   * @param {Object} state - 狀態物件
+   * @returns {boolean}
+   */
+  syncState(state) {
+    // 檢查是否已初始化同步功能
+    if (!this.initialized || !this.wsClient) {
+      Logger.debug("[SyncClient] 本機模式，跳過狀態同步");
+      return false;
+    }
     if (!this.connected || !this.sessionId) {
-      Logger.warn("未連線到工作階段，無法同步狀態");
+      Logger.warn("[SyncClient] 未連線，無法同步狀態");
       return false;
     }
 
     if (this.role !== "operator") {
-      Logger.warn("僅檢視模式無法發送狀態更新");
+      Logger.warn("[SyncClient] 僅操作者可以發送狀態更新");
       return false;
     }
 
-    try {
-      const response = await this.sendRequest("sync_state", {
-        sessionId: this.sessionId,
-        state: JSON.stringify(state),
-      });
-      return response.success;
-    } catch (error) {
-      Logger.error("狀態同步失敗:", error);
-      return false;
-    }
-  }
-
-  /**
-   * 開始狀態輪詢
-   */
-  startPolling() {
-    if (this.pollTimer) return;
-
-    const poll = async () => {
-      if (!this.connected || !this.sessionId) {
-        this.stopPolling();
-        return;
-      }
-
-      try {
-        const response = await this.sendRequest("get_state", {
-          sessionId: this.sessionId,
-          lastUpdate: this.lastUpdate,
-        });
-
-        if (response.success && response.data) {
-          this.lastUpdate = response.data.lastUpdate;
-          if (response.data.state) {
-            this.triggerStateUpdate(response.data.state);
-            // 有狀態更新，重置為活躍間隔
-            this.lastActivityTime = Date.now();
-            this.adjustPollInterval(true);
-          } else {
-            // 無狀態更新，檢查是否需要增加間隔
-            this.adjustPollInterval(false);
-          }
-          // 重置失敗計數
-          this.pollFailureCount = 0;
-        } else {
-          // 無新資料，調整間隔
-          this.adjustPollInterval(false);
-        }
-      } catch (error) {
-        Logger.error("輪詢錯誤:", error);
-
-        // 檢查是否為工作階段不存在的錯誤
-        const isSessionNotFound =
-          error.message &&
-          (error.message.includes("工作階段不存在") ||
-            error.message.includes("not found") ||
-            error.message.includes("已過期"));
-
-        // 檢查是否為網路/伺服器連線錯誤
-        const isNetworkError =
-          error.message &&
-          (error.message.includes("fetch") ||
-            error.message.includes("network") ||
-            error.message.includes("HTTP error") ||
-            error.message.includes("伺服器回傳無效的回應格式") ||
-            !this.serverOnline); // 如果伺服器已知離線
-
-        if (isSessionNotFound) {
-          Logger.warn("工作階段已失效，立即斷開連線:", this.sessionId);
-          this.disconnect();
-          return;
-        }
-
-        if (isNetworkError) {
-          Logger.warn("網路連線問題，增加失敗計數:", error.message);
-          this.pollFailureCount++;
-        } else {
-          // 其他未知錯誤，也增加失敗計數
-          Logger.warn("未知輪詢錯誤，增加失敗計數:", error.message);
-          this.pollFailureCount++;
-        }
-
-        // 如果連續失敗次數過多，停止輪詢並等待健康檢查還原
-        if (this.pollFailureCount >= this.maxPollFailures) {
-          Logger.warn(
-            `輪詢連續失敗 ${this.pollFailureCount} 次，停止輪詢等待還原`
-          );
-          this.stopPolling();
-          return;
-        }
-      }
-    };
-
-    // 立即執行一次，然後開始定時輪詢
-    poll();
-    this.pollTimer = setInterval(poll, this.pollInterval);
-  }
-
-  /**
-   * 動態調整輪詢間隔
-   * @param {boolean} hasActivity - 是否有活動
-   */
-  adjustPollInterval(hasActivity) {
-    if (hasActivity) {
-      // 有活動時使用最小間隔
-      if (this.pollInterval !== this.minPollInterval) {
-        this.pollInterval = this.minPollInterval;
-        this.restartPolling();
-      }
-    } else {
-      // 無活動時逐漸增加間隔
-      const timeSinceActivity = Date.now() - this.lastActivityTime;
-      if (timeSinceActivity > this.activityTimeout) {
-        // 超過閒置時間，增加間隔
-        const newInterval = Math.min(
-          this.pollInterval * 1.5,
-          this.maxPollInterval
-        );
-        if (newInterval !== this.pollInterval) {
-          this.pollInterval = newInterval;
-          this.restartPolling();
-        }
-      }
-    }
-  }
-
-  /**
-   * 重啟輪詢以套用新的間隔
-   */
-  restartPolling() {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.startPolling();
-    }
-  }
-
-  /**
-   * 停止狀態輪詢
-   */
-  stopPolling() {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
-    }
+    // 透過 WebSocket 發送狀態更新
+    this.wsClient.updateState(state);
+    return true;
   }
 
   /**
    * 觸發狀態更新事件
+   * @param {Object|string} state - 狀態資料
    */
   triggerStateUpdate(state) {
     try {
@@ -444,7 +600,7 @@ class SyncClient {
       });
       window.dispatchEvent(event);
     } catch (error) {
-      Logger.error("狀態解析錯誤:", error);
+      Logger.error("[SyncClient] 狀態解析錯誤:", error);
     }
   }
 
@@ -452,63 +608,31 @@ class SyncClient {
    * 斷開連線
    */
   disconnect() {
-    this.stopPolling();
-    this.stopHealthCheck();
+    Logger.info("[SyncClient] 斷開連線");
+    this.wsClient.disconnect();
     this.connected = false;
-    this.sessionId = null;
-    this.role = null;
-    this.lastUpdate = 0;
-    this.pollFailureCount = 0; // 重置失敗計數
-    // 新增：清除持久化的工作階段資訊
-    this.saveSessionId(null);
-    this.saveRole(null);
+    this.clearState();
   }
 
   /**
-   * 啟動伺服器健康檢查
-   */
-  startHealthCheck() {
-    if (this.healthCheckTimer) return;
-
-    // 立即檢查一次
-    this.checkServerHealth();
-
-    this.healthCheckTimer = setInterval(() => {
-      this.checkServerHealth();
-    }, this.healthCheckInterval);
-  }
-
-  /**
-   * 停止伺服器健康檢查
-   */
-  stopHealthCheck() {
-    if (this.healthCheckTimer) {
-      clearInterval(this.healthCheckTimer);
-      this.healthCheckTimer = null;
-    }
-  }
-
-  /**
-   * 檢查伺服器是否線上
+   * 檢查伺服器健康狀態（輕量級）
+   * 使用 HEAD 請求，只檢查狀態碼，不傳輸資料
+   * @returns {Promise<boolean>}
    */
   async checkServerHealth() {
     try {
-      const response = await fetch(`${this.apiUrl}?action=health_check`);
+      const response = await fetch(`${this.apiBaseUrl}/health`, {
+        method: "HEAD", // 使用 HEAD 更輕量
+        signal: AbortSignal.timeout(2000), // 2秒超時（快速失敗）
+      });
+
       const newOnlineStatus = response.ok;
 
-      // 如果狀態變化，觸發事件並通知 UI
+      // 如果狀態變化，觸發事件
       if (this.serverOnline !== newOnlineStatus) {
         this.previousServerOnline = this.serverOnline;
         this.serverOnline = newOnlineStatus;
 
-        // 如果從離線還原到線上，且仍然連線中，重新啟動輪詢
-        if (newOnlineStatus && this.connected && !this.pollTimer) {
-          Logger.debug("伺服器恢復連線，重新啟動輪詢");
-          this.pollFailureCount = 0; // 重置失敗計數
-          this.startPolling();
-        }
-
-        // 觸發伺服器狀態變化事件
         window.dispatchEvent(
           new CustomEvent("sync_server_status_changed", {
             detail: {
@@ -519,24 +643,17 @@ class SyncClient {
           })
         );
 
-        // console.log(
-        //   `伺服器狀態變化: ${this.previousServerOnline} → ${this.serverOnline}`
-        // );
-      } else {
-        this.serverOnline = newOnlineStatus;
+        Logger.debug(
+          `[SyncClient] 伺服器狀態變化: ${this.previousServerOnline} → ${this.serverOnline}`
+        );
       }
 
-      if (!this.serverOnline && this.connected) {
-        Logger.warn("伺服器離線，自動斷開連線");
-        this.disconnect();
-      }
-
+      this.serverOnline = newOnlineStatus;
       return this.serverOnline;
     } catch (error) {
       const wasOnline = this.serverOnline;
       this.serverOnline = false;
 
-      // 如果從線上變成離線，觸發事件
       if (wasOnline !== false) {
         this.previousServerOnline = wasOnline;
         window.dispatchEvent(
@@ -549,11 +666,7 @@ class SyncClient {
             },
           })
         );
-        Logger.warn(`伺服器狀態變化: ${wasOnline} → 離線 (${error.message})`);
-      }
-
-      if (this.connected) {
-        this.disconnect();
+        Logger.warn(`[SyncClient] 伺服器狀態變化: ${wasOnline} → 離線`);
       }
 
       return false;
@@ -561,51 +674,120 @@ class SyncClient {
   }
 
   /**
-   * 發送API請求
+   * 啟動輕量級健康檢查（本機模式用）
    */
-  async sendRequest(action, params = {}) {
-    const queryString = new URLSearchParams({
-      action,
-      ...params,
-    }).toString();
+  startLightweightHealthCheck() {
+    if (this.healthCheckTimer) return;
 
-    try {
-      const response = await fetch(`${this.apiUrl}?${queryString}`);
+    Logger.debug("[SyncClient] 啟動輕量級健康檢查 (10秒間隔)");
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+    // 立即檢查一次
+    this.checkServerHealth();
 
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        Logger.error("伺服器回傳非 JSON 回應:", text.substring(0, 200));
-        throw new Error("伺服器回傳無效的回應格式（可能是伺服器錯誤）");
-      }
+    // 定時檢查 (10秒)
+    this.healthCheckTimer = setInterval(() => {
+      this.checkServerHealth();
+    }, this.healthCheckInterval);
+  }
 
-      return await response.json();
-    } catch (error) {
-      Logger.error("API 請求失敗:", error.message);
-      throw error;
+  /**
+   * 啟動健康檢查定時器（舊版，保留相容）
+   */
+  startHealthCheck() {
+    // 同步模式不需要 HTTP 健康檢查，直接返回
+    if (this.healthCheckMethod === "websocket") {
+      Logger.debug(
+        "[SyncClient] 同步模式，使用 WebSocket 狀態監視，不啟動 HTTP 健康檢查"
+      );
+      return;
+    }
+
+    // 本機模式使用輕量級健康檢查
+    this.startLightweightHealthCheck();
+  }
+
+  /**
+   * 停止健康檢查定時器
+   */
+  stopHealthCheck() {
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.healthCheckTimer = null;
     }
   }
 
   /**
-   * 查詢客戶端是否有掛載中的工作階段
+   * 儲存狀態到 sessionStorage
    */
-  async queryClientSession(clientId) {
-    return await this.sendRequest("query_client_session", { clientId });
+  saveState() {
+    try {
+      sessionStorage.setItem("sync_sessionId", this.sessionId || "");
+      sessionStorage.setItem("sync_clientId", this.clientId || "");
+      sessionStorage.setItem("sync_role", this.role || "viewer");
+      Logger.debug("[SyncClient] 狀態已儲存至 sessionStorage");
+    } catch (error) {
+      Logger.error("[SyncClient] 儲存狀態失敗:", error);
+    }
   }
 
   /**
-   * 取得目前工作階段ID
+   * 從 sessionStorage 載入狀態
+   */
+  loadState() {
+    try {
+      this.sessionId = sessionStorage.getItem("sync_sessionId") || null;
+      this.clientId = sessionStorage.getItem("sync_clientId") || null;
+      this.role = sessionStorage.getItem("sync_role") || "viewer";
+
+      if (this.sessionId && this.clientId) {
+        Logger.debug("[SyncClient] 從 sessionStorage 載入狀態:", {
+          sessionId: this.sessionId,
+          clientId: this.clientId,
+          role: this.role,
+        });
+      }
+    } catch (error) {
+      Logger.error("[SyncClient] 載入狀態失敗:", error);
+    }
+  }
+
+  /**
+   * 清除 sessionStorage 狀態
+   */
+  clearState() {
+    try {
+      sessionStorage.removeItem("sync_sessionId");
+      sessionStorage.removeItem("sync_clientId");
+      sessionStorage.removeItem("sync_role");
+
+      this.sessionId = null;
+      this.clientId = null;
+      this.role = "viewer";
+
+      Logger.debug("[SyncClient] 已清除 sessionStorage 狀態");
+    } catch (error) {
+      Logger.error("[SyncClient] 清除狀態失敗:", error);
+    }
+  }
+
+  // ==================== Getter 方法 ====================
+
+  /**
+   * 取得工作階段 ID
    */
   getSessionId() {
     return this.sessionId;
   }
 
   /**
-   * 取得目前角色
+   * 取得客戶端 ID
+   */
+  getClientId() {
+    return this.clientId;
+  }
+
+  /**
+   * 取得角色
    */
   getRole() {
     return this.role;
@@ -622,62 +804,39 @@ class SyncClient {
    * 檢查是否已連線
    */
   isConnected() {
-    return this.connected;
+    return this.connected && this.wsClient !== null;
   }
 
   /**
-   * 取得目前狀態描述
-   * 區分四種狀態：
-   * - offline: 伺服器離線
-   * - idle: 伺服器線上但未加入工作階段
-   * - viewer: 已加入工作階段（檢視者）
-   * - operator: 已加入工作階段（操作者）
+   * 取得狀態描述文字
+   * @returns {'offline'|'idle'|'viewer'|'operator'}
    */
   getStatusText() {
-    // 伺服器離線
     if (this.serverOnline === false) {
       return "offline";
     }
 
-    // 已連線到工作階段
     if (this.connected && this.sessionId) {
       return this.role; // 'viewer' 或 'operator'
     }
 
-    // 伺服器線上但未連線
     return "idle";
   }
 
   /**
-   * 重新產生分享代碼
+   * 取得 WebSocket 狀態（用於除錯）
    */
-  async regenerateShareCode() {
-    if (!this.connected || !this.sessionId) {
-      throw new Error("未連線到工作階段");
-    }
-
-    if (this.role !== "operator") {
-      throw new Error("僅操作者可以重新產生分享代碼");
-    }
-
-    try {
-      const response = await this.sendRequest("regenerate_share_code", {
-        sessionId: this.sessionId,
-        clientId: this.clientId,
-      });
-      if (response.success && response.data) {
-        return {
-          shareCode: response.data.shareCode,
-          sessionId: response.data.sessionId,
-        };
-      }
-      throw new Error(response.message || "重新產生分享代碼失敗");
-    } catch (error) {
-      Logger.error("重新產生分享代碼錯誤:", error);
-      throw error;
-    }
+  getWebSocketState() {
+    return this.wsClient.getState();
   }
 }
 
-// 匯出
-export default SyncClient;
+// UMD 模式：同時支援全域和 ES6 模組
+if (typeof window !== "undefined") {
+  window.SyncClient = SyncClient;
+}
+
+// 僅在模組環境中匯出（避免普通 script 語法錯誤）
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = SyncClient;
+}

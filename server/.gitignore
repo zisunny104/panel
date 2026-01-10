@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.log
+
+# 執行時資料（資料庫、工作階段等敏感資料）
+../runtime/
+
+# 備份檔案
+*.backup
+*-old-*.js

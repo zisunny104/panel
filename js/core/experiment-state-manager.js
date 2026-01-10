@@ -175,6 +175,14 @@ class ExperimentStateManager {
   }
 
   /**
+   * 取得實驗ID
+   * @returns {string|null} 目前的實驗ID
+   */
+  getExperimentId() {
+    return this.experimentId;
+  }
+
+  /**
    * 設定受試者名稱
    * @param {string} subjectName - 新的受試者名稱
    * @param {string} source - 更新來源
@@ -194,6 +202,14 @@ class ExperimentStateManager {
       // 分發事件
       this._emit("subjectNameChanged", { subjectName, oldName, source });
     }
+  }
+
+  /**
+   * 取得受試者名稱
+   * @returns {string|null} 目前的受試者名稱
+   */
+  getSubjectName() {
+    return this.subjectName;
   }
 
   /**
@@ -317,9 +333,16 @@ class ExperimentStateManager {
     const newId = RandomUtils.generateNewExperimentId();
     this.setExperimentId(newId, "generate");
 
-    // 註冊到中樞
-    if (window.experimentHubManager) {
+    // 只在同步模式下註冊到中樞
+    if (window.experimentHubManager?.isInSyncMode?.()) {
+      Logger.debug(
+        `[ExperimentStateManager] 同步模式，註冊實驗ID到中樞: ${newId}`
+      );
       window.experimentHubManager.registerExperimentId(newId, "state_manager");
+    } else {
+      Logger.debug(
+        `[ExperimentStateManager] 獨立模式，實驗ID僅存本機: ${newId}`
+      );
     }
 
     return newId;

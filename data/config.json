@@ -1,9 +1,10 @@
 {
-    "version": "1.5.gv0tm",
-    "description": "虛擬操作面板實驗配置範例 (多裝置同步系統優化版)",
+    "version": "2.0",
+    "description": "虛擬操作面板實驗設定範例 (多裝置同步系統優化版)",
     "author": "謝祥紫、Github Copilot",
     "created_at": "2024-07-16T10:00:00Z",
-    "updated_at": "2026-01-08T00:00:00Z",
+    "updated_at": "2026-01-10T07:19:29.602Z",
+    "git_commit_hash": "09f31f1",
     "media_base_path": "assets/",
     "settings": {
         "mainScale": 1.29,
@@ -16,16 +17,16 @@
         "playBeepSound": true
     },
     "multiScreenSync": {
-        "sessionValidityDuration": 1800,
-        "sessionValidityUnit": "seconds",
-        "description": "Session有效期設定：1800秒 = 30分鐘。頁面重新整理後若在此時間內仍可重新連線到原session"
+        "description": "多裝置同步設定（超時時間由後端.env控制）",
+        "enableSync": true,
+        "maxClients": 6,
+        "validCreateCode": "113151006",
+        "validCreateCodeDescription": "建立工作階段的驗證碼，未來可擴展為多帳號不同代碼"
     },
     "experiment": {
         "defaultCombinationId": "random_core",
-        "description": "預設實驗組合設定。如果為空或不存在，將使用第一個可用組合"
+        "description": "預設實驗組合設定。如果為空或不存在，將使用第一個可用組合",
+        "logsDirectory": "runtime/experiment-data"
     },
-    "timezone": {
-        "default": "Asia/Taipei",
-        "description": "預設時區設定，用於所有時間顯示和格式化"
-    }
+    "timezone": "Asia/Taipei"
 }

@@ -389,6 +389,11 @@
     background: #2a2a2a;
 }
 
+.regenerate-id-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
 /* 受試者名稱欄位樣式 */
 .experiment-subject-row {
     display: flex;

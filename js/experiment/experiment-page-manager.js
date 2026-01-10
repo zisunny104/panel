@@ -93,9 +93,18 @@ class ExperimentPageManager {
   async generateNewExperimentIdWithHub() {
     const newId = this.generateNewExperimentId();
     Logger.debug(`[ExperimentPageManager] 🆕 產生新的實驗ID: ${newId}`);
-    await this.registerExperimentIdToHub(newId);
-    // 廣播新實驗ID給其他連線裝置
-    this.broadcastExperimentIdUpdate(newId);
+
+    // 只在同步模式下註冊到中樞
+    const hubManager = getExperimentHubManager();
+    if (hubManager?.isInSyncMode?.()) {
+      Logger.debug(`[同步模式] 註冊實驗ID到中樞`);
+      await this.registerExperimentIdToHub(newId);
+      // 廣播新實驗ID給其他連線裝置
+      this.broadcastExperimentIdUpdate(newId);
+    } else {
+      Logger.debug(`[獨立模式] 實驗ID僅存本機: ${newId}`);
+    }
+
     return newId;
   }
 
@@ -103,7 +112,7 @@ class ExperimentPageManager {
   async registerExperimentIdToHub(experimentId) {
     try {
       Logger.debug(
-        `[ExperimentPageManager] 📤 開始註冊實驗ID到中樞: ${experimentId}`
+        `[ExperimentPageManager] 開始註冊實驗ID到中樞: ${experimentId}`
       );
       const hubManager = getExperimentHubManager();
       const success = await hubManager.registerExperimentId(
@@ -174,7 +183,7 @@ class ExperimentPageManager {
       }
     } else {
       Logger.debug(`[ExperimentPageManager] 不在同步模式，使用本機產生ID`);
-      // 本機模式，直接使用本地的ID
+      // 本機模式，直接使用本機的ID
       if (!experimentIdInput.value.trim()) {
         this.generateNewExperimentId();
       }
@@ -194,7 +203,15 @@ class ExperimentPageManager {
       Logger.debug(
         `[ExperimentPageManager] 用戶手動輸入實驗ID: ${newExperimentId}`
       );
-      await this.registerExperimentIdToHub(newExperimentId);
+
+      // 只在同步模式下註冊到中樞
+      const hubManager = getExperimentHubManager();
+      if (hubManager?.isInSyncMode?.()) {
+        Logger.debug(`[同步模式] 註冊手動輸入的實驗ID到中樞`);
+        await this.registerExperimentIdToHub(newExperimentId);
+      } else {
+        Logger.debug(`[獨立模式] 實驗ID僅存本機`);
+      }
 
       if (this.currentCombination) {
         const combination =
@@ -332,7 +349,7 @@ class ExperimentPageManager {
       window.CONFIG?.experiment?.defaultCombinationId;
     let defaultIndex = 0;
 
-    // 如果配置中有預設組合ID，查找對應的索引
+    // 如果設定中有預設組合ID，查找對應的索引
     if (defaultCombinationId) {
       defaultIndex = this.scriptData.combinations.findIndex(
         (c) => c.combination_id === defaultCombinationId
@@ -351,7 +368,7 @@ class ExperimentPageManager {
 
   /**
    * 選擇預設組合並載入手勢序列
-   * 優先順序：本機快取 > 配置預設 > 第一個
+   * 優先順序：本機快取 > 設定預設 > 第一個
    */
   selectDefaultCombination() {
     if (!this.scriptData || !this.scriptData.combinations) return;
@@ -371,7 +388,7 @@ class ExperimentPageManager {
       }
     }
 
-    // 如果沒有快取，使用配置中的預設組合
+    // 如果沒有快取，使用設定中的預設組合
     if (selectedIndex === 0 && !cachedCombinationId) {
       const defaultCombinationId =
         window.CONFIG?.experiment?.defaultCombinationId;
@@ -2231,7 +2248,7 @@ class ExperimentPageManager {
       if (!data || !data.type) return;
 
       switch (data.type) {
-        // 注意：buttonAction 不在此處理
+        // 注意：button_action 不在此處理
         // 它已通過 remote_button_action 事件（來自同步系統）處理
         // 避免重複處理來自本機 Panel 的原始事件
         case "experimentInitialize":
@@ -2267,9 +2284,9 @@ class ExperimentPageManager {
         // 接收到機台面板的實驗開始訊號
         this.handleRemoteExperimentInit(state);
       }
-      // 處理面板的按鈕動作（buttonAction）
-      else if (state.type === "buttonAction") {
-        // 通過 sync_state_update 接收 buttonAction
+      // 處理面板的按鈕動作（button_action）
+      else if (state.type === "button_action") {
+        // 通過 sync_state_update 接收 button_action
         this.handleRemoteButtonAction(state);
       }
       // 處理面板的實驗狀態更新
@@ -2283,10 +2300,8 @@ class ExperimentPageManager {
       else if (state.type === "action_completed" && state.source === "panel") {
         this.handleRemoteActionCompleted(state);
       }
-      // 處理面板的 action
-      else if (state.type === "panel_action") {
-        this.handleSyncPanelAction(state);
-      } else if (
+      // 注意：已移除 panel_action 處理，面板按鈕動作統一使用 button_action
+      else if (
         state.type === "experiment_started" &&
         state.source === "panel"
       ) {
@@ -2355,10 +2370,10 @@ class ExperimentPageManager {
       }
 
       Logger.debug(
-        `[ExperimentPageManager] 📥 收到遠程實驗ID廣播: ${experimentId}`
+        `[ExperimentPageManager] 收到遠程實驗ID廣播: ${experimentId}`
       );
 
-      // 更新本地UI
+      // 更新本機UI
       const experimentIdInput = document.getElementById("experimentIdInput");
       if (experimentIdInput && experimentIdInput.value !== experimentId) {
         experimentIdInput.value = experimentId;
@@ -2445,86 +2460,11 @@ class ExperimentPageManager {
   }
 
   /**
-   * 處理同步的面板 action
+   * [已移除] handleSyncPanelAction - 改用 handleRemoteButtonAction
+   * [已移除] displayPanelActionFeedback - 視覺回饋已整合至 handleRemoteButtonAction
+   *
+   * 面板按鈕動作已統一使用 button_action 事件處理，功能已整合至 handleRemoteButtonAction()
    */
-  handleSyncPanelAction(syncData) {
-    const { device_id, action, actionData, timestamp } = syncData;
-
-    // 記錄到日誌
-    this.logAction("panel_action", {
-      device_id: device_id,
-      action: action,
-      actionData: actionData,
-      timestamp: timestamp,
-    });
-
-    // 在實驗進行中時，根據 action 類型更新 UI
-    if (this.experimentRunning) {
-      this.displayPanelActionFeedback(device_id, action, actionData);
-    }
-  }
-
-  /**
-   * 顯示面板 action 的視覺回饋
-   */
-  displayPanelActionFeedback(deviceId, action, actionData) {
-    // 簡化裝置 ID 顯示
-    const shortDeviceId = deviceId.substring(0, 8) + "...";
-
-    // 針對按鈕按下的 action 提供視覺回饋
-    if (action === "button_pressed" && actionData) {
-      const { button, function: buttonFunction } = actionData;
-
-      // 在實驗日誌區域顯示虛擬面板按鈕動作
-      const logPanel = document.getElementById("experimentLogPanel");
-      if (logPanel) {
-        const feedbackEl = document.createElement("div");
-        feedbackEl.style.cssText = `
-          padding: 8px 12px;
-          margin: 5px 0;
-          background: rgba(76, 175, 80, 0.2);
-          border-left: 3px solid #4caf50;
-          border-radius: 4px;
-          font-size: 12px;
-          animation: slideIn 0.3s ease-out;
-        `;
-        feedbackEl.innerHTML = `
-          <strong>面板操作</strong> (${shortDeviceId}):
-          按鈕 <span style="color: #4caf50; font-weight: bold;">${button}</span>
-          - 函數: <span style="color: #2196f3;">${buttonFunction}</span>
-        `;
-        logPanel.insertBefore(feedbackEl, logPanel.firstChild);
-
-        // 3 秒後淡出移除
-        setTimeout(() => {
-          feedbackEl.style.opacity = "0.5";
-          feedbackEl.style.fontSize = "11px";
-        }, 2000);
-
-        setTimeout(() => {
-          if (feedbackEl.parentNode) {
-            feedbackEl.remove();
-          }
-        }, 5000);
-      }
-    }
-
-    // 如果有對應的手勢步驟，可以在對應的 action 卡片中顯示
-    if (actionData && actionData.step_id) {
-      const actionCard = document.querySelector(
-        `[data-step-id="${actionData.step_id}"][data-action-id="${actionData.action_id}"]`
-      );
-      if (actionCard) {
-        // 可以新增視覺回饋（如高亮、動畫等）
-        actionCard.style.borderLeft = `3px solid #4caf50`;
-        actionCard.title = `面板 action (${shortDeviceId})`;
-
-        setTimeout(() => {
-          actionCard.style.borderLeft = "";
-        }, 2000);
-      }
-    }
-  }
 
   /** 處理遠端按鈕動作 */
   handleRemoteButtonAction(data) {
@@ -2612,7 +2552,7 @@ class ExperimentPageManager {
 
     //接收到機台面板的實驗開始訊號，立即自動開始實驗
     if (!this.experimentRunning) {
-      // 確保有必要的配置
+      // 確保有必要的設定
       if (currentCombination) {
         this.currentCombination = currentCombination;
       }
@@ -2885,13 +2825,11 @@ class ExperimentPageManager {
         source: "experiment_manager",
       });
 
-      const response = await fetch(`php/experiment-id-hub.php?${params}`);
-      const result = await response.json();
-
-      if (result.success) {
-      }
+      // 移除 PHP 調用
+      // 狀態管理由 ExperimentStateManager 和 WebSocket 處理
+      Logger.debug("[ExperimentPageManager] 跳過 PHP API 調用");
     } catch (error) {
-      Logger.warn("註冊實驗狀態到中樞失敗:", error);
+      Logger.warn("註冊實驗狀態失敗:", error);
     }
   }
 

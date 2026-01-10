@@ -93,21 +93,27 @@ video::-webkit-media-controls-overlay-play-button {
 }
 
 /* ================= 實驗面板按鈕狀態 ================= */
-.control-button#experimentPanelButton {
+.circular-button#experimentPanelButton {
+    background: #ff8c00;
     transition: background 0.3s, color 0.3s;
 }
 
-.control-button.experiment-running {
+/* ================= 設定面板按鈕樣式 ================= */
+button#toggleButton {
+    color: white;
+}
+
+.circular-button.experiment-running {
     background: #4CAF50 !important;
     color: #fff !important;
 }
 
-.control-button.experiment-paused {
+.circular-button.experiment-paused {
     background: #FF9800 !important;
     color: #fff !important;
 }
 
-.control-button.experiment-stopped {
+.circular-button.experiment-stopped {
     background: #BDBDBD !important;
     color: #333 !important;
 }
