@@ -284,7 +284,7 @@ router.get("/session/:sessionId/validate", (req, res) => {
 
 /**
  * GET /api/sync/session/:sessionId/clients
- * 獲取工作階段中的所有客戶端（即時連線狀態）
+ * 取得工作階段中的所有客戶端（即時連線狀態）
  *
  * Response: { clients: [{clientId, role, joinedAt}, ...], clientCount: number }
  */
@@ -305,7 +305,7 @@ router.get("/session/:sessionId/clients", (req, res) => {
     // 從 RoomManager 取得即時連線的客戶端
     const roomManager = req.app.locals.roomManager;
     if (!roomManager) {
-      // 如果 RoomManager 不可用，返回空列表
+      // 如果 RoomManager 不可用，回傳空列表
       return res.status(HTTP_STATUS.OK).json({
         success: true,
         data: {
@@ -336,7 +336,7 @@ router.get("/session/:sessionId/clients", (req, res) => {
 
 /**
  * GET /api/sync/session/:sessionId
- * 獲取工作階段資訊
+ * 取得工作階段資訊
  */
 router.get("/session/:sessionId", (req, res) => {
   const { sessionId } = req.params;
@@ -368,7 +368,7 @@ router.get("/session/:sessionId", (req, res) => {
 
 /**
  * GET /api/sync/sessions
- * 獲取所有活躍的工作階段列表
+ * 取得所有活動中的工作階段列表
  *
  * Response: { sessions: [...] }
  */
@@ -438,7 +438,7 @@ router.delete("/session/:sessionId", (req, res) => {
  */
 router.post("/sessions/clear", (req, res) => {
   try {
-    // 獲取所有工作階段
+    // 取得所有工作階段
     const sessions = query(`SELECT session_id FROM sessions`);
     const sessionIds = sessions.map((s) => s.session_id);
 

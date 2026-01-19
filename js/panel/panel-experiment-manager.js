@@ -287,7 +287,7 @@ class PanelExperimentManager {
           "目前實驗正在進行中，等待結束後再同步新的受試者名稱:",
           data.subjectName || data.subject_name
         );
-        // 將更新請求加入隊列，等待實驗結束
+        // 將更新請求加入佇列，等待實驗結束
         this.pendingSubjectNameUpdate = data;
         this.showPendingUpdateIndicator("subjectName");
         return;
@@ -315,9 +315,9 @@ class PanelExperimentManager {
       // 如果目前實驗正在進行中，等待實驗結束後再同步新的實驗ID
       if (this.isExperimentRunning) {
         Logger.debug(
-          `[PanelExperimentManager] ⏳ 實驗進行中，將ID更新請求加入隊列`
+          `[PanelExperimentManager] ⏳ 實驗進行中，將ID更新請求加入佇列`
         );
-        // 將更新請求加入隊列，等待實驗結束
+        // 將更新請求加入佇列，等待實驗結束
         this.pendingExperimentIdUpdate = data;
         this.showPendingUpdateIndicator("experimentId");
         return;
@@ -535,7 +535,7 @@ class PanelExperimentManager {
 
     // 根據模式顯示/隱藏實驗控制按鈕
     const controlButtons = document.querySelectorAll(
-      "#startExperimentButton, #pauseExperimentButton, #stopExperimentButton"
+      "#startExperimentBtn, #pauseExperimentBtn, #stopExperimentBtn"
     );
     controlButtons.forEach((button) => {
       if (button) {
@@ -771,15 +771,9 @@ class PanelExperimentManager {
 
   /** 設定實驗控制按鈕 */
   setupExperimentControls() {
-    const startExperimentButton = document.getElementById(
-      "startExperimentButton"
-    );
-    const pauseExperimentButton = document.getElementById(
-      "pauseExperimentButton"
-    );
-    const stopExperimentButton = document.getElementById(
-      "stopExperimentButton"
-    );
+    const startExperimentButton = document.getElementById("startExperimentBtn");
+    const pauseExperimentButton = document.getElementById("pauseExperimentBtn");
+    const stopExperimentButton = document.getElementById("stopExperimentBtn");
     const selectAllUnits = document.getElementById("selectAllUnits");
     const includeStartup = document.getElementById("includeStartup");
     const includeShutdown = document.getElementById("includeShutdown");
@@ -874,9 +868,9 @@ class PanelExperimentManager {
   updateButtonStates() {
     const isViewer = window.syncManager?.core?.syncClient?.role === "viewer";
     const buttonsToDisable = [
-      "startExperimentButton",
-      "pauseExperimentButton",
-      "stopExperimentButton",
+      "startExperimentBtn",
+      "pauseExperimentBtn",
+      "stopExperimentBtn",
       "regenerateIdButton",
     ];
 
@@ -1056,9 +1050,7 @@ class PanelExperimentManager {
       }, 100);
     }
 
-    const startExperimentButton = document.getElementById(
-      "startExperimentButton"
-    );
+    const startExperimentButton = document.getElementById("startExperimentBtn");
     const experimentControlButtons = document.getElementById(
       "experimentControlButtons"
     );
@@ -1477,9 +1469,7 @@ class PanelExperimentManager {
 
   /** 暫停/繼續實驗 */
   togglePauseExperiment() {
-    const pauseExperimentButton = document.getElementById(
-      "pauseExperimentButton"
-    );
+    const pauseExperimentButton = document.getElementById("pauseExperimentBtn");
     if (!this.experimentPaused) {
       this.experimentPaused = true;
       clearInterval(this.experimentInterval);

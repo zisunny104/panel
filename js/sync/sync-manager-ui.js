@@ -9,9 +9,9 @@ export class SyncManagerUI {
     this.capsuleIndicator = null;
     this.controlPanel = null;
     this.statusElement = null;
-    this.currentQRRole = "viewer"; //  QR code 的目前預設模式
+    this.currentQRRole = "viewer"; //  QR Code 的目前預設模式
     this.currentShareCode = null; // 目前連線的分享代碼
-    this.qrCountdownInterval = null; //  QR code 計時器
+    this.qrCountdownInterval = null; //  QR Code 計時器
     this.initialized = false; // 初始化標誌，防止重複初始化
     this.sharePanelOpened = false; // 分享面板是否已經打開過
   }
@@ -171,12 +171,12 @@ export class SyncManagerUI {
                                 <button id="joinSessionBtn">加入</button>
                             </div>
 
-                            <!-- 掃描 QR code -->
+                            <!-- 掃描 QR Code -->
                             <button class="sync-scan-btn" id="scanQrBtn">
-                                 掃描 QR code
+                                 掃描 QR Code
                             </button>
                             <div class="sync-scan-hint">
-                                掃描其他裝置的 QR code 加入工作階段
+                                掃描其他裝置的 QR Code 加入工作階段
                             </div>
                         </div>
                     </div>
@@ -405,7 +405,7 @@ export class SyncManagerUI {
         }
       });
 
-      // 重新產生 QR code 按鈕 - 此按鈕已不存在，使用 regenerateShareCodeBtn
+      // 重新產生 QR Code 按鈕 - 此按鈕已不存在，使用 regenerateShareCodeBtn
       /*
       const regenerateBtn = document.getElementById("regenerateQrBtn");
       if (regenerateBtn) {
@@ -422,7 +422,7 @@ export class SyncManagerUI {
       }
       */
 
-      //  QR code 區塊的預設模式選擇按鈕
+      //  QR Code 區塊的預設模式選擇按鈕
       const qrRoleButtons =
         this.controlPanel.querySelectorAll(".sync-qr-role-btn");
       qrRoleButtons.forEach((btn) => {
@@ -431,7 +431,7 @@ export class SyncManagerUI {
           btn.classList.add("active");
           this.currentQRRole = btn.dataset.role;
 
-          // 自動重新產生 QR code
+          // 自動重新產生 QR Code
           const sessionId = this.core.getSessionId();
           if (sessionId) {
             window.dispatchEvent(
@@ -502,7 +502,7 @@ export class SyncManagerUI {
         }
       });
 
-      // 掃描 QR code 按鈕
+      // 掃描 QR Code 按鈕
       const scanBtn = document.getElementById("scanQrBtn");
       scanBtn.addEventListener("click", () => {
         // 觸發QR掃描事件
@@ -558,7 +558,7 @@ export class SyncManagerUI {
           shareSessionContent.classList.remove("hidden");
           shareSessionToggleBtn.classList.add("hidden");
 
-          // 按下時產生分享代碼和  QR code
+          // 按下時產生分享代碼和  QR Code
           this.initializeShareCode();
         });
       }
@@ -571,7 +571,7 @@ export class SyncManagerUI {
             shareSessionToggleBtn.classList.remove("hidden");
           }
 
-          // 停止 QR code 計時器
+          // 停止 QR Code 計時器
           if (this.qrCountdownInterval) {
             clearInterval(this.qrCountdownInterval);
             this.qrCountdownInterval = null;
@@ -624,7 +624,7 @@ export class SyncManagerUI {
         });
       }
 
-      // 重新產生分享 QR code 按鈕
+      // 重新產生分享 QR Code 按鈕
       const regenerateShareCodeBtn = document.getElementById(
         "regenerateShareCodeBtn"
       );
@@ -636,7 +636,7 @@ export class SyncManagerUI {
           try {
             Logger.debug("[SyncUI] 呼叫後端API重新產生分享代碼");
             const result = await this.core.syncClient.regenerateShareCode();
-            Logger.debug("[SyncUI] regenerateShareCode() 返回結果", {
+            Logger.debug("[SyncUI] regenerateShareCode() 回傳結果", {
               result,
               type: typeof result,
               keys: result ? Object.keys(result) : "null",
@@ -660,7 +660,7 @@ export class SyncManagerUI {
               const remainingTime = result.remainingTime || 300;
               this.startShareQRCountdown(remainingTime);
 
-              // 2. 非同步產生 QR code（不阻擋 UI）
+              // 2. 非同步產生 QR Code（不阻擋 UI）
               window.dispatchEvent(
                 new CustomEvent("sync_generate_qr", {
                   detail: {
@@ -823,7 +823,7 @@ export class SyncManagerUI {
         shareDisplayCode.textContent = result.shareCode;
       }
 
-      // 啟用 QR code 按鈕
+      // 啟用 QR Code 按鈕
       const qrRoleButtons =
         this.controlPanel.querySelectorAll(".sync-qr-role-btn");
       qrRoleButtons.forEach((btn) => {
@@ -877,7 +877,7 @@ export class SyncManagerUI {
       this.updateUIState();
       this.updateConnectedSessionInfo();
 
-      // 顯示 QR code 區塊 - 此區塊已不存在，使用新的分享系統
+      // 顯示 QR Code 區塊 - 此區塊已不存在，使用新的分享系統
       /*
       const qrCodeSection = document.getElementById("qrCodeSection");
       if (qrCodeSection) {
@@ -903,7 +903,7 @@ export class SyncManagerUI {
         }
       });
 
-      // 觸發 QR code 產生事件（需要 shareCode，不是 sessionId）
+      // 觸發 QR Code 產生事件（需要 shareCode，不是 sessionId）
       // 注意：如果是通過 sessionId 加入，則沒有 shareCode，不產生 QR
       if (this.currentShareCode) {
         window.dispatchEvent(
@@ -1113,10 +1113,10 @@ export class SyncManagerUI {
   }
 
   /**
-   * 初始化分享代碼和  QR code （在使用者點擊展開按鈕時調用）
+   * 初始化分享代碼和  QR Code （在使用者點擊展開按鈕時調用）
    */
   async initializeShareCode() {
-    Logger.debug("[SyncUI] 開始初始化分享代碼和QR code");
+    Logger.debug("[SyncUI] 開始初始化分享代碼和QR Code");
 
     // 標記分享面板已經打開過
     this.sharePanelOpened = true;
@@ -1136,7 +1136,7 @@ export class SyncManagerUI {
       }
 
       // 立即發送 QR 產生事件（不等待驗證）
-      Logger.debug("[SyncUI] 並行啟動QR code產生", { shareCode });
+      Logger.debug("[SyncUI] 並行啟動QR Code產生", { shareCode });
       window.dispatchEvent(
         new CustomEvent("sync_generate_qr", {
           detail: {
@@ -1246,7 +1246,7 @@ export class SyncManagerUI {
       }
 
       // 發送 QR 產生事件
-      Logger.debug("[SyncUI] 並行啟動QR code產生（新代碼）", { shareCode });
+      Logger.debug("[SyncUI] 並行啟動QR Code產生（新代碼）", { shareCode });
       window.dispatchEvent(
         new CustomEvent("sync_generate_qr", {
           detail: {
@@ -1266,7 +1266,7 @@ export class SyncManagerUI {
   }
 
   /**
-   * 啟動分享  QR code 倒數計時
+   * 啟動分享  QR Code 倒數計時
    * @param {number} remainingTime - 剩餘時間（秒），如果未提供則使用預設300秒
    */
   startShareQRCountdown(remainingTime = null) {

@@ -201,7 +201,7 @@ class ExperimentPageManager {
 
       const newExperimentId = experimentIdInput.value.trim();
       Logger.debug(
-        `[ExperimentPageManager] 用戶手動輸入實驗ID: ${newExperimentId}`
+        `[ExperimentPageManager] 使用者手動輸入實驗ID: ${newExperimentId}`
       );
 
       // 只在同步模式下註冊到中樞
@@ -2569,7 +2569,7 @@ class ExperimentPageManager {
   handleRemoteSubjectNameUpdate(data) {
     // 如果目前實驗正在進行中，等待實驗結束後再同步新的受試者名稱
     if (this.experimentRunning) {
-      // 將更新請求加入隊列，等待實驗結束
+      // 將更新請求加入佇列，等待實驗結束
       this.pendingSubjectNameUpdate = data;
       return;
     }
@@ -2587,7 +2587,7 @@ class ExperimentPageManager {
   handleRemoteExperimentIdUpdate(data) {
     // 如果目前實驗正在進行中，等待實驗結束後再同步新的實驗ID
     if (this.experimentRunning) {
-      // 將更新請求加入隊列，等待實驗結束
+      // 將更新請求加入佇列，等待實驗結束
       this.pendingExperimentIdUpdate = data;
       return;
     }
@@ -3081,8 +3081,8 @@ class ExperimentPageManager {
 window.experimentPageManager = new ExperimentPageManager();
 
 // 為實驗頁面提供相容性
-window.app = window.experimentPageManager;
-const app = window.app; // 為了向後相容
+globalThis.app = window.experimentPageManager;
+const app = globalThis.app; // 為了向後相容
 
 // 暴露工具函式到全域作用域供 HTML 使用
 window.toggleTimer = toggleTimer;

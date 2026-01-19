@@ -93,6 +93,11 @@
     margin-right: 0.3125rem;
 }
 
+/* Switch 和文字間距 */
+.control-group .switch {
+    margin-right: 0.5rem;
+}
+
 /* 控制群組變體 */
 .control-group.indented {
     margin-left: 1.25rem;

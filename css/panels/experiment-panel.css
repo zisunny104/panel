@@ -364,34 +364,39 @@
 }
 
 .regenerate-id-btn {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    background: #3a3a3a;
-    color: #ff8c00;
-    cursor: pointer;
+    border-radius: 6px;
     font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    padding: 8px 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s, border-color 0.2s;
+    width: auto;
+    height: auto;
+    min-width: 32px;
 }
 
 .regenerate-id-btn:hover {
-    background: #4a4a4a;
-    border-color: #ff8c00;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    background: #e8e8e8;
+    border-color: #bbb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .regenerate-id-btn:active {
-    background: #2a2a2a;
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .regenerate-id-btn svg {
     width: 16px;
     height: 16px;
+    margin-right: 4px;
 }
 
 /* 受試者名稱欄位樣式 */
@@ -430,33 +435,37 @@
 
 /* 受試者名稱儲存按鈕 */
 .save-subject-name-btn {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    background: #3a3a3a;
-    color: #4caf50;
-    cursor: pointer;
+    border-radius: 6px;
     font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    padding: 8px 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    width: auto;
+    height: auto;
+    min-width: 32px;
     flex-shrink: 0;
 }
 
 .save-subject-name-btn:hover {
-    background: #4a4a4a;
-    border-color: #4caf50;
-    transform: scale(1.05);
+    background: #e8e8e8;
+    border-color: #bbb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .save-subject-name-btn:active {
-    transform: scale(0.95);
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.experiment-start-btn {
+.experiment-panel .experiment-start-btn {
     flex-shrink: 0;
     width: auto;
     min-width: 120px;
@@ -476,12 +485,12 @@
     justify-content: center;
 }
 
-.experiment-start-btn:hover {
+.experiment-panel .experiment-start-btn:hover {
     background: #ff9800;
 }
 
-.experiment-pause-btn,
-.experiment-stop-btn {
+.experiment-panel .experiment-pause-btn,
+.experiment-panel .experiment-stop-btn {
     width: 48%;
     padding: 12px 0;
     font-size: 1.05rem;
@@ -494,20 +503,20 @@
     transition: background 0.2s;
 }
 
-.experiment-pause-btn {
+.experiment-panel .experiment-pause-btn {
     background: #888;
     margin-right: 4%;
 }
 
-.experiment-pause-btn:hover {
+.experiment-panel .experiment-pause-btn:hover {
     background: #aaa;
 }
 
-.experiment-stop-btn {
+.experiment-panel .experiment-stop-btn {
     background: #d32f2f;
 }
 
-.experiment-stop-btn:hover {
+.experiment-panel .experiment-stop-btn:hover {
     background: #e53935;
 }
 

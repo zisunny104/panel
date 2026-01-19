@@ -54,7 +54,7 @@ export class SyncManagerSessions {
         <div class="modal-body">
           <div class="sync-sessions-actions">
             <button id="refreshSessionsBtn" class="sync-action-btn">重新整理</button>
-            <button id="stopAllActiveSessionsBtn" class="sync-action-btn sync-action-btn-warning">結束所有活躍工作階段</button>
+            <button id="stopAllActiveSessionsBtn" class="sync-action-btn sync-action-btn-warning">結束所有活動中工作階段</button>
             <button id="clearAllSessionsBtn" class="sync-action-btn sync-action-btn-danger">刪除所有工作階段</button>
           </div>
 
@@ -177,7 +177,7 @@ export class SyncManagerSessions {
           <div class="sync-session-card-status">
             <span class="sync-session-status ${
               isActive ? "active" : "inactive"
-            }">${isActive ? "活躍" : "非活躍"}</span>
+            }">${isActive ? "活動中" : "閒置中"}</span>
             <span class="sync-session-expand-icon">${
               isExpanded ? "▼" : "▶"
             }</span>
@@ -515,7 +515,7 @@ ${indentStr}}</span>`;
       }, 0);
     });
 
-    // 結束所有活躍工作階段按鈕
+    // 結束所有活動中工作階段按鈕
     const stopAllActiveBtn = this.sessionsPanel.querySelector(
       "#stopAllActiveSessionsBtn"
     );
@@ -527,12 +527,14 @@ ${indentStr}}</span>`;
         });
 
         if (activeSessions.length === 0) {
-          alert("目前沒有活躍的工作階段");
+          alert("目前沒有活動中的工作階段");
           return;
         }
 
         if (
-          !confirm(`確定要結束所有 ${activeSessions.length} 個活躍工作階段嗎？`)
+          !confirm(
+            `確定要結束所有 ${activeSessions.length} 個活動中工作階段嗎？`
+          )
         ) {
           return;
         }
@@ -541,17 +543,17 @@ ${indentStr}}</span>`;
         stopAllActiveBtn.textContent = "處理中...";
 
         try {
-          // 這裡可以實現結束活躍工作階段的邏輯
+          // 這裡可以實現結束活動中工作階段的邏輯
           // 目前先顯示成功訊息
-          alert(`已結束 ${activeSessions.length} 個活躍工作階段`);
+          alert(`已結束 ${activeSessions.length} 個活動中工作階段`);
           await this.refreshSessionsList();
         } catch (error) {
-          Logger.error("結束活躍工作階段錯誤:", error);
+          Logger.error("結束活動中工作階段錯誤:", error);
           alert("操作失敗: " + error.message);
         }
 
         stopAllActiveBtn.disabled = false;
-        stopAllActiveBtn.textContent = "結束所有活躍工作階段";
+        stopAllActiveBtn.textContent = "結束所有活動中工作階段";
       }, 0);
     });
 

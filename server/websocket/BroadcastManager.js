@@ -55,7 +55,7 @@ export class BroadcastManager {
     const { excludeClientId = null, onlyClientIds = null } = options;
 
     try {
-      // 獲取房間成員
+      // 取得房間成員
       const members = this.roomManager.getMembers(sessionId);
 
       if (members.length === 0) {
@@ -240,7 +240,7 @@ export class BroadcastManager {
   }
 
   /**
-   * 獲取統計資訊
+   * 取得統計資訊
    * @returns {Object}
    */
   getStats() {

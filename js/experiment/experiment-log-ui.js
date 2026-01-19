@@ -222,7 +222,7 @@ class ExperimentLogUI {
    */
   async listFilesInDirectory(dirPath) {
     try {
-      // 嘗試從伺服器 API 獲取檔案列表
+      // 嘗試從伺服器 API 取得檔案列表
       const apiUrl = this._getApiUrl();
       const response = await fetch(`${apiUrl}/api/experiment-logs/list`);
 
@@ -301,23 +301,22 @@ class ExperimentLogUI {
       <div class="log-item" data-log-id="${
         exp.actualExperimentId || exp.experimentId
       }">
-        <div class="log-info">
-          <div class="log-checkbox">
-            <input type="checkbox" id="log-${
-              exp.actualExperimentId || exp.experimentId
-            }" onchange="experimentLogUI.toggleLogSelection('${
+        <div class="log-checkbox">
+          <input type="checkbox" id="log-${
+            exp.actualExperimentId || exp.experimentId
+          }" onchange="experimentLogUI.toggleLogSelection('${
           exp.actualExperimentId || exp.experimentId
         }')">
-            <label for="log-${
-              exp.actualExperimentId || exp.experimentId
-            }"></label>
-          </div>
-          <div class="log-details">
-            <div class="log-filename">${
-              exp.filename ||
-              `${exp.experimentId}_${exp.subjectName}_experiment_log.jsonl`
-            }</div>
-            <div class="log-meta">
+          <label for="log-${
+            exp.actualExperimentId || exp.experimentId
+          }"></label>
+        </div>
+        <div class="log-details">
+          <div class="log-filename">${
+            exp.filename ||
+            `${exp.experimentId}_${exp.subjectName}_experiment_log.jsonl`
+          }</div>
+          <div class="log-meta">
               <span class="log-size">${exp.logCount} 條記錄</span>
               ${
                 exp.startTime
@@ -327,7 +326,6 @@ class ExperimentLogUI {
                   : ""
               }
             </div>
-          </div>
         </div>
         <div class="log-actions">
           <button class="btn btn-info btn-icon-only" onclick="experimentLogUI.viewLogDetails('${
@@ -918,7 +916,7 @@ class ExperimentLogUI {
       );
 
       if (!response.ok) {
-        throw new Error(`API 返回錯誤: ${response.status}`);
+        throw new Error(`API 回傳錯誤: ${response.status}`);
       }
 
       const result = await response.json();
@@ -979,7 +977,7 @@ class ExperimentLogUI {
       );
 
       if (!response.ok) {
-        throw new Error(`API 返回錯誤: ${response.status}`);
+        throw new Error(`API 回傳錯誤: ${response.status}`);
       }
 
       const result = await response.json();

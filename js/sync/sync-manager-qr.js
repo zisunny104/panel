@@ -1,6 +1,6 @@
 /**
- * SyncManager QR -  QR code 處理
- * 負責 QR code 產生、掃描、URL參數解析、確認對話框
+ * SyncManager QR -  QR Code 處理
+ * 負責 QR Code 產生、掃描、URL參數解析、確認對話框
  */
 
 export class SyncManagerQR {
@@ -37,25 +37,25 @@ export class SyncManagerQR {
       this.checkUrlParameters();
     }
 
-    // 監聽 QR code 產生事件
+    // 監聽 QR Code 產生事件
     window.addEventListener("sync_generate_qr", async (event) => {
       const { shareCode, role } = event.detail;
 
-      Logger.debug("[QR] 收到QR code產生事件", { shareCode, role });
+      Logger.debug("[QR] 收到QR Code產生事件", { shareCode, role });
 
       // 使用分享代碼
       const codeToUse = shareCode;
 
       if (!codeToUse) {
-        Logger.debug("[QR] QR code 產生失敗：沒有有效的代碼", event.detail);
+        Logger.debug("[QR] QR Code 產生失敗：沒有有效的代碼", event.detail);
         return;
       }
 
       try {
         await this.generateQRCode(codeToUse, role);
-        Logger.debug("[QR] QR code產生完成");
+        Logger.debug("[QR] QR Code產生完成");
       } catch (error) {
-        Logger.error("[QR] QR code產生過程中發生錯誤", error);
+        Logger.error("[QR] QR Code產生過程中發生錯誤", error);
       }
     });
 
@@ -68,7 +68,7 @@ export class SyncManagerQR {
   }
 
   /**
-   * 檢查URL參數（處理 QR code 掃描進入的情況）
+   * 檢查URL參數（處理 QR Code 掃描進入的情況）
    * 支援模式：
    * - ?shareCode=XXX&role=YYY (分享代碼)
    */
@@ -250,15 +250,15 @@ export class SyncManagerQR {
   }
 
   /**
-   * 產生 QR code （包含完整URL）
+   * 產生 QR Code （包含完整URL）
    * @param {string} code - 分享代碼
    * @param {string} role - 'viewer' 或 'operator'
    */
   async generateQRCode(code, role = "viewer") {
-    Logger.debug("[QR] 開始產生QR code", { code, role });
+    Logger.debug("[QR] 開始產生QR Code", { code, role });
 
     if (!code) {
-      Logger.error("[QR] QR code 產生失敗：代碼為空");
+      Logger.error("[QR] QR Code 產生失敗：代碼為空");
       return;
     }
 
@@ -268,7 +268,7 @@ export class SyncManagerQR {
       container = document.getElementById("qrCodeDisplay");
     }
     if (!container) {
-      Logger.warn("[QR] 找不到 QR code 容器 (shareQRCode 或 qrCodeDisplay)");
+      Logger.warn("[QR] 找不到 QR Code 容器 (shareQRCode 或 qrCodeDisplay)");
       return;
     }
 
@@ -341,7 +341,7 @@ export class SyncManagerQR {
       });
 
       qrCode.append(container);
-      Logger.debug("[QR] QR code 已附加到容器");
+      Logger.debug("[QR] QR Code 已附加到容器");
 
       const roleText = role === "viewer" ? "僅檢視" : "同步操作";
       const codeText = document.createElement("div");
@@ -353,20 +353,20 @@ export class SyncManagerQR {
                 </p>
             `;
       container.appendChild(codeText);
-      Logger.info("[QR] QR code 產產生功", { code, role });
+      Logger.info("[QR] QR Code 產產生功", { code, role });
 
       // 不啟動倒數計時，因為這是由UI層負責的
     } catch (error) {
-      Logger.error("[QR] QR code 產生失敗:", error);
+      Logger.error("[QR] QR Code 產生失敗:", error);
     }
   }
 
   /**
-   * 啟動 QR code 倒數計時
+   * 啟動 QR Code 倒數計時
    * @param {number} remainingTime - 剩餘時間（秒），如果未提供則使用預設300秒
    */
   startQRCodeCountdown(remainingTime = null) {
-    Logger.debug("[QR] 開始QR code倒數計時", { remainingTime });
+    Logger.debug("[QR] 開始QR Code倒數計時", { remainingTime });
 
     const countdownElement = document.getElementById("qrCountdown");
     if (!countdownElement) {
@@ -391,15 +391,15 @@ export class SyncManagerQR {
       currentTime--;
 
       if (currentTime <= 0) {
-        Logger.debug("[QR] QR code倒數結束，已過期");
+        Logger.debug("[QR] QR Code倒數結束，已過期");
         clearInterval(this.countdownInterval);
         countdownElement.textContent = "有效期已過期";
         countdownElement.classList.add("sync-qr-expired");
-        // 隱藏 QR code
+        // 隱藏 QR Code
         const qrSection = document.getElementById("qrCodeSection");
         if (qrSection) {
           qrSection.innerHTML =
-            '<div class="sync-qr-expired"> QR code 已過期，請重新建立工作階段</div>';
+            '<div class="sync-qr-expired"> QR Code 已過期，請重新建立工作階段</div>';
         }
         return;
       }
@@ -432,7 +432,7 @@ export class SyncManagerQR {
   }
 
   /**
-   * 啟動 QR code 掃描器
+   * 啟動 QR Code 掃描器
    */
   async startQRScanner() {
     if (!navigator.mediaDevices) {
@@ -446,7 +446,7 @@ export class SyncManagerQR {
     this.qrScanner.innerHTML = `
             <div class="sync-scanner-ui">
                 <div class="sync-scanner-header">
-                    <h3>掃描 QR code</h3>
+                    <h3>掃描 QR Code</h3>
                     <button class="sync-scanner-close-btn" title="關閉" aria-label="關閉掃描器">×</button>
                 </div>
                 <div class="sync-scanner-video-container">
@@ -456,7 +456,7 @@ export class SyncManagerQR {
                         <option value="">自動選擇相機</option>
                     </select>
                 </div>
-                <div class="sync-scanner-status">對準 QR code 掃描加入工作階段</div>
+                <div class="sync-scanner-status">對準 QR Code 掃描加入工作階段</div>
             </div>
         `;
 
@@ -567,7 +567,7 @@ export class SyncManagerQR {
   }
 
   /**
-   * 開始 QR code 檢測
+   * 開始 QR Code 檢測
    */
   startQRDetection(video) {
     if (typeof jsQR === "undefined") {
@@ -611,7 +611,7 @@ export class SyncManagerQR {
         // 取得像素資料
         const imageData = context.getImageData(0, 0, width, height);
 
-        // 分析 QR code (耗時操作)
+        // 分析 QR Code (耗時操作)
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
           inversionAttempts: "dontInvert", // 若不需要掃反色碼，關閉此項可提升一倍速度
         });
@@ -643,7 +643,7 @@ export class SyncManagerQR {
   }
 
   /**
-   * 處理掃描到的 QR code （支援URL格式）
+   * 處理掃描到的 QR Code （支援URL格式）
    */
   async handleQRCodeScanned(qrData) {
     try {
@@ -667,7 +667,7 @@ export class SyncManagerQR {
         shareCode = code;
         role = "viewer";
       } else {
-        // 非分享代碼相關的 QR code，靜默忽略
+        // 非分享代碼相關的 QR Code，靜默忽略
         return;
       }
 
@@ -690,13 +690,13 @@ export class SyncManagerQR {
         this.showJoinConfirmation(codeToUse, role);
       }
     } catch (error) {
-      Logger.error("QR code 處理錯誤:", error);
+      Logger.error("QR Code 處理錯誤:", error);
       alert("掃描處理失敗，請重試");
     }
   }
 
   /**
-   * 停止 QR code 掃描器
+   * 停止 QR Code 掃描器
    */
   stopQRScanner() {
     this.scanning = false;

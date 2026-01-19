@@ -29,9 +29,7 @@ class LogPanel {
    */
   isExperimentMode() {
     // 檢查實驗按鈕是否隱藏（表示實驗已開始）
-    const startExperimentButton = document.getElementById(
-      "startExperimentButton"
-    );
+    const startExperimentButton = document.getElementById("startExperimentBtn");
     if (
       startExperimentButton &&
       startExperimentButton.style.display === "none"

@@ -107,10 +107,7 @@
 .logs-list-container {
     max-height: 400px;
     overflow-y: auto;
-    background: #f5f5f5;
-    border-radius: 4px;
-    border: 2px solid #ddd;
-    padding: 10px;
+    padding: 2px;
 }
 
 /* 分隔線 */
@@ -129,6 +126,29 @@
 
 .experiment-id-group .form-input {
     flex: 1;
+}
+
+.experiment-id-group .btn-secondary {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.experiment-id-group .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
 }
 
 .experiment-id-group .experiment-timer {
@@ -150,12 +170,34 @@
 }
 
 .subject-name-group .btn-secondary {
-    display: none;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.subject-name-group .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
 }
 
 /* 實驗控制區域 */
 .experiment-control-group {
     margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .experiment-control-header {
@@ -192,6 +234,18 @@
     padding: 10px;
     font-size: 14px;
     font-weight: 700;
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.experiment-start-row .experiment-start-btn:hover {
+    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
 }
 
 .experiment-control-buttons {
@@ -206,6 +260,30 @@
     padding: 10px;
     font-size: 14px;
     font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.experiment-control-buttons .experiment-pause-btn {
+    background: #667eea;
+    color: white;
+}
+
+.experiment-control-buttons .experiment-pause-btn:hover {
+    background: #5568d3;
+}
+
+.experiment-control-buttons .experiment-stop-btn {
+    background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.experiment-control-buttons .experiment-stop-btn:hover {
+    background: linear-gradient(135deg, #da190b 0%, #c41a0a 100%);
+    box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4);
 }
 
 /* SVG 圖示 */
@@ -292,6 +370,7 @@ svg.icon-sm {
 .log-actions {
     display: flex;
     gap: 4px;
+    margin-left: auto;
 }
 
 /* 日誌列表標題操作區 */
@@ -328,6 +407,26 @@ svg.icon-sm {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.logs-list-header .btn-secondary {
+    background: white;
+    color: #333;
+}
+
+.logs-list-header .btn-secondary:hover {
+    background: #f8f9fa;
+    border-color: #bbb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logs-list-header .btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* 卡片內操作按鈕 - 統一大小和高度 */

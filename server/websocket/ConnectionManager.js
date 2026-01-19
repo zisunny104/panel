@@ -174,7 +174,7 @@ export class ConnectionManager {
   }
 
   /**
-   * 根據 clientId 獲取 WebSocket 連線
+   * 根據 clientId 取得 WebSocket 連線
    * @param {string} clientId - 客戶端 ID
    * @returns {WebSocket|null}
    */
@@ -190,7 +190,7 @@ export class ConnectionManager {
   }
 
   /**
-   * 根據 sessionId 獲取所有 WebSocket 連線
+   * 根據 sessionId 取得所有 WebSocket 連線
    * @param {string} sessionId - 工作階段 ID
    * @returns {WebSocket[]}
    */
@@ -214,7 +214,7 @@ export class ConnectionManager {
   }
 
   /**
-   * 根據 sessionId 獲取所有客戶端 ID
+   * 根據 sessionId 取得所有客戶端 ID
    * @param {string} sessionId - 工作階段 ID
    * @returns {string[]}
    */
@@ -313,7 +313,7 @@ export class ConnectionManager {
   }
 
   /**
-   * 獲取連線統計資訊
+   * 取得連線統計資訊
    * @returns {Object} 統計資訊
    */
   getStats() {

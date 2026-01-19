@@ -93,7 +93,7 @@ export class RoomManager {
   }
 
   /**
-   * 獲取房間成員列表
+   * 取得房間成員列表
    * @param {string} sessionId - 工作階段 ID
    * @returns {Array} 客戶端列表 [{ clientId, metadata }, ...]
    */
@@ -111,7 +111,7 @@ export class RoomManager {
   }
 
   /**
-   * 獲取房間統計資訊
+   * 取得房間統計資訊
    * @param {string} sessionId - 工作階段 ID
    * @returns {Object|null} 統計資訊
    */
@@ -142,7 +142,7 @@ export class RoomManager {
   }
 
   /**
-   * 獲取客戶端所在的房間
+   * 取得客戶端所在的房間
    * @param {string} clientId - 客戶端 ID
    * @returns {string|null} sessionId
    */
@@ -156,7 +156,7 @@ export class RoomManager {
   }
 
   /**
-   * 獲取所有活躍房間
+   * 取得所有活動中的房間
    * @returns {Array} 房間列表 [{ sessionId, clientCount, ... }, ...]
    */
   getAllRooms() {
@@ -180,7 +180,7 @@ export class RoomManager {
   }
 
   /**
-   * 獲取統計資訊
+   * 取得統計資訊
    * @returns {Object}
    */
   getStats() {

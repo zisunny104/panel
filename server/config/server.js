@@ -76,7 +76,7 @@ export function loadBusinessConfigSync() {
     return businessConfig;
   } catch (error) {
     console.error("載入 config.json 失敗:", error.message);
-    // 返回預設設定
+    // 回傳預設設定
     return {
       multiScreenSync: {
         validCreateCode: "113151006",
@@ -88,7 +88,7 @@ export function loadBusinessConfigSync() {
 }
 
 /**
- * 獲取驗證碼 (從 config.json)
+ * 取得驗證碼 (從 config.json)
  */
 export function getValidCreateCode() {
   const config = businessConfig || loadBusinessConfigSync();

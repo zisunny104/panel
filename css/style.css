@@ -43,6 +43,7 @@
 /* 實驗頁面專用樣式 */
 @import url('./experiment/base.css');
 @import url('./experiment/layout.css');
+@import url('./experiment/buttons.css');
 @import url('./experiment/combinations.css');
 @import url('./experiment/experiment-forms.css');
 @import url('./experiment/cards.css');

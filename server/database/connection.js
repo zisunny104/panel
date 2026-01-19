@@ -7,7 +7,7 @@ import { DATABASE_CONFIG } from "../config/database.js";
 let dbInstance = null;
 
 /**
- * 初始化並獲取資料庫實例（單例模式）
+ * 初始化並取得資料庫實例（單例模式）
  */
 export function getDatabase() {
   if (dbInstance) {
@@ -52,7 +52,7 @@ export function getDatabase() {
 }
 
 /**
- * 執行查詢並返回所有結果
+ * 執行查詢並回傳所有結果
  * @param {string} sql - SQL查詢語句
  * @param {Array} params - 參數化查詢的參數
  * @returns {Array} 查詢結果數組
@@ -70,7 +70,7 @@ export function query(sql, params = []) {
 }
 
 /**
- * 執行查詢並返回第一行結果
+ * 執行查詢並回傳第一行結果
  * @param {string} sql - SQL查詢語句
  * @param {Array} params - 參數化查詢的參數
  * @returns {Object|null} 查詢結果（單行）或null

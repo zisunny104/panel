@@ -3,7 +3,7 @@
  */
 
 /**
- * 獲取目前時間戳（秒）
+ * 取得目前時間戳（秒）
  * @returns {number} Unix時間戳（秒）
  */
 export function getCurrentTimestamp() {

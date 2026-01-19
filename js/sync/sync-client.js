@@ -694,7 +694,7 @@ class SyncClient {
    * 啟動健康檢查定時器（舊版，保留相容）
    */
   startHealthCheck() {
-    // 同步模式不需要 HTTP 健康檢查，直接返回
+    // 同步模式不需要 HTTP 健康檢查，直接回傳
     if (this.healthCheckMethod === "websocket") {
       Logger.debug(
         "[SyncClient] 同步模式，使用 WebSocket 狀態監視，不啟動 HTTP 健康檢查"

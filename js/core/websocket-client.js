@@ -391,7 +391,7 @@ class WebSocketClient {
   }
 
   /**
-   * 獲取工作階段狀態
+   * 取得工作階段狀態
    */
   getSessionState() {
     this.send({
@@ -561,7 +561,7 @@ class WebSocketClient {
   }
 
   /**
-   * 獲取連接狀態
+   * 取得連接狀態
    */
   getState() {
     return {

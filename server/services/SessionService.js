@@ -178,8 +178,8 @@ class SessionService {
   }
 
   /**
-   * 獲取所有活躍的工作階段
-   * @returns {Array} 活躍工作階段列表
+   * 取得所有活動中的工作階段
+   * @returns {Array} 活動中工作階段列表
    */
   getActiveSessions() {
     const expirationTime =
@@ -193,7 +193,7 @@ class SessionService {
 
       return sessions;
     } catch (error) {
-      console.error("查詢活躍工作階段失敗:", error.message);
+      console.error("查詢活動中工作階段失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }

@@ -221,7 +221,7 @@ export class ExperimentHubManager {
   }
 
   /**
-   * 處理離線隊列
+   * 處理離線佇列
    */
   async processOfflineQueue() {
     if (this.isProcessingQueue || !this.hubClient.isConnected()) {
@@ -235,8 +235,8 @@ export class ExperimentHubManager {
       try {
         await this.syncState(item.state);
       } catch (error) {
-        Logger.error("處理離線隊列項目失敗:", error);
-        // 重新加入隊列
+        Logger.error("處理離線佇列項目失敗:", error);
+        // 重新加入佇列
         this.offlineQueue.unshift(item);
         break;
       }
@@ -303,7 +303,7 @@ export class ExperimentHubManager {
 
   /**
    * 檢查伺服器健康狀態
-   * @returns {boolean} 本機模式返回 false，同步模式返回實際健康狀態
+   * @returns {boolean} 本機模式回傳 false，同步模式回傳實際健康狀態
    */
   async checkServerHealth() {
     if (!this.hubClient) {
@@ -314,7 +314,7 @@ export class ExperimentHubManager {
 
   /**
    * 註冊實驗ID
-   * @returns {boolean} 本機模式返回 true（視為成功），同步模式返回實際結果
+   * @returns {boolean} 本機模式回傳 true（視為成功），同步模式回傳實際結果
    */
   async registerExperimentId(experimentId, source = "manager") {
     if (!this.hubClient) {
@@ -328,7 +328,7 @@ export class ExperimentHubManager {
 
   /**
    * 取得實驗ID
-   * @returns {string|null} 本機模式返回 null，同步模式返回實際的實驗ID
+   * @returns {string|null} 本機模式回傳 null，同步模式回傳實際的實驗ID
    */
   async getExperimentId() {
     if (!this.hubClient) {
@@ -341,7 +341,7 @@ export class ExperimentHubManager {
   // 代理方法到hubClient - 安全處理 null 值
   /**
    * 取得工作階段ID
-   * @returns {string|null} 本機模式返回 null，同步模式返回實際的 sessionId
+   * @returns {string|null} 本機模式回傳 null，同步模式回傳實際的 sessionId
    */
   getSessionId() {
     return this.hubClient?.getSessionId?.() || null;
@@ -349,7 +349,7 @@ export class ExperimentHubManager {
 
   /**
    * 取得目前角色
-   * @returns {string} 本機模式返回 "viewer"，同步模式返回實際角色
+   * @returns {string} 本機模式回傳 "viewer"，同步模式回傳實際角色
    */
   getRole() {
     return this.hubClient?.getRole?.() || "viewer";
@@ -357,7 +357,7 @@ export class ExperimentHubManager {
 
   /**
    * 檢查是否可以操作
-   * @returns {boolean} 本機模式返回 false，同步模式返回實際權限
+   * @returns {boolean} 本機模式回傳 false，同步模式回傳實際權限
    */
   canOperate() {
     return this.hubClient?.canOperate?.() || false;
@@ -365,7 +365,7 @@ export class ExperimentHubManager {
 
   /**
    * 檢查是否已連線
-   * @returns {boolean} 本機模式返回 false，同步模式返回實際連線狀態
+   * @returns {boolean} 本機模式回傳 false，同步模式回傳實際連線狀態
    */
   isConnected() {
     return this.hubClient?.isConnected?.() || false;
@@ -373,7 +373,7 @@ export class ExperimentHubManager {
 
   /**
    * 取得狀態文字
-   * @returns {string} 本機模式返回 "未連線"，同步模式返回實際狀態文字
+   * @returns {string} 本機模式回傳 "未連線"，同步模式回傳實際狀態文字
    */
   getStatusText() {
     return this.hubClient?.getStatusText?.() || "未連線";

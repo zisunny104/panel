@@ -36,7 +36,7 @@ export function validateSchema() {
 }
 
 /**
- * 獲取資料表資訊
+ * 取得資料表資訊
  */
 export function getTableInfo(tableName) {
   const db = getDatabase();

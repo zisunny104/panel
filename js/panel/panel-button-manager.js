@@ -5,7 +5,7 @@ class ButtonManager {
     this.buttonFunctionsMap = {}; // 按鈕功能對照表
     this.isShiftPressed = false; // Shift 狀態
     this.isTouchShiftActive = false; // 觸控 Shift 狀態
-    this.activeTouches = new Set(); // 追蹤目前活躍的觸控點
+    this.activeTouches = new Set(); // 追蹤目前活動中的觸控點
     this.touchShiftTimeout = null; // Shift 按鈕觸控逾時
     this.lastActionTime = 0; // 最後動作時間，用於防重複
     this.actionCooldown = 100; // 動作冷卻時間（毫秒）
@@ -904,7 +904,7 @@ class ButtonManager {
           const buttonId = button.dataset.label;
           const touchId = event.changedTouches[0].identifier;
 
-          // 新增觸控 ID 到活躍觸控集合
+          // 新增觸控 ID 到活動中觸控集合
           this.activeTouches.add(`${buttonId}_${touchId}`);
 
           if (toggleTouchVisuals?.checked) button.classList.add("touch-active");
@@ -970,7 +970,7 @@ class ButtonManager {
         const touchId = event.changedTouches[0].identifier;
         const touchKey = `${buttonId}_${touchId}`;
 
-        // 從活躍觸控集合中移除
+        // 從活動中觸控集合中移除
         this.activeTouches.delete(touchKey);
 
         button.classList.remove("touch-active");
@@ -996,7 +996,7 @@ class ButtonManager {
         const touchId = event.changedTouches[0].identifier;
         const touchKey = `${buttonId}_${touchId}`;
 
-        // 從活躍觸控集合中移除
+        // 從活動中觸控集合中移除
         this.activeTouches.delete(touchKey);
 
         button.classList.remove("touch-active");

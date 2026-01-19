@@ -85,7 +85,7 @@ export class MessageHandler {
         throw new Error(`工作階段不存在: ${sessionId}`);
       }
 
-      // 驗證工作階段活躍
+      // 驗證工作階段活動中
       if (!session.is_active) {
         throw new Error(`工作階段已失效: ${sessionId}`);
       }
@@ -244,7 +244,7 @@ export class MessageHandler {
   }
 
   /**
-   * 處理獲取工作階段狀態請求
+   * 處理取得工作階段狀態請求
    * @param {string} wsConnectionId - WebSocket 連線 ID
    * @param {Object} data - { sessionId }
    * @param {WebSocket} ws - WebSocket 連線
@@ -253,7 +253,7 @@ export class MessageHandler {
     const { sessionId } = data;
 
     if (!sessionId) {
-      throw new Error("獲取狀態失敗: 缺少 sessionId");
+      throw new Error("取得狀態失敗: 缺少 sessionId");
     }
 
     try {
@@ -261,7 +261,7 @@ export class MessageHandler {
 
       this.sendResponse(ws, "session_state", state);
     } catch (error) {
-      throw new Error(`獲取狀態失敗: ${error.message}`);
+      throw new Error(`取得狀態失敗: ${error.message}`);
     }
   }
 
@@ -278,18 +278,18 @@ export class MessageHandler {
   }
 
   /**
-   * 獲取工作階段完整狀態
+   * 取得工作階段完整狀態
    * @param {string} sessionId - 工作階段 ID
    * @returns {Object}
    */
   getSessionState(sessionId) {
-    // 獲取工作階段資料
+    // 取得工作階段資料
     const session = this.sessionService.getSession(sessionId);
     if (!session) {
       throw new Error(`工作階段不存在: ${sessionId}`);
     }
 
-    // 獲取房間資訊
+    // 取得房間資訊
     const roomInfo = this.roomManager.getRoomInfo(sessionId);
 
     // 解析 session.data

@@ -1,6 +1,181 @@
 /* ================= 實驗表單樣式 ================= */
 
 /* ========== 表單樣式 ========== */
+
+/* 實驗ID輸入區域 */
+.experiment-id-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.experiment-id-group .form-input {
+    flex: 1;
+    height: 40px;
+    box-sizing: border-box;
+}
+
+.experiment-id-group .btn-secondary {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.experiment-id-group .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
+}
+
+.experiment-id-group .experiment-timer {
+    display: none;
+    font-size: 0.9rem;
+    color: #666;
+    white-space: nowrap;
+}
+
+/* 受試者名稱輸入區域 */
+.subject-name-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.subject-name-group .form-input {
+    flex: 1;
+    height: 40px;
+    box-sizing: border-box;
+}
+
+.subject-name-group .btn-secondary {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.subject-name-group .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
+}
+
+/* 實驗控制區域 */
+.experiment-control-group {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.experiment-control-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.experiment-control-header label {
+    font-weight: 600;
+}
+
+.experiment-control-header .experiment-timer {
+    display: none;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #667eea;
+    background: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.experiment-start-row {
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+    margin-top: 10px;
+}
+
+.experiment-start-row .experiment-start-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.experiment-start-row .experiment-start-btn:hover {
+    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+.experiment-control-buttons {
+    display: none;
+    gap: 8px;
+    flex-direction: row;
+    margin-top: 10px;
+}
+
+.experiment-control-buttons button {
+    flex: 1;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.experiment-control-buttons .experiment-pause-btn {
+    background: #667eea;
+    color: white;
+}
+
+.experiment-control-buttons .experiment-pause-btn:hover {
+    background: #5568d3;
+}
+
+.experiment-control-buttons .experiment-stop-btn {
+    background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.experiment-control-buttons .experiment-stop-btn:hover {
+    background: linear-gradient(135deg, #da190b 0%, #c41a0a 100%);
+    box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4);
+}
+
+/* ========== 表單樣式 ========== */
 .input-section {
     background: #f5f5f5;
     padding: 15px;
@@ -112,28 +287,77 @@
 }
 
 .logs-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     max-height: 200px;
     overflow-y: auto;
-    border: 2px solid #ddd;
-    border-radius: 4px;
 }
 
 .log-item {
-    padding: 8px 12px;
-    border-bottom: 1px solid #eee;
+    padding: 0.5rem 1rem;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    font-size: 12px;
-    transition: background-color 0.2s;
+    gap: 0.5rem;
+    background: #ffffff;
+    border-radius: 0.375rem;
+    border: 2px solid #ddd;
+    transition: all 0.2s;
+    position: relative;
+    margin-bottom: 0.375rem;
 }
 
 .log-item:hover {
-    background: #f8f8f8;
+    background: #f9f9f9;
+    border-color: #bbb;
 }
 
-.log-item:last-child {
-    border-bottom: none;
+.log-item input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.log-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.log-checkbox input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: #667eea;
+    width: 16px;
+    height: 16px;
+}
+
+.log-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.log-filename {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 2px;
+    word-break: break-word;
+}
+
+.log-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    color: #666;
+}
+
+.log-size,
+.log-date {
+    color: #888;
 }
 
 .log-timestamp {
@@ -150,6 +374,7 @@
 .log-actions {
     display: flex;
     gap: 4px;
+    margin-left: auto;
 }
 
 /* 日誌過濾器 */
@@ -190,11 +415,56 @@
     gap: 4px;
 }
 
-/* 日誌載入狀態 */
-.logs-list-loading {
-    text-align: center;
-    padding: 20px;
-    color: #999;
+/* 日誌區域標題和按鈕同一列 */
+.logs-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+}
+
+.logs-section-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #2c3e50;
+    font-weight: 700;
+}
+
+/* 列表操作按鈕 - 統一大小和高度 */
+.logs-list-header .btn-secondary,
+.logs-list-header .btn-danger {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logs-list-header .btn-secondary {
+    background: #f5f5f5;
+    color: #333;
+}
+
+.logs-list-header .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logs-list-header .btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .logs-list-error {

@@ -53,7 +53,7 @@ class ShareCodeService {
   }
 
   /**
-   * 驗證分享代碼並獲取對應的工作階段
+   * 驗證分享代碼並取得對應的工作階段
    * @param {string} shareCode - 8位分享代碼
    * @returns {Object|null} { session_id } 或錯誤對象
    */
@@ -213,7 +213,7 @@ class ShareCodeService {
   }
 
   /**
-   * 獲取工作階段的所有分享代碼
+   * 取得工作階段的所有分享代碼
    * @param {string} sessionId - 工作階段ID
    * @returns {Array} 分享代碼列表
    */

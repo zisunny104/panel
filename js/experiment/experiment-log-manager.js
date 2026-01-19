@@ -7,7 +7,7 @@
 class ExperimentLogManager {
   constructor() {
     this.logs = [];
-    this.pendingLogs = []; // 初始化為空陣列，防止事件監聽器訪問 undefined
+    this.pendingLogs = []; // 初始化為空陣列，防止事件監聽器存取 undefined
     this.experimentId = null;
     this.subjectName = null;
     this.experimentStartTime = null;
@@ -921,7 +921,7 @@ class ExperimentLogManager {
     try {
       if (!this.db) {
         Logger.warn(
-          "[ExperimentLogManager] IndexedDB 尚未初始化，僅返回記憶體中的日誌"
+          "[ExperimentLogManager] IndexedDB 尚未初始化，僅回傳記憶體中的日誌"
         );
         return [...this.logs, ...this.pendingLogs];
       }
@@ -948,7 +948,7 @@ class ExperimentLogManager {
             "[ExperimentLogManager] 讀取所有日誌失敗:",
             event.target.error
           );
-          // 發生錯誤時至少返回記憶體中的日誌
+          // 發生錯誤時至少回傳記憶體中的日誌
           resolve([...this.logs, ...this.pendingLogs]);
         };
       });

@@ -24,7 +24,7 @@ export class SyncManagerCore {
     // 自動偵測目前URL - 支援任何部署環境
     this.baseUrl = this.getBaseUrl();
 
-    // 離線隊列 - 儲存離線時的狀態更新
+    // 離線佇列 - 儲存離線時的狀態更新
     this.offlineQueue = [];
     this.isProcessingQueue = false;
   }
@@ -54,7 +54,7 @@ export class SyncManagerCore {
   }
 
   /**
-   * 產生包含完整URL的 QR code 內容
+   * 產生包含完整URL的 QR Code 內容
    * @param {string} code - 可以是 sessionId 或 shareCode
    * @param {string} role - 'viewer' 或 'operator'
    */
@@ -166,7 +166,7 @@ export class SyncManagerCore {
         })
       );
 
-      // 連線成功後，處理離線隊列
+      // 連線成功後，處理離線佇列
       setTimeout(() => this.processOfflineQueue(), 1000);
 
       return true;
@@ -263,24 +263,24 @@ export class SyncManagerCore {
 
   /**
    * 同步狀態
-   * 如果離線，會加入隊列等待連線還原後發送
+   * 如果離線，會加入佇列等待連線還原後發送
    * 優化：去重檢查確保不發送完全相同的狀態
    */
   async syncState(state) {
-    // 本機模式（無 sessionId）：直接忽略，不加入隊列
+    // 本機模式（無 sessionId）：直接忽略，不加入佇列
     if (!this.getSessionId()) {
       Logger.debug(`本機模式，忽略狀態同步 (type=${state.type})`);
       return false;
     }
 
-    // 去重：檢查隊列中是否已有相同的狀態
+    // 去重：檢查佇列中是否已有相同的狀態
     const isDuplicate = this._isDuplicateState(state);
     if (isDuplicate) {
       Logger.debug(`跳過重複的狀態更新 (type=${state.type})`);
       return false;
     }
 
-    // 如果未連線到工作階段，將狀態加入離線隊列
+    // 如果未連線到工作階段，將狀態加入離線佇列
     if (!this.syncClient.isConnected()) {
       this.addToOfflineQueue(state);
       return false;
@@ -294,13 +294,13 @@ export class SyncManagerCore {
 
     try {
       const result = await this.syncClient.syncState(state);
-      // 成功發送後，嘗試處理離線隊列
+      // 成功發送後，嘗試處理離線佇列
       if (result) {
         this.processOfflineQueue();
       }
       return result;
     } catch (error) {
-      Logger.warn("同步狀態失敗，加入離線隊列:", error);
+      Logger.warn("同步狀態失敗，加入離線佇列:", error);
       this.addToOfflineQueue(state);
       return false;
     }
@@ -323,7 +323,7 @@ export class SyncManagerCore {
       return false;
     }
 
-    // 檢查隊列中是否已有相同類型且相同裝置的狀態
+    // 檢查佇列中是否已有相同類型且相同裝置的狀態
     const lastSimilar = this.offlineQueue.find(
       (item) =>
         item.state.type === newState.type &&
@@ -350,10 +350,10 @@ export class SyncManagerCore {
   }
 
   /**
-   * 將狀態加入離線隊列
+   * 將狀態加入離線佇列
    */
   addToOfflineQueue(state) {
-    // 本機模式（無 sessionId）：不加入隊列
+    // 本機模式（無 sessionId）：不加入佇列
     if (!this.getSessionId()) {
       return;
     }
@@ -376,14 +376,14 @@ export class SyncManagerCore {
     if (duplicateIndex !== -1) {
       // 如果新狀態時間戳更新，替換舊狀態
       if (state.timestamp > this.offlineQueue[duplicateIndex].state.timestamp) {
-        Logger.debug(`替換舊的離線隊列項目 (type=${state.type}，時間戳已更新)`);
+        Logger.debug(`替換舊的離線佇列項目 (type=${state.type}，時間戳已更新)`);
         this.offlineQueue[duplicateIndex] = {
           state: state,
           addedAt: Date.now(),
           retryCount: 0,
         };
       } else {
-        Logger.debug(`忽略較舊的離線隊列項目 (type=${state.type})`);
+        Logger.debug(`忽略較舊的離線佇列項目 (type=${state.type})`);
         return; // 忽略較舊的更新
       }
     } else {
@@ -397,12 +397,12 @@ export class SyncManagerCore {
     // 按時間戳排序（較舊的在前）
     this.offlineQueue.sort((a, b) => a.state.timestamp - b.state.timestamp);
 
-    Logger.debug(`已加入離線隊列，目前隊列長度: ${this.offlineQueue.length}`);
+    Logger.debug(`已加入離線佇列，目前佇列長度: ${this.offlineQueue.length}`);
   }
 
   /**
-   * 處理離線隊列 - 按時間戳順序發送隊列中的狀態
-   * 優化：使用更快的發送速度（50ms 而非 100ms），提高用戶體驗
+   * 處理離線佇列 - 按時間戳順序發送佇列中的狀態
+   * 優化：使用更快的發送速度（50ms 而非 100ms），提高使用者體驗
    */
   async processOfflineQueue() {
     if (this.isProcessingQueue || this.offlineQueue.length === 0) {
@@ -415,7 +415,7 @@ export class SyncManagerCore {
 
     this.isProcessingQueue = true;
     const startTime = Date.now();
-    Logger.debug(`開始處理離線隊列，共 ${this.offlineQueue.length} 個項目`);
+    Logger.debug(`開始處理離線佇列，共 ${this.offlineQueue.length} 個項目`);
 
     // 時間戳校正回歸：按時間戳重新排序
     const sortedItems = [...this.offlineQueue].sort((a, b) => {
@@ -430,7 +430,7 @@ export class SyncManagerCore {
       Logger.debug("偵測到時間戳問題，但繼續處理:", timeCorrections);
     }
 
-    this.offlineQueue = []; // 清空隊列，避免重複處理
+    this.offlineQueue = []; // 清空佇列，避免重複處理
     let successCount = 0;
     let failCount = 0;
 
@@ -440,7 +440,7 @@ export class SyncManagerCore {
         if (result) {
           successCount++;
           Logger.debug(
-            `離線隊列項目發送成功: ${
+            `離線佇列項目發送成功: ${
               item.state.type || "unknown"
             } (時間戳: ${new Date(
               item.state.timestamp || item.addedAt
@@ -448,27 +448,27 @@ export class SyncManagerCore {
           );
         } else {
           failCount++;
-          Logger.debug(`離線隊列項目發送失敗: ${item.state.type || "unknown"}`);
-          // 重新加入隊列，但增加重試計數
+          Logger.debug(`離線佇列項目發送失敗: ${item.state.type || "unknown"}`);
+          // 重新加入佇列，但增加重試計數
           item.retryCount++;
           if (item.retryCount < 3) {
             this.offlineQueue.push(item);
           } else {
             Logger.warn(
-              `離線隊列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
+              `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
             );
           }
         }
       } catch (error) {
         failCount++;
-        Logger.error(`離線隊列項目發送異常:`, error);
-        // 重新加入隊列，但增加重試計數
+        Logger.error(`離線佇列項目發送異常:`, error);
+        // 重新加入佇列，但增加重試計數
         item.retryCount++;
         if (item.retryCount < 3) {
           this.offlineQueue.push(item);
         } else {
           Logger.warn(
-            `離線隊列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
+            `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
           );
         }
       }
@@ -483,7 +483,7 @@ export class SyncManagerCore {
     this.isProcessingQueue = false;
 
     Logger.debug(
-      `離線隊列處理完成 (成功: ${successCount}, 失敗: ${failCount}, 耗時: ${duration}ms，剩餘: ${this.offlineQueue.length})`
+      `離線佇列處理完成 (成功: ${successCount}, 失敗: ${failCount}, 耗時: ${duration}ms，剩餘: ${this.offlineQueue.length})`
     );
   }
 
