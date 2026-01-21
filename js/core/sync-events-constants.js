@@ -10,6 +10,7 @@ export const SyncEvents = {
   SESSION_LEFT: "sync_session_left",
   SESSION_RESTORED: "sync_session_restored",
   SESSION_ENDED: "sync_session_ended",
+  SYNC_DATA_CLEARED: "sync_data_cleared",
 
   // 伺服器狀態事件
   SERVER_STATUS_CHANGED: "sync_server_status_changed",

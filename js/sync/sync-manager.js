@@ -44,7 +44,7 @@ class SyncManager {
         // 只在同步模式下初始化完整功能
         if (isSync) {
           Logger.info(
-            "[SyncManager] 進入同步模式 - 初始化完整 UI、QR、Sessions"
+            "[SyncManager] 進入同步模式 - 初始化完整 UI、QR、Sessions",
           );
           // UI 的其他部分（控制面板、事件監聽等）
           this.ui.createControlPanel();
@@ -56,7 +56,7 @@ class SyncManager {
           this.ui.updateIndicator();
         } else {
           Logger.debug(
-            "[SyncManager] 進入本機模式 - 初始化控制面板以支援膠囊點擊"
+            "[SyncManager] 進入本機模式 - 初始化控制面板以支援膠囊點擊",
           );
           // 本機模式下也需要初始化控制面板和事件監聽，讓膠囊可以點擊打開同步面板
           // 但不需要初始化 QR 和 Sessions
@@ -83,15 +83,15 @@ class SyncManager {
 
     this.setupEventListeners();
 
-    // 標記初始化流程已啟動（在異步健康檢查前設置，避免競態條件）
+    // 標記初始化流程已啟動（在異步心跳檢測前設置，避免競態條件）
     this.initialized = true;
 
-    // 初始化時執行一次健康檢查並設定初始狀態
+    // 初始化時執行一次心跳檢測並設定初始狀態
     this.core
       .checkServerHealth()
       .then((online) => {
         this.serverOnline = online;
-        Logger.debug("[SyncManager] 伺服器健康檢查完成", { online });
+        Logger.debug("[SyncManager] 伺服器心跳檢測完成", { online });
 
         // 只在 UI 已初始化且存在時更新（同步模式）
         if (this.ui && this.ui.initialized) {
@@ -105,20 +105,20 @@ class SyncManager {
         window.dispatchEvent(
           new CustomEvent(SyncEvents.CLIENT_INITIALIZED, {
             detail: { serverOnline: online },
-          })
+          }),
         );
 
         Logger.debug(
-          "[SyncManager] 初始化完成，已觸發 CLIENT_INITIALIZED 事件"
+          "[SyncManager] 初始化完成，已觸發 CLIENT_INITIALIZED 事件",
         );
       })
       .catch((error) => {
-        Logger.warn("[SyncManager] 伺服器健康檢查失敗", error);
-        // 即使健康檢查失敗，也觸發初始化完成事件
+        Logger.warn("[SyncManager] 伺服器心跳檢測失敗", error);
+        // 即使心跳檢測失敗，也觸發初始化完成事件
         window.dispatchEvent(
           new CustomEvent(SyncEvents.CLIENT_INITIALIZED, {
             detail: { serverOnline: false },
-          })
+          }),
         );
       });
 
@@ -152,7 +152,7 @@ class SyncManager {
     };
     window.addEventListener(
       SyncEvents.SERVER_STATUS_CHANGED,
-      serverStatusHandler
+      serverStatusHandler,
     );
     this.eventListeners.push({
       target: window,
@@ -187,7 +187,7 @@ class SyncManager {
         role,
       });
 
-      // 等待伺服器健康檢查
+      // 等待伺服器心跳檢測
       const isOnline = await this.core.checkServerHealth();
       if (!isOnline) {
         Logger.warn("[SyncManager] 伺服器離線，進入本機模式");
@@ -199,7 +199,7 @@ class SyncManager {
         const result = await this.core.syncClient.restoreSession(
           sessionId,
           clientId,
-          role // 新增：傳遞儲存的角色
+          role, // 新增：傳遞儲存的角色
         );
         if (result && result.success !== false) {
           Logger.info("[SyncManager] 工作階段還原成功", {
@@ -209,9 +209,8 @@ class SyncManager {
 
           // 新增：從伺服器取得工作階段的完整客戶端資訊
           try {
-            const sessionInfo = await this.core.syncClient.getSessionClients(
-              sessionId
-            );
+            const sessionInfo =
+              await this.core.syncClient.getSessionClients(sessionId);
             if (sessionInfo && sessionInfo.clients) {
               const clientList = sessionInfo.clients
                 .map((c) => `${c.id}(${c.role})`)
@@ -225,7 +224,7 @@ class SyncManager {
           } catch (error) {
             Logger.warn(
               "[SyncManager] 無法取得工作階段客戶端資訊:",
-              error.message
+              error.message,
             );
           }
 
@@ -237,7 +236,7 @@ class SyncManager {
                 clientId,
                 role: result.role || "viewer",
               },
-            })
+            }),
           );
 
           // 更新 UI（延遲初始化，但由於 initialize() 已做，這裡只是更新狀態）
@@ -292,6 +291,47 @@ class SyncManager {
       event: "experimentStateChange",
       handler: stateChangeHandler,
     });
+
+    // 監聽同步數據清除事件（工作階段不存在時）
+    const syncDataClearedHandler = (event) => {
+      Logger.warn(`[SyncManager] 監聽到 sync_data_cleared 事件`, event.detail);
+
+      const { reason, message } = event.detail || {};
+      Logger.warn(`[SyncManager] 同步數據已清除 [${reason}]: ${message}`);
+
+      // 重置為本機模式
+      this.isSyncMode = false;
+      Logger.info("[SyncManager] 已切換為本機模式");
+
+      // 隱藏同步面板
+      if (this.ui && this.ui.hidePanel) {
+        Logger.debug("[SyncManager] 隱藏同步面板");
+        this.ui.hidePanel();
+      }
+
+      // 更新膠囊指示器為離線狀態
+      if (this.ui && this.ui.updateIndicator) {
+        Logger.debug("[SyncManager] 更新膠囊指示器為離線狀態");
+        this.ui.updateIndicator();
+      }
+
+      // 觸發事件通知其他模組同步已清除
+      window.dispatchEvent(
+        new CustomEvent(SyncEvents.SYNC_DATA_CLEARED, {
+          detail: { reason, message, timestamp: Date.now() },
+        }),
+      );
+      Logger.info("[SyncManager] 已派發 SYNC_DATA_CLEARED 事件");
+    };
+
+    window.addEventListener("sync_data_cleared", syncDataClearedHandler);
+    Logger.debug("[SyncManager] 已監聽 sync_data_cleared 事件");
+
+    this.eventListeners.push({
+      target: window,
+      event: "sync_data_cleared",
+      handler: syncDataClearedHandler,
+    });
   }
 
   startConnectionCheck() {
@@ -311,7 +351,7 @@ class SyncManager {
 
     this.connectionCheckTimer = setInterval(
       () => this.checkConnection(),
-      this.connectionCheckInterval
+      this.connectionCheckInterval,
     );
   }
 
@@ -325,7 +365,7 @@ class SyncManager {
       Logger.info(
         `調整連線檢查間隔: ${
           this.connectionCheckInterval
-        }ms → ${newInterval}ms (伺服器${this.serverOnline ? "線上" : "離線"})`
+        }ms → ${newInterval}ms (伺服器${this.serverOnline ? "線上" : "離線"})`,
       );
       this.connectionCheckInterval = newInterval;
       this.startConnectionCheck();

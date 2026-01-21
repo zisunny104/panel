@@ -38,11 +38,12 @@ if (typeof window !== "undefined" && window.SyncClient) {
       this.serverOnline = true;
       this.previousServerOnline = true;
       this.initialized = false; // 標記是否已初始化
+      this.sessionInvalid = false; // 標記工作階段是否已失效
 
       // 從 sessionStorage 載入狀態（如果有）
       this.loadState();
 
-      // 健康檢查定時器（本機模式也需要，用於指示器）
+      // 心跳檢測定時器（本機模式也需要，用於指示器）
       this.healthCheckTimer = null;
       this.healthCheckInterval = 10000; // 10秒（輕量級即時檢查）
       this.healthCheckMethod = "lightweight"; // "lightweight" 或 "websocket"
@@ -52,10 +53,43 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.info("[SyncClient] 偵測到儲存的工作階段，準備恢復連線");
         this.initializeSync();
       } else {
-        Logger.debug("[SyncClient] 本機模式，啟動輕量級健康檢查");
-        // 本機模式也啟動健康檢查，但使用輕量級方法
-        this.startLightweightHealthCheck();
+        Logger.debug("[SyncClient] 本機模式，啟動心跳檢測");
+        // 本機模式也啟動心跳檢測，但使用輕量級方法
+        this.startHeartbeatCheck();
       }
+
+      // 無論是否初始化同步，都監聽全域工作階段失效事件
+      this.setupGlobalEventHandlers();
+    }
+
+    /**
+     * 設定全域事件處理器（始終監聽）
+     */
+    setupGlobalEventHandlers() {
+      // 監聽全域工作階段失效事件（來自 WebSocketClient）
+      window.addEventListener("websocket_session_invalid", (event) => {
+        const { reason, originalError } = event.detail;
+        Logger.warn("[SyncClient] 收到全域工作階段失效事件", {
+          reason,
+          originalError,
+        });
+
+        // 標記工作階段已失效
+        this.sessionInvalid = true;
+
+        // 清理工作階段相關的儲存資訊
+        this.clearInvalidSessionData();
+
+        // 觸發工作階段失效事件
+        window.dispatchEvent(
+          new CustomEvent("sync_session_invalid", {
+            detail: {
+              reason,
+              originalError,
+            },
+          }),
+        );
+      });
     }
 
     /**
@@ -70,7 +104,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
       Logger.info("[SyncClient] 初始化同步功能...");
 
-      // 停止輕量級健康檢查（切換到 WebSocket 狀態監聆）
+      // 停止心跳檢測（切換到 WebSocket 狀態監聆）
       this.stopHealthCheck();
 
       // 建立 WebSocket 客戶端
@@ -79,7 +113,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
       // 設定 WebSocket 事件處理
       this.setupWebSocketHandlers();
 
-      // 同步模式使用 WebSocket 狀態，不需要額外的 HTTP 健康檢查
+      // 同步模式使用 WebSocket 狀態，不需要額外的 HTTP 心跳檢測
       this.healthCheckMethod = "websocket";
 
       this.initialized = true;
@@ -101,11 +135,27 @@ if (typeof window !== "undefined" && window.SyncClient) {
     }
 
     /**
-     * 取得 API 路徑前綴（可由外部配置覆蓋）
+     * 取得 API 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
      */
     getApiBasePath() {
-      // 預設使用 /api，可通過全域配置覆蓋
-      return window.PANEL_API_BASE_PATH || "/api";
+      // 根據頁面路徑動態決定 API 前綴（完全動態，無硬編碼）
+      const pathname = window.location.pathname;
+
+      // 取得頁面所在的目錄路徑
+      let basePath = pathname;
+      if (!basePath.endsWith("/")) {
+        // 如果包含檔名，移除檔名部分
+        basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
+      }
+
+      // 確保以 / 結尾
+      if (!basePath.endsWith("/")) {
+        basePath += "/";
+      }
+
+      // API 永遠在頁面所在目錄的 api 子目錄
+      // 讓 Nginx 處理實際的路徑映射
+      return basePath + "api";
     }
 
     /**
@@ -198,6 +248,9 @@ if (typeof window !== "undefined" && window.SyncClient) {
           Logger.warn(
             "[SyncClient] 偵測到工作階段不存在錯誤，自動清理工作階段資訊",
           );
+
+          // 標記工作階段已失效
+          this.sessionInvalid = true;
 
           // 清理工作階段相關的儲存資訊
           this.clearInvalidSessionData();
@@ -396,6 +449,12 @@ if (typeof window !== "undefined" && window.SyncClient) {
      */
     async joinSessionByShareCode(shareCode, role = "viewer") {
       try {
+        // 如果之前工作階段失效，重置標記允許重新加入
+        if (this.sessionInvalid) {
+          this.sessionInvalid = false;
+          Logger.info("[SyncClient] 重置工作階段失效標記，允許重新加入");
+        }
+
         // 首次加入工作階段，初始化同步功能
         this.initializeSync();
 
@@ -457,6 +516,12 @@ if (typeof window !== "undefined" && window.SyncClient) {
      */
     async restoreSession() {
       try {
+        // 如果工作階段已標記為失效，不嘗試還原
+        if (this.sessionInvalid) {
+          Logger.debug("[SyncClient] 工作階段已失效，跳過還原");
+          return false;
+        }
+
         // 檢查是否有儲存的狀態
         if (!this.sessionId || !this.clientId) {
           Logger.debug("[SyncClient] 沒有可還原的工作階段");
@@ -711,12 +776,12 @@ if (typeof window !== "undefined" && window.SyncClient) {
     }
 
     /**
-     * 啟動輕量級健康檢查（本機模式用）
+     * 啟動心跳檢測（本機模式用）
      */
-    startLightweightHealthCheck() {
+    startHeartbeatCheck() {
       if (this.healthCheckTimer) return;
 
-      Logger.debug("[SyncClient] 啟動輕量級健康檢查 (10秒間隔)");
+      Logger.debug("[SyncClient] 啟動心跳檢測 (10秒間隔)");
 
       // 立即檢查一次
       this.checkServerHealth();
@@ -728,23 +793,23 @@ if (typeof window !== "undefined" && window.SyncClient) {
     }
 
     /**
-     * 啟動健康檢查定時器（舊版，保留相容）
+     * 啟動心跳檢測定時器（舊版，保留相容）
      */
     startHealthCheck() {
-      // 同步模式不需要 HTTP 健康檢查，直接回傳
+      // 同步模式不需要 HTTP 心跳檢測，直接回傳
       if (this.healthCheckMethod === "websocket") {
         Logger.debug(
-          "[SyncClient] 同步模式，使用 WebSocket 狀態監視，不啟動 HTTP 健康檢查",
+          "[SyncClient] 同步模式，使用 WebSocket 狀態監視，不啟動 HTTP 心跳檢測",
         );
         return;
       }
 
-      // 本機模式使用輕量級健康檢查
-      this.startLightweightHealthCheck();
+      // 本機模式使用心跳檢測
+      this.startHeartbeatCheck();
     }
 
     /**
-     * 停止健康檢查定時器
+     * 停止心跳檢測定時器
      */
     stopHealthCheck() {
       if (this.healthCheckTimer) {

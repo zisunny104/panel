@@ -1,5 +1,5 @@
 /**
- * 健康檢查路由
+ * 心跳檢測路由
  */
 import express from "express";
 import { getDatabase } from "../database/connection.js";
@@ -9,7 +9,7 @@ const router = express.Router();
 
 /**
  * GET /api/health
- * 健康檢查端點 - 驗證伺服器和資料庫狀態
+ * 心跳檢測端點 - 驗證伺服器和資料庫狀態
  */
 router.get("/", (req, res) => {
   try {
@@ -28,7 +28,7 @@ router.get("/", (req, res) => {
       message: "伺服器執行正常",
     });
   } catch (error) {
-    console.error("健康檢查失敗:", error.message);
+    console.error("心跳檢測失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       status: "error",
       message: "伺服器或資料庫異常",

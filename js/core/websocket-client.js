@@ -62,11 +62,27 @@ class WebSocketClient {
   }
 
   /**
-   * 取得 WebSocket 路徑前綴（可由外部配置覆蓋）
+   * 取得 WebSocket 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
    */
   getWebSocketBasePath() {
-    // 預設使用 /ws，可通過全域配置覆蓋
-    return window.PANEL_WS_BASE_PATH || "/ws";
+    // 根據頁面路徑動態決定 WebSocket 前綴（完全動態，無硬編碼）
+    const pathname = window.location.pathname;
+
+    // 取得頁面所在的目錄路徑
+    let basePath = pathname;
+    if (!basePath.endsWith("/")) {
+      // 如果包含檔名，移除檔名部分
+      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
+    }
+
+    // 確保以 / 結尾
+    if (!basePath.endsWith("/")) {
+      basePath += "/";
+    }
+
+    // WebSocket 永遠在頁面所在目錄的 ws 子目錄
+    // 讓 Nginx 處理實際的路徑映射
+    return basePath + "ws";
   }
 
   /**   * 初始化連接
@@ -135,6 +151,11 @@ class WebSocketClient {
 
         case "auth_success":
           this.handleAuthSuccess(data);
+          break;
+
+        case "clear_sync_data":
+          Logger.warn("[WebSocketClient] 處理 clear_sync_data 訊息");
+          this.handleClearSyncData(data);
           break;
 
         case "heartbeat_ack":
@@ -259,6 +280,79 @@ class WebSocketClient {
   }
 
   /**
+   * 處理清除同步數據命令
+   * 當伺服器發現工作階段不存在時，通知客戶端清除本機的同步信息
+   */
+  handleClearSyncData(data) {
+    const { reason, message } = data;
+
+    Logger.warn(
+      `[WebSocketClient] 接收到清除同步數據命令 [${reason}]: ${message}`,
+    );
+
+    // 禁用自動重連，避免無限重連循環
+    this.config.autoReconnect = false;
+    Logger.debug("[WebSocketClient] 已禁用自動重連");
+
+    // 清除本機同步資訊
+    this.clearLocalSyncData();
+
+    // 派發 window 事件，讓 SyncManager 進行後續處理
+    const clearEvent = new CustomEvent("sync_data_cleared", {
+      detail: {
+        reason,
+        message,
+        timestamp: Date.now(),
+      },
+    });
+
+    Logger.debug("[WebSocketClient] 準備派發 sync_data_cleared 事件", {
+      reason,
+      message,
+    });
+
+    window.dispatchEvent(clearEvent);
+    Logger.info("[WebSocketClient] 已派發 window.sync_data_cleared 事件");
+
+    // 同時派發內部事件
+    this.emit("sync_data_cleared", {
+      reason,
+      message,
+      timestamp: Date.now(),
+    });
+
+    Logger.info(
+      `[WebSocketClient] 已派發內部 sync_data_cleared 事件 [${reason}]`,
+    );
+
+    // 延遲斷開連線，給 SyncManager 時間處理事件
+    Logger.debug("[WebSocketClient] 500ms 後斷開連線...");
+    setTimeout(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        Logger.info("[WebSocketClient] 斷開 WebSocket 連線");
+        this.ws.close(1000, "Session not found, clearing sync data");
+      }
+    }, 500);
+  }
+
+  /**
+   * 清除本機同步資訊
+   */
+  clearLocalSyncData() {
+    try {
+      // 清除 sessionStorage 中的同步信息
+      sessionStorage.removeItem("syncClientState_sessionId");
+      sessionStorage.removeItem("syncClientState_clientId");
+      sessionStorage.removeItem("syncClientState_role");
+      sessionStorage.removeItem("syncClientState_timestamp");
+
+      Logger.info("[WebSocketClient] 本機同步數據已清除");
+    } catch (error) {
+      Logger.error("[WebSocketClient] 清除本機同步數據失敗:", error);
+    }
+  }
+
+  /**
    * 連接關閉處理
    */
   handleClose(event) {
@@ -293,6 +387,20 @@ class WebSocketClient {
    */
   handleServerError(data) {
     Logger.error("[WebSocketClient] 伺服器錯誤:", data);
+
+    // 檢查是否為工作階段不存在錯誤，如果是則發送全域事件
+    if (data && data.message && data.message.includes("工作階段不存在")) {
+      Logger.warn("[WebSocketClient] 偵測到工作階段不存在錯誤，發送清理事件");
+      window.dispatchEvent(
+        new CustomEvent("websocket_session_invalid", {
+          detail: {
+            reason: "session_not_found",
+            originalError: data,
+          },
+        }),
+      );
+    }
+
     this.emit("server_error", data);
   }
 

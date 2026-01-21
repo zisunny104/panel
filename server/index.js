@@ -36,6 +36,9 @@ const __dirname = path.dirname(__filename);
 // 建立Express應用
 const app = express();
 
+// 設定信任代理（支援 Nginx 反向代理）
+app.set("trust proxy", true);
+
 // 建立 HTTP 伺服器（用於 WebSocket 升級）
 const httpServer = createServer(app);
 
@@ -43,6 +46,16 @@ const httpServer = createServer(app);
 app.use(cors(SERVER_CONFIG.cors));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 自動取得完整網址 middleware
+app.use((req, res, next) => {
+  // 利用 req.protocol 和 req.get('host') 自動組裝完整網址
+  const protocol = req.protocol;
+  const host = req.get("host");
+  req.fullUrl = `${protocol}://${host}${req.originalUrl}`;
+  req.baseUrl = `${protocol}://${host}`; // 基礎 URL（不含路徑）
+  next();
+});
 
 // 請求日誌
 app.use((req, res, next) => {
@@ -53,9 +66,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// ===== 靜態文件服務 (前端) =====
+// ===== 靜態檔案服務 (前端) =====
 const publicPath = path.join(__dirname, "..");
-Logger.info(`提供靜態文件服務: ${publicPath}`);
+Logger.info("初始化靜態檔案服務");
+Logger.debug(`靜態檔案路徑: <cyan>${publicPath}</cyan>`);
 app.use(
   express.static(publicPath, {
     index: "index.html",
@@ -75,6 +89,7 @@ app.get("/", (req, res) => {
     version: "2.0.0",
     port: SERVER_CONFIG.port,
     status: "running",
+    fullUrl: req.fullUrl, // 測試自動取得的完整網址
     endpoints: {
       health: "/api/health",
       sync: {
@@ -127,6 +142,8 @@ try {
 // 清理過期分享代碼
 const cleanupInterval = SERVER_CONFIG.cleanup.interval;
 
+Logger.info("初始化清理任務");
+
 setInterval(() => {
   try {
     SessionService.cleanupExpiredSessions();
@@ -136,7 +153,7 @@ setInterval(() => {
   }
 }, cleanupInterval);
 
-Logger.info(`清理任務已啟動 (間隔: ${cleanupInterval / 1000}秒)`);
+Logger.success("清理任務已啟動");
 
 // ===== WebSocket 系統初始化 =====
 Logger.info("初始化 WebSocket 系統");
@@ -169,30 +186,28 @@ Logger.success("WebSocket 系統已初始化");
 
 // ===== 啟動伺服器 =====
 const server = httpServer.listen(SERVER_CONFIG.port, () => {
-  console.log("");
-  Logger.success("================================");
   Logger.success("Panel Backend Server 已啟動");
-  Logger.success("================================");
+
+  // 伺服器綁定在 0.0.0.0，客戶端可通過多種方式存取
+  // 前端使用 window.location 自動決定實際網址，所以這裡只作為參考顯示
   Logger.info(
-    `HTTP        <yellow>|</yellow> <cyan>http://localhost:${SERVER_CONFIG.port}</cyan>`,
+    `<yellow>|</yellow> 綁定網址: <dim>0.0.0.0:${SERVER_CONFIG.port}</dim>`,
+  );
+  Logger.info(`  HTTP      <yellow>|</yellow> <cyan>/api/*</cyan>`);
+  Logger.info(
+    `  WebSocket <yellow>|</yellow> <cyan>/ws</cyan> <dim>(ws://host:port/ws)</dim>`,
+  );
+  Logger.info(`  健康檢測  <yellow>|</yellow> <cyan>/api/health</cyan>`);
+  Logger.info(
+    `工作階段超時: <cyan>${SERVER_CONFIG.session.timeout}</cyan> 秒 <yellow>|</yellow> 分享代碼超時: <cyan>${SERVER_CONFIG.shareCode.timeout}</cyan> 秒`,
   );
   Logger.info(
-    `WebSocket   <yellow>|</yellow> <cyan>ws://localhost:${SERVER_CONFIG.port}/ws</cyan>`,
+    `心跳檢測間隔: <cyan>${SERVER_CONFIG.websocket.heartbeatInterval / 1000}</cyan> 秒 <yellow>|</yellow> 心跳檢測超時: <cyan>${SERVER_CONFIG.websocket.heartbeatTimeout / 1000}</cyan> 秒`,
   );
   Logger.info(
-    `心跳檢測    <yellow>|</yellow> <cyan>http://localhost:${SERVER_CONFIG.port}/api/health</cyan>`,
+    `清理任務間隔: <cyan>${SERVER_CONFIG.cleanup.interval / 1000}</cyan> 秒`,
   );
   Logger.info("");
-  Logger.debug(
-    `工作階段超時  <yellow>${SERVER_CONFIG.session.timeout}</yellow> 秒`,
-  );
-  Logger.debug(
-    `分享代碼超時  <yellow>${SERVER_CONFIG.shareCode.timeout}</yellow> 秒`,
-  );
-  Logger.debug(
-    `心跳檢測間隔  <yellow>${SERVER_CONFIG.websocket.heartbeatInterval / 1000}</yellow> 秒`,
-  );
-  Logger.debug("");
 });
 
 // ===== 優雅關閉 =====
@@ -220,7 +235,7 @@ process.on("SIGTERM", () => {
 
   // 關閉 HTTP 伺服器
   server.close(() => {
-    console.log("HTTP伺服器已關閉");
+    Logger.info("HTTP伺服器已關閉");
     closeDatabase();
     process.exit(0);
   });

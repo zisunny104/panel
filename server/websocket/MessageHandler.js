@@ -58,7 +58,7 @@ export class MessageHandler {
       // 執行處理器
       await handler(wsConnectionId, data, ws);
     } catch (error) {
-      console.error(`處理訊息失敗 [${wsConnectionId}]:`, error.message);
+      Logger.error(`處理訊息失敗 [${wsConnectionId}]: ${error.message}`);
 
       // 發送錯誤回應
       this.sendErrorResponse(ws, "HANDLER_ERROR", error.message);
@@ -83,7 +83,18 @@ export class MessageHandler {
       // 驗證工作階段存在
       const session = this.sessionService.getSession(sessionId);
       if (!session) {
-        throw new Error(`工作階段不存在: ${sessionId}`);
+        // 工作階段不存在，通知客戶端清除本機同步資訊
+        Logger.warn(
+          `工作階段不存在 [${sessionId}]，通知客戶端 [${wsConnectionId}] 清除本機數據`,
+        );
+        this.sendResponse(ws, "clear_sync_data", {
+          reason: "SESSION_NOT_FOUND",
+          message: `工作階段不存在: ${sessionId}`,
+        });
+        Logger.debug(
+          `[${wsConnectionId}] clear_sync_data 訊息已發送，準備拋出錯誤`,
+        );
+        throw new Error(`認證失敗: 工作階段不存在: ${sessionId}`);
       }
 
       // 驗證工作階段活動中
@@ -412,12 +423,16 @@ export class MessageHandler {
   sendResponse(ws, type, data) {
     if (ws.readyState === 1) {
       // OPEN
-      ws.send(
-        JSON.stringify({
-          type,
-          data,
-          timestamp: Date.now(),
-        }),
+      const message = JSON.stringify({
+        type,
+        data,
+        timestamp: Date.now(),
+      });
+      ws.send(message);
+      Logger.debug(`[sendResponse] 已發送 ${type} 訊息`);
+    } else {
+      Logger.warn(
+        `[sendResponse] WebSocket 連接狀態異常 (${ws.readyState})，無法發送 ${type}`,
       );
     }
   }

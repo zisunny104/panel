@@ -156,6 +156,15 @@ export class Logger {
   static http(method, path, status = null) {
     const timestamp = formatTimestamp();
 
+    // URL 解碼處理中文字符
+    let decodedPath;
+    try {
+      decodedPath = decodeURIComponent(path);
+    } catch (error) {
+      // 如果解碼失敗，使用原始路徑
+      decodedPath = path;
+    }
+
     // 根據方法選擇顏色
     let methodColor = colors.white;
     if (method === "GET" || method === "HEAD") {
@@ -185,7 +194,7 @@ export class Logger {
     }
 
     console.log(
-      `${colors.cyan}${timestamp}${colors.reset} ${methodColor}${method}${colors.reset} ${path}${statusText}`,
+      `${colors.cyan}${timestamp}${colors.reset} ${methodColor}${method}${colors.reset} ${decodedPath}${statusText}`,
     );
   }
 

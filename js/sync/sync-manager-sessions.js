@@ -26,11 +26,27 @@ export class SyncManagerSessions {
   }
 
   /**
-   * 取得 API 路徑前綴（可由外部配置覆蓋）
+   * 取得 API 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
    */
   getApiBasePath() {
-    // 預設使用 /api，可通過全域配置覆蓋
-    return window.PANEL_API_BASE_PATH || "/api";
+    // 根據頁面路徑動態決定 API 前綴（完全動態，無硬編碼）
+    const pathname = window.location.pathname;
+
+    // 取得頁面所在的目錄路徑
+    let basePath = pathname;
+    if (!basePath.endsWith("/")) {
+      // 如果包含檔名，移除檔名部分
+      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
+    }
+
+    // 確保以 / 結尾
+    if (!basePath.endsWith("/")) {
+      basePath += "/";
+    }
+
+    // API 永遠在頁面所在目錄的 api 子目錄
+    // 讓 Nginx 處理實際的路徑映射
+    return basePath + "api";
   }
 
   /**

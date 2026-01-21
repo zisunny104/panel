@@ -127,7 +127,7 @@ class ExperimentLogUI {
           // 透過 API 讀取檔案內容
           const apiUrl = this._getApiUrl();
           const response = await fetch(
-            `${apiUrl}/api/experiment-logs/read/${filename}`,
+            `${apiUrl}/experiment-logs/read/${filename}`,
           );
 
           if (!response.ok) {
@@ -225,7 +225,7 @@ class ExperimentLogUI {
     try {
       // 嘗試從伺服器 API 取得檔案列表
       const apiUrl = this._getApiUrl();
-      const response = await fetch(`${apiUrl}/api/experiment-logs/list`);
+      const response = await fetch(`${apiUrl}/experiment-logs/list`);
 
       if (response.ok) {
         const result = await response.json();
@@ -265,12 +265,28 @@ class ExperimentLogUI {
   }
 
   /**
-   * 取得 API 路徑前綴（可由外部配置覆蓋）
+   * 取得 API 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
    * @private
    */
   _getApiBasePath() {
-    // 預設使用 /api，可通過全域配置覆蓋
-    return window.PANEL_API_BASE_PATH || "/api";
+    // 根據頁面路徑動態決定 API 前綴（完全動態，無硬編碼）
+    const pathname = window.location.pathname;
+
+    // 取得頁面所在的目錄路徑
+    let basePath = pathname;
+    if (!basePath.endsWith("/")) {
+      // 如果包含檔名，移除檔名部分
+      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
+    }
+
+    // 確保以 / 結尾
+    if (!basePath.endsWith("/")) {
+      basePath += "/";
+    }
+
+    // API 永遠在頁面所在目錄的 api 子目錄
+    // 讓 Nginx 處理實際的路徑映射
+    return basePath + "api";
   }
 
   /**
@@ -925,7 +941,7 @@ class ExperimentLogUI {
       // 透過 API 讀取檔案內容
       const apiUrl = this._getApiUrl();
       const response = await fetch(
-        `${apiUrl}/api/experiment-logs/read/${experiment.filename}`,
+        `${apiUrl}/experiment-logs/read/${experiment.filename}`,
       );
 
       if (!response.ok) {
@@ -983,7 +999,7 @@ class ExperimentLogUI {
       // 透過 API 刪除檔案
       const apiUrl = this._getApiUrl();
       const response = await fetch(
-        `${apiUrl}/api/experiment-logs/delete/${experiment.filename}`,
+        `${apiUrl}/experiment-logs/delete/${experiment.filename}`,
         {
           method: "DELETE",
         },

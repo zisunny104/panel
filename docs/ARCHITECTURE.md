@@ -25,7 +25,7 @@
 │  │  通訊層 (Communication)                              │   │
 │  │  ┌──────────────┐  ┌──────────────┐                │   │
 │  │  │ WebSocket    │  │  HTTP HEAD   │                │   │
-│  │  │   Client     │  │(健康檢查 10s)│                │   │
+│  │  │   Client     │  │(心跳檢測 10s)│                │   │
 │  │  └──────────────┘  └──────────────┘                │   │
 │  └──────────────────────────────────────────────────────┘   │
 └──────────────────────┬──────────────────────────────────────┘
@@ -67,10 +67,11 @@ panel/
 │   ├── index.js                      # 主入口：Express + WebSocket 伺服器
 │   ├── package.json                  # 依賴管理
 │   ├── .env                          # 環境變數設定
+│   ├── .env.example                  # 環境變數範例
 │   │
 │   ├── config/                       # 設定檔案
-│   │   ├── database.js               # SQLite 連線設定
 │   │   ├── server.js                 # 伺服器設定（連接埠、CORS 等）
+│   │   ├── database.js               # SQLite 連線設定
 │   │   └── constants.js              # 常數定義
 │   │
 │   ├── database/                     # 資料庫層
@@ -91,7 +92,7 @@ panel/
 │   │   └── MessageHandler.js         # 訊息處理器（含校時）
 │   │
 │   ├── routes/                       # HTTP 路由層
-│   │   ├── health.js                 # 健康檢查 API
+│   │   ├── health.js                 # 心跳檢測 API
 │   │   ├── sync.js                   # 同步 API（工作階段、分享代碼）
 │   │   ├── experiment-logs.js        # 實驗日誌 API（JSONL 檔案管理）
 │   │   ├── experiment.js             # 實驗 API
@@ -100,6 +101,7 @@ panel/
 │   ├── middleware/                   # 中間件（目前為空）
 │   │
 │   └── utils/                        # 工具函數
+│       ├── logger.js                 # 日誌工具
 │       ├── idGenerator.js            # ID 產生器 (sessionId, shareCode)
 │       ├── checksum.js               # 校驗碼計算
 │       └── time.js                   # 時間處理工具
@@ -121,17 +123,17 @@ panel/
 ├── js/                               # 前端 JavaScript
 │   ├── core/                         # 核心模組
 │   │   ├── main.js                   # 初始化流程
+│   │   ├── config.js                 # 設定管理與版本管理
+│   │   ├── console-manager.js        # 主控台管理
+│   │   ├── data-loader.js            # 資料載入器
 │   │   ├── websocket-client.js       # WebSocket 客戶端（含校時）
 │   │   ├── experiment-hub-client.js  # WebSocket 版本實驗中樞
 │   │   ├── time-sync-manager.js      # 時間同步與格式化
 │   │   ├── experiment-state-manager.js # 本機狀態管理
-│   │   ├── console-manager.js        # 主控台管理
-│   │   ├── data-loader.js            # 資料載入器
-│   │   ├── random-utils.js           # 隨機工具
 │   │   ├── realtime-communication.js # 即時通訊管理
 │   │   ├── sync-events-constants.js  # 同步事件常數
-│   │   ├── version-manager.js        # 版本管理
-│   │   └── config.js                 # 設定管理
+│   │   ├── random-utils.js           # 隨機工具
+│   │   └── version-manager.js        # 版本管理（已移至 config.js）
 │   │
 │   ├── experiment/                   # 實驗管理模組
 │   │   ├── experiment-action-manager.js    # 實驗動作管理
@@ -157,10 +159,11 @@ panel/
 │   │   ├── panel-toggle.js                 # 切換控制
 │   │   ├── panel-ui-controls.js            # 面板UI控制
 │   │   ├── combination-selector.js         # 組合選擇器
-│   │   └── power-logger.js                 # 電源日誌
+│   │   ├── power-logger.js                 # 電源日誌
+│   │   └── panel-experiment-log.js         # 面板實驗日誌
 │   │
 │   ├── sync/                         # 同步模組
-│   │   ├── sync-client.js            # WebSocket 版本（健康檢查 10s）
+│   │   ├── sync-client.js            # WebSocket 版本（心跳檢測 10s）
 │   │   ├── sync-manager.js           # 工作階段管理
 │   │   ├── sync-manager-ui.js        # UI 管理（膠囊指示器）
 │   │   ├── sync-manager-sessions.js  # 工作階段UI管理
@@ -1113,7 +1116,7 @@ db.exec("PRAGMA temp_store = MEMORY;"); // 臨時表在記憶體中
 ```json
 {
   "name": "panel-backend",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "description": "Node.js + WebSocket backend for experiment panel synchronization",
   "main": "index.js",
   "type": "module",

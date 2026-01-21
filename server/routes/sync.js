@@ -110,9 +110,15 @@ router.post("/generate_share_code", (req, res) => {
     // 產生分享代碼
     const codeData = ShareCodeService.generateCode(sessionId, clientId);
 
+    // 組裝完整分享 URL
+    const shareUrl = `${req.baseUrl}/index.html?shareCode=${encodeURIComponent(codeData.share_code)}&role=viewer`;
+
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
-      data: codeData,
+      data: {
+        ...codeData,
+        shareUrl: shareUrl, // 返回完整分享 URL
+      },
     });
   } catch (error) {
     console.error("產生分享代碼失敗:", error.message);

@@ -1,10 +1,10 @@
 {
-    "version": "2.1.bb4fb11",
+    "version": "2.1.0a7dec8",
     "description": "虛擬操作面板實驗設定範例 (多裝置同步系統優化版)",
     "author": "謝祥紫、Github Copilot",
     "created_at": "2024-07-16T10:00:00Z",
-    "updated_at": "2026-01-21 下午02:03:57.000Z",
-    "git_commit_hash": "bb4fb11",
+    "updated_at": "2026-01-22 上午02:03:02.000Z",
+    "git_commit_hash": "0a7dec8",
     "media_base_path": "assets/",
     "settings": {
         "mainScale": 1.29,

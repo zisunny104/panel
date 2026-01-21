@@ -25,6 +25,7 @@ export class ConnectionManager {
 
     // 心跳檢測定時器
     this.heartbeatInterval = null;
+    this.heartbeatStarted = false; // 標記心跳檢測是否已啟動
 
     // 啟動心跳檢測
     this.startHeartbeatCheck();
@@ -256,6 +257,12 @@ export class ConnectionManager {
     const interval = SERVER_CONFIG.websocket.heartbeatInterval;
     const timeout = SERVER_CONFIG.websocket.heartbeatTimeout;
 
+    // 只在第一次啟動時記錄
+    if (!this.heartbeatStarted) {
+      Logger.success("心跳檢測已啟動");
+      this.heartbeatStarted = true;
+    }
+
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
       const deadConnections = [];
@@ -288,7 +295,7 @@ export class ConnectionManager {
 
         // 如果超過超時時間，標記為死連線
         if (timeSinceLastHeartbeat > timeout) {
-          console.log(
+          Logger.debug(
             `連線超時: ${wsConnectionId} (${timeSinceLastHeartbeat}ms)`,
           );
           deadConnections.push(wsConnectionId);
@@ -327,8 +334,6 @@ export class ConnectionManager {
         );
       }
     }, interval);
-
-    Logger.info(`心跳檢測已啟動 (間隔: ${interval}ms, 超時: ${timeout}ms)`);
   }
 
   /**
@@ -338,7 +343,7 @@ export class ConnectionManager {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
-      console.log("心跳檢測已停止");
+      Logger.info("心跳檢測已停止");
     }
   }
 

@@ -2,6 +2,7 @@
  * 伺服器設定
  */
 import dotenv from "dotenv";
+import os from "os";
 
 // 載入環境變數
 dotenv.config();
@@ -13,6 +14,7 @@ export const SERVER_CONFIG = {
   // 伺服器設定
   port: parseInt(process.env.PORT || "7645", 10),
   host: process.env.HOST || "0.0.0.0",
+  displayHost: process.env.DISPLAY_HOST || os.hostname(),
 
   // CORS設定
   cors: {
@@ -24,7 +26,7 @@ export const SERVER_CONFIG = {
   websocket: {
     heartbeatInterval: parseInt(
       process.env.WS_HEARTBEAT_INTERVAL || "30000",
-      10
+      10,
     ),
     heartbeatTimeout: parseInt(process.env.WS_HEARTBEAT_TIMEOUT || "60000", 10),
   },
