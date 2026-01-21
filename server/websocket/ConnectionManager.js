@@ -132,7 +132,7 @@ export class ConnectionManager {
   }
 
   /**
-   * 註銷 WebSocket 連線
+   * 移除 WebSocket 連線
    * @param {string} wsConnectionId - WebSocket 連線 ID
    */
   unregister(wsConnectionId) {
@@ -171,7 +171,7 @@ export class ConnectionManager {
     // 移除連線記錄
     this.connections.delete(wsConnectionId);
 
-    Logger.connection(`註銷 WebSocket 連線: ${wsConnectionId}`);
+    Logger.connection(`移除 WebSocket 連線: ${wsConnectionId}`);
   }
 
   /**
@@ -259,11 +259,32 @@ export class ConnectionManager {
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
       const deadConnections = [];
+      const invalidSessionConnections = [];
 
       // 檢查所有連線
       for (const [wsConnectionId, connection] of this.connections.entries()) {
-        const { ws, metadata } = connection;
+        const { ws, metadata, sessionId } = connection;
         const timeSinceLastHeartbeat = now - metadata.lastHeartbeat;
+
+        // 檢查工作階段是否仍然有效
+        if (sessionId) {
+          try {
+            const session = this.sessionManager.getSession(sessionId);
+            if (!session || !session.is_active) {
+              Logger.debug(
+                `工作階段已失效，斷開連線: ${wsConnectionId} (session: ${sessionId})`,
+              );
+              invalidSessionConnections.push(wsConnectionId);
+              continue;
+            }
+          } catch (error) {
+            Logger.debug(
+              `檢查工作階段失敗，斷開連線: ${wsConnectionId} (${error.message})`,
+            );
+            invalidSessionConnections.push(wsConnectionId);
+            continue;
+          }
+        }
 
         // 如果超過超時時間，標記為死連線
         if (timeSinceLastHeartbeat > timeout) {
@@ -275,6 +296,11 @@ export class ConnectionManager {
           // 發送 Ping
           ws.ping();
         }
+      }
+
+      // 清理無效工作階段連線
+      for (const wsConnectionId of invalidSessionConnections) {
+        this.unregister(wsConnectionId);
       }
 
       // 清理死連線

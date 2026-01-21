@@ -2,10 +2,30 @@
  * 資料庫連線管理 - 使用Node.js內建的node:sqlite模組
  */
 import { DatabaseSync } from "node:sqlite";
+import fs from "fs";
+import path from "path";
 import { DATABASE_CONFIG } from "../config/database.js";
 import { Logger } from "../utils/logger.js";
 
 let dbInstance = null;
+
+/**
+ * 確保資料庫目錄存在
+ */
+function ensureDatabaseDirectory() {
+  const dbDir = path.dirname(DATABASE_CONFIG.path);
+
+  try {
+    if (!fs.existsSync(dbDir)) {
+      Logger.info(`建立資料庫目錄: ${dbDir}`);
+      fs.mkdirSync(dbDir, { recursive: true });
+      Logger.success(`資料庫目錄已建立: ${dbDir}`);
+    }
+  } catch (error) {
+    Logger.error(`建立資料庫目錄失敗: ${error.message}`);
+    throw new Error(`無法建立資料庫目錄: ${dbDir}`);
+  }
+}
 
 /**
  * 初始化並取得資料庫實例（單例模式）
@@ -16,6 +36,9 @@ export function getDatabase() {
   }
 
   try {
+    // 確保資料庫目錄存在
+    ensureDatabaseDirectory();
+
     // 建立資料庫連線
     const db = new DatabaseSync(DATABASE_CONFIG.path);
 

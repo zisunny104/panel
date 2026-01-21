@@ -47,15 +47,26 @@ class WebSocketClient {
     this.handleError = this.handleError.bind(this);
   }
 
-  /**   * 取得預設 WebSocket URL（自動偵測目前網域）
-   * 測試環境：ws://localhost:7645/ws
-   * 生產環境：wss://yourdomain.com:7645/ws 或 ws://yourdomain.com:7645/ws
+  /**
+   * 取得預設 WebSocket URL（自動偵測目前網域）
+   * 支援 Nginx 反向代理路徑
    */
   getDefaultWebSocketUrl() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.hostname;
-    const port = "7645";
-    return `${protocol}//${host}:${port}/ws`;
+    const host = window.location.host; // 包含 hostname 和 port
+
+    // 根據環境決定 WebSocket 路徑前綴
+    const basePath = this.getWebSocketBasePath();
+
+    return `${protocol}//${host}${basePath}`;
+  }
+
+  /**
+   * 取得 WebSocket 路徑前綴（可由外部配置覆蓋）
+   */
+  getWebSocketBasePath() {
+    // 預設使用 /ws，可通過全域配置覆蓋
+    return window.PANEL_WS_BASE_PATH || "/ws";
   }
 
   /**   * 初始化連接

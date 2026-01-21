@@ -2431,6 +2431,10 @@ class ExperimentPageManager {
       else if (state.type === "experimentIdUpdate") {
         this.handleRemoteExperimentIdUpdate(state);
       }
+      // 處理受試者名稱更新
+      else if (state.type === "subjectNameUpdate") {
+        this.handleRemoteSubjectNameUpdate(state);
+      }
     });
 
     // 監聽來自其他 experiment.html 裝置的實驗狀態變化

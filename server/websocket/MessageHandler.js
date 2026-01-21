@@ -184,6 +184,16 @@ export class MessageHandler {
       throw new Error("狀態更新失敗: 缺少必要欄位");
     }
 
+    // 驗證工作階段有效性
+    const session = this._validateSessionAndCleanup(
+      wsConnectionId,
+      sessionId,
+      ws,
+    );
+    if (!session) {
+      return; // 連線已被清理
+    }
+
     try {
       // 驗證客戶端在工作階段中
       if (!this.sessionManager.isClientInSession(sessionId, clientId)) {
@@ -207,7 +217,12 @@ export class MessageHandler {
         timestamp: Date.now(),
       });
 
-      console.log(`狀態已更新: ${sessionId} (來自 ${clientId})`);
+      // 記錄狀態更新詳情
+      const stateType = state.type || "未知類型";
+      const stateInfo = this._getStateUpdateInfo(state);
+      Logger.debug(
+        `<cyan>${sessionId}</cyan> | <yellow>${clientId}</yellow> | ${stateType}${stateInfo}`,
+      );
     } catch (error) {
       throw new Error(`狀態更新失敗: ${error.message}`);
     }
@@ -225,6 +240,16 @@ export class MessageHandler {
     // 驗證必要欄位
     if (!sessionId || !action) {
       throw new Error("實驗操作失敗: 缺少必要欄位");
+    }
+
+    // 驗證工作階段有效性
+    const session = this._validateSessionAndCleanup(
+      wsConnectionId,
+      sessionId,
+      ws,
+    );
+    if (!session) {
+      return; // 連線已被清理
     }
 
     try {
@@ -294,6 +319,11 @@ export class MessageHandler {
       throw new Error(`工作階段不存在: ${sessionId}`);
     }
 
+    // 驗證工作階段活動中
+    if (!session.is_active) {
+      throw new Error(`工作階段已失效: ${sessionId}`);
+    }
+
     // 取得工作階段資訊
     const sessionInfo = this.sessionManager.getSessionInfo(sessionId);
 
@@ -315,11 +345,70 @@ export class MessageHandler {
   }
 
   /**
-   * 發送回應訊息
-   * @param {WebSocket} ws - WebSocket 連線
-   * @param {string} type - 訊息類型
-   * @param {Object} data - 資料
+   * 取得狀態更新資訊摘要
+   * @private
    */
+  _getStateUpdateInfo(state) {
+    switch (state.type) {
+      case "subjectNameUpdate":
+        return ` | 受試者: <green>${state.subjectName || "N/A"}</green>`;
+      case "experimentIdUpdate":
+        return ` | 實驗ID: <green>${state.experimentId || "N/A"}</green>`;
+      case "combination_selected":
+        return ` | 組合: <green>${state.combination || "N/A"}</green>`;
+      case "experimentStateUpdate":
+        return ` | 狀態: <green>${state.experimentState || "N/A"}</green>`;
+      case "button_action":
+        return ` | 按鈕: <green>${state.buttonId || "N/A"}</green>`;
+      default:
+        return "";
+    }
+  }
+
+  /**
+   * 驗證工作階段並在無效時斷開連線
+   * @private
+   * @param {string} wsConnectionId - WebSocket 連線 ID
+   * @param {string} sessionId - 工作階段 ID
+   * @param {WebSocket} ws - WebSocket 連線
+   * @returns {Object|null} 工作階段資料或 null（如果無效）
+   */
+  _validateSessionAndCleanup(wsConnectionId, sessionId, ws) {
+    try {
+      const session = this.sessionService.getSession(sessionId);
+      if (!session) {
+        Logger.warn(
+          `工作階段不存在，斷開連線: ${wsConnectionId} (session: ${sessionId})`,
+        );
+        this.connectionManager.unregister(wsConnectionId);
+        this.sendResponse(ws, "error", {
+          type: "session_expired",
+          message: "工作階段已過期，請重新加入",
+        });
+        return null;
+      }
+
+      if (!session.is_active) {
+        Logger.warn(
+          `工作階段已失效，斷開連線: ${wsConnectionId} (session: ${sessionId})`,
+        );
+        this.connectionManager.unregister(wsConnectionId);
+        this.sendResponse(ws, "error", {
+          type: "session_inactive",
+          message: "工作階段已失效",
+        });
+        return null;
+      }
+
+      return session;
+    } catch (error) {
+      Logger.error(
+        `驗證工作階段失敗，斷開連線: ${wsConnectionId} (${error.message})`,
+      );
+      this.connectionManager.unregister(wsConnectionId);
+      return null;
+    }
+  }
   sendResponse(ws, type, data) {
     if (ws.readyState === 1) {
       // OPEN

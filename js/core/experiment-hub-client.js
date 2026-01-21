@@ -38,15 +38,24 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
     }
 
     /**
-     * 取得預設 API URL（自動偵測目前網域）
-     * 測試環境: http://localhost:7645/api
-     * 生產環境: http://yourdomain.com:7645/api 或 https://yourdomain.com:7645/api
+     * 取得預設 API URL（支援 Nginx 反向代理）
      */
     getDefaultApiUrl() {
       const protocol = window.location.protocol;
-      const host = window.location.hostname;
-      const port = "7645";
-      return `${protocol}//${host}:${port}/api`;
+      const host = window.location.host; // 包含 hostname 和 port
+
+      // 根據環境決定 API 路徑前綴
+      const basePath = this.getApiBasePath();
+
+      return `${protocol}//${host}${basePath}`;
+    }
+
+    /**
+     * 取得 API 路徑前綴（可由外部配置覆蓋）
+     */
+    getApiBasePath() {
+      // 預設使用 /api，可通過全域配置覆蓋
+      return window.PANEL_API_BASE_PATH || "/api";
     }
 
     /**

@@ -9,7 +9,9 @@ const __dirname = dirname(__filename);
 
 export const DATABASE_CONFIG = {
   // 資料庫檔案路徑（相對於server目錄）
-  path: process.env.DB_PATH || resolve(__dirname, "../../data/experiment.db"),
+  path:
+    process.env.DB_PATH ||
+    resolve(__dirname, "../../runtime/database/experiment.db"),
 
   // SQLite設定選項
   options: {

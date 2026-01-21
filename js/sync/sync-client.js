@@ -88,14 +88,24 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
     /**
      * 取得預設 API URL（自動偵測目前網域）
-     * 測試環境: http://localhost:7645/api
-     * 生產環境: http://yourdomain.com:7645/api 或 https://yourdomain.com:7645/api
+     * 支援 Nginx 反向代理路徑
      */
     getDefaultApiUrl() {
       const protocol = window.location.protocol;
-      const host = window.location.hostname;
-      const port = "7645";
-      return `${protocol}//${host}:${port}/api`;
+      const host = window.location.host; // 包含 hostname 和 port
+
+      // 根據環境決定 API 路徑前綴
+      const basePath = this.getApiBasePath();
+
+      return `${protocol}//${host}${basePath}`;
+    }
+
+    /**
+     * 取得 API 路徑前綴（可由外部配置覆蓋）
+     */
+    getApiBasePath() {
+      // 預設使用 /api，可通過全域配置覆蓋
+      return window.PANEL_API_BASE_PATH || "/api";
     }
 
     /**
@@ -182,6 +192,27 @@ if (typeof window !== "undefined" && window.SyncClient) {
       // 伺服器錯誤
       this.wsClient.on("server_error", (data) => {
         Logger.error("[SyncClient] 伺服器錯誤", data);
+
+        // 檢查是否為工作階段不存在錯誤
+        if (data && data.message && data.message.includes("工作階段不存在")) {
+          Logger.warn(
+            "[SyncClient] 偵測到工作階段不存在錯誤，自動清理工作階段資訊",
+          );
+
+          // 清理工作階段相關的儲存資訊
+          this.clearInvalidSessionData();
+
+          // 觸發工作階段失效事件
+          window.dispatchEvent(
+            new CustomEvent("sync_session_invalid", {
+              detail: {
+                reason: "session_not_found",
+                originalError: data,
+              },
+            }),
+          );
+        }
+
         window.dispatchEvent(
           new CustomEvent("sync_server_error", {
             detail: data,
@@ -848,6 +879,41 @@ if (typeof window !== "undefined" && window.SyncClient) {
      */
     getWebSocketState() {
       return this.wsClient.getState();
+    }
+
+    /**
+     * 清理無效的工作階段資料
+     * 當伺服器回報工作階段不存在時呼叫
+     */
+    clearInvalidSessionData() {
+      try {
+        Logger.info("[SyncClient] 清理無效的工作階段資料");
+
+        // 清除 localStorage 中的工作階段資訊
+        localStorage.removeItem("sync_session_id");
+        localStorage.removeItem("sync_session_backup");
+        localStorage.removeItem("sync_client_id");
+
+        // 清除 sessionStorage 中的工作階段資訊
+        sessionStorage.removeItem("sync_session_id");
+        sessionStorage.removeItem("sync_client_id");
+        sessionStorage.removeItem("sync_role");
+
+        // 重置內部狀態
+        this.sessionId = null;
+        this.clientId = null;
+        this.role = "viewer";
+        this.connected = false;
+
+        // 如果 WebSocket 連線存在，斷開它
+        if (this.wsClient) {
+          this.wsClient.disconnect();
+        }
+
+        Logger.info("[SyncClient] 工作階段資料清理完成");
+      } catch (error) {
+        Logger.error("[SyncClient] 清理工作階段資料時發生錯誤:", error);
+      }
     }
   }
 

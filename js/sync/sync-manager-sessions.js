@@ -13,6 +13,27 @@ export class SyncManagerSessions {
   }
 
   /**
+   * 取得 API URL（支援 Nginx 反向代理）
+   */
+  getApiUrl() {
+    const protocol = window.location.protocol;
+    const host = window.location.host; // 包含 hostname 和 port
+
+    // 根據環境決定 API 路徑前綴
+    const basePath = this.getApiBasePath();
+
+    return `${protocol}//${host}${basePath}`;
+  }
+
+  /**
+   * 取得 API 路徑前綴（可由外部配置覆蓋）
+   */
+  getApiBasePath() {
+    // 預設使用 /api，可通過全域配置覆蓋
+    return window.PANEL_API_BASE_PATH || "/api";
+  }
+
+  /**
    * 初始化工作階段管理
    */
   initialize() {
@@ -24,6 +45,21 @@ export class SyncManagerSessions {
     // 監聽工作階段建立事件，自動重新整理列表
     window.addEventListener("sync_session_created", () => {
       // 如果面板正在顯示，自動重新整理
+      if (this.sessionsPanel && document.body.contains(this.sessionsPanel)) {
+        this.refreshSessionsList();
+      }
+    });
+
+    // 監聽工作階段失效事件，清理相關資料
+    window.addEventListener("sync_session_invalid", (event) => {
+      const { reason, originalError } = event.detail;
+
+      Logger.info("[SyncManagerSessions] 工作階段失效，重新載入列表", {
+        reason,
+        originalError,
+      });
+
+      // 如果面板正在顯示，重新載入工作階段列表
       if (this.sessionsPanel && document.body.contains(this.sessionsPanel)) {
         this.refreshSessionsList();
       }
@@ -92,7 +128,9 @@ export class SyncManagerSessions {
    */
   async loadSessionsData() {
     try {
-      const response = await fetch("http://localhost:7645/api/sync/sessions");
+      // 使用動態 API URL，支援 Nginx 反向代理
+      const apiUrl = this.getApiUrl();
+      const response = await fetch(`${apiUrl}/sync/sessions`);
       const data = await response.json();
 
       if (data.success) {
@@ -228,7 +266,7 @@ export class SyncManagerSessions {
         if (value.length > 50) {
           return `<span class="sync-state-string">"${value.substring(
             0,
-            47
+            47,
           )}..."</span>`;
         }
         return `<span class="sync-state-string">"${value}"</span>`;
@@ -262,8 +300,8 @@ ${indentStr}]</span>`;
             ([key, val]) =>
               `${indentStr}  <span class="sync-state-key">"${key}"</span>: ${formatValue(
                 val,
-                indent + 1
-              )}`
+                indent + 1,
+              )}`,
           );
 
         const remaining =
@@ -290,7 +328,7 @@ ${indentStr}}</span>`;
 
       // 依建立時間排序（最新的在前）
       const sortedCodes = [...session.shareCodes].sort(
-        (a, b) => b.createdAt - a.createdAt
+        (a, b) => b.createdAt - a.createdAt,
       );
 
       const codeList = sortedCodes
@@ -298,13 +336,13 @@ ${indentStr}}</span>`;
           const status = code.used
             ? "已使用"
             : code.expiresAt < Date.now() / 1000
-            ? "已過期"
-            : "有效";
+              ? "已過期"
+              : "有效";
           const statusClass = code.used
             ? "used"
             : code.expiresAt < Date.now() / 1000
-            ? "expired"
-            : "active";
+              ? "expired"
+              : "active";
 
           const createdTime = window.timeSyncManager
             ? window.timeSyncManager.formatDateTime(code.createdAt * 1000)
@@ -369,7 +407,7 @@ ${indentStr}}</span>`;
                   });
               const lastActivityTime = window.timeSyncManager
                 ? window.timeSyncManager.formatDateTime(
-                    client.lastActivity * 1000
+                    client.lastActivity * 1000,
                   )
                 : new Date(client.lastActivity * 1000).toLocaleString("zh-TW", {
                     timeZone: window.CONFIG?.timezone || "Asia/Taipei",
@@ -467,7 +505,7 @@ ${indentStr}}</span>`;
 
     // 刪除所有工作階段按鈕
     const clearAllBtn = this.sessionsPanel.querySelector(
-      "#clearAllSessionsBtn"
+      "#clearAllSessionsBtn",
     );
     clearAllBtn.addEventListener("click", () => {
       // 將所有操作（包括確認對話框）移到下一個事件循環
@@ -481,11 +519,11 @@ ${indentStr}}</span>`;
 
         try {
           const response = await fetch(
-            "http://localhost:7645/api/sync/sessions/clear",
+            `${this.getApiUrl()}/sync/sessions/clear`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
           const data = await response.json();
 
@@ -517,7 +555,7 @@ ${indentStr}}</span>`;
 
     // 結束所有活動中工作階段按鈕
     const stopAllActiveBtn = this.sessionsPanel.querySelector(
-      "#stopAllActiveSessionsBtn"
+      "#stopAllActiveSessionsBtn",
     );
     stopAllActiveBtn.addEventListener("click", () => {
       setTimeout(async () => {
@@ -533,7 +571,7 @@ ${indentStr}}</span>`;
 
         if (
           !confirm(
-            `確定要結束所有 ${activeSessions.length} 個活動中工作階段嗎？`
+            `確定要結束所有 ${activeSessions.length} 個活動中工作階段嗎？`,
           )
         ) {
           return;
@@ -580,7 +618,7 @@ ${indentStr}}</span>`;
 
     // 選取無同步資料的工作階段
     const selectNoDataBtn = this.sessionsPanel.querySelector(
-      "#selectNoDataSessionsBtn"
+      "#selectNoDataSessionsBtn",
     );
     selectNoDataBtn.addEventListener("click", () => {
       const checkboxes =
@@ -608,7 +646,7 @@ ${indentStr}}</span>`;
 
     // 選取僅一個裝置的工作階段
     const selectSingleClientBtn = this.sessionsPanel.querySelector(
-      "#selectSingleClientSessionsBtn"
+      "#selectSingleClientSessionsBtn",
     );
     selectSingleClientBtn.addEventListener("click", () => {
       const checkboxes =
@@ -633,7 +671,7 @@ ${indentStr}}</span>`;
 
     // 下載選取工作階段
     const downloadSelectedBtn = this.sessionsPanel.querySelector(
-      "#downloadSelectedSessionsBtn"
+      "#downloadSelectedSessionsBtn",
     );
     downloadSelectedBtn.addEventListener("click", () => {
       if (this.selectedSessions.size === 0) {
@@ -642,7 +680,7 @@ ${indentStr}}</span>`;
       }
 
       const selectedData = this.sessionsData.filter((session) =>
-        this.selectedSessions.has(session.id)
+        this.selectedSessions.has(session.id),
       );
 
       const dataStr = JSON.stringify(selectedData, null, 2);
@@ -662,7 +700,7 @@ ${indentStr}}</span>`;
 
     // 刪除選取工作階段
     const deleteSelectedBtn = this.sessionsPanel.querySelector(
-      "#deleteSelectedSessionsBtn"
+      "#deleteSelectedSessionsBtn",
     );
     deleteSelectedBtn.addEventListener("click", () => {
       setTimeout(async () => {
@@ -673,7 +711,7 @@ ${indentStr}}</span>`;
 
         if (
           !confirm(
-            `確定要刪除選取的 ${this.selectedSessions.size} 個工作階段嗎？此操作無法還原。`
+            `確定要刪除選取的 ${this.selectedSessions.size} 個工作階段嗎？此操作無法還原。`,
           )
         ) {
           return;
@@ -685,20 +723,20 @@ ${indentStr}}</span>`;
         try {
           const deletePromises = Array.from(this.selectedSessions).map(
             (sessionId) =>
-              fetch(`http://localhost:7645/api/sync/session/${sessionId}`, {
+              fetch(`${this.getApiUrl()}/sync/session/${sessionId}`, {
                 method: "DELETE",
-              }).then((response) => response.json())
+              }).then((response) => response.json()),
           );
 
           const results = await Promise.all(deletePromises);
           const successCount = results.filter(
-            (result) => result.success
+            (result) => result.success,
           ).length;
           const failCount = results.length - successCount;
 
           // 從本機資料中移除已刪除的工作階段
           this.sessionsData = this.sessionsData.filter(
-            (session) => !this.selectedSessions.has(session.id)
+            (session) => !this.selectedSessions.has(session.id),
           );
 
           // 清空選取狀態
@@ -754,17 +792,17 @@ ${indentStr}}</span>`;
 
           try {
             const response = await fetch(
-              `http://localhost:7645/api/sync/session/${sessionId}`,
+              `${this.getApiUrl()}/sync/session/${sessionId}`,
               {
                 method: "DELETE",
-              }
+              },
             );
             const data = await response.json();
 
             if (data.success) {
               // 從本機資料中移除已刪除的工作階段
               this.sessionsData = this.sessionsData.filter(
-                (session) => session.id !== sessionId
+                (session) => session.id !== sessionId,
               );
               this.expandedCards.delete(sessionId);
 
@@ -838,7 +876,7 @@ ${indentStr}}</span>`;
       if (event.target.closest(".sync-session-state-header")) {
         const stateToggle = event.target.closest(".sync-session-state-toggle");
         const stateDetails = stateToggle.querySelector(
-          ".sync-session-state-details"
+          ".sync-session-state-details",
         );
         const expandIcon = stateToggle.querySelector(".sync-state-expand-icon");
 
@@ -871,7 +909,7 @@ ${indentStr}}</span>`;
     if (!selectAllCheckbox || !checkboxes) return;
 
     const checkedCount = this.sessionsPanel.querySelectorAll(
-      ".session-checkbox:checked"
+      ".session-checkbox:checked",
     ).length;
     const totalCount = checkboxes.length;
 
@@ -885,10 +923,10 @@ ${indentStr}}</span>`;
    */
   updateBatchOperationButtons() {
     const downloadBtn = this.sessionsPanel?.querySelector(
-      "#downloadSelectedSessionsBtn"
+      "#downloadSelectedSessionsBtn",
     );
     const deleteBtn = this.sessionsPanel?.querySelector(
-      "#deleteSelectedSessionsBtn"
+      "#deleteSelectedSessionsBtn",
     );
 
     const hasSelection = this.selectedSessions.size > 0;

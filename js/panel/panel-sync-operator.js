@@ -13,6 +13,27 @@ class PanelSyncOperator {
   }
 
   /**
+   * 取得 API URL（支援 Nginx 反向代理）
+   */
+  getApiUrl() {
+    const protocol = window.location.protocol;
+    const host = window.location.host; // 包含 hostname 和 port
+
+    // 根據環境決定 API 路徑前綴
+    const basePath = this.getApiBasePath();
+
+    return `${protocol}//${host}${basePath}`;
+  }
+
+  /**
+   * 取得 API 路徑前綴（可由外部配置覆蓋）
+   */
+  getApiBasePath() {
+    // 預設使用 /api，可通過全域配置覆蓋
+    return window.PANEL_API_BASE_PATH || "/api";
+  }
+
+  /**
    * 取得或產生裝置 ID
    */
   getDeviceId() {
@@ -150,7 +171,7 @@ class PanelSyncOperator {
     const connectedOperators = await this.checkMultipleOperators();
     if (connectedOperators > 1) {
       const confirmed = confirm(
-        `偵測到 ${connectedOperators} 個同步操作面板。\n確認要由此裝置開始實驗嗎？\n(裝置 ID: ${this.deviceId})`
+        `偵測到 ${connectedOperators} 個同步操作面板。\n確認要由此裝置開始實驗嗎？\n(裝置 ID: ${this.deviceId})`,
       );
       if (!confirmed) {
         this.updateStatus("操作已取消");
@@ -266,7 +287,7 @@ class PanelSyncOperator {
         const clients = window.syncManager.core.connectedClients;
         // 計數操作者角色的客戶端
         const operatorCount = Object.values(clients).filter(
-          (client) => client.role === "operator"
+          (client) => client.role === "operator",
         ).length;
         return operatorCount;
       }
@@ -276,7 +297,7 @@ class PanelSyncOperator {
         const sessionId = window.syncManager.core.syncClient.sessionId;
         try {
           const response = await fetch(
-            `http://localhost:7645/api/sync/session/${sessionId}/clients`
+            `${this.getApiUrl()}/sync/session/${sessionId}/clients`,
           );
 
           if (response.ok) {

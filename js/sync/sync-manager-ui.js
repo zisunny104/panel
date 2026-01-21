@@ -340,6 +340,32 @@ export class SyncManagerUI {
         }
       });
 
+      // 監聽工作階段失效事件
+      window.addEventListener("sync_session_invalid", (event) => {
+        const { reason, originalError } = event.detail;
+
+        Logger.warn("[SyncManagerUI] 工作階段失效", { reason, originalError });
+
+        // 顯示錯誤訊息
+        if (reason === "session_not_found") {
+          this.showStatus(
+            "error",
+            "工作階段已失效，請重新加入或建立新工作階段",
+          );
+        } else {
+          this.showStatus("error", "工作階段連線異常，請重新連線");
+        }
+
+        // 切換回初始狀態（未連線）
+        this.updateIndicator();
+        this.updateConnectedSessionInfo();
+
+        // 如果面板是開啟的，顯示加入/建立工作階段的介面
+        if (this.panelVisible) {
+          this.showJoinCreateInterface();
+        }
+      });
+
       // 關閉面板
       const closeBtn = this.controlPanel.querySelector(".modal-close-btn");
       if (closeBtn) {

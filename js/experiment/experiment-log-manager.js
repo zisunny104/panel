@@ -726,14 +726,26 @@ class ExperimentLogManager {
   }
 
   /**
-   * 取得 API URL
+   * 取得 API URL（支援 Nginx 反向代理）
    * @private
    */
   _getApiUrl() {
     const protocol = window.location.protocol;
-    const host = window.location.hostname;
-    const port = "7645";
-    return `${protocol}//${host}:${port}`;
+    const host = window.location.host; // 包含 hostname 和 port
+
+    // 根據環境決定 API 路徑前綴
+    const basePath = this._getApiBasePath();
+
+    return `${protocol}//${host}${basePath}`;
+  }
+
+  /**
+   * 取得 API 路徑前綴（可由外部配置覆蓋）
+   * @private
+   */
+  _getApiBasePath() {
+    // 預設使用 /api，可通過全域配置覆蓋
+    return window.PANEL_API_BASE_PATH || "/api";
   }
 
   /**
