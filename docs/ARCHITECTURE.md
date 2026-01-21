@@ -1,6 +1,5 @@
 # Node.js 伺服器重構版本 架構藍圖
 
-
 ## 專案概述
 
 ### 整體架構圖
@@ -43,7 +42,7 @@
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  WebSocket 層                                        │   │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌─────────┐  │   │
-│  │  │ Connection   │  │    Room      │  │Broadcast│  │   │
+│  │  │ Connection   │  │   Session    │  │Broadcast│  │   │
 │  │  │   Manager    │  │   Manager    │  │ Manager │  │   │
 │  │  └──────────────┘  └──────────────┘  └─────────┘  │   │
 │  │  - 連線管理         - 工作階段管理    - 狀態廣播    │   │
@@ -87,7 +86,7 @@ panel/
 │   ├── websocket/                    # WebSocket 層
 │   │   ├── WSServer.js               # WebSocket 伺服器封裝
 │   │   ├── ConnectionManager.js      # 連線管理器
-│   │   ├── RoomManager.js            # 房間管理器
+│   │   ├── SessionManager.js         # 工作階段管理器
 │   │   ├── BroadcastManager.js       # 廣播管理器
 │   │   └── MessageHandler.js         # 訊息處理器（含校時）
 │   │
@@ -252,11 +251,11 @@ interface Session {
 
 ### 2. 分享代碼 (ShareCode)
 
-用於客戶端加入工作階段的一次性代碼，格式：6 位基礎碼 + 2 位校驗碼。
+用於客戶端加入工作階段的代碼，格式：5 位基礎碼 + 1 位校驗碼。
 
 ```javascript
 interface ShareCode {
-  code: string; // 8位代碼 (1234AB42)
+  code: string; // 6位代碼 (123456)
   sessionId: string;
 
   createdAt: number;
@@ -271,15 +270,28 @@ interface ShareCode {
 }
 ```
 
-校驗碼計算：
+校驗碼計算（Luhn 演算法變體）：
 
 ```javascript
 function calculateChecksum(baseCode) {
+  // baseCode 為 5 位數字
   let sum = 0;
   for (let i = 0; i < baseCode.length; i++) {
-    sum += baseCode.charCodeAt(i);
+    let digit = parseInt(baseCode[i]);
+
+    // 從右到左，偶數位置數字乘以 2
+    if ((baseCode.length - i) % 2 === 0) {
+      digit *= 2;
+      if (digit > 9) {
+        digit = Math.floor(digit / 10) + (digit % 10);
+      }
+    }
+    sum += digit;
   }
-  return String(sum % 100).padStart(2, "0");
+
+  // 計算校驗碼
+  const checksum = (10 - (sum % 10)) % 10;
+  return checksum.toString();
 }
 ```
 
@@ -289,7 +301,8 @@ Client 是分頁級實體，每個瀏覽器分頁擁有獨立的 clientId。
 
 ```javascript
 interface Client {
-  clientId: string; // D1JKFL2P-A3B5C7 (分頁唯一)
+  clientId: string; // D{timestamp}{random} (分頁唯一)
+                    // 範例: "D1736405234567ABC"
   role: "viewer" | "operator";
 
   connectedAt: number;
@@ -300,19 +313,60 @@ interface Client {
 }
 ```
 
+**clientId 產生機制**：
+
+```javascript
+function generateClientId() {
+  const timestamp = Date.now(); // 13位時間戳
+  const random = Math.random().toString(36).substring(2, 5).toUpperCase(); // 3位隨機碼
+  return `D${timestamp}${random}`;
+}
+```
+
 ### 4. 實驗 ID
 
 ```javascript
 interface ExperimentId {
-  experimentId: string; // JHWH4A (6位隨機碼)
+  experimentId: string; // 6位隨機碼，例如: "JHWH4A", "K3LM9P"
   sessionId: string | null;
   createdAt: number;
   source: string; // "panel", "state_manager"
 }
 ```
 
-格式：`[A-Z0-9]{6}` - 6 位大寫英數字隨機碼
-特性：相同 ID 搭配相同組合邏輯，可透過 seeded random 還原實驗序列排序
+**格式**：`[A-Z0-9]{6}` - 6 位大寫英數字隨機碼
+
+**特性**：相同 ID 搭配相同組合邏輯，可透過 seeded random 還原實驗序列排序
+
+**產生機制** (前端):
+
+```javascript
+function generateNewExperimentId() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+```
+
+**產生機制** (後端 - 保留但不常用):
+
+```javascript
+function generateExperimentId() {
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let randomStr = "";
+  for (let i = 0; i < 4; i++) {
+    randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return `EXP${dateStr}${randomStr}`; // 例：EXP20260109ABCD
+}
+```
 
 **同工作階段多客戶端同步示範**:
 
@@ -338,34 +392,6 @@ Session['SESSION1'].clients = [
 ]
 
 // 結果：Tab 1 的狀態更新 → 廣播到同 session 內所有 clients → Tab 2 收到（自動同步）
-```
-
----
-
-### 4. **實驗 ID (Experiment ID)**
-
-**定義**: 實驗的唯一標識，用於跨裝置同步實驗狀態
-
-**資料結構**:
-
-```javascript
-interface ExperimentId {
-  experimentId: string; // 實驗ID，如 "2026-01-09_15-30-45_SUBJ001"
-  sessionId: string | null; // 關聯的工作階段ID
-
-  // 時間資訊
-  createdAt: number; // 建立時間
-
-  // 來源資訊
-  source: string; // 來源裝置/模組，如 "panel", "state_manager"
-
-  // 元資料
-  metadata: {
-    subjectName?: string, // 受試者名稱
-    ipAddress?: string, // 來源IP
-    userAgent?: string, // 瀏覽器資訊
-  };
-}
 ```
 
 ---
@@ -689,7 +715,7 @@ class WebSocketClient {
       JSON.stringify({
         type: "auth",
         data: { sessionId, clientId, role },
-      })
+      }),
     );
   }
 }
@@ -899,7 +925,6 @@ async handleAuth(wsConnectionId, data, ws) {
 
 ---
 
-
 ### 模組依賴關係圖
 
 ```
@@ -928,36 +953,36 @@ async handleAuth(wsConnectionId, data, ws) {
 
 #### 2. 同步 API
 
-| 方法 | 端點 | 說明 |
-| ---- | ---- | ---- |
-| POST | `/api/sync/session` | 建立新的工作階段 |
-| POST | `/api/sync/create_session` | 建立工作階段（僅建立） |
-| POST | `/api/sync/generate_share_code` | 產生分享代碼 |
-| POST | `/api/sync/join` | 使用分享代碼加入工作階段 |
-| POST | `/api/sync/session/:sessionId/share-code` | 為指定工作階段產生分享代碼 |
-| GET | `/api/sync/session/:sessionId/validate` | 驗證工作階段是否有效 |
-| GET | `/api/sync/session/:sessionId/clients` | 取得工作階段中的所有客戶端 |
-| GET | `/api/sync/session/:sessionId` | 取得工作階段資訊 |
-| GET | `/api/sync/sessions` | 取得所有活動中的工作階段列表 |
-| DELETE | `/api/sync/session/:sessionId` | 刪除指定的工作階段 |
-| POST | `/api/sync/sessions/clear` | 清除所有工作階段 |
-| POST | `/api/sync/heartbeat` | 更新工作階段活動時間 |
-| GET | `/api/sync/share-code/:code` | 取得分享代碼資訊 |
+| 方法   | 端點                                      | 說明                         |
+| ------ | ----------------------------------------- | ---------------------------- |
+| POST   | `/api/sync/session`                       | 建立新的工作階段             |
+| POST   | `/api/sync/create_session`                | 建立工作階段（僅建立）       |
+| POST   | `/api/sync/generate_share_code`           | 產生分享代碼                 |
+| POST   | `/api/sync/join`                          | 使用分享代碼加入工作階段     |
+| POST   | `/api/sync/session/:sessionId/share-code` | 為指定工作階段產生分享代碼   |
+| GET    | `/api/sync/session/:sessionId/validate`   | 驗證工作階段是否有效         |
+| GET    | `/api/sync/session/:sessionId/clients`    | 取得工作階段中的所有客戶端   |
+| GET    | `/api/sync/session/:sessionId`            | 取得工作階段資訊             |
+| GET    | `/api/sync/sessions`                      | 取得所有活動中的工作階段列表 |
+| DELETE | `/api/sync/session/:sessionId`            | 刪除指定的工作階段           |
+| POST   | `/api/sync/sessions/clear`                | 清除所有工作階段             |
+| POST   | `/api/sync/heartbeat`                     | 更新工作階段活動時間         |
+| GET    | `/api/sync/share-code/:code`              | 取得分享代碼資訊             |
 
 #### 3. 實驗 API
 
-| 方法 | 端點 | 說明 |
-| ---- | ---- | ---- |
+| 方法 | 端點                 | 說明        |
+| ---- | -------------------- | ----------- |
 | POST | `/api/experiment/id` | 建立實驗 ID |
 
 #### 4. 日誌 API
 
-| 方法 | 端點 | 說明 |
-| ---- | ---- | ---- |
-| GET | `/api/experiment-logs/list` | 列出所有日誌檔案 |
-| POST | `/api/experiment-logs/save` | 儲存日誌檔案 |
-| GET | `/api/experiment-logs/:filename` | 讀取日誌檔案內容 |
-| DELETE | `/api/experiment-logs/:filename` | 刪除日誌檔案 |
+| 方法   | 端點                             | 說明             |
+| ------ | -------------------------------- | ---------------- |
+| GET    | `/api/experiment-logs/list`      | 列出所有日誌檔案 |
+| POST   | `/api/experiment-logs/save`      | 儲存日誌檔案     |
+| GET    | `/api/experiment-logs/:filename` | 讀取日誌檔案內容 |
+| DELETE | `/api/experiment-logs/:filename` | 刪除日誌檔案     |
 
 ---
 
@@ -1124,19 +1149,16 @@ db.exec("PRAGMA temp_store = MEMORY;"); // 臨時表在記憶體中
 **重要**: 為避免設定重複和衝突，系統採用以下分工：
 
 1. **後端執行設定** → `.env` 控制
-
    - 伺服器連接埠、主機、資料庫路徑
    - 超時設定 (Session, ShareCode, Cleanup)
    - WebSocket 設定 (心跳間隔)
    - CORS 和日誌設定
 
 2. **前端業務設定** → `config.json` 控制
-
    - UI 顯示設定 (縮放、標籤顯示)
    - 實驗組合設定
    - 時區設定
    - 多裝置同步開關狀態
-
 
 ```env
 # 伺服器設定
@@ -1361,18 +1383,15 @@ npm run dev
 **實驗日誌系統已完整實作**：
 
 1. **伺服器端 API**（`server/routes/experiment-logs.js`）
-
    - 列出、儲存、讀取、刪除 JSONL 檔案
    - 自動管理 `runtime/experiment-data/` 目錄
 
 2. **前端日誌管理**（`js/experiment/experiment-log-ui.js`）
-
    - 透過 API 動態載入日誌列表
    - 檢視、下載、刪除功能完整
    - 統計資訊計算（手勢正確率、實驗時長等）
 
 3. **本機儲存**（IndexedDB）
-
    - 實驗進行中即時儲存
    - 離線可用
    - 與伺服器雙向同步

@@ -6,6 +6,7 @@ import { generateSessionId } from "../utils/idGenerator.js";
 import { getCurrentTimestamp, isExpired } from "../utils/time.js";
 import { SERVER_CONFIG } from "../config/server.js";
 import { SESSION_CONSTANTS, ERROR_CODES } from "../config/constants.js";
+import Logger from "../utils/logger.js";
 
 class SessionService {
   /**
@@ -32,10 +33,10 @@ class SessionService {
           created_at,
           defaultData,
           1,
-        ]
+        ],
       );
 
-      console.log(`工作階段已建立: ${sessionId} (client: ${clientId})`);
+      Logger.debug(`工作階段已建立 | ${sessionId} | 客戶端: ${clientId}`);
 
       return {
         sessionId,
@@ -65,7 +66,7 @@ class SessionService {
 
       // 檢查是否過期
       if (isExpired(session.last_active_at, SERVER_CONFIG.session.timeout)) {
-        console.log(`工作階段已過期: ${sessionId}`);
+        Logger.warn(`工作階段已過期 | ${sessionId}`);
         this.deleteSession(sessionId);
         return null;
       }
@@ -88,12 +89,35 @@ class SessionService {
     try {
       const result = execute(
         `UPDATE sessions SET updated_at = ?, last_active_at = ? WHERE session_id = ?`,
-        [timestamp, timestamp, sessionId]
+        [timestamp, timestamp, sessionId],
       );
 
       return result.changes > 0;
     } catch (error) {
       console.error("更新工作階段失敗:", error.message);
+      throw new Error(ERROR_CODES.DATABASE_ERROR);
+    }
+  }
+
+  /**
+   * 更新工作階段的狀態資料
+   * @param {string} sessionId - 工作階段ID
+   * @param {Object} state - 狀態物件
+   * @returns {boolean} 是否更新成功
+   */
+  updateState(sessionId, state) {
+    const timestamp = getCurrentTimestamp();
+    const stateJson = JSON.stringify(state || {});
+
+    try {
+      const result = execute(
+        `UPDATE sessions SET data = ?, updated_at = ?, last_active_at = ? WHERE session_id = ?`,
+        [stateJson, timestamp, timestamp, sessionId],
+      );
+
+      return result.changes > 0;
+    } catch (error) {
+      console.error("更新工作階段狀態失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -110,7 +134,7 @@ class SessionService {
       ]);
 
       if (result.changes > 0) {
-        console.log(`工作階段已刪除: ${sessionId}`);
+        Logger.debug(`工作階段已刪除 | ${sessionId}`);
         return true;
       }
 
@@ -133,7 +157,7 @@ class SessionService {
       // 1. 先找出所有過期的 session_id
       const expiredSessions = query(
         `SELECT session_id FROM sessions WHERE last_active_at < ?`,
-        [expirationTime]
+        [expirationTime],
       );
 
       if (expiredSessions.length === 0) {
@@ -147,7 +171,7 @@ class SessionService {
       try {
         execute(
           `DELETE FROM state_updates WHERE session_id IN (${placeholders})`,
-          sessionIds
+          sessionIds,
         );
       } catch (error) {
         // state_updates 表可能不存在或為空，忽略錯誤
@@ -157,17 +181,17 @@ class SessionService {
       // 3. 刪除相關的 share_codes
       execute(
         `DELETE FROM share_codes WHERE session_id IN (${placeholders})`,
-        sessionIds
+        sessionIds,
       );
 
       // 4. 最後刪除 sessions
       const result = execute(
         `DELETE FROM sessions WHERE session_id IN (${placeholders})`,
-        sessionIds
+        sessionIds,
       );
 
       if (result.changes > 0) {
-        console.log(`[清理] 已清除 ${result.changes} 個過期工作階段`);
+        Logger.debug(`[清理] 已清除 ${result.changes} 個過期工作階段`);
       }
 
       return result.changes;
@@ -188,7 +212,7 @@ class SessionService {
     try {
       const sessions = query(
         `SELECT * FROM sessions WHERE last_active_at >= ? AND is_active = 1 ORDER BY created_at DESC`,
-        [expirationTime]
+        [expirationTime],
       );
 
       return sessions;

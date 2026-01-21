@@ -10,11 +10,12 @@
 
 import SessionService from "../services/SessionService.js";
 import ShareCodeService from "../services/ShareCodeService.js";
+import Logger from "../utils/logger.js";
 
 export class MessageHandler {
-  constructor(connectionManager, roomManager, broadcastManager) {
+  constructor(connectionManager, sessionManager, broadcastManager) {
     this.connectionManager = connectionManager;
-    this.roomManager = roomManager;
+    this.sessionManager = sessionManager;
     this.broadcastManager = broadcastManager;
 
     // Services (實例化)
@@ -94,11 +95,11 @@ export class MessageHandler {
       const isReconnect = this.connectionManager.authenticate(
         wsConnectionId,
         clientId,
-        sessionId
+        sessionId,
       );
 
-      // 加入房間（如果是重新連線，會更新 metadata）
-      const roomInfo = this.roomManager.join(sessionId, clientId, {
+      // 加入工作階段（如果是重新連線，會更新 metadata）
+      const sessionInfo = this.sessionManager.addClient(sessionId, clientId, {
         role,
         isReconnect,
       });
@@ -111,7 +112,7 @@ export class MessageHandler {
         sessionId,
         clientId,
         role,
-        roomInfo,
+        sessionInfo,
         isReconnect, // 告知前端是否為重新連線
       });
 
@@ -128,7 +129,7 @@ export class MessageHandler {
             type: "client_reconnected",
             data: { clientId, role },
           },
-          { excludeClientId: clientId }
+          { excludeClientId: clientId },
         );
       }
 
@@ -140,9 +141,13 @@ export class MessageHandler {
       });
 
       if (isReconnect) {
-        console.log(`客戶端已重新連線: ${clientId} -> ${sessionId}`);
+        Logger.debug(`客戶端重新連線 | ${clientId} → ${sessionId}`);
       } else {
-        console.log(`客戶端已認證: ${clientId} -> ${sessionId}`);
+        Logger.event(
+          "green",
+          "*",
+          `<green>連線已認證</green> | ${clientId} <magenta>></magenta> ${sessionId}`,
+        );
       }
     } catch (error) {
       throw new Error(`認證失敗: ${error.message}`);
@@ -180,8 +185,8 @@ export class MessageHandler {
     }
 
     try {
-      // 驗證客戶端在房間中
-      if (!this.roomManager.isMember(sessionId, clientId)) {
+      // 驗證客戶端在工作階段中
+      if (!this.sessionManager.isClientInSession(sessionId, clientId)) {
         throw new Error("客戶端不在工作階段中");
       }
 
@@ -227,7 +232,7 @@ export class MessageHandler {
       this.broadcastManager.broadcastExperimentEvent(
         sessionId,
         action,
-        actionData
+        actionData,
       );
 
       // 發送確認回應
@@ -289,8 +294,8 @@ export class MessageHandler {
       throw new Error(`工作階段不存在: ${sessionId}`);
     }
 
-    // 取得房間資訊
-    const roomInfo = this.roomManager.getRoomInfo(sessionId);
+    // 取得工作階段資訊
+    const sessionInfo = this.sessionManager.getSessionInfo(sessionId);
 
     // 解析 session.data
     const sessionData =
@@ -304,7 +309,7 @@ export class MessageHandler {
       updatedAt: session.updated_at,
       lastActiveAt: session.last_active_at,
       isActive: session.is_active,
-      clients: roomInfo ? roomInfo.members : [],
+      clients: sessionInfo ? sessionInfo.clients : [],
       state: sessionData.state || {},
     };
   }
@@ -323,7 +328,7 @@ export class MessageHandler {
           type,
           data,
           timestamp: Date.now(),
-        })
+        }),
       );
     }
   }

@@ -3,6 +3,7 @@
  */
 import { DatabaseSync } from "node:sqlite";
 import { DATABASE_CONFIG } from "../config/database.js";
+import { Logger } from "../utils/logger.js";
 
 let dbInstance = null;
 
@@ -37,16 +38,16 @@ export function getDatabase() {
     // 設定WAL自動checkpoint
     if (DATABASE_CONFIG.options.walAutoCheckpoint) {
       db.exec(
-        `PRAGMA wal_autocheckpoint = ${DATABASE_CONFIG.options.walAutoCheckpoint};`
+        `PRAGMA wal_autocheckpoint = ${DATABASE_CONFIG.options.walAutoCheckpoint};`,
       );
     }
 
-    console.log("資料庫連線成功:", DATABASE_CONFIG.path);
+    Logger.success(`資料庫連線成功 | ${DATABASE_CONFIG.path}`);
 
     dbInstance = db;
     return db;
   } catch (error) {
-    console.error("資料庫連線失敗:", error.message);
+    Logger.error("資料庫連線失敗:", error.message);
     throw error;
   }
 }
@@ -115,6 +116,6 @@ export function closeDatabase() {
   if (dbInstance) {
     dbInstance.close();
     dbInstance = null;
-    console.log("資料庫連線已關閉");
+    Logger.info("資料庫連線已關閉");
   }
 }

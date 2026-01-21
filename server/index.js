@@ -22,9 +22,12 @@ import experimentLogsRouter from "./routes/experiment-logs.js";
 // 匯入 WebSocket 系統
 import { WSServer } from "./websocket/WSServer.js";
 import { ConnectionManager } from "./websocket/ConnectionManager.js";
-import { RoomManager } from "./websocket/RoomManager.js";
+import { SessionManager } from "./websocket/SessionManager.js";
 import { BroadcastManager } from "./websocket/BroadcastManager.js";
 import { MessageHandler } from "./websocket/MessageHandler.js";
+
+// 匯入日誌工具
+import { Logger } from "./utils/logger.js";
 
 // ES module 中取得目前檔案路徑
 const __filename = fileURLToPath(import.meta.url);
@@ -43,18 +46,21 @@ app.use(express.urlencoded({ extended: true }));
 
 // 請求日誌
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  // 過濾掉 HEAD 請求（心跳檢測），減少日誌噪音
+  if (req.method !== "HEAD") {
+    Logger.http(req.method, req.path);
+  }
   next();
 });
 
 // ===== 靜態文件服務 (前端) =====
 const publicPath = path.join(__dirname, "..");
-console.log(`提供靜態文件服務: ${publicPath}`);
+Logger.info(`提供靜態文件服務: ${publicPath}`);
 app.use(
   express.static(publicPath, {
     index: "index.html",
     extensions: ["html", "htm"],
-  })
+  }),
 );
 
 // ===== 路由註冊 =====
@@ -108,11 +114,11 @@ app.use((err, req, res, next) => {
 
 // ===== 資料庫初始化 =====
 try {
-  console.log("初始化資料庫連線...");
+  Logger.info("初始化資料庫連線");
   getDatabase();
   validateSchema();
 } catch (error) {
-  console.error("資料庫初始化失敗:", error.message);
+  Logger.error("資料庫初始化失敗:", error.message);
   process.exit(1);
 }
 
@@ -126,23 +132,26 @@ setInterval(() => {
     SessionService.cleanupExpiredSessions();
     ShareCodeService.cleanupExpiredCodes();
   } catch (error) {
-    console.error("清理任務失敗:", error.message);
+    Logger.error("清理任務失敗:", error.message);
   }
 }, cleanupInterval);
 
-console.log(`清理任務已啟動（間隔: ${cleanupInterval / 1000}秒）`);
+Logger.info(`清理任務已啟動 (間隔: ${cleanupInterval / 1000}秒)`);
 
 // ===== WebSocket 系統初始化 =====
-console.log("初始化 WebSocket 系統...");
+Logger.info("初始化 WebSocket 系統");
 
 // 建立管理器
 const connectionManager = new ConnectionManager();
-const roomManager = new RoomManager(connectionManager);
-const broadcastManager = new BroadcastManager(connectionManager, roomManager);
+const sessionManager = new SessionManager(connectionManager, SessionService);
+const broadcastManager = new BroadcastManager(
+  connectionManager,
+  sessionManager,
+);
 const messageHandler = new MessageHandler(
   connectionManager,
-  roomManager,
-  broadcastManager
+  sessionManager,
+  broadcastManager,
 );
 
 // 建立 WebSocket 伺服器
@@ -153,32 +162,42 @@ wsServer.initialize({
 });
 
 // 將 WebSocket 管理器掛載到 app.locals，供路由使用
-app.locals.roomManager = roomManager;
+app.locals.sessionManager = sessionManager;
 app.locals.connectionManager = connectionManager;
 
-console.log("WebSocket 系統已初始化");
+Logger.success("WebSocket 系統已初始化");
 
 // ===== 啟動伺服器 =====
 const server = httpServer.listen(SERVER_CONFIG.port, () => {
   console.log("");
-  console.log("=======================================");
-  console.log(" Panel Backend Server 已啟動");
-  console.log("=======================================");
-  console.log(`HTTP: http://localhost:${SERVER_CONFIG.port}`);
-  console.log(`WebSocket: ws://localhost:${SERVER_CONFIG.port}/ws`);
-  console.log(`健康檢查: http://localhost:${SERVER_CONFIG.port}/api/health`);
-  console.log(`工作階段超時: ${SERVER_CONFIG.session.timeout}秒`);
-  console.log(`分享代碼超時: ${SERVER_CONFIG.shareCode.timeout}秒`);
-  console.log(
-    `心跳間隔: ${SERVER_CONFIG.websocket.heartbeatInterval / 1000}秒`
+  Logger.success("================================");
+  Logger.success("Panel Backend Server 已啟動");
+  Logger.success("================================");
+  Logger.info(
+    `HTTP        <yellow>|</yellow> <cyan>http://localhost:${SERVER_CONFIG.port}</cyan>`,
   );
-  console.log("=======================================");
-  console.log("");
+  Logger.info(
+    `WebSocket   <yellow>|</yellow> <cyan>ws://localhost:${SERVER_CONFIG.port}/ws</cyan>`,
+  );
+  Logger.info(
+    `心跳檢測    <yellow>|</yellow> <cyan>http://localhost:${SERVER_CONFIG.port}/api/health</cyan>`,
+  );
+  Logger.info("");
+  Logger.debug(
+    `工作階段超時  <yellow>${SERVER_CONFIG.session.timeout}</yellow> 秒`,
+  );
+  Logger.debug(
+    `分享代碼超時  <yellow>${SERVER_CONFIG.shareCode.timeout}</yellow> 秒`,
+  );
+  Logger.debug(
+    `心跳檢測間隔  <yellow>${SERVER_CONFIG.websocket.heartbeatInterval / 1000}</yellow> 秒`,
+  );
+  Logger.debug("");
 });
 
 // ===== 優雅關閉 =====
 process.on("SIGINT", () => {
-  console.log("收到SIGINT信號，正在關閉伺服器...");
+  Logger.warn("收到SIGINT信號，正在關閉伺服器...");
 
   // 關閉 WebSocket 系統
   wsServer.close();
@@ -186,14 +205,14 @@ process.on("SIGINT", () => {
 
   // 關閉 HTTP 伺服器
   server.close(() => {
-    console.log("HTTP伺服器已關閉");
+    Logger.info("HTTP伺服器已關閉");
     closeDatabase();
     process.exit(0);
   });
 });
 
 process.on("SIGTERM", () => {
-  console.log("收到SIGTERM信號，正在關閉伺服器...");
+  Logger.warn("收到SIGTERM信號，正在關閉伺服器...");
 
   // 關閉 WebSocket 系統
   wsServer.close();

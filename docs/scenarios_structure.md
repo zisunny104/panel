@@ -6,7 +6,7 @@
 
 ---
 
-## 🏗️ Scenarios 整體架構
+## Scenarios 整體架構
 
 ```
 scenarios.json
@@ -241,7 +241,7 @@ A002_13 (end)
 
 ---
 
-## 📌 備註
+## 備註
 
 1. **Shift 組合按鈕：** SA01_2 中的 f6 需要同時按下 Shift (B1)
 2. **媒體顯示時機：** 第一個 action 通常媒體為 null（跳過媒體顯示）

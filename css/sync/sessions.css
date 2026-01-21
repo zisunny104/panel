@@ -405,7 +405,7 @@
 }
 
 /* 工作階段詳細資訊區域 */
-.sync-session-info {
+.sync-session-details .sync-session-info {
     margin-bottom: 8px;
 }
 

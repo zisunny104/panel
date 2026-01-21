@@ -10,6 +10,7 @@
 
 import { generateClientId } from "../utils/idGenerator.js";
 import { SERVER_CONFIG } from "../config/server.js";
+import { Logger } from "../utils/logger.js";
 
 export class ConnectionManager {
   constructor() {
@@ -53,7 +54,7 @@ export class ConnectionManager {
       },
     });
 
-    console.log(`註冊 WebSocket 連線: ${wsConnectionId}`);
+    Logger.connection(`註冊 WebSocket 連線: ${wsConnectionId}`);
 
     return wsConnectionId;
   }
@@ -81,7 +82,7 @@ export class ConnectionManager {
       const oldConnection = this.connections.get(existingWsConnectionId);
       if (oldConnection) {
         console.log(
-          `偵測到重新連線: ${clientId} (舊連線: ${existingWsConnectionId})`
+          `偵測到重新連線: ${clientId} (舊連線: ${existingWsConnectionId})`,
         );
 
         // 關閉舊連線
@@ -118,12 +119,12 @@ export class ConnectionManager {
     this.sessionMap.get(sessionId).add(wsConnectionId);
 
     if (isReconnect) {
-      console.log(
-        `WebSocket 重新連線: ${wsConnectionId} -> clientId: ${clientId}, sessionId: ${sessionId}`
+      Logger.debug(
+        `客戶端重新連線: ${wsConnectionId} → ${clientId} (工作階段: ${sessionId})`,
       );
     } else {
-      console.log(
-        `WebSocket 認證: ${wsConnectionId} -> clientId: ${clientId}, sessionId: ${sessionId}`
+      Logger.debug(
+        `客戶端認證: ${wsConnectionId} → ${clientId} (工作階段: ${sessionId})`,
       );
     }
 
@@ -170,7 +171,7 @@ export class ConnectionManager {
     // 移除連線記錄
     this.connections.delete(wsConnectionId);
 
-    console.log(`註銷 WebSocket 連線: ${wsConnectionId}`);
+    Logger.connection(`註銷 WebSocket 連線: ${wsConnectionId}`);
   }
 
   /**
@@ -267,7 +268,7 @@ export class ConnectionManager {
         // 如果超過超時時間，標記為死連線
         if (timeSinceLastHeartbeat > timeout) {
           console.log(
-            `連線超時: ${wsConnectionId} (${timeSinceLastHeartbeat}ms)`
+            `連線超時: ${wsConnectionId} (${timeSinceLastHeartbeat}ms)`,
           );
           deadConnections.push(wsConnectionId);
         } else if (ws.readyState === 1) {
@@ -285,20 +286,23 @@ export class ConnectionManager {
       if (this.connections.size > 0) {
         const now = new Date();
         const timestamp = `${now.getFullYear()}-${String(
-          now.getMonth() + 1
+          now.getMonth() + 1,
         ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(
-          now.getHours()
+          now.getHours(),
         ).padStart(2, "0")}:${String(now.getMinutes()).padStart(
           2,
-          "0"
+          "0",
         )}:${String(now.getSeconds()).padStart(2, "0")}`;
-        console.log(
-          `[${timestamp}] 目前連線數: ${this.connections.size}，工作階段數: ${this.sessionMap.size}`
+        Logger.stats(
+          "目前連線",
+          this.connections.size,
+          "工作階段",
+          this.sessionMap.size,
         );
       }
     }, interval);
 
-    console.log(`心跳檢測已啟動 (間隔: ${interval}ms, 超時: ${timeout}ms)`);
+    Logger.info(`心跳檢測已啟動 (間隔: ${interval}ms, 超時: ${timeout}ms)`);
   }
 
   /**
@@ -328,7 +332,7 @@ export class ConnectionManager {
    * 關閉所有連線
    */
   closeAll() {
-    console.log("正在關閉所有 WebSocket 連線...");
+    Logger.debug("正在關閉所有 WebSocket 連線...");
 
     // 停止心跳檢測
     this.stopHeartbeatCheck();
@@ -345,6 +349,6 @@ export class ConnectionManager {
     this.clientIdMap.clear();
     this.sessionMap.clear();
 
-    console.log("所有 WebSocket 連線已關閉");
+    Logger.debug("所有 WebSocket 連線已關閉");
   }
 }

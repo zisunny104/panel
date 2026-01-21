@@ -78,7 +78,7 @@ class WebSocketClient {
     // 4. 建立 WebSocket 連接
     Logger.info(
       "[WebSocketClient] 正在連接到 WebSocket 伺服器...",
-      this.config.url
+      this.config.url,
     );
 
     try {
@@ -148,6 +148,11 @@ class WebSocketClient {
 
         case "client_reconnected":
           this.emit("client_reconnected", data);
+          break;
+
+        case "state_update_ack":
+          // 狀態更新確認回應，記錄但不需要特殊處理
+          Logger.debug("[WebSocketClient] 伺服器確認狀態更新", data);
           break;
 
         case "experiment_started":
@@ -247,7 +252,7 @@ class WebSocketClient {
    */
   handleClose(event) {
     Logger.info(
-      `[WebSocketClient] WebSocket 連接已關閉 [${event.code}]: ${event.reason}`
+      `[WebSocketClient] WebSocket 連接已關閉 [${event.code}]: ${event.reason}`,
     );
 
     this.isAuthenticated = false;
@@ -288,7 +293,7 @@ class WebSocketClient {
     const delay = this.config.reconnectInterval * this.reconnectAttempts;
 
     Logger.info(
-      `[WebSocketClient] 將在 ${delay}ms 後嘗試重新連接 (第 ${this.reconnectAttempts} 次)`
+      `[WebSocketClient] 將在 ${delay}ms 後嘗試重新連接 (第 ${this.reconnectAttempts} 次)`,
     );
 
     this.reconnectTimer = setTimeout(() => {
@@ -320,7 +325,7 @@ class WebSocketClient {
     }, this.config.heartbeatInterval);
 
     Logger.debug(
-      `[WebSocketClient] 心跳已啟動 (間隔: ${this.config.heartbeatInterval}ms)`
+      `[WebSocketClient] 心跳已啟動 (間隔: ${this.config.heartbeatInterval}ms)`,
     );
   }
 
@@ -367,7 +372,7 @@ class WebSocketClient {
     if (this.messageQueue.length === 0) return;
 
     Logger.debug(
-      `[WebSocketClient] 發送佇列中的 ${this.messageQueue.length} 條訊息`
+      `[WebSocketClient] 發送佇列中的 ${this.messageQueue.length} 條訊息`,
     );
 
     while (this.messageQueue.length > 0) {

@@ -9,7 +9,7 @@
 
 class TimeSyncManager {
   constructor() {
-    // 時間偏差（毫秒）= 本地時間 - 伺服器時間
+    // 時間偏差（毫秒）= 本機時間 - 伺服器時間
     // 初始值為 0，表示假設時鐘同步
     this.timeOffset = 0;
 
@@ -29,7 +29,7 @@ class TimeSyncManager {
 
   /**
    * 初始化時間同步
-   * 從伺服器取得參考時間，計算本地時間偏差
+   * 從伺服器取得參考時間，計算本機時間偏差
    */
   async initialize() {
     Logger.debug("[TimeSyncManager] 初始化時間同步...");
@@ -39,7 +39,7 @@ class TimeSyncManager {
       Logger.debug("[TimeSyncManager] 時間同步初始化完成");
     } catch (error) {
       Logger.warn("[TimeSyncManager] 時間同步初始化失敗:", error);
-      // 初始化失敗不影響系統運作，使用本地時間
+      // 初始化失敗不影響系統運作，使用本機時間
       this.isSynced = false;
     }
   }
@@ -58,17 +58,17 @@ class TimeSyncManager {
 
   /**
    * 與伺服器同步時間
-   * 使用本地時間，時間偏差固定為 0
+   * 使用本機時間，時間偏差固定為 0
    */
   async syncWithServer() {
     try {
       // 不需要與伺服器同步
-      // 所有裝置使用各自的本地時間，透過 WebSocket 進行事件同步
+      // 所有裝置使用各自的本機時間，透過 WebSocket 進行事件同步
       this.timeOffset = 0;
       this.isSynced = true;
       this.lastSyncTime = Date.now();
 
-      Logger.debug("[TimeSyncManager] 使用本地時間，時間偏差 = 0ms");
+      Logger.debug("[TimeSyncManager] 使用本機時間，時間偏差 = 0ms");
     } catch (error) {
       Logger.warn("[TimeSyncManager] 時間初始化失敗:", error.message);
       this.isSynced = false;
@@ -80,12 +80,12 @@ class TimeSyncManager {
    * 應該在所有需要參考時間的地方使用此方法
    */
   getServerTime() {
-    // 伺服器時間 = 本地時間 - 時間偏差
+    // 伺服器時間 = 本機時間 - 時間偏差
     return Date.now() - this.timeOffset;
   }
 
   /**
-   * 取得目前本地時間（毫秒級）
+   * 取得目前本機時間（毫秒級）
    */
   getLocalTime() {
     return Date.now();
@@ -140,14 +140,14 @@ class TimeSyncManager {
     // 計算平均偏差
     this.timeOffset = Math.round(
       this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
-        this.syncSamples.length
+        this.syncSamples.length,
     );
 
     this.isSynced = true;
     this.lastSyncTime = Date.now();
 
     Logger.debug(
-      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`
+      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`,
     );
   }
 
@@ -253,14 +253,14 @@ class TimeSyncManager {
     // 計算平均偏差
     this.timeOffset = Math.round(
       this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
-        this.syncSamples.length
+        this.syncSamples.length,
     );
 
     this.isSynced = true;
     this.lastSyncTime = Date.now();
 
     Logger.debug(
-      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`
+      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`,
     );
   }
 
@@ -357,8 +357,8 @@ class TimeSyncManager {
         typeof timestamp === "number"
           ? new Date(timestamp)
           : timestamp instanceof Date
-          ? timestamp
-          : new Date(timestamp);
+            ? timestamp
+            : new Date(timestamp);
 
       if (isNaN(date.getTime())) {
         return "無效時間";

@@ -2,6 +2,7 @@
  * 資料庫結構驗證 - 確保所有必要的表存在
  */
 import { getDatabase } from "./connection.js";
+import { Logger } from "../utils/logger.js";
 
 /**
  * 驗證資料庫結構
@@ -27,10 +28,10 @@ export function validateSchema() {
       }
     }
 
-    console.log("資料庫結構驗證通過");
+    Logger.success("資料庫結構驗證通過");
     return true;
   } catch (error) {
-    console.error("資料庫結構驗證失敗:", error.message);
+    Logger.error("資料庫結構驗證失敗:", error.message);
     throw error;
   }
 }

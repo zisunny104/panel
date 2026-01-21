@@ -183,6 +183,32 @@ class ExperimentStateManager {
   }
 
   /**
+   * 同步輸入框的實驗ID值
+   * 確保輸入框顯示的ID = 實驗會使用的ID
+   * 只負責同步輸入框和內部狀態，不決定優先級
+   * @param {string} experimentId - 要同步的實驗ID
+   */
+  syncExperimentIdWithInput(experimentId) {
+    if (!experimentId) return;
+
+    this.experimentId = experimentId;
+
+    const experimentIdInput = document.getElementById("experimentIdInput");
+    if (experimentIdInput && experimentIdInput.value.trim() !== experimentId) {
+      experimentIdInput.value = experimentId;
+    }
+  }
+
+  /**
+   * 取得輸入框的實驗ID（如果有的話）
+   * @returns {string|null}
+   */
+  getInputExperimentId() {
+    const experimentIdInput = document.getElementById("experimentIdInput");
+    return experimentIdInput?.value?.trim() || null;
+  }
+
+  /**
    * 設定受試者名稱
    * @param {string} subjectName - 新的受試者名稱
    * @param {string} source - 更新來源
@@ -224,7 +250,7 @@ class ExperimentStateManager {
       const oldCombination = this.currentCombination;
       this.currentCombination = combination;
       Logger.info(
-        `目前組合已更新 (${source}): ${combination?.combination_name || "null"}`
+        `目前組合已更新 (${source}): ${combination?.combination_name || "null"}`,
       );
 
       // 分發事件
@@ -255,7 +281,7 @@ class ExperimentStateManager {
           this.subjectName || `受試者_${this.experimentId}`;
         window.experimentLogManager.initialize(
           this.experimentId,
-          defaultSubjectName
+          defaultSubjectName,
         );
         window.experimentLogManager.logExperimentStart();
       }
@@ -336,12 +362,12 @@ class ExperimentStateManager {
     // 只在同步模式下註冊到中樞
     if (window.experimentHubManager?.isInSyncMode?.()) {
       Logger.debug(
-        `[ExperimentStateManager] 同步模式，註冊實驗ID到中樞: ${newId}`
+        `[ExperimentStateManager] 同步模式，註冊實驗ID到中樞: ${newId}`,
       );
       window.experimentHubManager.registerExperimentId(newId, "state_manager");
     } else {
       Logger.debug(
-        `[ExperimentStateManager] 獨立模式，實驗ID僅存本機: ${newId}`
+        `[ExperimentStateManager] 獨立模式，實驗ID僅存本機: ${newId}`,
       );
     }
 
@@ -410,7 +436,7 @@ class ExperimentStateManager {
     document.dispatchEvent(
       new CustomEvent(`state_${event}`, {
         detail: data,
-      })
+      }),
     );
 
     // 狀態變更後儲存快照
@@ -440,7 +466,7 @@ class ExperimentStateManager {
         if (state.currentCombination !== undefined) {
           this.currentCombination = state.currentCombination;
           restoredFields.push(
-            `currentCombination: ${state.currentCombination}`
+            `currentCombination: ${state.currentCombination}`,
           );
         }
         if (state.loadedUnits !== undefined) {
@@ -450,7 +476,7 @@ class ExperimentStateManager {
         if (state.isExperimentRunning !== undefined) {
           this.isExperimentRunning = state.isExperimentRunning;
           restoredFields.push(
-            `isExperimentRunning: ${state.isExperimentRunning}`
+            `isExperimentRunning: ${state.isExperimentRunning}`,
           );
         }
         if (state.experimentPaused !== undefined) {
@@ -463,16 +489,16 @@ class ExperimentStateManager {
             `experimentStartTime: ${
               state.experimentStartTime
                 ? window.timeSyncManager.formatDateTime(
-                    state.experimentStartTime
+                    state.experimentStartTime,
                   )
                 : "未開始"
-            }`
+            }`,
           );
         }
         if (state.experimentElapsed !== undefined) {
           this.experimentElapsed = state.experimentElapsed;
           restoredFields.push(
-            `experimentElapsed: ${state.experimentElapsed}ms`
+            `experimentElapsed: ${state.experimentElapsed}ms`,
           );
         }
 
@@ -501,7 +527,7 @@ class ExperimentStateManager {
       const snapshot = this.getCurrentState();
       sessionStorage.setItem(
         "experiment_state_snapshot",
-        JSON.stringify(snapshot)
+        JSON.stringify(snapshot),
       );
 
       // 詳細記錄儲存的內容
@@ -516,7 +542,7 @@ class ExperimentStateManager {
         savedFields.push(`loadedUnits: [${snapshot.loadedUnits.join(", ")}]`);
       if (snapshot.isExperimentRunning !== undefined)
         savedFields.push(
-          `isExperimentRunning: ${snapshot.isExperimentRunning}`
+          `isExperimentRunning: ${snapshot.isExperimentRunning}`,
         );
       if (snapshot.experimentPaused !== undefined)
         savedFields.push(`experimentPaused: ${snapshot.experimentPaused}`);

@@ -218,7 +218,6 @@
 }
 
 /* 建立/加入工作階段內部區塊 - 各自有邊框 */
-.sync-create-section,
 .sync-join-section {
     border: 2px solid #999;
     border-radius: 6px;
@@ -227,11 +226,6 @@
     background: transparent;
 }
 
-.sync-create-section {
-    margin-bottom: 0;
-}
-
-.sync-create-section h3,
 .sync-join-section h3 {
     margin: 0 0 10px 0;
     font-size: 14px;
@@ -748,20 +742,6 @@
     background: #d1ecf1;
     color: #0c5460;
     border: 2px solid #bee5eb;
-}
-
-/* 工作階段資訊 */
-.sync-session-info {
-    padding: 15px;
-    background: #e9ecef;
-    border-radius: 10px;
-    margin-top: 20px;
-}
-
-.sync-session-info p {
-    margin: 8px 0;
-    font-size: 14px;
-    color: #495057;
 }
 
 .sync-session-info strong {

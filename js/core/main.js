@@ -18,7 +18,7 @@ class MainApp {
       // 等待 DOM 完全載入
       if (document.readyState !== "complete") {
         await new Promise((resolve) =>
-          window.addEventListener("load", resolve, { once: true })
+          window.addEventListener("load", resolve, { once: true }),
         );
       }
 
@@ -35,7 +35,7 @@ class MainApp {
             "[MainApp] SyncManager 已初始化（檢查標記）",
             window.syncManager?.core?.syncClient?.sessionId
               ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
-              : "本機模式"
+              : "本機模式",
           );
           resolve();
           return;
@@ -49,7 +49,7 @@ class MainApp {
               "[MainApp] SyncManager 已就緒（收到 CLIENT_INITIALIZED 事件）",
               window.syncManager?.core?.syncClient?.sessionId
                 ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
-                : "本機模式"
+                : "本機模式",
             );
             resolve();
           }
@@ -66,7 +66,7 @@ class MainApp {
             Logger.warn("[MainApp] 等待 SyncManager 超時（10秒），繼續初始化");
             window.removeEventListener(
               "sync:client-initialized",
-              handleClientInit
+              handleClientInit,
             );
             resolve();
           }
@@ -103,15 +103,14 @@ class MainApp {
       if (!window.experimentHubManager) {
         try {
           Logger.debug("[MainApp] 開始初始化 ExperimentHubManager...");
-          const { initializeExperimentHub } = await import(
-            "../sync/experiment-hub-manager.js"
-          );
+          const { initializeExperimentHub } =
+            await import("../sync/experiment-hub-manager.js");
 
           // 設置初始化超時（5秒）
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => {
               reject(new Error("ExperimentHubManager 初始化超時 (5秒)"));
-            }, 5000)
+            }, 5000),
           );
 
           window.experimentHubManager = await Promise.race([
@@ -127,9 +126,8 @@ class MainApp {
           // 建立備用實例，以保證系統繼續運作
           if (!window.experimentHubManager) {
             Logger.debug("[MainApp] 建立備用 ExperimentHubManager 實例");
-            const { ExperimentHubManager } = await import(
-              "../sync/experiment-hub-manager.js"
-            );
+            const { ExperimentHubManager } =
+              await import("../sync/experiment-hub-manager.js");
             window.experimentHubManager = new ExperimentHubManager();
           }
         }
@@ -312,7 +310,7 @@ class MainApp {
         } catch (error) {
           Logger.error(
             "[MainApp] panelExperiment.startExperiment() 失敗:",
-            error
+            error,
           );
         }
       }
@@ -331,7 +329,7 @@ class MainApp {
         false,
         false,
         null,
-        { device_id: deviceId, source: source }
+        { device_id: deviceId, source: source },
       );
     }
   }
@@ -362,7 +360,7 @@ class MainApp {
       } catch (error) {
         Logger.error(
           "[MainApp] panelExperiment.togglePauseExperiment() 失敗:",
-          error
+          error,
         );
       }
     }
@@ -378,7 +376,7 @@ class MainApp {
         false,
         false,
         null,
-        { device_id: deviceId, source: source }
+        { device_id: deviceId, source: source },
       );
     }
   }
@@ -410,7 +408,7 @@ class MainApp {
       } catch (error) {
         Logger.error(
           "[MainApp] panelExperiment.togglePauseExperiment() 失敗:",
-          error
+          error,
         );
       }
     }
@@ -426,7 +424,7 @@ class MainApp {
         false,
         false,
         null,
-        { device_id: deviceId, source: source }
+        { device_id: deviceId, source: source },
       );
     }
   }
@@ -475,7 +473,7 @@ class MainApp {
       document.dispatchEvent(
         new CustomEvent("experimentIdChanged", {
           detail: { experimentId, timestamp },
-        })
+        }),
       );
     }
   }
@@ -550,7 +548,7 @@ class MainApp {
 
   // 建立動作管理器以支援 action-based 實驗
   createActionManager() {
-    // 使用共享的 ActionManager 類別
+    // 使用共用的 ActionManager 類別
     if (!window.actionManager) {
       window.actionManager = new ActionManager();
       this.modules.actionManager = window.actionManager;

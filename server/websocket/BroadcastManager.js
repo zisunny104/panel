@@ -2,16 +2,18 @@
  * 廣播管理器
  *
  * 功能:
- * - 向房間內所有客戶端廣播訊息
+ * - 向工作階段內所有客戶端廣播訊息
  * - 向特定客戶端發送訊息
  * - 訊息序列化
  * - 發送失敗重試機制
  */
 
+import { Logger } from "../utils/logger.js";
+
 export class BroadcastManager {
-  constructor(connectionManager, roomManager) {
+  constructor(connectionManager, sessionManager) {
     this.connectionManager = connectionManager;
-    this.roomManager = roomManager;
+    this.sessionManager = sessionManager;
   }
 
   /**
@@ -55,11 +57,11 @@ export class BroadcastManager {
     const { excludeClientId = null, onlyClientIds = null } = options;
 
     try {
-      // 取得房間成員
-      const members = this.roomManager.getMembers(sessionId);
+      // 取得工作階段成員
+      const members = this.sessionManager.getClients(sessionId);
 
       if (members.length === 0) {
-        console.warn(`無法廣播: 房間 ${sessionId} 無成員`);
+        console.warn(`無法廣播: 工作階段 ${sessionId} 無成員`);
         return { sent: 0, failed: 0, total: 0 };
       }
 
@@ -98,8 +100,22 @@ export class BroadcastManager {
         }
       }
 
-      console.log(
-        `[廣播] 工作階段 ${sessionId} - 成功: ${sent}, 失敗: ${failed}, 總數: ${targetMembers.length}`
+      // 統計角色
+      let operatorCount = 0;
+      let viewerCount = 0;
+      for (const member of members) {
+        if (member.role === "operator") {
+          operatorCount++;
+        } else if (member.role === "viewer") {
+          viewerCount++;
+        }
+      }
+      const totalCount = members.length;
+
+      Logger.event(
+        "cyan",
+        "=",
+        `工作階段 ${sessionId} | 角色<dim>[</dim><green>${operatorCount}</green><dim>/</dim><blue>${viewerCount}</blue><dim>/</dim><cyan>${totalCount}</cyan><dim>]</dim> | 廣播 <dim>[</dim><green>${sent}</green><dim>/</dim><red>${failed}</red><dim>/</dim><cyan>${targetMembers.length}</cyan><dim>]</dim>`,
       );
 
       return {
@@ -245,11 +261,11 @@ export class BroadcastManager {
    */
   getStats() {
     const connectionStats = this.connectionManager.getStats();
-    const roomStats = this.roomManager.getStats();
+    const sessionStats = this.sessionManager.getStats();
 
     return {
       ...connectionStats,
-      ...roomStats,
+      ...sessionStats,
     };
   }
 }

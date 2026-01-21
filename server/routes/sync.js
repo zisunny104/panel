@@ -5,7 +5,10 @@ import express from "express";
 import SessionService from "../services/SessionService.js";
 import ShareCodeService from "../services/ShareCodeService.js";
 import { generateClientId } from "../utils/idGenerator.js";
+import { validateChecksum } from "../utils/checksum.js";
 import { HTTP_STATUS, ERROR_CODES } from "../config/constants.js";
+import { SHARE_CODE_CONSTANTS } from "../config/constants.js";
+import Logger from "../utils/logger.js";
 import { query, execute } from "../database/connection.js";
 
 const router = express.Router();
@@ -131,7 +134,12 @@ router.post("/generate_share_code", (req, res) => {
 router.post("/join", (req, res) => {
   const { shareCode, role, clientId } = req.body;
 
+  console.log(
+    `[Join] 使用者請求加入工作階段 - 分享代碼: ${shareCode}, 角色: ${role}, 客戶端ID: ${clientId}`,
+  );
+
   if (!shareCode) {
+    console.warn("[Join] 分享代碼缺失");
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
       success: false,
       error: ERROR_CODES.INVALID_SHARE_CODE,
@@ -141,9 +149,13 @@ router.post("/join", (req, res) => {
 
   try {
     // 驗證分享代碼
+    console.log(`[Join] 開始驗證分享代碼: ${shareCode}`);
     const validation = ShareCodeService.validateCode(shareCode);
 
     if (validation.error) {
+      console.warn(
+        `[Join] 分享代碼驗證失敗 - 代碼: ${shareCode}, 錯誤: ${validation.error}`,
+      );
       const statusMap = {
         [ERROR_CODES.INVALID_SHARE_CODE]: HTTP_STATUS.BAD_REQUEST,
         [ERROR_CODES.SHARE_CODE_NOT_FOUND]: HTTP_STATUS.NOT_FOUND,
@@ -161,13 +173,20 @@ router.post("/join", (req, res) => {
 
     // 使用提供的clientId或產生新的
     const finalClientId = clientId || generateClientId();
+    console.log(
+      `[Join] 分享代碼驗證成功 - 工作階段ID: ${validation.session_id}, 客戶端ID: ${finalClientId}`,
+    );
 
     // 標記分享代碼為已使用
     ShareCodeService.markAsUsed(shareCode, finalClientId);
+    console.log(`[Join] 分享代碼已標記為已使用 - 代碼: ${shareCode}`);
 
     // 更新工作階段最後活動時間
     SessionService.updateLastActive(validation.session_id);
 
+    console.log(
+      `[Join] 加入成功 - 工作階段ID: ${validation.session_id}, 角色: ${role || "viewer"}`,
+    );
     res.status(HTTP_STATUS.OK).json({
       success: true,
       data: {
@@ -302,10 +321,10 @@ router.get("/session/:sessionId/clients", (req, res) => {
       });
     }
 
-    // 從 RoomManager 取得即時連線的客戶端
-    const roomManager = req.app.locals.roomManager;
-    if (!roomManager) {
-      // 如果 RoomManager 不可用，回傳空列表
+    // 從 SessionManager 取得即時連線的客戶端
+    const sessionManager = req.app.locals.sessionManager;
+    if (!sessionManager) {
+      // 如果 SessionManager 不可用，回傳空列表
       return res.status(HTTP_STATUS.OK).json({
         success: true,
         data: {
@@ -315,7 +334,7 @@ router.get("/session/:sessionId/clients", (req, res) => {
       });
     }
 
-    const members = roomManager.getMembers(sessionId);
+    const members = sessionManager.getClients(sessionId);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -515,21 +534,63 @@ router.post("/heartbeat", (req, res) => {
  * GET /api/sync/share-code/:code
  * 取得分享代碼資訊（用於檢查狀態，不會標記為已使用）
  *
+ * 驗證順序（與加入時保持一致）：
+ * 1. 長度驗證：必須為 SHARE_CODE_CONSTANTS.LENGTH 位
+ * 2. 校驗碼驗證：使用 validateChecksum() 驗證
+ * 3. 資料庫查詢：檢查代碼是否存在
+ * 4. 狀態檢查：檢查是否過期或已使用
+ *
  * Response: { sessionId, expired, used, expiresAt, createdAt }
  */
 router.get("/share-code/:code", (req, res) => {
   const { code } = req.params;
 
   try {
+    console.log(
+      `[ShareCode] 收到分享代碼查詢請求 - 代碼: ${code}, 長度: ${code.length}`,
+    );
+
+    // 步驟 1: 長度驗證
+    if (code.length !== SHARE_CODE_CONSTANTS.LENGTH) {
+      console.warn(
+        `[ShareCode] 長度驗證失敗 - 期望: ${SHARE_CODE_CONSTANTS.LENGTH}, 實際: ${code.length}`,
+      );
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: ERROR_CODES.INVALID_SHARE_CODE,
+        message: "分享代碼格式錯誤（應為6位數字）",
+      });
+    }
+
+    // 步驟 2: 校驗碼驗證
+    if (!validateChecksum(code)) {
+      console.warn(`[ShareCode] 校驗碼驗證失敗 - 代碼: ${code}`);
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: ERROR_CODES.INVALID_SHARE_CODE,
+        message: "分享代碼校驗失敗",
+      });
+    }
+
+    console.log(`[ShareCode] 格式驗證通過，準備查詢資料庫 - 代碼: ${code}`);
+
+    // 步驟 3 & 4: 取得代碼資訊（資料庫查詢 + 狀態檢查）
     const codeInfo = ShareCodeService.getCodeInfo(code);
 
     if (codeInfo.error) {
+      Logger.warn(
+        `[ShareCode] 代碼資訊查詢失敗 - 代碼: ${code}, 錯誤: ${codeInfo.error}`,
+      );
       return res.status(HTTP_STATUS.NOT_FOUND).json({
         success: false,
         error: codeInfo.error,
         message: "分享代碼無效",
       });
     }
+
+    console.log(
+      `[ShareCode] 代碼驗證成功 - 代碼: ${code}, 工作階段ID: ${codeInfo.session_id}, 過期: ${codeInfo.expired}, 已使用: ${codeInfo.used}`,
+    );
 
     // 回傳格式統一為 camelCase
     res.status(HTTP_STATUS.OK).json({

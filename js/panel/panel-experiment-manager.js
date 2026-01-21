@@ -95,6 +95,10 @@ class PanelExperimentManager {
       if (e.detail && e.detail.type === "experimentIdUpdate") {
         this.handleRemoteExperimentIdUpdate(e.detail);
       }
+      // 組合選擇
+      if (e.detail && e.detail.type === "combination_selected") {
+        this.handleRemoteCombinationSelected(e.detail);
+      }
       // 手勢標記
       if (e.detail && e.detail.type === "gesture_marked") {
         this.handleRemoteGestureMarked(e.detail);
@@ -106,6 +110,10 @@ class PanelExperimentManager {
       // 動作按鈕點擊
       if (e.detail && e.detail.type === "action_button_clicked") {
         this.handleRemoteActionButtonClicked(e.detail);
+      }
+      // 遠端實驗開始事件
+      if (e.detail && e.detail.type === "experiment_started") {
+        this.handleRemoteExperimentStarted(e.detail);
       }
     });
 
@@ -119,11 +127,11 @@ class PanelExperimentManager {
     window.addEventListener("experiment_id_broadcasted", (e) => {
       Logger.debug(
         `[PanelExperimentManager] 收到 experiment_id_broadcasted 事件:`,
-        e.detail
+        e.detail,
       );
       if (e.detail && e.detail.experimentId) {
         Logger.debug(
-          `[PanelExperimentManager] 處理廣播的實驗ID更新: ${e.detail.experimentId}`
+          `[PanelExperimentManager] 處理廣播的實驗ID更新: ${e.detail.experimentId}`,
         );
         this.handleRemoteExperimentIdUpdate({
           experimentId: e.detail.experimentId,
@@ -165,12 +173,12 @@ class PanelExperimentManager {
         if (window.experimentStateManager) {
           window.experimentStateManager.setExperimentId(
             data.currentExperimentId,
-            "sync"
+            "sync",
           );
         } else if (window.experimentLogManager) {
           window.experimentLogManager.setExperimentId(
             data.currentExperimentId,
-            "sync"
+            "sync",
           );
         }
         this.currentExperimentId = data.currentExperimentId;
@@ -231,7 +239,7 @@ class PanelExperimentManager {
       if (window.experimentStateManager && data.experimentId) {
         window.experimentStateManager.setExperimentId(
           data.experimentId,
-          "sync_init"
+          "sync_init",
         );
       }
       this.currentExperimentId = data.experimentId;
@@ -270,7 +278,7 @@ class PanelExperimentManager {
               button: buttonData.button,
               experimentId: data.experimentId,
             },
-          })
+          }),
         );
       }
     } catch (error) {
@@ -285,7 +293,7 @@ class PanelExperimentManager {
       if (this.isExperimentRunning) {
         Logger.debug(
           "目前實驗正在進行中，等待結束後再同步新的受試者名稱:",
-          data.subjectName || data.subject_name
+          data.subjectName || data.subject_name,
         );
         // 將更新請求加入佇列，等待實驗結束
         this.pendingSubjectNameUpdate = data;
@@ -305,17 +313,17 @@ class PanelExperimentManager {
       Logger.debug(
         `[PanelExperimentManager] 開始處理遠端實驗ID更新: ${
           data?.experimentId
-        } (來源: ${data?.source || "unknown"})`
+        } (來源: ${data?.source || "unknown"})`,
       );
       Logger.debug(
         `[PanelExperimentManager] 收到遠端實驗ID更新事件詳情:`,
-        data
+        data,
       );
 
       // 如果目前實驗正在進行中，等待實驗結束後再同步新的實驗ID
       if (this.isExperimentRunning) {
         Logger.debug(
-          `[PanelExperimentManager] ⏳ 實驗進行中，將ID更新請求加入佇列`
+          `[PanelExperimentManager] ⏳ 實驗進行中，將ID更新請求加入佇列`,
         );
         // 將更新請求加入佇列，等待實驗結束
         this.pendingExperimentIdUpdate = data;
@@ -327,8 +335,74 @@ class PanelExperimentManager {
     } catch (error) {
       Logger.error(
         `[PanelExperimentManager] 套用遠端實驗ID更新時發生錯誤:`,
-        error
+        error,
       );
+    }
+  }
+
+  /** 處理遠端組合選擇 */
+  handleRemoteCombinationSelected(data) {
+    try {
+      Logger.debug(
+        `[PanelExperimentManager] 收到遠端組合選擇: ${
+          data?.combination?.combination_name || "unknown"
+        }`,
+      );
+
+      // 如果目前實驗正在進行中，等待實驗結束後再同步組合
+      if (this.isExperimentRunning) {
+        Logger.debug(
+          `[PanelExperimentManager] 實驗進行中，將組合更新請求加入佇列`,
+        );
+        this.pendingCombinationUpdate = {
+          combination: data.combination,
+          device_id: data.device_id,
+          timestamp: data.timestamp,
+        };
+        this.showPendingUpdateIndicator("combination");
+        return;
+      }
+
+      // 應用遠端組合選擇
+      this.applyCombinationSelection(data.combination);
+    } catch (error) {
+      Logger.error(
+        `[PanelExperimentManager] 套用遠端組合選擇時發生錯誤:`,
+        error,
+      );
+    }
+  }
+
+  /** 應用遠端組合選擇 */
+  applyCombinationSelection(combination) {
+    try {
+      if (!combination) return;
+
+      Logger.debug(
+        `[PanelExperimentManager] 應用組合選擇: ${combination.combination_name}`,
+      );
+
+      // 更新組合選擇器的內部狀態
+      if (window.combinationSelector) {
+        window.combinationSelector.currentCombination = combination;
+
+        // 更新 UI 顯示（組合卡片選中狀態）
+        window.combinationSelector.updateCombinationCardSelection(combination);
+
+        // 更新單元列表以反映組合內容
+        window.combinationSelector.updateUnitListForCombination(combination);
+      }
+
+      // 記錄日誌
+      this.logAction("remote_combination_selected", {
+        combination_name: combination.combination_name,
+        combination_id: combination.combination_id,
+        timestamp: new Date().toISOString(),
+      });
+
+      Logger.debug(`[PanelExperimentManager] 遠端組合選擇已套用`);
+    } catch (error) {
+      Logger.error(`[PanelExperimentManager] 應用遠端組合選擇失敗:`, error);
     }
   }
 
@@ -377,7 +451,7 @@ class PanelExperimentManager {
     Logger.debug(
       `[PanelExperimentManager] 開始套用實驗ID更新: ${
         data?.experimentId || data?.experiment_id
-      }`
+      }`,
     );
     Logger.debug(`[PanelExperimentManager] 套用詳情:`, data);
 
@@ -386,18 +460,18 @@ class PanelExperimentManager {
       // 支援多種欄位名稱
       const experimentId = data.experimentId || data.experiment_id || "";
       Logger.debug(
-        `[PanelExperimentManager] 套用實驗ID更新: 新ID = ${experimentId}`
+        `[PanelExperimentManager] 套用實驗ID更新: 新ID = ${experimentId}`,
       );
 
       if (window.experimentStateManager) {
         window.experimentStateManager.setExperimentId(
           experimentId,
-          "sync_update"
+          "sync_update",
         );
       } else if (window.experimentLogManager) {
         window.experimentLogManager.setExperimentId(
           experimentId,
-          "sync_update"
+          "sync_update",
         );
       }
       experimentIdInput.value = experimentId;
@@ -406,14 +480,14 @@ class PanelExperimentManager {
       this.hidePendingUpdateIndicator("experimentId");
 
       Logger.debug(
-        `[PanelExperimentManager] 實驗ID已成功更新: ${experimentId}`
+        `[PanelExperimentManager] 實驗ID已成功更新: ${experimentId}`,
       );
     }
   }
 
   /** 套用受試者名稱更新 */
   applySubjectNameUpdate(data) {
-    const subjectNameInput = document.getElementById("subjectName");
+    const subjectNameInput = document.getElementById("subjectNameInput");
     if (subjectNameInput) {
       // 支援多種欄位名稱
       const subjectName = data.subjectName || data.subject_name || "";
@@ -453,7 +527,7 @@ class PanelExperimentManager {
     try {
       const { step_index, gesture_name, mark_status } = data;
       Logger.debug(
-        `遠端手勢標記: 步驟${step_index} - ${gesture_name} 標記為 ${mark_status}`
+        `遠端手勢標記: 步驟${step_index} - ${gesture_name} 標記為 ${mark_status}`,
       );
 
       // 在卡片上顯示標記指示（可選：在對應卡片上顯示標記顏色）
@@ -492,7 +566,7 @@ class PanelExperimentManager {
     try {
       const { step_index, gesture_name, timer_value } = data;
       Logger.debug(
-        `遠端手勢步驟完成: 步驟${step_index} - ${gesture_name} (${timer_value})`
+        `遠端手勢步驟完成: 步驟${step_index} - ${gesture_name} (${timer_value})`,
       );
 
       // 在控制面板上顯示遠端進度
@@ -529,13 +603,34 @@ class PanelExperimentManager {
     }
   }
 
+  /** 處理遠端實驗開始事件 */
+  handleRemoteExperimentStarted(data) {
+    try {
+      Logger.debug(
+        `[PanelExperimentManager] 收到遠端實驗開始事件，即將關閉面板`,
+        data,
+      );
+
+      // 遠端開始實驗時，關閉面板以便操作者專注於實驗進行
+      // 延遲 500ms 以確保所有事件都已處理完畢
+      setTimeout(() => {
+        this.closeExperimentPanel();
+        if (window.logger) {
+          window.logger.logAction("遠端實驗開始_面板自動關閉");
+        }
+      }, 500);
+    } catch (error) {
+      Logger.error("處理遠端實驗開始事件時發生錯誤:", error);
+    }
+  }
+
   /** 處理裝置模式變更 */
   handleDeviceModeChanged(data) {
     const isInteractive = data.isInteractive;
 
     // 根據模式顯示/隱藏實驗控制按鈕
     const controlButtons = document.querySelectorAll(
-      "#startExperimentBtn, #pauseExperimentBtn, #stopExperimentBtn"
+      "#startExperimentBtn, #pauseExperimentBtn, #stopExperimentBtn",
     );
     controlButtons.forEach((button) => {
       if (button) {
@@ -563,7 +658,7 @@ class PanelExperimentManager {
       "廣播實驗初始化 - loadedUnits 數量:",
       this.loadedUnits.length,
       "ID:",
-      this.getCurrentExperimentId()
+      this.getCurrentExperimentId(),
     );
     Logger.debug("   詳細資料:", initData);
 
@@ -571,7 +666,7 @@ class PanelExperimentManager {
     document.dispatchEvent(
       new CustomEvent("experimentStateChange", {
         detail: initData,
-      })
+      }),
     );
 
     //透過同步系統發送到其他裝置（experiment.html）
@@ -660,7 +755,7 @@ class PanelExperimentManager {
     document.dispatchEvent(
       new CustomEvent("experimentStateChange", {
         detail: actionData,
-      })
+      }),
     );
   }
 
@@ -730,10 +825,10 @@ class PanelExperimentManager {
   }
 
   /** 廣播實驗ID更新到其他裝置 */
-  broadcastExperimentIdUpdate(experimentId) {
+  async broadcastExperimentIdUpdate(experimentId) {
     try {
       Logger.debug(
-        `[PanelExperimentManager] 開始廣播實驗ID更新: ${experimentId}`
+        `[PanelExperimentManager] 開始廣播實驗ID更新: ${experimentId}`,
       );
 
       const syncIdData = {
@@ -748,25 +843,60 @@ class PanelExperimentManager {
       Logger.debug(`[PanelExperimentManager] 廣播資料:`, syncIdData);
 
       if (window.syncManager?.core?.syncState) {
-        window.syncManager.core.syncState(syncIdData).catch((error) => {
-          Logger.debug(
-            `[PanelExperimentManager] 同步實驗ID更新失敗: ${error.message}`
+        try {
+          const result = await window.syncManager.core.syncState(syncIdData);
+          Logger.info(
+            `[PanelExperimentManager] 實驗ID廣播成功: ${experimentId} (結果: ${result})`,
           );
-        });
-        Logger.debug(
-          `[PanelExperimentManager] 實驗ID廣播請求已發送: ${experimentId}`
-        );
+        } catch (error) {
+          Logger.warn(
+            `[PanelExperimentManager] 同步實驗ID更新失敗: ${error.message}`,
+          );
+        }
       } else {
         Logger.warn(
-          "[PanelExperimentManager] window.syncManager.core.syncState 不存在"
+          "[PanelExperimentManager] window.syncManager.core.syncState 不存在，本機模式",
         );
       }
     } catch (error) {
       Logger.error(
         `[PanelExperimentManager] 廣播實驗ID更新時發生錯誤: ${error.message}`,
-        error
+        error,
       );
     }
+  }
+
+  /** 廣播受試者名稱變更到其他連線裝置 */
+  broadcastSubjectNameChange(subjectName) {
+    // 檢查是否存在同步工作階段
+    if (!window.syncManager?.core?.isConnected?.()) {
+      Logger.debug(
+        "[PanelExperimentManager] 未連接到同步工作階段，跳過受試者名稱廣播",
+      );
+      return;
+    }
+
+    // 如果受試者名稱為空，不進行同步（避免 null 污染）
+    if (!subjectName || !subjectName.trim()) {
+      Logger.debug("[PanelExperimentManager] 受試者名稱為空，跳過同步");
+      return;
+    }
+
+    const updateData = {
+      type: "subjectNameUpdate",
+      device_id:
+        window.syncManager?.core?.syncClient?.clientId || "panel_device",
+      experimentId: document.getElementById("experimentIdInput")?.value || "",
+      subjectName: subjectName.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+    // 同步到伺服器
+    window.syncManager.core.syncState(updateData).catch((error) => {
+      Logger.warn("[PanelExperimentManager] 同步受試者名稱更新失敗:", error);
+    });
+
+    Logger.debug(`[PanelExperimentManager] 廣播受試者名稱變更: ${subjectName}`);
   }
 
   /** 設定實驗控制按鈕 */
@@ -788,18 +918,18 @@ class PanelExperimentManager {
     }
     if (pauseExperimentButton) {
       pauseExperimentButton.addEventListener("click", () =>
-        this.togglePauseExperiment()
+        this.togglePauseExperiment(),
       );
     }
     if (stopExperimentButton) {
       stopExperimentButton.addEventListener("click", () =>
-        this.stopExperiment()
+        this.stopExperiment(),
       );
     }
 
     if (selectAllUnits) {
       selectAllUnits.addEventListener("change", (e) =>
-        this.toggleSelectAllUnits(e.target.checked)
+        this.toggleSelectAllUnits(e.target.checked),
       );
     }
 
@@ -830,6 +960,18 @@ class PanelExperimentManager {
       experimentIdInput.addEventListener("change", (e) => {
         const newId = e.target.value.trim();
         if (newId) {
+          // 實驗ID改變時根據所選組合更新單元序列
+          const currentCombination = this.currentCombination;
+          if (currentCombination && window.combinationSelector) {
+            Logger.debug(
+              `[PanelExperimentManager] 實驗ID改變時更新單元序列: ${
+                currentCombination.combination_name
+              }`,
+            );
+            window.combinationSelector.updateUnitListForCombination(
+              currentCombination,
+            );
+          }
           this.broadcastExperimentIdUpdate(newId);
         } else {
           // 如果清空，產生新ID
@@ -837,17 +979,53 @@ class PanelExperimentManager {
         }
       });
     }
-
     // 重新產生ID按鈕事件
     const regenerateIdButton = document.getElementById("regenerateIdButton");
     if (regenerateIdButton) {
-      regenerateIdButton.addEventListener("click", () => {
-        this.generateNewExperimentId();
-        // 自動重新套用指定隨機組合（如果目前選中的是）
-        this.autoReapplyRandomCombination();
+      regenerateIdButton.addEventListener("click", async () => {
+        try {
+          // 檢查是否在同步模式
+          if (window.experimentHubManager?.isInSyncMode?.()) {
+            // 同步模式：使用智慧方法
+            await this.smartRegenerateExperimentId();
+          } else {
+            // 獨立模式：簡單產生
+            this.generateNewExperimentId();
+          }
+          // 自動重新套用指定隨機組合（如果目前選中的是）
+          this.autoReapplyRandomCombination();
+        } catch (error) {
+          Logger.error("[PanelExperimentManager] 重新產生ID失敗:", error);
+          // 失敗時仍進行簡單產生
+          this.generateNewExperimentId();
+          this.autoReapplyRandomCombination();
+        }
       });
     } else {
       Logger.warn("regenerateIdButton 未找到");
+    }
+
+    // 受試者名稱輸入框事件
+    const subjectNameInput = document.getElementById("subjectNameInput");
+    if (subjectNameInput) {
+      subjectNameInput.addEventListener("change", (e) => {
+        const newSubjectName = e.target.value.trim();
+        if (newSubjectName) {
+          // 受試者名稱改變時同步到中樞
+          this.broadcastSubjectNameChange(newSubjectName);
+        }
+      });
+
+      // 及時更新狀態管理器
+      subjectNameInput.addEventListener("input", (e) => {
+        // 及時保存到統一狀態管理
+        if (window.experimentStateManager) {
+          window.experimentStateManager.setSubjectName(
+            e.target.value,
+            "panel_input",
+          );
+        }
+      });
     }
 
     // 初始化按鈕狀態
@@ -857,9 +1035,111 @@ class PanelExperimentManager {
     document.addEventListener("sync_session_restored", () => {
       this.updateButtonStates();
     });
-    document.addEventListener("sync_session_joined", () => {
+    document.addEventListener("sync_session_joined", (event) => {
+      Logger.debug(
+        "[PanelExperimentManager] 工作階段加入事件觸發",
+        event.detail,
+      );
+
+      // 同步階段初始化：讀取中樞資料
+      this.initializeFromSync(event.detail);
+
+      // 更新按鈕狀態：根據角色禁用/啟用按鈕
       this.updateButtonStates();
     });
+  }
+
+  /**
+   * 同步加入後的初始化：讀取中樞資料並同步到本機
+   * @param {Object} detail - sync_session_joined 事件詳情
+   */
+  async initializeFromSync(detail) {
+    try {
+      const { sessionId, shouldSyncFromHub, syncItems } = detail;
+
+      if (!shouldSyncFromHub) {
+        Logger.debug("[PanelExperimentManager] 跳過中樞同步");
+        return;
+      }
+
+      Logger.info("[PanelExperimentManager] 開始從中樞同步資料", syncItems);
+
+      // 應該同步的項目：實驗ID、受試者名稱、實驗組合、實驗狀態
+      if (syncItems?.includes("experimentId")) {
+        Logger.debug("[PanelExperimentManager] 同步項目: 實驗ID");
+        // 從中樞讀取目前的實驗ID
+        const hubState = await this.getHubState(sessionId);
+        if (hubState?.experimentId) {
+          this.currentExperimentId = hubState.experimentId;
+          this.updateExperimentIdDisplay();
+          Logger.info(
+            `[PanelExperimentManager] 實驗ID已同步: ${hubState.experimentId}`,
+          );
+        }
+      }
+
+      if (syncItems?.includes("subjectName")) {
+        Logger.debug("[PanelExperimentManager] 同步項目: 受試者名稱");
+        const hubState = await this.getHubState(sessionId);
+        if (hubState?.subjectName) {
+          this.currentSubjectName = hubState.subjectName;
+          this.updateSubjectNameDisplay();
+          Logger.info(
+            `[PanelExperimentManager] 受試者名稱已同步: ${hubState.subjectName}`,
+          );
+        }
+      }
+
+      if (syncItems?.includes("combination")) {
+        Logger.debug("[PanelExperimentManager] 同步項目: 實驗組合");
+        const hubState = await this.getHubState(sessionId);
+        if (hubState?.combination) {
+          this.currentCombination = hubState.combination;
+          this.updateCombinationDisplay();
+          Logger.info(
+            `[PanelExperimentManager] 實驗組合已同步: ${hubState.combination?.name}`,
+          );
+        }
+      }
+
+      if (syncItems?.includes("experimentState")) {
+        Logger.debug("[PanelExperimentManager] 同步項目: 實驗狀態");
+        const hubState = await this.getHubState(sessionId);
+        if (hubState?.state) {
+          this.currentState = hubState.state;
+          this.updateExperimentStateDisplay();
+          Logger.info(
+            `[PanelExperimentManager] 實驗狀態已同步: ${hubState.state}`,
+          );
+        }
+      }
+
+      Logger.info("[PanelExperimentManager] 中樞資料同步完成");
+    } catch (error) {
+      Logger.error("[PanelExperimentManager] 中樞同步失敗:", error);
+    }
+  }
+
+  /**
+   * 從中樞取得目前工作階段的狀態
+   * @param {string} sessionId - 工作階段ID
+   * @returns {Object} 中樞狀態
+   */
+  async getHubState(sessionId) {
+    try {
+      if (!window.syncManager?.core?.syncClient?.getState) {
+        Logger.warn("[PanelExperimentManager] SyncClient 未初始化");
+        return null;
+      }
+
+      const state =
+        await window.syncManager.core.syncClient.getState(sessionId);
+      Logger.debug("[PanelExperimentManager] 取得中樞狀態:", state);
+      return state;
+    } catch (error) {
+      Logger.error("[PanelExperimentManager] 讀取中樞狀態失敗:", error);
+      return null;
+    }
   }
 
   /**
@@ -909,53 +1189,180 @@ class PanelExperimentManager {
     }
   }
 
+  /** 產生新的實驗ID 並在同步模式下註冊到中樞 */
+  async generateNewExperimentIdWithHub() {
+    try {
+      Logger.debug(`[PanelExperimentManager] 產生新的實驗ID...`);
+
+      // 產生新的實驗ID
+      const newId = RandomUtils.generateNewExperimentId();
+
+      // 更新本機狀態
+      this.currentExperimentId = newId;
+      this.updateExperimentIdDisplay();
+
+      if (window.experimentStateManager) {
+        window.experimentStateManager.setExperimentId(newId, "generate");
+      }
+
+      // 檢查是否在同步模式
+      if (window.experimentHubManager?.hubClient) {
+        Logger.debug(
+          `[PanelExperimentManager] 同步模式: 註冊新ID到中樞: ${newId}`,
+        );
+        try {
+          await window.experimentHubManager.hubClient.registerExperimentId(
+            newId,
+            "panel_manager",
+          );
+          Logger.info(
+            `[PanelExperimentManager] 實驗ID已成功註冊到中樞: ${newId}`,
+          );
+        } catch (error) {
+          Logger.warn(
+            `[PanelExperimentManager] 無法連線到實驗中樞: ${error.message}`,
+          );
+        }
+      } else {
+        Logger.debug(
+          `[PanelExperimentManager] 獨立模式: 新ID僅存本機: ${newId}`,
+        );
+      }
+
+      // 廣播新的實驗ID
+      this.broadcastExperimentIdUpdate(newId);
+
+      Logger.info(`[PanelExperimentManager] 新的實驗ID已產生: ${newId}`);
+      return newId;
+    } catch (error) {
+      Logger.error(`[PanelExperimentManager] 產生新實驗ID失敗:`, error);
+      throw error;
+    }
+  }
+
+  /** 智慧重新產生實驗ID - 檢查中樞同步狀態 */
+  async smartRegenerateExperimentId() {
+    const hubManager = window.experimentHubManager;
+
+    // 檢查是否在同步模式
+    if (!hubManager?.isInSyncMode?.()) {
+      Logger.debug(
+        `[PanelExperimentManager 智慧重新產生] 獨立模式 - 直接產生新的實驗ID`,
+      );
+      await this.generateNewExperimentIdWithHub();
+      return;
+    }
+
+    try {
+      // 取得中樞的實驗ID
+      const hubExperimentId = await hubManager.getExperimentId();
+      const currentExperimentId = this.currentExperimentId;
+
+      Logger.debug(
+        `[PanelExperimentManager 智慧重新產生] 中樞ID: ${hubExperimentId}, 本機ID: ${currentExperimentId}`,
+      );
+
+      if (
+        hubExperimentId &&
+        currentExperimentId &&
+        hubExperimentId !== currentExperimentId
+      ) {
+        // 實驗ID與中樞不同，同步到中樞的ID
+        Logger.info(
+          `[PanelExperimentManager 智慧重新產生] 實驗ID與中樞不同，同步到中樞ID: ${hubExperimentId}`,
+        );
+        this.currentExperimentId = hubExperimentId;
+        this.updateExperimentIdDisplay();
+
+        // 更新狀態管理器
+        if (window.experimentStateManager) {
+          window.experimentStateManager.setExperimentId(
+            hubExperimentId,
+            "sync",
+          );
+        }
+
+        // 廣播同步
+        this.broadcastExperimentIdUpdate(hubExperimentId);
+      } else {
+        // 實驗ID與中樞相同或中樞沒有ID，產生新的ID
+        Logger.info(
+          `[PanelExperimentManager 智慧重新產生] 產生新的實驗ID並廣播`,
+        );
+        await this.generateNewExperimentIdWithHub();
+      }
+    } catch (error) {
+      Logger.error(
+        `[PanelExperimentManager 智慧重新產生] 檢查中樞狀態失敗:`,
+        error,
+      );
+      // 出錯時仍產生新的ID
+      await this.generateNewExperimentIdWithHub();
+    }
+  }
+
   /**
    * 初始化連線時取得實驗ID
    * 使用新的 ExperimentHubClient 系統
    */
   async initializeExperimentId() {
     try {
-      // 等待 ExperimentHubManager 初始化（最多等 5 秒）
-      let attempts = 0;
-      const maxAttempts = 50;
+      let experimentId = null;
 
-      while (!window.experimentHubManager && attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        attempts++;
-      }
-
-      if (!window.experimentHubManager) {
-        Logger.warn(
-          "[PanelExperimentManager] ExperimentHubManager 初始化超時，產生新ID"
-        );
-        this.generateNewExperimentId();
-        return;
-      }
-
-      // 檢查是否處於同步模式且有客戶端
-      if (window.experimentHubManager.hubClient) {
-        const experimentId =
-          await window.experimentHubManager.hubClient.getExperimentId();
-        if (experimentId) {
-          this.currentExperimentId = experimentId;
-          this.updateExperimentIdDisplay();
-          if (window.experimentStateManager) {
-            window.experimentStateManager.setExperimentId(experimentId, "hub");
+      // 第1步：檢查是否在同步模式，優先從中樞取得
+      if (window.experimentHubManager?.hubClient) {
+        try {
+          experimentId =
+            await window.experimentHubManager.hubClient.getExperimentId();
+          if (experimentId) {
+            Logger.debug(
+              `[PanelExperimentManager] 第1優先：從中樞取得實驗ID: ${experimentId}`,
+            );
+            this.currentExperimentId = experimentId;
+            if (window.experimentStateManager) {
+              window.experimentStateManager.syncExperimentIdWithInput(
+                experimentId,
+              );
+            }
+            return;
           }
+        } catch (e) {
           Logger.debug(
-            `[PanelExperimentManager] 從中樞讀取實驗ID: ${experimentId}`
+            `[PanelExperimentManager] 中樞讀取失敗，嘗試其他來源: ${e.message}`,
           );
-          return;
         }
       }
 
-      // 本機模式或無法從中樞取得 ID，產生新 ID
-      Logger.debug(
-        "[PanelExperimentManager] 本機模式或無法從中樞取得ID，產生新ID"
-      );
+      // 第2步：檢查快照ID（非同步模式優先）
+      if (window.experimentStateManager?.experimentId) {
+        experimentId = window.experimentStateManager.experimentId;
+        Logger.debug(
+          `[PanelExperimentManager] 第2優先：使用快照ID: ${experimentId}`,
+        );
+        this.currentExperimentId = experimentId;
+        this.updateExperimentIdDisplay();
+        return;
+      }
+
+      // 第3步：檢查輸入框是否已有值
+      const inputId = window.experimentStateManager?.getInputExperimentId();
+      if (inputId) {
+        experimentId = inputId;
+        Logger.debug(
+          `[PanelExperimentManager] 第3優先：使用輸入框ID: ${experimentId}`,
+        );
+        this.currentExperimentId = experimentId;
+        if (window.experimentStateManager) {
+          window.experimentStateManager.syncExperimentIdWithInput(experimentId);
+        }
+        return;
+      }
+
+      // 第4步：都沒有ID，產生新ID
+      Logger.debug(`[PanelExperimentManager] 第4步：產生新ID`);
       this.generateNewExperimentId();
     } catch (e) {
-      Logger.warn("無法從中樞讀取ID，產生新ID:", e);
+      Logger.warn("初始化實驗ID失敗，即將產生新ID:", e);
       this.generateNewExperimentId();
     }
   }
@@ -1006,7 +1413,7 @@ class PanelExperimentManager {
       if (window.experimentStateManager) {
         window.experimentStateManager.setExperimentId(
           inputValue,
-          "panel_start"
+          "panel_start",
         );
       }
     } else {
@@ -1022,15 +1429,28 @@ class PanelExperimentManager {
 
     //開始 JSONL 實驗日誌記錄
     const experimentId = this.getCurrentExperimentId();
-    const subjectName =
-      document.getElementById("subjectNameInput")?.value || "";
+    let subjectName =
+      document.getElementById("subjectNameInput")?.value?.trim() || "";
     const combinationName = this.currentCombination?.combination_name || "";
+
+    // 如果受試者名稱為空，自動產生「受試者_實驗ID」
+    if (!subjectName) {
+      subjectName = `受試者_${experimentId}`;
+      const subjectNameInput = document.getElementById("subjectNameInput");
+      if (subjectNameInput) {
+        // 更新輸入框，確保輸入欄等於實際使用的值
+        subjectNameInput.value = subjectName;
+      }
+      Logger.debug(
+        `[PanelExperimentManager] 自動產生受試者名稱: ${subjectName}`,
+      );
+    }
 
     if (window.panelExperimentLog) {
       window.panelExperimentLog.startRecording(
         experimentId,
         subjectName,
-        combinationName
+        combinationName,
       );
     }
 
@@ -1041,7 +1461,7 @@ class PanelExperimentManager {
         null,
         null,
         false,
-        false
+        false,
       );
 
       // 自動最小化 logger 在實驗模式
@@ -1052,7 +1472,7 @@ class PanelExperimentManager {
 
     const startExperimentButton = document.getElementById("startExperimentBtn");
     const experimentControlButtons = document.getElementById(
-      "experimentControlButtons"
+      "experimentControlButtons",
     );
 
     if (startExperimentButton) startExperimentButton.style.display = "none";
@@ -1080,7 +1500,7 @@ class PanelExperimentManager {
       Logger.debug(`[同步模式] 註冊實驗ID到中樞: ${finalExperimentId}`);
       window.experimentHubManager.registerExperimentId(
         finalExperimentId,
-        "panel_start"
+        "panel_start",
       );
     } else if (finalExperimentId) {
       Logger.debug(`[獨立模式] 實驗ID僅存本機: ${finalExperimentId}`);
@@ -1103,7 +1523,7 @@ class PanelExperimentManager {
           window.mainApp.setExperimentPanelButtonColor("running");
         } else {
           Logger.error(
-            "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義"
+            "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義",
           );
         }
         //不在此呼叫 loadUnitsAndStart()，等待打開電源後再呼叫
@@ -1138,14 +1558,14 @@ class PanelExperimentManager {
           combinationId: this.currentCombination?.combination_id || "",
           combinationName: this.currentCombination?.combination_name || "",
         },
-      })
+      }),
     );
 
     if (window.mainApp?.setExperimentPanelButtonColor) {
       window.mainApp.setExperimentPanelButtonColor("running");
     } else {
       Logger.error(
-        "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義"
+        "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義",
       );
     }
     window.dispatchExperimentStatusChanged &&
@@ -1166,7 +1586,7 @@ class PanelExperimentManager {
       };
       Logger.debug(
         "[PanelExperiment] 廣播實驗開始訊號到其他裝置:",
-        syncStartData
+        syncStartData,
       );
       window.syncManager.core.syncState(syncStartData).catch((error) => {
         Logger.warn("[PanelExperiment] 同步實驗開始失敗:", error);
@@ -1180,12 +1600,12 @@ class PanelExperimentManager {
     Logger.debug(
       `highlightPowerSwitch(${enable}): powerSwitchArea=${
         powerSwitchArea ? "找到" : "未找到"
-      }`
+      }`,
     );
 
     if (powerSwitchArea) {
       Logger.debug(
-        `   目前 display=${powerSwitchArea.style.display}, visibility=${powerSwitchArea.style.visibility}`
+        `   目前 display=${powerSwitchArea.style.display}, visibility=${powerSwitchArea.style.visibility}`,
       );
 
       if (enable) {
@@ -1300,7 +1720,7 @@ class PanelExperimentManager {
         window.mainApp.setExperimentPanelButtonColor("running");
       } else {
         Logger.error(
-          "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義"
+          "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義",
         );
       }
 
@@ -1359,7 +1779,7 @@ class PanelExperimentManager {
           null,
           null,
           false,
-          false
+          false,
         );
       }
       this.finishExperiment();
@@ -1412,7 +1832,7 @@ class PanelExperimentManager {
             Logger.debug(
               "實驗資料載入後已初始化動作序列，共",
               window.actionManager.currentActionSequence.length,
-              "個動作"
+              "個動作",
             );
 
             //記錄第一個單元到 JSONL 實驗日誌
@@ -1420,7 +1840,7 @@ class PanelExperimentManager {
               window.panelExperimentLog.logUnitChange(
                 this.loadedUnits[0],
                 0,
-                this.loadedUnits.length
+                this.loadedUnits.length,
               );
             }
 
@@ -1459,7 +1879,7 @@ class PanelExperimentManager {
       window.logger.logAction(
         `等待指令 - ${unit.unit_name || unitId}：${
           step.step_name || step.step_id
-        }`
+        }`,
       );
     }
 
@@ -1486,7 +1906,7 @@ class PanelExperimentManager {
       document.dispatchEvent(
         new CustomEvent("experiment_paused", {
           detail: { isPaused: true },
-        })
+        }),
       );
 
       //廣播暫停狀態到其他裝置
@@ -1497,7 +1917,7 @@ class PanelExperimentManager {
         window.mainApp.setExperimentPanelButtonColor("paused");
       } else {
         Logger.error(
-          "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義"
+          "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義",
         );
       }
     } else {
@@ -1516,7 +1936,7 @@ class PanelExperimentManager {
       document.dispatchEvent(
         new CustomEvent("experiment_resumed", {
           detail: { isPaused: false },
-        })
+        }),
       );
 
       //廣播還原狀態到其他裝置
@@ -1530,7 +1950,7 @@ class PanelExperimentManager {
         window.mainApp.setExperimentPanelButtonColor("running");
       } else {
         Logger.error(
-          "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義"
+          "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義",
         );
       }
     }
@@ -1545,26 +1965,26 @@ class PanelExperimentManager {
 
     // 記錄停止類型
     Logger.debug(
-      `[PanelExperimentManager] ${isManualStop ? "人為停止" : "自動停止"} 實驗`
+      `[PanelExperimentManager] ${isManualStop ? "人為停止" : "自動停止"} 實驗`,
     );
 
     //先停止 JSONL 實驗日誌並下載（使用開始實驗時的 ID）
     if (window.panelExperimentLog) {
       window.panelExperimentLog.stopRecording(
         this.experimentElapsed,
-        !isManualStop
+        !isManualStop,
       );
     }
 
     const experimentTimer = document.getElementById("experimentTimer");
     const experimentControlButtons = document.getElementById(
-      "experimentControlButtons"
+      "experimentControlButtons",
     );
     const startExperimentButton = document.getElementById(
-      "startExperimentButton"
+      "startExperimentButton",
     );
     const pauseExperimentButton = document.getElementById(
-      "pauseExperimentButton"
+      "pauseExperimentButton",
     );
 
     if (experimentTimer) experimentTimer.style.display = "none";
@@ -1589,7 +2009,7 @@ class PanelExperimentManager {
     if (this.pendingSubjectNameUpdate) {
       Logger.debug(
         "套用等待中的受試者名稱更新:",
-        this.pendingSubjectNameUpdate
+        this.pendingSubjectNameUpdate,
       );
       this.applySubjectNameUpdate(this.pendingSubjectNameUpdate);
       this.pendingSubjectNameUpdate = null;
@@ -1603,7 +2023,7 @@ class PanelExperimentManager {
           subjectName: document.getElementById("subjectName")?.value || "",
           combinationName: this.currentCombination?.combination_name || "",
         },
-      })
+      }),
     );
 
     //廣播停止狀態到其他裝置（僅人為停止時廣播）
@@ -1632,7 +2052,7 @@ class PanelExperimentManager {
           Logger.debug(`[同步模式] 註冊實驗ID到中樞: ${newId}`);
           window.experimentHubManager.registerExperimentId(
             newId,
-            "panel_auto_generate"
+            "panel_auto_generate",
           );
         } else {
           Logger.debug(`[獨立模式] 實驗ID僅存本機: ${newId}`);
@@ -1653,7 +2073,7 @@ class PanelExperimentManager {
             const newId = this.getCurrentExperimentId();
             Logger.debug(
               "[PanelExperimentManager]同步完成，已產生新的實驗ID:",
-              newId
+              newId,
             );
             Logger.debug(`[PanelExperimentManager] 廣播新的實驗ID: ${newId}`);
             this.broadcastExperimentIdUpdate(newId);
@@ -1663,7 +2083,7 @@ class PanelExperimentManager {
               Logger.debug(`[同步模式] 註冊實驗ID到中樞: ${newId}`);
               window.experimentHubManager.registerExperimentId(
                 newId,
-                "panel_sync_complete"
+                "panel_sync_complete",
               );
             } else {
               Logger.debug(`[獨立模式] 實驗ID僅存本機: ${newId}`);
@@ -1675,7 +2095,7 @@ class PanelExperimentManager {
               subjectNameInput.value = `受試者_${newId}`;
             }
           },
-          { once: true }
+          { once: true },
         );
       }
     }
@@ -1698,7 +2118,7 @@ class PanelExperimentManager {
         null,
         null,
         false,
-        false
+        false,
       );
       //使用開始實驗時的 ID 作為檔案名稱
       const logExportId =
@@ -1710,7 +2130,7 @@ class PanelExperimentManager {
       window.mainApp.setExperimentPanelButtonColor("default");
     } else {
       Logger.error(
-        "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義"
+        "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義",
       );
     }
     window.dispatchExperimentStatusChanged &&
@@ -1731,7 +2151,7 @@ class PanelExperimentManager {
         if (!this.experimentPaused) {
           const now = Date.now();
           this.experimentElapsed = Math.floor(
-            (now - this.experimentStartTime) / 1000
+            (now - this.experimentStartTime) / 1000,
           );
           const min = Math.floor(this.experimentElapsed / 60)
             .toString()
@@ -1756,7 +2176,7 @@ class PanelExperimentManager {
         if (!this.experimentPaused) {
           const now = Date.now();
           this.experimentElapsed = Math.floor(
-            (now - this.experimentStartTime) / 1000
+            (now - this.experimentStartTime) / 1000,
           );
           const min = Math.floor(this.experimentElapsed / 60)
             .toString()
@@ -1795,7 +2215,7 @@ class PanelExperimentManager {
     ) {
       if (window.logger) {
         window.logger.logAction(
-          `操作被阻止：機器未開機，請先開啟機器電源再進行操作 (${key})`
+          `操作被阻止：機器未開機，請先開啟機器電源再進行操作 (${key})`,
         );
       }
       return;
@@ -1803,7 +2223,7 @@ class PanelExperimentManager {
 
     if (window.logger) {
       window.logger.logAction(
-        `${key} → ${interaction.function_name || "下一步"}`
+        `${key} → ${interaction.function_name || "下一步"}`,
       );
     }
 
@@ -1818,7 +2238,7 @@ class PanelExperimentManager {
         return;
       }
       const nextIdx = unit.steps.findIndex(
-        (s) => s.step_id === interaction.next_step_id
+        (s) => s.step_id === interaction.next_step_id,
       );
       if (nextIdx !== -1) {
         this.currentStepIndex = nextIdx;
@@ -1873,7 +2293,7 @@ class PanelExperimentManager {
         window.panelExperimentLog.logUnitChange(
           nextUnitId,
           this.currentUnitIndex,
-          this.loadedUnits.length
+          this.loadedUnits.length,
         );
       }
 
@@ -1968,7 +2388,7 @@ class PanelExperimentManager {
           muted: true,
           loop: true,
           autoplay: true,
-        }
+        },
       );
       if (window.logger) {
         window.logger.logAction("回到首頁");
@@ -2037,7 +2457,7 @@ class PanelExperimentManager {
                         `;
             }
           },
-        }
+        },
       );
       if (window.logger) {
         window.logger.logAction(`播放首頁 - ${step.step_name || step.step_id}`);
@@ -2082,7 +2502,7 @@ class PanelExperimentManager {
         const nextUnitId = this.loadedUnits[this.currentUnitIndex + 1];
         if (window.logger) {
           window.logger.logAction(
-            `單元完成，自動進入下一個單元：${nextUnitId}`
+            `單元完成，自動進入下一個單元：${nextUnitId}`,
           );
         }
         this.handleUnitCompletion();
@@ -2190,12 +2610,12 @@ class PanelExperimentManager {
     const experimentIdInput = document.getElementById("experimentIdInput");
     const regenerateIdButton = document.getElementById("regenerateIdButton");
     const experimentIdInputGroup = document.querySelector(
-      ".experiment-id-input-group"
+      ".experiment-id-input-group",
     );
 
     Logger.debug(
       `lockExperimentId(${lock}) - InputGroup found:`,
-      !!experimentIdInputGroup
+      !!experimentIdInputGroup,
     );
 
     if (lock) {
@@ -2261,43 +2681,107 @@ class PanelExperimentManager {
   initializeExperimentUI() {
     this.renderDefaultSequences();
     this.renderUnitList();
+    // 初始化後自動套用預設組合
+    this.selectDefaultCombination();
+  }
+
+  /**
+   * 選擇並套用預設組合
+   * 優先級：快取 > 設定中的預設 > 第一個
+   */
+  selectDefaultCombination() {
+    try {
+      // 非同步載入組合資料
+      loadUnitsFromScenarios()
+        .then((data) => {
+          if (!data || !Array.isArray(data.unit_combinations)) return;
+
+          let selectedCombination = null;
+
+          // 優先檢查本機快取
+          const cachedCombinationId = localStorage.getItem(
+            "last_selected_combination_id",
+          );
+          if (cachedCombinationId) {
+            selectedCombination = data.unit_combinations.find(
+              (c) => c.combination_id === cachedCombinationId,
+            );
+          }
+
+          // 如果沒有快取，使用設定中的預設組合
+          if (!selectedCombination) {
+            const defaultCombinationId =
+              window.CONFIG?.experiment?.defaultCombinationId;
+            if (defaultCombinationId) {
+              selectedCombination = data.unit_combinations.find(
+                (c) => c.combination_id === defaultCombinationId,
+              );
+            }
+          }
+
+          // 如果都沒有，使用第一個組合
+          if (!selectedCombination && data.unit_combinations.length > 0) {
+            selectedCombination = data.unit_combinations[0];
+          }
+
+          // 套用選定的組合
+          if (selectedCombination) {
+            Logger.debug(
+              `[PanelExperimentManager] 套用預設組合: ${selectedCombination.combination_name}`,
+            );
+            this.applyUnitCombination(selectedCombination);
+          }
+        })
+        .catch((error) => {
+          Logger.warn("套用預設組合失敗:", error);
+        });
+    } catch (error) {
+      Logger.warn("選擇預設組合時發生錯誤:", error);
+    }
   }
 
   /** 從 scenarios.json 渲染預設實驗序列 */
   async renderDefaultSequences() {
     try {
       const data = await loadUnitsFromScenarios();
-      const list = document.querySelector(".experiment-default-list");
-      if (!list) return;
-      list.innerHTML = "";
+      // 找出所有組合列表容器（index.html 和 experiment.html 共用）
+      const lists = document.querySelectorAll(".experiment-default-list");
+      if (lists.length === 0) return;
+
       if (data && Array.isArray(data.unit_combinations)) {
         const defaultCombinationId =
           window.CONFIG?.experiment?.defaultCombinationId;
 
-        data.unit_combinations.forEach((combination) => {
-          const btn = document.createElement("button");
-          btn.className = "default-combo-btn";
-          btn.textContent = combination.combination_name;
-          btn.dataset.combinationId = combination.combination_id;
-          btn.addEventListener("click", () =>
-            this.applyUnitCombination(combination)
-          );
+        // 為每個列表容器渲染組合
+        lists.forEach((list) => {
+          list.innerHTML = "";
 
-          // 如果是預設組合，自動選擇並點擊
-          if (
-            defaultCombinationId &&
-            combination.combination_id === defaultCombinationId
-          ) {
-            btn.classList.add("active");
-            // 延遲套用，確保 DOM 已完全更新
-            setTimeout(() => {
-              this.applyUnitCombination(combination);
-            }, 0);
-          }
+          data.unit_combinations.forEach((combination) => {
+            const li = document.createElement("li");
+            li.className = "combination-item";
+            li.dataset.combinationId = combination.combination_id;
+            li.innerHTML = `
+              <div class="combo-name">${combination.combination_name}</div>
+              <div class="combo-desc">${combination.description || ""}</div>
+            `;
+            li.addEventListener("click", () =>
+              this.applyUnitCombination(combination),
+            );
 
-          const li = document.createElement("li");
-          li.appendChild(btn);
-          list.appendChild(li);
+            // 如果是預設組合，自動選擇並點擊
+            if (
+              defaultCombinationId &&
+              combination.combination_id === defaultCombinationId
+            ) {
+              li.classList.add("active");
+              // 延遲套用，確保 DOM 已完全更新
+              setTimeout(() => {
+                this.applyUnitCombination(combination);
+              }, 0);
+            }
+
+            list.appendChild(li);
+          });
         });
       }
     } catch (error) {
@@ -2340,13 +2824,13 @@ class PanelExperimentManager {
       // 取得所有項目
       const allItems = Array.from(unitList.children);
       const startupCard = allItems.find((item) =>
-        item.classList.contains("startup-card")
+        item.classList.contains("startup-card"),
       );
       const shutdownCard = allItems.find((item) =>
-        item.classList.contains("shutdown-card")
+        item.classList.contains("shutdown-card"),
       );
       const normalItems = allItems.filter(
-        (item) => !item.classList.contains("power-option-card")
+        (item) => !item.classList.contains("power-option-card"),
       );
 
       // 建立新的排序
@@ -2397,8 +2881,8 @@ class PanelExperimentManager {
       if (window.logger) {
         window.logger.logAction(
           `已套用預設組合：${sequenceId}，單元順序：開機 → ${unitIds.join(
-            " → "
-          )} → 關機`
+            " → ",
+          )} → 關機`,
         );
       }
     }
@@ -2431,7 +2915,7 @@ class PanelExperimentManager {
       const experimentId = this.getCurrentExperimentId();
       if (combination.is_randomizable) {
         window.logger.logAction(
-          `套用組合：${combination.combination_name} (ID:${experimentId})`
+          `套用組合：${combination.combination_name} (ID:${experimentId})`,
         );
       } else {
         window.logger.logAction(`套用組合：${combination.combination_name}`);
@@ -2551,8 +3035,8 @@ class PanelExperimentManager {
     unitInfo.innerHTML = `
             <div class="unit-info-title">${unit.unit_name || unit.unit_id}</div>
             <div class="unit-info-subtitle">${unit.unit_id} • ${
-      unit.steps ? unit.steps.length : 0
-    } 步驟</div>
+              unit.steps ? unit.steps.length : 0
+            } 步驟</div>
         `;
     li.appendChild(unitInfo);
 
@@ -2604,7 +3088,7 @@ class PanelExperimentManager {
 
     // 取得所有普通單元項目（排除電源卡片）
     const normalItems = Array.from(list.children).filter(
-      (item) => !item.classList.contains("power-option-card")
+      (item) => !item.classList.contains("power-option-card"),
     );
 
     const idx = normalItems.indexOf(li);
@@ -2634,7 +3118,7 @@ class PanelExperimentManager {
 
     // 只對普通單元項目啟用拖曳，排除電源卡片
     const handles = unitList.querySelectorAll(
-      "li:not(.power-option-card) .unit-drag-handle"
+      "li:not(.power-option-card) .unit-drag-handle",
     );
     handles.forEach((handle) => {
       handle.addEventListener("mousedown", (e) => {
@@ -2687,7 +3171,7 @@ class PanelExperimentManager {
 
       // 只在普通單元項目之間進行排序，排除電源卡片
       const items = Array.from(unitList.children).filter(
-        (item) => !item.classList.contains("power-option-card")
+        (item) => !item.classList.contains("power-option-card"),
       );
       let insertBefore = null;
 
@@ -2800,7 +3284,7 @@ class PanelExperimentManager {
 
     // 只考慮普通單元項目的位置
     const normalItems = Array.from(list.children).filter(
-      (item) => !item.classList.contains("power-option-card")
+      (item) => !item.classList.contains("power-option-card"),
     );
 
     const index = normalItems.indexOf(li);
@@ -2875,7 +3359,7 @@ class PanelExperimentManager {
         false,
         false,
         null,
-        detail
+        detail,
       );
     }
 

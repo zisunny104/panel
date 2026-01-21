@@ -10,6 +10,7 @@
 
 import { WebSocketServer } from "ws";
 import { SERVER_CONFIG } from "../config/server.js";
+import { Logger } from "../utils/logger.js";
 
 export class WSServer {
   constructor(httpServer) {
@@ -42,7 +43,7 @@ export class WSServer {
     // 設置 WebSocket 連線處理
     this.setupConnectionHandler();
 
-    console.log("WebSocket 伺服器已初始化");
+    Logger.success("WebSocket 伺服器已初始化");
   }
 
   /**
@@ -83,16 +84,14 @@ export class WSServer {
 
         const now = new Date();
         const timestamp = `${now.getFullYear()}-${String(
-          now.getMonth() + 1
+          now.getMonth() + 1,
         ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(
-          now.getHours()
+          now.getHours(),
         ).padStart(2, "0")}:${String(now.getMinutes()).padStart(
           2,
-          "0"
+          "0",
         )}:${String(now.getSeconds()).padStart(2, "0")}`;
-        console.log(
-          `[${timestamp}] [WebSocket] 新連線來自: ${clientInfo.ipAddress}`
-        );
+        Logger.event("green", ">", `新連線 | IP: ${clientInfo.ipAddress}`);
 
         // 註冊連線到 ConnectionManager
         const wsConnectionId = this.connectionManager.register(ws, clientInfo);
@@ -169,14 +168,14 @@ export class WSServer {
   handleClose(wsConnectionId, code, reason) {
     const now = new Date();
     const timestamp = `${now.getFullYear()}-${String(
-      now.getMonth() + 1
+      now.getMonth() + 1,
     ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(
-      now.getHours()
+      now.getHours(),
     ).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-      now.getSeconds()
+      now.getSeconds(),
     ).padStart(2, "0")}`;
     console.log(
-      `[${timestamp}] [WebSocket] 連線關閉 [${wsConnectionId}]: ${code} - ${reason}`
+      `[${timestamp}] [WebSocket] 連線關閉 [${wsConnectionId}]: ${code} - ${reason}`,
     );
 
     // 從 ConnectionManager 移除
@@ -247,7 +246,7 @@ export class WSServer {
    */
   close() {
     if (this.wss) {
-      console.log("正在關閉 WebSocket 伺服器...");
+      Logger.debug("正在關閉 WebSocket 伺服器...");
 
       // 關閉所有連線
       this.wss.clients.forEach((ws) => {
@@ -256,7 +255,7 @@ export class WSServer {
 
       // 關閉伺服器
       this.wss.close(() => {
-        console.log("WebSocket 伺服器已關閉");
+        Logger.info("WebSocket 伺服器已關閉");
       });
     }
   }

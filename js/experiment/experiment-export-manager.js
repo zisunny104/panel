@@ -30,7 +30,7 @@ class ExperimentExportManager {
   getStartTime() {
     if (window.logger?.logEntries?.length > 0) {
       const startEntry = window.logger.logEntries.find(
-        (entry) => entry.action_type === "experiment_started"
+        (entry) => entry.action_type === "experiment_started",
       );
       if (startEntry) {
         return startEntry.timestamp;
@@ -46,7 +46,7 @@ class ExperimentExportManager {
     if (!window.logger?.logEntries || window.logger.logEntries.length < 2)
       return 0;
     const startEntry = window.logger.logEntries.find(
-      (entry) => entry.action_type === "experiment_started"
+      (entry) => entry.action_type === "experiment_started",
     );
     const endEntry = [...window.logger.logEntries]
       .reverse()
@@ -71,7 +71,7 @@ class ExperimentExportManager {
       Object.keys(this.app.gestureStats).length > 0
     ) {
       for (const [gestureName, stats] of Object.entries(
-        this.app.gestureStats
+        this.app.gestureStats,
       )) {
         const total = stats.planned || 0;
         const correct = stats.correct || 0;
@@ -172,7 +172,7 @@ class ExperimentExportManager {
         <h3 style="margin: 0 0 5px 0; color: #333; font-size: 14px;">實驗統計</h3>
         <div style="color: #666; font-size: 12px;">
           <div>花費時間: <strong>${this.formatDurationSimple(
-            data.experiment_metadata.total_duration_ms
+            data.experiment_metadata.total_duration_ms,
           )}</strong></div>
           <div>手勢總數: <strong>${
             data.experiment_metadata.gesture_count
@@ -192,25 +192,25 @@ class ExperimentExportManager {
       `;
 
       for (const [gestureName, stats] of Object.entries(
-        data.gesture_statistics
+        data.gesture_statistics,
       )) {
         const accuracyNum = parseFloat(stats.accuracy_rate);
         const accuracyColor =
           accuracyNum >= 80
             ? "#4caf50"
             : accuracyNum >= 50
-            ? "#ff9800"
-            : "#f44336";
+              ? "#ff9800"
+              : "#f44336";
 
         html += `
           <div style="margin: 5px 0; padding: 5px; background: #f5f5f5; border-radius: 4px;">
             <div style="font-weight: 600; color: #333;">${gestureName}</div>
             <div style="font-size: 11px; color: #666; margin-top: 3px;">
-              <div>✓ 準確: ${stats.correct}/${stats.planned}
+              <div>正確: ${stats.correct}/${stats.planned}
                 <span style="color: ${accuracyColor}; font-weight: 600;">${
-          stats.accuracy_rate
-        }</span></div>
-              <div>? 同意: ${stats.correct + stats.uncertain}/${stats.planned}
+                  stats.accuracy_rate
+                }</span></div>
+              <div>同意: ${stats.correct + stats.uncertain}/${stats.planned}
                 <span style="color: #667eea; font-weight: 600;">${
                   stats.concordance_rate
                 }</span></div>
@@ -240,8 +240,8 @@ class ExperimentExportManager {
                 stats.avg_duration_ms || "N/A"
               }</strong> ms</div>
               <div>範圍: ${stats.min_duration_ms || "N/A"} - ${
-          stats.max_duration_ms || "N/A"
-        } ms</div>
+                stats.max_duration_ms || "N/A"
+              } ms</div>
             </div>
           </div>
         `;
@@ -266,7 +266,7 @@ class ExperimentExportManager {
     const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
       2,
-      "0"
+      "0",
     )}`;
   }
 }

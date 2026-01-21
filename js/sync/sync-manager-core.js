@@ -69,7 +69,7 @@ export class SyncManagerCore {
     // 確保分享代碼正確進行 URL 編碼
     const encodedCode = encodeURIComponent(code);
     const qrUrl = `${url}index.html?shareCode=${encodedCode}&role=${encodeURIComponent(
-      role
+      role,
     )}`;
     Logger.debug("產生的 QR URL:", qrUrl);
     return qrUrl;
@@ -98,11 +98,14 @@ export class SyncManagerCore {
             sessionId: result.sessionId,
             role: this.currentRole,
           },
-        })
+        }),
       );
 
       // 連線成功後，處理離線佇列
       setTimeout(() => this.processOfflineQueue(), 1000);
+
+      // 建立工作階段後，同步目前狀態到中樞
+      setTimeout(() => this.syncCurrentStateToHub(), 1500);
 
       return result; // 回傳結果給調用者
     } catch (error) {
@@ -132,7 +135,7 @@ export class SyncManagerCore {
             shareCode: result.shareCode,
             expiresAt: result.expiresAt,
           },
-        })
+        }),
       );
 
       return result;
@@ -152,7 +155,7 @@ export class SyncManagerCore {
       this.currentShareCode = shareCode; // 記錄使用過的分享代碼
 
       Logger.debug(
-        `[SyncCore] 成功加入工作階段 - 代碼: ${shareCode}, 角色: ${role}, 工作階段ID: ${this.syncClient.sessionId}`
+        `[SyncCore] 成功加入工作階段 - 代碼: ${shareCode}, 角色: ${role}, 工作階段ID: ${this.syncClient.sessionId}`,
       );
 
       // 觸發工作階段加入事件
@@ -163,11 +166,14 @@ export class SyncManagerCore {
             shareCode: shareCode,
             role: role,
           },
-        })
+        }),
       );
 
       // 連線成功後，處理離線佇列
       setTimeout(() => this.processOfflineQueue(), 1000);
+
+      // 加入工作階段後，檢查並同步中樞資料
+      setTimeout(() => this.syncCurrentStateFromHub(), 1500);
 
       return true;
     } catch (error) {
@@ -183,7 +189,7 @@ export class SyncManagerCore {
       const result = await this.syncClient.restoreSession(
         sessionId,
         clientId,
-        role
+        role,
       );
       this.currentRole = role;
       // 新增：取得還原的分享代碼
@@ -200,7 +206,7 @@ export class SyncManagerCore {
             role: role,
             shareCode: result?.shareCode,
           },
-        })
+        }),
       );
 
       return result;
@@ -327,14 +333,14 @@ export class SyncManagerCore {
     const lastSimilar = this.offlineQueue.find(
       (item) =>
         item.state.type === newState.type &&
-        item.state.device_id === newState.device_id
+        item.state.device_id === newState.device_id,
     );
 
     if (lastSimilar) {
       // 如果時間戳相差不到 1 秒，認為是重複
       const timeDiff = Math.abs(
         (newState.timestamp || Date.now()) -
-          (lastSimilar.state.timestamp || lastSimilar.addedAt)
+          (lastSimilar.state.timestamp || lastSimilar.addedAt),
       );
       return timeDiff < 1000;
     }
@@ -360,7 +366,7 @@ export class SyncManagerCore {
 
     // 確保狀態有時間戳（使用同步的伺服器時間）
     if (!state.timestamp) {
-      // 優先使用同步的伺服器時間，如果未初始化則使用本地時間
+      // 優先使用同步的伺服器時間，如果未初始化則使用本機時間
       state.timestamp = this.timeSyncManager.isSynchronized()
         ? this.timeSyncManager.getServerTime()
         : Date.now();
@@ -370,7 +376,7 @@ export class SyncManagerCore {
     const duplicateIndex = this.offlineQueue.findIndex(
       (item) =>
         item.state.type === state.type &&
-        item.state.device_id === state.device_id
+        item.state.device_id === state.device_id,
     );
 
     if (duplicateIndex !== -1) {
@@ -443,8 +449,8 @@ export class SyncManagerCore {
             `離線佇列項目發送成功: ${
               item.state.type || "unknown"
             } (時間戳: ${new Date(
-              item.state.timestamp || item.addedAt
-            ).toISOString()})`
+              item.state.timestamp || item.addedAt,
+            ).toISOString()})`,
           );
         } else {
           failCount++;
@@ -455,7 +461,7 @@ export class SyncManagerCore {
             this.offlineQueue.push(item);
           } else {
             Logger.warn(
-              `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
+              `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`,
             );
           }
         }
@@ -468,7 +474,7 @@ export class SyncManagerCore {
           this.offlineQueue.push(item);
         } else {
           Logger.warn(
-            `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
+            `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`,
           );
         }
       }
@@ -483,7 +489,7 @@ export class SyncManagerCore {
     this.isProcessingQueue = false;
 
     Logger.debug(
-      `離線佇列處理完成 (成功: ${successCount}, 失敗: ${failCount}, 耗時: ${duration}ms，剩餘: ${this.offlineQueue.length})`
+      `離線佇列處理完成 (成功: ${successCount}, 失敗: ${failCount}, 耗時: ${duration}ms，剩餘: ${this.offlineQueue.length})`,
     );
   }
 
@@ -546,6 +552,60 @@ export class SyncManagerCore {
    */
   async checkServerHealth() {
     return await this.syncClient.checkServerHealth();
+  }
+
+  /**
+   * 建立工作階段時，同步目前狀態到中樞
+   * @private
+   */
+  syncCurrentStateToHub() {
+    try {
+      const stateData = {
+        type: "sessionState",
+        experimentId: document.getElementById("experimentIdInput")?.value || "",
+        subjectName: document.getElementById("subjectName")?.value || "",
+        timestamp: new Date().toISOString(),
+      };
+
+      // 只在有受試者名稱時才同步（避免 null 污染）
+      if (stateData.subjectName) {
+        this.syncState(stateData);
+        Logger.debug("[Sync] 工作階段建立後已同步狀態到中樞:", stateData);
+      }
+    } catch (error) {
+      Logger.warn("[Sync] 同步工作階段狀態失敗:", error);
+    }
+  }
+
+  /**
+   * 加入工作階段時，檢查並同步中樞資料
+   * @private
+   */
+  syncCurrentStateFromHub() {
+    try {
+      Logger.debug("[Sync] 加入工作階段後，開始同步中樞資料");
+      Logger.debug(
+        "[Sync] 需要初始化的項目: 實驗ID、受試者名稱、實驗組合、實驗狀態",
+      );
+
+      // 觸發事件，讓各頁面同步加入後的初始化資料
+      window.dispatchEvent(
+        new CustomEvent("sync_session_joined", {
+          detail: {
+            sessionId: this.currentSessionId || this.syncClient.sessionId,
+            shouldSyncFromHub: true,
+            syncItems: [
+              "experimentId",
+              "subjectName",
+              "combination",
+              "experimentState",
+            ],
+          },
+        }),
+      );
+    } catch (error) {
+      Logger.warn("[Sync] 同步中樞資料失敗:", error);
+    }
   }
 
   /**

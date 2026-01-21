@@ -37,7 +37,7 @@ export class ExperimentHubManager {
     const initializeClient = () => {
       if (!this.hubClient) {
         Logger.debug(
-          "[ExperimentHubManager] 工作階段可用，初始化 ExperimentHubClient"
+          "[ExperimentHubManager] 工作階段可用，初始化 ExperimentHubClient",
         );
         // 使用全域物件而非 import
         const ExperimentHubClient = window.ExperimentHubClient;
@@ -72,10 +72,10 @@ export class ExperimentHubManager {
 
     Logger.debug(
       `[ExperimentHubManager] 檢查是否同步模式: ${
-        hasSession ? "✓" : "✗"
-      } (sessionId: ${sessionId ? "✓" : "✗"}, clientId: ${
-        clientId ? "✓" : "✗"
-      })`
+        hasSession ? "是" : "否"
+      } (sessionId: ${sessionId ? "已設定" : "未設定"}, clientId: ${
+        clientId ? "已設定" : "未設定"
+      })`,
     );
 
     return hasSession;
@@ -125,7 +125,7 @@ export class ExperimentHubManager {
       window.dispatchEvent(
         new CustomEvent("sync_session_created", {
           detail: result,
-        })
+        }),
       );
 
       return result;
@@ -145,7 +145,7 @@ export class ExperimentHubManager {
     try {
       const success = await this.hubClient.joinSessionByShareCode(
         shareCode,
-        role
+        role,
       );
       this.currentRole = role;
 
@@ -154,7 +154,7 @@ export class ExperimentHubManager {
         window.dispatchEvent(
           new CustomEvent("sync_session_joined_by_code", {
             detail: { shareCode, role },
-          })
+          }),
         );
       }
 
@@ -173,7 +173,7 @@ export class ExperimentHubManager {
       const result = await this.hubClient.restoreSession(
         sessionId,
         clientId,
-        role
+        role,
       );
       this.currentRole = role;
 
@@ -181,7 +181,7 @@ export class ExperimentHubManager {
       window.dispatchEvent(
         new CustomEvent("sync_session_restored", {
           detail: result,
-        })
+        }),
       );
 
       return result;
@@ -255,7 +255,7 @@ export class ExperimentHubManager {
       window.dispatchEvent(
         new CustomEvent("sync_state_update", {
           detail: event.detail,
-        })
+        }),
       );
     });
 
@@ -263,13 +263,13 @@ export class ExperimentHubManager {
       // 處理實驗ID更新 - 廣播給其他組件
       const { experimentId, device_id, timestamp } = event.detail;
       Logger.debug(
-        `[ExperimentHubManager] 處理實驗ID更新: ${experimentId} (來自: ${device_id})`
+        `[ExperimentHubManager] 處理實驗ID更新: ${experimentId} (來自: ${device_id})`,
       );
       Logger.debug("實驗ID更新詳情:", event.detail);
 
       // 觸發事件讓實驗頁面管理器更新UI
       Logger.debug(
-        `[ExperimentHubManager] 轉發 experiment_id_broadcasted 事件`
+        `[ExperimentHubManager] 轉發 experiment_id_broadcasted 事件`,
       );
       window.dispatchEvent(
         new CustomEvent("experiment_id_broadcasted", {
@@ -278,10 +278,10 @@ export class ExperimentHubManager {
             device_id,
             timestamp,
           },
-        })
+        }),
       );
       Logger.debug(
-        `[ExperimentHubManager] 已轉發 experiment_id_broadcasted 事件`
+        `[ExperimentHubManager] 已轉發 experiment_id_broadcasted 事件`,
       );
     });
 
@@ -319,7 +319,7 @@ export class ExperimentHubManager {
   async registerExperimentId(experimentId, source = "manager") {
     if (!this.hubClient) {
       Logger.debug(
-        `[ExperimentHubManager] 本機模式，不需要註冊實驗ID: ${experimentId}`
+        `[ExperimentHubManager] 本機模式，不需要註冊實驗ID: ${experimentId}`,
       );
       return true; // 本機模式，視為成功
     }
@@ -419,7 +419,7 @@ export async function initializeExperimentHub() {
     globalHubManager = new ExperimentHubManager();
   } else {
     Logger.debug(
-      "[initializeExperimentHub] ExperimentHubManager 已存在，使用現有實例"
+      "[initializeExperimentHub] ExperimentHubManager 已存在，使用現有實例",
     );
   }
 

@@ -9,9 +9,11 @@
 
 .combination-selector-section h3 {
     margin: 0 0 10px 0;
-    font-size: 13px;
-    color: #333;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+    font-size: 14px;
     font-weight: 600;
+    color: #333;
 }
 
 /* ========== 組合選擇器樣式 ========== */
@@ -62,6 +64,9 @@
     flex-shrink: 0;
     min-width: 160px;
     white-space: normal;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
 .combination-item:hover {
@@ -80,9 +85,15 @@
     font-weight: 600;
     color: #333;
     margin-bottom: 3px;
+    text-align: left;
+    display: block;
+    width: 100%;
 }
 
 .combination-item .combo-desc {
     font-size: 11px;
     color: #666;
+    text-align: left;
+    display: block;
+    width: 100%;
 }

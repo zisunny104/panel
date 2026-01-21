@@ -7,6 +7,7 @@ import { calculateChecksum, validateChecksum } from "../utils/checksum.js";
 import { getCurrentTimestamp, isExpired } from "../utils/time.js";
 import { SERVER_CONFIG } from "../config/server.js";
 import { SHARE_CODE_CONSTANTS, ERROR_CODES } from "../config/constants.js";
+import Logger from "../utils/logger.js";
 
 class ShareCodeService {
   /**
@@ -35,10 +36,10 @@ class ShareCodeService {
           1,
           1,
           defaultData,
-        ]
+        ],
       );
 
-      console.log(`分享代碼已產生: ${share_code} (session: ${sessionId})`);
+      Logger.debug(`分享代碼已產生 | ${share_code} | 工作階段: ${sessionId}`);
 
       return {
         share_code,
@@ -54,7 +55,7 @@ class ShareCodeService {
 
   /**
    * 驗證分享代碼並取得對應的工作階段
-   * @param {string} shareCode - 8位分享代碼
+   * @param {string} shareCode - 6位分享代碼（5位數據+1位校驗碼）
    * @returns {Object|null} { session_id } 或錯誤對象
    */
   validateCode(shareCode) {
@@ -79,7 +80,7 @@ class ShareCodeService {
 
       // 檢查是否過期
       if (isExpired(codeData.created_at, SERVER_CONFIG.shareCode.timeout)) {
-        console.log(`分享代碼已過期: ${shareCode}`);
+        Logger.warn(`分享代碼已過期 | ${shareCode}`);
         this.deleteCode(shareCode);
         return { error: ERROR_CODES.SHARE_CODE_EXPIRED };
       }
@@ -102,7 +103,7 @@ class ShareCodeService {
 
   /**
    * 取得分享代碼資訊（不進行驗證，只回傳狀態）
-   * @param {string} shareCode - 8位分享代碼
+   * @param {string} shareCode - 6位分享代碼（5位數據+1位校驗碼）
    * @returns {Object} { session_id, expired, used, expires_at, created_at } 或錯誤對象
    */
   getCodeInfo(shareCode) {
@@ -128,7 +129,7 @@ class ShareCodeService {
       // 檢查是否過期
       const expired = isExpired(
         codeData.created_at,
-        SERVER_CONFIG.shareCode.timeout
+        SERVER_CONFIG.shareCode.timeout,
       );
 
       return {
@@ -155,11 +156,11 @@ class ShareCodeService {
     try {
       const result = execute(
         `UPDATE share_codes SET used = 1, used_by = ?, used_at = ? WHERE code = ?`,
-        [usedBy, used_at, shareCode]
+        [usedBy, used_at, shareCode],
       );
 
       if (result.changes > 0) {
-        console.log(`分享代碼已使用: ${shareCode} (by: ${usedBy})`);
+        Logger.debug(`分享代碼已使用 | ${shareCode} | 使用者: ${usedBy}`);
         return true;
       }
 
@@ -202,7 +203,7 @@ class ShareCodeService {
       ]);
 
       if (result.changes > 0) {
-        console.log(`[清理] 已清除 ${result.changes} 個過期分享代碼`);
+        Logger.debug(`[清理] 已清除 ${result.changes} 個過期分享代碼`);
       }
 
       return result.changes;
@@ -221,7 +222,7 @@ class ShareCodeService {
     try {
       const codes = query(
         `SELECT * FROM share_codes WHERE session_id = ? ORDER BY created_at DESC`,
-        [sessionId]
+        [sessionId],
       );
 
       return codes;

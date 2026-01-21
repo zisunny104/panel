@@ -485,8 +485,7 @@
 /* 日誌顯示區域的內容 */
 .log-display-empty,
 .logs-list-empty,
-.logs-list-loading,
-.logs-list-error {
+.logs-list-loading {
     text-align: center;
     padding: 20px;
     color: #999;
@@ -564,34 +563,13 @@ svg.icon-sm {
     flex-wrap: wrap;
 }
 
-/* 組合項目樣式 */
-.combination-item {
-    padding: 12px;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    margin-bottom: 10px;
-    background: white;
-    transition: all 0.3s;
-}
-
-.combination-item:hover {
-    border-color: #667eea;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
-}
-
-.combination-item.selected {
-    border-color: #4caf50;
-    background: #e8f5e8;
-    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
-}
-
 .combination-title {
     font-weight: 600;
     margin-bottom: 6px;
     color: #333;
 }
 
-.combination-description {
+.combination-item-desc {
     font-size: 13px;
     color: #666;
     line-height: 1.4;

@@ -79,7 +79,7 @@ export class SyncManagerUI {
 
       // 點擊膠囊打開面板（只在 UI 初始化後有效）
       const indicator = this.capsuleIndicator.querySelector(
-        ".sync-status-indicator"
+        ".sync-status-indicator",
       );
       if (indicator) {
         indicator.addEventListener("click", () => {
@@ -305,7 +305,7 @@ export class SyncManagerUI {
       window.addEventListener("sync_connected", (event) => {
         Logger.debug(
           "[SyncUI] 收到 SYNC_CONNECTED 事件，更新面板狀態",
-          event.detail
+          event.detail,
         );
 
         // 更新 UI 狀態（切換到已連線面板）
@@ -348,7 +348,7 @@ export class SyncManagerUI {
 
       // 頁面切換按鈕
       const pageToggleButtons = this.controlPanel.querySelectorAll(
-        ".sync-page-toggle-btn"
+        ".sync-page-toggle-btn",
       );
       if (pageToggleButtons.length > 0) {
         // 設定目前頁面按鈕為 active
@@ -359,7 +359,7 @@ export class SyncManagerUI {
             const targetPage = btn.dataset.page;
             const basePath = window.location.pathname.substring(
               0,
-              window.location.pathname.lastIndexOf("/") + 1
+              window.location.pathname.lastIndexOf("/") + 1,
             );
 
             let targetUrl;
@@ -437,7 +437,7 @@ export class SyncManagerUI {
             window.dispatchEvent(
               new CustomEvent("sync_generate_qr", {
                 detail: { sessionId, role: this.currentQRRole },
-              })
+              }),
             );
           }
         });
@@ -445,11 +445,30 @@ export class SyncManagerUI {
 
       // 角色選擇按鈕
       const roleButtons = this.controlPanel.querySelectorAll(".sync-role-btn");
+
+      // 初始化時讀取保存的角色偏好
+      const savedRole = localStorage.getItem("sync_preferred_role");
+      if (savedRole) {
+        roleButtons.forEach((btn) => {
+          if (btn.dataset.role === savedRole) {
+            btn.classList.add("active");
+          } else {
+            btn.classList.remove("active");
+          }
+        });
+        Logger.debug("[SyncUI] 初始化：恢復保存的角色偏好:", savedRole);
+      }
+
+      // 點擊按鈕時切換角色
       roleButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
           roleButtons.forEach((b) => b.classList.remove("active"));
           btn.classList.add("active");
           this.core.currentRole = btn.dataset.role;
+
+          // 保存角色偏好到 localStorage
+          localStorage.setItem("sync_preferred_role", btn.dataset.role);
+          Logger.debug("[SyncUI] 角色已切換並保存:", btn.dataset.role);
         });
       });
 
@@ -481,7 +500,7 @@ export class SyncManagerUI {
             // 發送切換通知到伺服器
             this.showStatus(
               "info",
-              `角色已切換為: ${newRole === "operator" ? "同步操作" : "僅檢視"}`
+              `角色已切換為: ${newRole === "operator" ? "同步操作" : "僅檢視"}`,
             );
           } catch (error) {
             Logger.error("角色切換失敗:", error);
@@ -543,13 +562,13 @@ export class SyncManagerUI {
 
       // 分享工作階段展開/隱藏按鈕
       const shareSessionToggleBtn = document.getElementById(
-        "shareSessionToggleBtn"
+        "shareSessionToggleBtn",
       );
       const shareSessionContent = document.getElementById(
-        "shareSessionContent"
+        "shareSessionContent",
       );
       const shareSessionCollapseBtn = document.getElementById(
-        "shareSessionCollapseBtn"
+        "shareSessionCollapseBtn",
       );
 
       if (shareSessionToggleBtn && shareSessionContent) {
@@ -626,7 +645,7 @@ export class SyncManagerUI {
 
       // 重新產生分享 QR Code 按鈕
       const regenerateShareCodeBtn = document.getElementById(
-        "regenerateShareCodeBtn"
+        "regenerateShareCodeBtn",
       );
       if (regenerateShareCodeBtn) {
         regenerateShareCodeBtn.addEventListener("click", async () => {
@@ -668,7 +687,7 @@ export class SyncManagerUI {
                     role: this.core.syncClient.role,
                     isShareCode: true,
                   },
-                })
+                }),
               );
 
               this.showStatus("success", "已重新產生分享代碼（有效期已重置）");
@@ -698,7 +717,7 @@ export class SyncManagerUI {
             // 產生完整的分享連結
             const shareUrl = this.core.generateQRContent(
               shareCode,
-              this.core.syncClient?.role || "viewer"
+              this.core.syncClient?.role || "viewer",
             );
 
             // 複製到剪貼簿
@@ -744,11 +763,11 @@ export class SyncManagerUI {
 
     if (code.length < 9) {
       statusDiv.className = "sync-code-validation-indicator invalid";
-      statusDiv.textContent = "✖";
+      statusDiv.textContent = "無效";
       createBtn.disabled = true;
     } else if (code.length === 9) {
       statusDiv.className = "sync-code-validation-indicator valid";
-      statusDiv.textContent = "✓";
+      statusDiv.textContent = "有效";
       createBtn.disabled = false;
     }
   }
@@ -792,7 +811,7 @@ export class SyncManagerUI {
       window.dispatchEvent(
         new CustomEvent("sync_session_created", {
           detail: { sessionId },
-        })
+        }),
       );
 
       // 清除輸入框
@@ -850,17 +869,41 @@ export class SyncManagerUI {
     const input = document.getElementById("sessionCodeInput");
     const code = input.value.trim().toUpperCase();
 
-    // 只接受 8 位分享代碼（工作階段ID已停用，僅作內部使用）
-    if (code.length !== 8 || !/^[A-Z0-9]+$/.test(code)) {
-      this.showStatus("error", "請輸入有效之8位分享代碼");
+    Logger.debug("[SyncUI] 使用者嘗試加入工作階段，分享代碼:", code);
+
+    // 驗證分享代碼：6位純數字（5位數據+1位校驗碼）
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      Logger.warn(
+        "[SyncUI] 分享代碼格式錯誤 - 長度:",
+        code.length,
+        "內容:",
+        code,
+      );
+      this.showStatus("error", "請輸入有效之6位分享代碼（純數字）");
       return;
     }
 
-    // 讀取 UI 上目前選擇的角色
+    // 讀取 UI 上目前選擇的角色，或使用保存的偏好角色
+    const savedRole = localStorage.getItem("sync_preferred_role");
     const activeRoleBtn = this.controlPanel.querySelector(
-      ".sync-role-btn.active"
+      ".sync-role-btn.active",
     );
-    const role = activeRoleBtn ? activeRoleBtn.dataset.role : "viewer";
+    let role = activeRoleBtn ? activeRoleBtn.dataset.role : "viewer";
+
+    // 如果有保存的偏好角色，優先使用
+    if (savedRole) {
+      role = savedRole;
+      // 更新 UI 按鈕狀態以反映保存的角色
+      const roleButtons = this.controlPanel.querySelectorAll(".sync-role-btn");
+      roleButtons.forEach((btn) => {
+        if (btn.dataset.role === savedRole) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      });
+      Logger.debug("[SyncUI] 使用保存的角色偏好:", role);
+    }
 
     this.showStatus("info", "正在加入工作階段...");
 
@@ -909,7 +952,7 @@ export class SyncManagerUI {
         window.dispatchEvent(
           new CustomEvent("sync_generate_qr", {
             detail: { shareCode: this.currentShareCode, role },
-          })
+          }),
         );
       }
 
@@ -930,7 +973,7 @@ export class SyncManagerUI {
         {
           hasCore: !!this.core,
           timestamp: new Date().toISOString(),
-        }
+        },
       );
       return;
     }
@@ -944,7 +987,7 @@ export class SyncManagerUI {
       "online",
       "idle",
       "viewer",
-      "operator"
+      "operator",
     );
 
     // 新增連線狀態類別和功能狀態類別
@@ -1027,7 +1070,7 @@ export class SyncManagerUI {
     }
 
     const pageToggleButtons = this.controlPanel.querySelectorAll(
-      ".sync-page-toggle-btn"
+      ".sync-page-toggle-btn",
     );
     pageToggleButtons.forEach((btn) => {
       if (btn.dataset.page === currentPage) {
@@ -1044,7 +1087,7 @@ export class SyncManagerUI {
   updateUIState() {
     try {
       const connectionSection = document.getElementById(
-        "syncConnectionSection"
+        "syncConnectionSection",
       );
       const connectedSection = document.getElementById("syncConnectedSection");
       const isConnected = this.core.isConnected();
@@ -1091,7 +1134,7 @@ export class SyncManagerUI {
 
       // 更新工作階段資訊
       const sessionIdSpan = document.getElementById(
-        "connectedDisplaySessionId"
+        "connectedDisplaySessionId",
       );
       const roleSpan = document.getElementById("connectedDisplayRole");
       const statusSpan = document.getElementById("connectedDisplayStatus");
@@ -1144,7 +1187,7 @@ export class SyncManagerUI {
             role: this.core.syncClient?.role || "viewer",
             isShareCode: true,
           },
-        })
+        }),
       );
 
       // 在背景非同步驗證分享代碼（不阻塞UI）
@@ -1178,7 +1221,7 @@ export class SyncManagerUI {
           {
             used: shareCodeInfo.used,
             expired: shareCodeInfo.expired,
-          }
+          },
         );
         await this.regenerateAndDisplayShareCode();
       }
@@ -1200,7 +1243,7 @@ export class SyncManagerUI {
       shareDisplayCode.classList.remove(
         "share-code-valid",
         "share-code-used",
-        "share-code-expired"
+        "share-code-expired",
       );
       // 添加新的狀態類別
       shareDisplayCode.classList.add(`share-code-${statusClass}`);
@@ -1254,7 +1297,7 @@ export class SyncManagerUI {
             role: this.core.syncClient?.role || "viewer",
             isShareCode: true,
           },
-        })
+        }),
       );
 
       // 啟動倒計時（固定 300 秒）
@@ -1380,10 +1423,10 @@ export class SyncManagerUI {
 
       // 重置分享UI狀態
       const shareSessionContent = document.getElementById(
-        "shareSessionContent"
+        "shareSessionContent",
       );
       const shareSessionToggleBtn = document.getElementById(
-        "shareSessionToggleBtn"
+        "shareSessionToggleBtn",
       );
       if (shareSessionContent) {
         shareSessionContent.classList.add("hidden");
