@@ -115,7 +115,7 @@ class PanelActionManager {
         window.syncManager.core
           .syncState({
             type: "action_completed",
-            source: "panel",
+            source: window.SyncManager?.PAGE?.PANEL,
             device_id:
               window.syncManager?.core?.syncClient?.clientId ||
               "action_manager",
@@ -123,9 +123,9 @@ class PanelActionManager {
             action_sequence_progress: {
               current: this.currentActionIndex,
               total: this.currentActionSequence.length,
-              completed: Array.from(this.completedActions),
+              completed: Array.from(this.completedActions)
             },
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
           })
           .catch((error) => {
             Logger.warn("廣播 action 完成失敗:", error);
@@ -167,7 +167,7 @@ class PanelActionManager {
       current: this.currentActionIndex,
       total: this.currentActionSequence.length,
       completed: Array.from(this.completedActions),
-      isComplete: this.currentActionIndex >= this.currentActionSequence.length,
+      isComplete: this.currentActionIndex >= this.currentActionSequence.length
     };
   }
 

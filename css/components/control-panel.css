@@ -11,9 +11,10 @@
     border-radius: 0.875rem;
     z-index: 25;
     box-shadow: 0 0 1rem rgba(0, 0, 0, 0.35);
-    padding: 1rem;
+    padding: 0.75rem;
     display: flex;
     flex-direction: column;
+    gap: 0.5rem;
     overflow: hidden;
 }
 
@@ -53,7 +54,7 @@
 .settings-panel-header,
 .scale-controls-header {
     font-size: 1.1rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -62,6 +63,130 @@
 
 .panel-divider {
     border: none;
-    border-top: 0.0625rem solid #666;
-    margin: 0.5rem 0;
+    border-top: 0.0625rem solid rgba(255, 255, 255, 0.06);
+    margin: 0.6rem 0;
+}
+
+/* 專門針對 settings 面板內的 divider 間距 */
+.settings-panel .panel-divider {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    margin-left: 0.75rem;
+    /* align with content padding */
+    margin-right: 0.75rem;
+}
+
+/* Reset settings compact block */
+.reset-settings-compact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0;
+    /* removed padding as requested */
+    width: 100%;
+}
+
+.version-info-inline {
+    opacity: 0.75;
+    font-size: 0.9rem;
+    color: #ddd;
+    text-align: right;
+}
+
+/* ================= 設定面板：固定標題與可捲動內容 ================= */
+.settings-panel-header {
+    flex: 0 0 auto;
+    /* horizontal padding removed so header aligns flush with panel content */
+}
+
+
+/* On tall viewports position the panel bottom to match the corner buttons */
+@media screen and (min-height: 900px) {
+    .settings-panel {
+        bottom: 1rem;
+    }
+}
+
+.panel-divider {
+    flex: 0 0 auto;
+}
+
+.settings-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* allow proper flex child scrolling */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 0.75rem 0.75rem;
+    /* respect panel padding */
+    box-sizing: border-box;
+    /* space for scrollbar */
+    max-height: calc(70vh - 4.25rem);
+}
+
+.settings-panel-body .control-group:last-child {
+    padding-bottom: 0.75rem;
+    /* avoid content buttressed against edge */
+}
+
+/* 調整 settings 面板裡每個控制群組的間距與對齊，讓欄位更整齊 */
+.settings-panel .control-group {
+    margin-bottom: 0;
+    /* spacing handled by padding/gap */
+    padding: 0.35rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    /* prevent wrapping */
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* 在設定面板中，標題型控制群組 (section) 的樣式 */
+.settings-panel .control-group.section-title {
+    font-weight: 600;
+    color: #f1f1f1;
+    padding-top: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.02);
+    margin-top: 0.5rem;
+}
+
+/* 內縮變體已移除：統一使用一般 .control-group 排版 */
+
+/* 註：.control-group.indented 規則已移除以避免額外左側縮排。 */
+
+/* 微調輸入項與開關的對齊 */
+.settings-panel input[type="number"] {
+    min-width: 3.25rem;
+}
+
+.settings-panel input[type="range"] {
+    vertical-align: middle;
+}
+
+/* Control label and input sizing for consistent, non-wrapping rows */
+.settings-panel .control-label {
+    min-width: 6rem;
+    /* reduced a bit */
+    display: inline-block;
+    text-align: left;
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.settings-panel .control-group input[type="range"] {
+    flex: 1 1 8rem;
+    min-width: 6rem;
+}
+
+.settings-panel .control-group input[type="number"] {
+    flex: 0 0 2.25rem;
+    /* narrowed to ~half */
+    padding: 0.125rem 0.25rem;
+    text-align: center;
 }

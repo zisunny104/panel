@@ -34,23 +34,23 @@
 }
 
 /* ===== 實驗頁面與維護列表滾動條（灰白版本） ===== */
-.experiment-content-scroll,
+.experiment-panel-body,
 .maintenance-units-list {
     scrollbar-width: thin;
     scrollbar-color: #bbb #f5f5f5;
 }
 
-.experiment-content-scroll::-webkit-scrollbar,
+.experiment-panel-body::-webkit-scrollbar,
 .maintenance-units-list::-webkit-scrollbar {
     width: 12px;
 }
 
-.experiment-content-scroll::-webkit-scrollbar-track,
+.experiment-panel-body::-webkit-scrollbar-track,
 .maintenance-units-list::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.experiment-content-scroll::-webkit-scrollbar-thumb,
+.experiment-panel-body::-webkit-scrollbar-thumb,
 .maintenance-units-list::-webkit-scrollbar-thumb {
     background: #bbb;
     border-radius: 6px;
@@ -59,7 +59,7 @@
     min-height: 40px;
 }
 
-.experiment-content-scroll::-webkit-scrollbar-thumb:hover,
+.experiment-panel-body::-webkit-scrollbar-thumb:hover,
 .maintenance-units-list::-webkit-scrollbar-thumb:hover {
     background: #999;
     background-clip: padding-box;

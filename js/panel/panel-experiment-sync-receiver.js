@@ -18,42 +18,45 @@ class PanelExperimentSyncReceiver {
    */
   initialize() {
     // 監聽同步連線狀態
-    window.addEventListener("sync_session_joined", () => {
+    window.addEventListener(window.SyncEvents.SESSION_JOINED, () => {
       this.isConnected = true;
     });
 
-    window.addEventListener("sync_session_left", () => {
+    window.addEventListener(window.SyncEvents.SESSION_LEFT, () => {
       this.isConnected = false;
       this.remoteExperimentRunning = false;
       this.remoteExperimentPaused = false;
     });
 
     // 監聽遠端實驗狀態變化
-    document.addEventListener("remote_experiment_started", (event) => {
+    document.addEventListener(window.SyncEvents.EXPERIMENT_STARTED, (event) => {
       this.handleRemoteExperimentStart(event.detail);
     });
 
-    document.addEventListener("remote_experiment_paused", (event) => {
+    document.addEventListener(window.SyncEvents.EXPERIMENT_PAUSED, (event) => {
       this.handleRemoteExperimentPause(event.detail);
     });
 
-    document.addEventListener("remote_experiment_resumed", (event) => {
+    document.addEventListener(window.SyncEvents.EXPERIMENT_RESUMED, (event) => {
       this.handleRemoteExperimentResume(event.detail);
     });
 
-    document.addEventListener("remote_experiment_stopped", (event) => {
+    document.addEventListener(window.SyncEvents.EXPERIMENT_STOPPED, (event) => {
       this.handleRemoteExperimentStop(event.detail);
     });
 
     // 監聽遠端操作
-    document.addEventListener("remote_experiment_action", (event) => {
+    document.addEventListener(window.SyncEvents.EXPERIMENT_ACTION, (event) => {
       this.handleRemoteExperimentAction(event.detail);
     });
 
     // 監聽遠端組合選擇
-    document.addEventListener("remote_combination_selected", (event) => {
-      this.handleRemoteCombinationSelected(event.detail);
-    });
+    document.addEventListener(
+      window.SyncEvents.EXPERIMENT_COMBINATION_SELECTED,
+      (event) => {
+        this.handleRemoteCombinationSelected(event.detail);
+      }
+    );
 
     // 監聽設定面板的同步指示器顯示開關已移除
   }
@@ -66,7 +69,7 @@ class PanelExperimentSyncReceiver {
     this.remoteExperimentPaused = false;
     this.remoteDeviceId = detail.remote_device_id;
 
-    // 可選：在虛擬面板上顯示提示
+    // 顯示同步通知（目前以 Logger 輸出）
     this.showSyncNotification("實驗已在遠端開始", "info");
   }
 
@@ -100,8 +103,7 @@ class PanelExperimentSyncReceiver {
    * 處理遠端實驗操作
    */
   handleRemoteExperimentAction(detail) {
-    // 可在這裡記錄或展示遠端操作
-    // 例如：在虛擬面板上高亮顯示被遠端按下的按鈕
+    // 可在此記錄或展示遠端操作（例如：在虛擬面板上高亮顯示被遠端按下的按鈕）
   }
 
   /**
@@ -130,11 +132,11 @@ class PanelExperimentSyncReceiver {
   }
 
   /**
-   * 顯示同步通知
+   * 顯示同步通知（目前以 Logger 輸出為主）
    */
   showSyncNotification(message, type = "info") {
-    // 可選實作：顯示臨時通知
-    // 目前只記錄到控制台
+    // 簡單的紀錄行為以便日後擴充 UI
+    Logger.info(`[PanelExperimentSyncReceiver] ${message}`, { type });
   }
 
   /**
@@ -145,7 +147,7 @@ class PanelExperimentSyncReceiver {
       connected: this.isConnected,
       remoteExperimentRunning: this.remoteExperimentRunning,
       remoteExperimentPaused: this.remoteExperimentPaused,
-      remoteDeviceId: this.remoteDeviceId,
+      remoteDeviceId: this.remoteDeviceId
     };
   }
 }

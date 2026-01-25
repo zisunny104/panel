@@ -2,7 +2,7 @@
  * WebSocket 連線管理器
  *
  * 功能:
- * - 註冊/註銷 WebSocket 連線
+ * - 註冊/移除 WebSocket 連線
  * - 維護連線狀態（連線ID、客戶端ID、工作階段ID映射）
  * - 心跳檢測（30秒間隔）
  * - 自動清理過期連線
@@ -11,6 +11,7 @@
 import { generateClientId } from "../utils/idGenerator.js";
 import { SERVER_CONFIG } from "../config/server.js";
 import { Logger } from "../utils/logger.js";
+import { metrics } from "../metrics.js";
 
 export class ConnectionManager {
   constructor() {
@@ -52,10 +53,36 @@ export class ConnectionManager {
         ...clientInfo,
         connectedAt: Date.now(),
         lastHeartbeat: Date.now(),
+        // rate limiter state
+        rateLimit: {
+          tokens: null,
+          lastRefill: Date.now(),
+          violations: 0,
+        },
       },
     });
 
+    // 初始化 rate limiter tokens（使用設定或預設值）
+    try {
+      const conn = this.connections.get(wsConnectionId);
+      const rlConfig = SERVER_CONFIG.websocket.rateLimit || {
+        capacity: 20,
+        refillPerSec: 10,
+        violationThreshold: 3,
+      };
+      conn.metadata.rateLimit.tokens = rlConfig.capacity;
+    } catch (e) {
+      // ignore
+    }
+
     Logger.connection(`註冊 WebSocket 連線: ${wsConnectionId}`);
+
+    // 更新 metrics
+    try {
+      metrics.setConnectionStats(this.getStats());
+    } catch (e) {
+      // ignore metric errors
+    }
 
     return wsConnectionId;
   }
@@ -163,14 +190,47 @@ export class ConnectionManager {
       }
     }
 
-    // 關閉 WebSocket 連線
-    if (connection.ws.readyState === 1) {
-      // OPEN
-      connection.ws.close(1000, "Connection unregistered");
+    // 安全關閉 WebSocket 連線並移除事件監聽，避免記憶體洩漏
+    try {
+      if (connection.ws) {
+        try {
+          connection.ws.removeAllListeners();
+        } catch (e) {
+          // ignore
+        }
+
+        try {
+          if (connection.ws.readyState === 1) {
+            // OPEN
+            connection.ws.close(1000, "Connection unregistered");
+          } else {
+            // 若不是 OPEN，直接 terminate
+            if (typeof connection.ws.terminate === "function") {
+              connection.ws.terminate();
+            }
+          }
+        } catch (closeErr) {
+          Logger.warn(
+            `關閉連線時發生錯誤 [${wsConnectionId}]: ${closeErr.message}`,
+          );
+        }
+
+        // 斷開引用，讓 GC 可以回收
+        connection.ws = null;
+      }
+    } catch (e) {
+      Logger.warn(`unregister清理時發生錯誤 [${wsConnectionId}]: ${e.message}`);
     }
 
     // 移除連線記錄
     this.connections.delete(wsConnectionId);
+
+    // 更新 metrics
+    try {
+      metrics.setConnectionStats(this.getStats());
+    } catch (e) {
+      // ignore
+    }
 
     Logger.connection(`移除 WebSocket 連線: ${wsConnectionId}`);
   }
@@ -251,7 +311,68 @@ export class ConnectionManager {
   }
 
   /**
+   * 檢查並更新 token bucket（Token Bucket 演算法）
+   * - 目的：防止單一連線以高頻訊息佔滿主執行緒（JSON 解析等 CPU 工作），
+   *   造成其他使用者延遲或服務中斷。
+   * - 實作：每個連線在 metadata 儲存 tokens / lastRefill / violations，
+   *   以 capacity/refillPerSec 參數控制速度與突發容許量。
+   * @param {string} wsConnectionId
+   * @returns {Object} { allowed: boolean, violations?: number, threshold?: number }
+   */
+  allowMessage(wsConnectionId) {
+    const connection = this.connections.get(wsConnectionId);
+    if (!connection || !connection.metadata) {
+      return { allowed: false };
+    }
+
+    const rl = connection.metadata.rateLimit || {};
+    const cfg = SERVER_CONFIG.websocket.rateLimit || {
+      capacity: 20,
+      refillPerSec: 10,
+      violationThreshold: 3,
+    };
+
+    const now = Date.now();
+    const last = rl.lastRefill || now;
+    const elapsed = Math.max(0, (now - last) / 1000);
+    const refill = elapsed * cfg.refillPerSec;
+
+    rl.tokens = Math.min(cfg.capacity, (rl.tokens || cfg.capacity) + refill);
+    rl.lastRefill = now;
+
+    if (rl.tokens >= 1) {
+      rl.tokens -= 1;
+      return { allowed: true };
+    }
+
+    rl.violations = (rl.violations || 0) + 1;
+    connection.metadata.rateLimit = rl;
+
+    return {
+      allowed: false,
+      violations: rl.violations,
+      threshold: cfg.violationThreshold,
+    };
+  }
+
+  /**
+   * 回傳指定 sessionId 下的 wsConnectionId 列表
+   * @param {string} sessionId
+   * @returns {string[]}
+   */
+  getConnectionIdsBySessionId(sessionId) {
+    const set = this.sessionMap.get(sessionId);
+    if (!set) return [];
+    return Array.from(set);
+  }
+
+  /**
    * 啟動心跳檢測
+   *
+   * 注意：為避免心跳導致大量同步 I/O（DB 查詢）而造成效能瓶頸，
+   * 心跳迴圈僅使用 in-memory 的 `SessionManager` 做快速驗證（若可用），
+   * 並以 ping/pong 更新 `lastHeartbeat`。較高成本的 session 驗證
+   *（例如確認 DB 狀態、封鎖等）請交由低頻排程處理。
    */
   startHeartbeatCheck() {
     const interval = SERVER_CONFIG.websocket.heartbeatInterval;
@@ -264,74 +385,107 @@ export class ConnectionManager {
     }
 
     this.heartbeatInterval = setInterval(() => {
-      const now = Date.now();
-      const deadConnections = [];
-      const invalidSessionConnections = [];
+      try {
+        const now = Date.now();
+        const deadConnections = [];
+        const invalidSessionConnections = [];
 
-      // 檢查所有連線
-      for (const [wsConnectionId, connection] of this.connections.entries()) {
-        const { ws, metadata, sessionId } = connection;
-        const timeSinceLastHeartbeat = now - metadata.lastHeartbeat;
-
-        // 檢查工作階段是否仍然有效
-        if (sessionId) {
+        // 檢查所有連線
+        for (const [wsConnectionId, connection] of this.connections.entries()) {
           try {
-            const session = this.sessionManager.getSession(sessionId);
-            if (!session || !session.is_active) {
-              Logger.debug(
-                `工作階段已失效，斷開連線: ${wsConnectionId} (session: ${sessionId})`,
-              );
-              invalidSessionConnections.push(wsConnectionId);
-              continue;
+            const { ws, metadata, sessionId } = connection;
+            const timeSinceLastHeartbeat = now - metadata.lastHeartbeat;
+
+            // 檢查工作階段是否仍然有效（只檢查 in-memory，避免 DB 呼叫）
+            if (sessionId) {
+              if (
+                !this.sessionManager ||
+                typeof this.sessionManager.getSessionInfo !== "function"
+              ) {
+                Logger.debug(
+                  `沒有可用的 in-memory SessionManager，跳過 session 檢查: ${wsConnectionId} (session: ${sessionId})`,
+                );
+              } else {
+                const sessionInfo =
+                  this.sessionManager.getSessionInfo(sessionId);
+                if (!sessionInfo) {
+                  Logger.debug(
+                    `工作階段不存在或已從記憶體移除，斷開連線: ${wsConnectionId} (session: ${sessionId})`,
+                  );
+                  invalidSessionConnections.push(wsConnectionId);
+                  continue;
+                }
+              }
             }
-          } catch (error) {
+
+            // 如果超過超時時間，標記為死連線
+            if (timeSinceLastHeartbeat > timeout) {
+              Logger.debug(
+                `連線超時: ${wsConnectionId} (${timeSinceLastHeartbeat}ms)`,
+              );
+              deadConnections.push(wsConnectionId);
+            } else if (ws && ws.readyState === 1) {
+              // 發送 Ping（保護性 try/catch）
+              try {
+                ws.ping();
+              } catch (e) {
+                Logger.warn(`Ping 失敗: ${wsConnectionId} (${e.message})`);
+                deadConnections.push(wsConnectionId);
+              }
+            }
+          } catch (innerError) {
             Logger.debug(
-              `檢查工作階段失敗，斷開連線: ${wsConnectionId} (${error.message})`,
+              `處理連線時出錯 [${wsConnectionId}]: ${innerError.message}`,
             );
-            invalidSessionConnections.push(wsConnectionId);
-            continue;
+            // 若有未處理錯誤，將該連線標為死連線
+            deadConnections.push(wsConnectionId);
           }
         }
 
-        // 如果超過超時時間，標記為死連線
-        if (timeSinceLastHeartbeat > timeout) {
-          Logger.debug(
-            `連線超時: ${wsConnectionId} (${timeSinceLastHeartbeat}ms)`,
-          );
-          deadConnections.push(wsConnectionId);
-        } else if (ws.readyState === 1) {
-          // 發送 Ping
-          ws.ping();
+        // 清理無效工作階段連線
+        for (const wsConnectionId of invalidSessionConnections) {
+          try {
+            metrics.incrementHeartbeatMissed();
+          } catch (e) {
+            // ignore
+          }
+          this.unregister(wsConnectionId);
         }
-      }
 
-      // 清理無效工作階段連線
-      for (const wsConnectionId of invalidSessionConnections) {
-        this.unregister(wsConnectionId);
-      }
+        // 清理死連線
+        for (const wsConnectionId of deadConnections) {
+          try {
+            metrics.incrementHeartbeatMissed();
+          } catch (e) {
+            // ignore
+          }
+          this.unregister(wsConnectionId);
+        }
 
-      // 清理死連線
-      for (const wsConnectionId of deadConnections) {
-        this.unregister(wsConnectionId);
-      }
-
-      // 顯示統計資訊
-      if (this.connections.size > 0) {
-        const now = new Date();
-        const timestamp = `${now.getFullYear()}-${String(
-          now.getMonth() + 1,
-        ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(
-          now.getHours(),
-        ).padStart(2, "0")}:${String(now.getMinutes()).padStart(
-          2,
-          "0",
-        )}:${String(now.getSeconds()).padStart(2, "0")}`;
-        Logger.stats(
-          "目前連線",
-          this.connections.size,
-          "工作階段",
-          this.sessionMap.size,
-        );
+        // 顯示統計資訊
+        if (this.connections.size > 0) {
+          const nowDate = new Date();
+          const timestamp = `${nowDate.getFullYear()}-${String(
+            nowDate.getMonth() + 1,
+          ).padStart(
+            2,
+            "0",
+          )}-${String(nowDate.getDate()).padStart(2, "0")} ${String(
+            nowDate.getHours(),
+          ).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(
+            2,
+            "0",
+          )}:${String(nowDate.getSeconds()).padStart(2, "0")}`;
+          Logger.stats(
+            "目前連線",
+            this.connections.size,
+            "工作階段",
+            this.sessionMap.size,
+          );
+        }
+      } catch (err) {
+        // 防止偶發錯誤終止整個心跳定時器
+        Logger.error(`心跳迴圈發生未處理的錯誤: ${err.message}`);
       }
     }, interval);
   }

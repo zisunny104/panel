@@ -1,7 +1,16 @@
 /**
- * SyncManager QR -  QR Code 處理
- * 負責 QR Code 產生、掃描、URL參數解析、確認對話框
- */
+ * SyncManagerQR - 處理 QR Code 相關功能
+ * - QR Code 產生 (分享用)
+ * - QR Code 掃描 (透過攝影機啟動掃描器並使用 jsQR 分析)
+ * - URL 參數解析（支援 ?shareCode=XXX&role=YYY）
+ *
+ * 設計要點：
+ * - 使用本機 (local) enumerateDevices / getUserMedia 取得 videoinput
+ * - 避免 race condition：單次啟動攝影機使用互斥鎖（this.cameraLoading）防止重複啟動
+ * - 採用 fallback 與逐 deviceId 嘗試來增加在各種驅動/裝置上的相容性
+ * */
+
+import { SyncEvents } from "../core/sync-events-constants.js";
 
 export class SyncManagerQR {
   constructor(core) {
@@ -11,6 +20,46 @@ export class SyncManagerQR {
     this.scanning = false;
     this.scanTimer = null;
     this.initialized = false;
+
+    // 防止同時多次啟動相機（互斥鎖），避免 race condition
+    this.cameraLoading = false;
+    // 可用的 video devices 列表（由 enumerateDevices 填入）
+    this.availableVideoDevices = [];
+    // 最近的相機嘗試記錄（供偵錯用）
+    this.lastCameraAttempts = [];
+  }
+
+  /**
+   * 判斷 label 是否看起來像虛擬或橋接的攝影機（例如 Meta Quest、OBS 虚擬攝影機等）
+   * - 回傳 true 表示為虛擬設備，會在排序時降級
+   */
+  isVirtualDeviceLabel(label) {
+    if (!label) return false;
+    const l = label.toLowerCase();
+    const virtualKeywords = [
+      "meta quest",
+      "obs",
+      "virtual",
+      "nvidia",
+      "oculus",
+      "quest",
+      "vr"
+    ];
+    return virtualKeywords.some((k) => l.includes(k));
+  }
+
+  /**
+   * 以虛擬裝置降級方式排序 video device list（非破壞式）
+   */
+  sortVideoDevices(videoDevices) {
+    if (!Array.isArray(videoDevices)) return videoDevices;
+    return videoDevices.slice().sort((a, b) => {
+      const aIsVirtual = this.isVirtualDeviceLabel(a.label || "");
+      const bIsVirtual = this.isVirtualDeviceLabel(b.label || "");
+      if (aIsVirtual && !bIsVirtual) return 1;
+      if (!aIsVirtual && bIsVirtual) return -1;
+      return 0;
+    });
   }
 
   /**
@@ -33,15 +82,19 @@ export class SyncManagerQR {
         { once: true }
       );
     } else {
-      // 檢查URL參數（從QR掃描進入）
+      // 檢查URL參數（從 QR Code 掃描進入）
       this.checkUrlParameters();
     }
 
     // 監聽 QR Code 產生事件
     window.addEventListener("sync_generate_qr", async (event) => {
-      const { shareCode, role } = event.detail;
+      const {
+        shareCode,
+        role,
+        target = window.SyncManager?.PAGE?.PANEL
+      } = event.detail;
 
-      Logger.debug("[QR] 收到QR Code產生事件", { shareCode, role });
+      Logger.debug("[QR] 收到 QR Code 產生事件", { shareCode, role, target });
 
       // 使用分享代碼
       const codeToUse = shareCode;
@@ -52,17 +105,36 @@ export class SyncManagerQR {
       }
 
       try {
-        await this.generateQRCode(codeToUse, role);
-        Logger.debug("[QR] QR Code產生完成");
+        await this.generateQRCode(codeToUse, role, target);
+        Logger.debug("[QR] QR Code 產生完成");
       } catch (error) {
-        Logger.error("[QR] QR Code產生過程中發生錯誤", error);
+        Logger.error("[QR] QR Code 產生過程中發生錯誤", error);
       }
     });
 
-    // 監聽QR掃描事件
+    // 監聽 QR Code 掃描事件
     window.addEventListener("sync_start_qr_scan", () => {
       this.startQRScanner();
     });
+
+    // [新增] 監聽裝置變更事件 (devicechange)，當作業系統或驅動新增/移除裝置時自動刷新
+    if (
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.addEventListener === "function"
+    ) {
+      navigator.mediaDevices.addEventListener("devicechange", async () => {
+        Logger.debug("[QR] 偵測到裝置變更 (devicechange)，正在刷新清單...");
+        const video = document.getElementById("syncQrVideo");
+        // 只有當掃描器已經打開時才刷新，避免背景執行報錯
+        if (this.qrScanner && video) {
+          try {
+            await this.refreshDeviceList(video);
+          } catch (err) {
+            Logger.warn("[QR] devicechange refresh failed:", err);
+          }
+        }
+      });
+    }
 
     this.initialized = true;
   }
@@ -76,7 +148,7 @@ export class SyncManagerQR {
     Logger.debug("[QR] 檢查URL參數開始");
     const urlParams = new URLSearchParams(window.location.search);
     const shareCode = urlParams.get("shareCode");
-    const role = urlParams.get("role") || "viewer";
+    const role = urlParams.get("role") || window.SyncManager?.ROLE?.VIEWER;
 
     Logger.debug("[QR] 解析URL參數", { shareCode, role });
 
@@ -138,7 +210,6 @@ export class SyncManagerQR {
           }
         }, 500);
       }
-    } else {
     }
   }
 
@@ -163,7 +234,7 @@ export class SyncManagerQR {
       // onConfirm Callback
       async (editedCode, selectedRole) => {
         try {
-          // 使用分享代碼加入（使用重試機制，避免暫時性錯誤）
+          // 使用分享代碼加入（使用重試機制以提高穩定性）
           let joinSuccess = false;
           let lastError = null;
           const maxRetries = 3;
@@ -204,7 +275,7 @@ export class SyncManagerQR {
           const processed = JSON.parse(processedShareCodes);
           processed[editedCode] = {
             processedAt: Date.now(),
-            role: selectedRole,
+            role: selectedRole
           };
           sessionStorage.setItem(
             "processedShareCodes",
@@ -220,7 +291,7 @@ export class SyncManagerQR {
 
           // 更新UI
           Logger.debug("[QR] 同步工作階段加入流程完成，觸發UI更新事件");
-          window.dispatchEvent(new Event("sync_session_joined"));
+          window.dispatchEvent(new Event(SyncEvents.SESSION_JOINED));
         } catch (error) {
           Logger.error("加入工作階段失敗:", error);
 
@@ -254,15 +325,19 @@ export class SyncManagerQR {
    * @param {string} code - 分享代碼
    * @param {string} role - 'viewer' 或 'operator'
    */
-  async generateQRCode(code, role = "viewer") {
-    Logger.debug("[QR] 開始產生QR Code", { code, role });
+  async generateQRCode(
+    code,
+    role = window.SyncManager?.ROLE?.VIEWER,
+    target = window.SyncManager?.PAGE?.PANEL
+  ) {
+    Logger.debug("[QR] 開始產生 QR Code ", { code, role, target });
 
     if (!code) {
       Logger.error("[QR] QR Code 產生失敗：代碼為空");
       return;
     }
 
-    // 優先使用分享QR容器，若不存在則使用普通容器
+    // 優先使用分享 QR Code 容器，若不存在則使用普通容器
     let container = document.getElementById("shareQRCode");
     if (!container) {
       container = document.getElementById("qrCodeDisplay");
@@ -271,8 +346,6 @@ export class SyncManagerQR {
       Logger.warn("[QR] 找不到 QR Code 容器 (shareQRCode 或 qrCodeDisplay)");
       return;
     }
-
-    container.innerHTML = "";
 
     // 清除之前的倒數計時
     if (this.countdownInterval) {
@@ -286,13 +359,12 @@ export class SyncManagerQR {
       shareCodeInfo = await this.core.getShareCodeInfo(code);
       Logger.debug("[QR] 分享代碼資訊取得成功", shareCodeInfo);
     } catch (error) {
-      Logger.error("[QR] 取得分享代碼資訊失敗（將繼續產生QR）", error);
-      // 如果無法取得資訊，繼續使用預設邏輯
+      Logger.error("[QR] 取得分享代碼資訊失敗（將繼續產生 QR Code）", error);
     }
 
-    // 構建完整URL
-    const qrUrl = this.core.generateQRContent(code, role);
-    Logger.debug("[QR] 產生的QR URL", { qrUrl });
+    // 構建完整URL（根據 target）
+    const qrUrl = this.core.generateQRContent(code, role, target);
+    Logger.debug("[QR] 產生的QR URL", { qrUrl, target });
 
     // 檢查分享代碼是否已過期
     const isExpired = shareCodeInfo && shareCodeInfo.expired;
@@ -301,63 +373,187 @@ export class SyncManagerQR {
     // 檢查 QRCodeStyling 庫是否已載入
     Logger.debug("[QR] QRCodeStyling 可用性", {
       available: typeof QRCodeStyling !== "undefined",
-      globalType: typeof window.QRCodeStyling,
+      globalType: typeof window.QRCodeStyling
     });
 
     if (typeof QRCodeStyling === "undefined") {
       // QR庫未載入，顯示文字URL
-      container.innerHTML = `
-                <div class="sync-qr-fallback">
-                    <h3>分享代碼: ${code}${statusText}</h3>
-                    <p>
-                        URL: <a href="${qrUrl}" target="_blank">${qrUrl}</a>
-                    </p>
-                </div>
-            `;
-      // 不啟動倒數計時，因為這是由UI層負責的
+      const qrImageContainer = container.querySelector(
+        ".sync-qr-image-container"
+      );
+      if (qrImageContainer) {
+        qrImageContainer.innerHTML = `
+          <div class="sync-qr-fallback">
+              <h3>分享代碼: ${code}${statusText}</h3>
+              <p>
+                  URL: <a href="${qrUrl}" target="_blank">${qrUrl}</a>
+              </p>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="sync-qr-fallback">
+              <h3>分享代碼: ${code}${statusText}</h3>
+              <p>
+                  URL: <a href="${qrUrl}" target="_blank">${qrUrl}</a>
+              </p>
+          </div>
+        `;
+      }
       return;
     }
 
     try {
+      // 初次建立：建立容器結構
+      if (!container.querySelector(".sync-qr-image-container")) {
+        container.innerHTML = "";
+
+        // 建立 QR 圖片容器
+        const qrImageContainer = document.createElement("div");
+        qrImageContainer.className = "sync-qr-image-container";
+        container.appendChild(qrImageContainer);
+
+        // 建立控制按鈕容器
+        const roleText = window.SyncManager?.getRoleText(role) || "未知角色";
+        const initialTarget =
+          target ||
+          (window.location.pathname.includes("experiment.html")
+            ? window.SyncManager?.PAGE?.EXPERIMENT
+            : window.SyncManager?.PAGE?.PANEL);
+        const enterLabel =
+          window.SyncManager?.getPageName(initialTarget) || initialTarget;
+
+        const codeText = document.createElement("div");
+        codeText.className = "sync-qr-code-text";
+        codeText.innerHTML = `
+          <div class="sync-qr-controls sync-share-code-buttons" role="group" aria-label="QR 操作">
+            <button id="qrDefaultModeBtn" class="sync-btn-base" data-role="${role}" title="切換預設模式">
+              ${roleText}
+            </button>
+            <button id="qrEnterPageBtn" class="sync-btn-base" title="切換 QR 目標頁面">${enterLabel}</button>
+          </div>
+        `;
+        container.appendChild(codeText);
+
+        container.dataset.qrTarget = initialTarget;
+        container.dataset.qrRole = role;
+
+        // 綁定按鈕事件
+        this._bindQRButtons(container, code);
+      }
+
+      // 只更新 QR 圖片容器
+      const qrImageContainer = container.querySelector(
+        ".sync-qr-image-container"
+      );
+      if (qrImageContainer) {
+        qrImageContainer.innerHTML = ""; // 清空舊 QR 碼
+      }
+
+      // 產生新 QR Code 並附加到圖片容器
       const qrCode = new QRCodeStyling({
         width: 200,
         height: 200,
         data: qrUrl,
         dotsOptions: {
           color: "#000000",
-          type: "rounded",
+          type: "rounded"
         },
         backgroundOptions: {
-          color: "#ffffff",
+          color: "#ffffff"
         },
         cornersSquareOptions: {
           color: "#000000",
-          type: "extra-rounded",
+          type: "extra-rounded"
         },
         cornersDotOptions: {
           color: "#000000",
-          type: "dot",
-        },
+          type: "dot"
+        }
       });
 
-      qrCode.append(container);
+      qrCode.append(qrImageContainer);
       Logger.debug("[QR] QR Code 已附加到容器");
 
-      const roleText = role === "viewer" ? "僅檢視" : "同步操作";
-      const codeText = document.createElement("div");
-      codeText.className = "sync-qr-code-text";
-      codeText.innerHTML = `
-                <p>分享代碼: <strong>${code}${statusText}</strong></p>
-                <p class="sync-qr-role-text">
-                    預設模式: <strong>${roleText}</strong>
-                </p>
-            `;
-      container.appendChild(codeText);
-      Logger.info("[QR] QR Code 產產生功", { code, role });
+      // 更新按鈕狀態
+      const modeBtn = container.querySelector("#qrDefaultModeBtn");
+      if (modeBtn) {
+        const roleText = window.SyncManager?.getRoleText(role) || "未知角色";
+        modeBtn.innerHTML = `<strong>${roleText}</strong>`;
+        modeBtn.dataset.role = role;
+      }
 
-      // 不啟動倒數計時，因為這是由UI層負責的
+      const enterBtn = container.querySelector("#qrEnterPageBtn");
+      if (enterBtn) {
+        const enterLabel = window.SyncManager?.getPageName(target) || target;
+        enterBtn.textContent = enterLabel;
+      }
+
+      container.dataset.qrTarget = target;
+      container.dataset.qrRole = role;
+
+      Logger.info("[QR] QR Code 產生成功", { code, role });
     } catch (error) {
       Logger.error("[QR] QR Code 產生失敗:", error);
+    }
+  }
+
+  /**
+   * 綁定 QR 控制按鈕事件（避免重複綁定）
+   * @private
+   */
+  _bindQRButtons(container, code) {
+    // 綁定按鈕事件：切換預設模式並重新產生 QR（保留原分享代碼）
+    const modeBtn = container.querySelector("#qrDefaultModeBtn");
+    if (modeBtn && !modeBtn._isBound) {
+      modeBtn._isBound = true;
+      modeBtn.addEventListener("click", () => {
+        try {
+          const current =
+            modeBtn.dataset.role || window.SyncManager?.ROLE?.VIEWER;
+          const newRole =
+            current === window.SyncManager?.ROLE?.OPERATOR
+              ? window.SyncManager?.ROLE?.VIEWER
+              : window.SyncManager?.ROLE?.OPERATOR;
+
+          Logger.debug("[QR] 使用者切換預設模式，重新產生 QR", {
+            code,
+            newRole
+          });
+          // 重新產生 QR（保留目前 target）
+          const currentTarget =
+            container.dataset.qrTarget || window.SyncManager?.PAGE?.PANEL;
+          this.generateQRCode(code, newRole, currentTarget);
+        } catch (err) {
+          Logger.error("[QR] 切換預設模式失敗:", err);
+        }
+      });
+    }
+
+    // 綁定按鈕事件：切換頁面（機台面板 <-> 實驗管理）
+    const enterBtn = container.querySelector("#qrEnterPageBtn");
+    if (enterBtn && !enterBtn._isBound) {
+      enterBtn._isBound = true;
+      enterBtn.addEventListener("click", () => {
+        try {
+          // 切換 QR 目標（只影響 QR 的內容，不會在此頁面跳轉）
+          const currentTarget =
+            container.dataset.qrTarget || window.SyncManager?.PAGE?.PANEL;
+          const newTarget =
+            currentTarget === window.SyncManager?.PAGE?.EXPERIMENT
+              ? window.SyncManager?.PAGE?.PANEL
+              : window.SyncManager?.PAGE?.EXPERIMENT;
+
+          Logger.debug("[QR] 使用者切換 QR 目標頁面", { code, newTarget });
+
+          // 重新產生 QR（使用相同 shareCode 與目前 role）
+          const currentRole =
+            container.dataset.qrRole || window.SyncManager?.ROLE?.VIEWER;
+          this.generateQRCode(code, currentRole, newTarget);
+        } catch (err) {
+          Logger.error("[QR] 切換 QR 目標頁面失敗:", err);
+        }
+      });
     }
   }
 
@@ -366,7 +562,7 @@ export class SyncManagerQR {
    * @param {number} remainingTime - 剩餘時間（秒），如果未提供則使用預設300秒
    */
   startQRCodeCountdown(remainingTime = null) {
-    Logger.debug("[QR] 開始QR Code倒數計時", { remainingTime });
+    Logger.debug("[QR] 開始 QR Code 倒數計時", { remainingTime });
 
     const countdownElement = document.getElementById("qrCountdown");
     if (!countdownElement) {
@@ -378,7 +574,7 @@ export class SyncManagerQR {
     let initialTime = remainingTime !== null ? remainingTime : 300;
     Logger.debug("[QR] 使用倒數時間", {
       initialTime,
-      provided: remainingTime !== null,
+      provided: remainingTime !== null
     });
 
     let currentTime = initialTime;
@@ -391,7 +587,7 @@ export class SyncManagerQR {
       currentTime--;
 
       if (currentTime <= 0) {
-        Logger.debug("[QR] QR Code倒數結束，已過期");
+        Logger.debug("[QR] QR Code 倒數結束，已過期");
         clearInterval(this.countdownInterval);
         countdownElement.textContent = "有效期已過期";
         countdownElement.classList.add("sync-qr-expired");
@@ -399,7 +595,7 @@ export class SyncManagerQR {
         const qrSection = document.getElementById("qrCodeSection");
         if (qrSection) {
           qrSection.innerHTML =
-            '<div class="sync-qr-expired"> QR Code 已過期，請重新建立工作階段</div>';
+            "<div class=\"sync-qr-expired\"> QR Code 已過期，請重新建立工作階段</div>";
         }
         return;
       }
@@ -432,9 +628,81 @@ export class SyncManagerQR {
   }
 
   /**
+   * [新增] 重新抓取並更新相機下拉選單
+   * - 會保留目前選取（若仍存在）或套用儲存的偏好
+   */
+  async refreshDeviceList(video) {
+    const cameraSelect = document.getElementById("syncCameraSelect");
+    const statusEl = this.qrScanner?.querySelector(".sync-scanner-status");
+    if (!cameraSelect) return;
+
+    try {
+      // 1. 重新列舉裝置並排序
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((d) => d.kind === "videoinput");
+      const sorted = this.sortVideoDevices(videoDevices);
+      this.availableVideoDevices = sorted;
+
+      Logger.debug(
+        "[QR] refreshDeviceList: 更新清單",
+        sorted.map((d) => ({ deviceId: d.deviceId, label: d.label }))
+      );
+
+      // 2. 記錄目前選中的 ID (刷新後嘗試選回它)
+      const currentSelectedId = cameraSelect.value;
+
+      // 3. 重繪下拉選單
+      cameraSelect.innerHTML = "";
+      sorted.forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.textContent = device.label || `相機 ${index + 1}`;
+        cameraSelect.appendChild(option);
+      });
+
+      // 4. 嘗試保持原本的選擇或套用儲存偏好
+      if (
+        currentSelectedId &&
+        sorted.some((d) => d.deviceId === currentSelectedId)
+      ) {
+        cameraSelect.value = currentSelectedId;
+      } else {
+        const savedId = localStorage.getItem("preferredCameraId");
+        const savedLabel = (
+          localStorage.getItem("preferredCameraLabel") || ""
+        ).toLowerCase();
+
+        if (savedId && sorted.some((d) => d.deviceId === savedId)) {
+          cameraSelect.value = savedId;
+        } else if (savedLabel) {
+          const match = sorted.find((d) =>
+            (d.label || "").toLowerCase().includes(savedLabel)
+          );
+          if (match) {
+            cameraSelect.value = match.deviceId;
+          } else if (sorted.length > 0) {
+            cameraSelect.value = sorted[0].deviceId;
+          }
+        } else if (sorted.length > 0) {
+          cameraSelect.value = sorted[0].deviceId;
+        }
+      }
+    } catch (error) {
+      Logger.warn("[QR] refreshDeviceList failed:", error);
+      if (statusEl) statusEl.textContent = "刷新相機清單失敗";
+    }
+  }
+
+  /**
    * 啟動 QR Code 掃描器
    */
   async startQRScanner() {
+    // 防止同時多次建立 scanner UI 或重複啟動
+    if (this.qrScanner) {
+      Logger.warn("[QR] Scanner UI 已存在，忽略重複啟動請求");
+      return;
+    }
+
     if (!navigator.mediaDevices) {
       Logger.error("裝置不支援攝影機存取");
       alert("您的裝置不支援攝影機功能");
@@ -446,15 +714,33 @@ export class SyncManagerQR {
     this.qrScanner.innerHTML = `
             <div class="sync-scanner-ui">
                 <div class="sync-scanner-header">
-                    <h3>掃描 QR Code</h3>
-                    <button class="sync-scanner-close-btn" title="關閉" aria-label="關閉掃描器">×</button>
+                    <h3>掃描 QR Code </h3>
+                    <div class="sync-scanner-header-actions">
+                        <button class="sync-scanner-refresh-btn" id="refreshCamerasBtn" title="重新整理相機" aria-label="重新整理相機">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
+                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                                <path d="M21 3v5h-5"></path>
+                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                                <path d="M3 21v-5h5"></path>
+                            </svg>
+                        </button>
+                        <button class="sync-scanner-copy-btn" id="copyDebugBtn" title="複製偵錯日誌" aria-label="複製偵錯日誌">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
+                                <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                        <button class="sync-scanner-close-btn" title="關閉" aria-label="關閉掃描器">×</button>
+                    </div>
                 </div>
                 <div class="sync-scanner-video-container">
                     <video id="syncQrVideo" autoplay playsinline muted webkit-playsinline></video>
                     <div class="sync-scanning-frame"></div>
-                    <select id="syncCameraSelect" class="sync-camera-select">
-                        <option value="">自動選擇相機</option>
-                    </select>
+                    <select id="syncCameraSelect" class="sync-camera-select"></select>
+                    <div class="sync-camera-filter">
+                        <input id="syncCameraFilter" class="sync-camera-filter-input" placeholder="過濾相機（例如: 174f:1811 或 'Integrated'）" aria-label="過濾相機" />
+                        <button id="applyCameraFilterBtn" class="sync-camera-apply-btn" title="套用並選擇匹配的相機">選取</button>
+                    </div>
                 </div>
                 <div class="sync-scanner-status">對準 QR Code 掃描加入工作階段</div>
             </div>
@@ -465,7 +751,121 @@ export class SyncManagerQR {
     const video = document.getElementById("syncQrVideo");
     const cameraSelect = document.getElementById("syncCameraSelect");
     const closeBtn = this.qrScanner.querySelector(".sync-scanner-close-btn");
+    const refreshBtn = this.qrScanner.querySelector("#refreshCamerasBtn");
+    const copyBtn = this.qrScanner.querySelector("#copyDebugBtn");
+    const statusEl = this.qrScanner.querySelector(".sync-scanner-status");
+
+    // 相機過濾輸入與套用按鈕（提前宣告，避免後續閉包中使用前未定義）
+    const filterInput = this.qrScanner.querySelector("#syncCameraFilter");
+    const applyFilterBtn = this.qrScanner.querySelector(
+      "#applyCameraFilterBtn"
+    );
+
+    // 關閉掃描器
     closeBtn.addEventListener("click", () => this.stopQRScanner());
+
+    // 複製偵錯資訊按鈕（使用 SVG 圖示而非 emoji）
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const debug = {
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          devices: (this.availableVideoDevices || []).map((d) => ({
+            deviceId: d.deviceId,
+            label: d.label
+          })),
+          attempts: this.lastCameraAttempts || []
+        };
+        try {
+          await navigator.clipboard.writeText(JSON.stringify(debug, null, 2));
+          if (statusEl) statusEl.textContent = "已複製偵錯資訊到剪貼簿";
+          const originalHTML = copyBtn.innerHTML;
+          copyBtn.innerHTML =
+            "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
+          copyBtn.classList.add("copied");
+          Logger.info("[QR] 已複製偵錯資訊到剪貼簿", debug);
+          setTimeout(() => {
+            copyBtn.innerHTML = originalHTML;
+            copyBtn.classList.remove("copied");
+          }, 1400);
+        } catch (err) {
+          Logger.warn("[QR] 複製偵錯資訊失敗:", err);
+          if (statusEl) statusEl.textContent = "無法複製偵錯資訊";
+        }
+      });
+    }
+
+    // 重新整理按鈕：重新列舉相機並重新啟動（使用者可視覺確認）
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        if (this.cameraLoading) {
+          Logger.debug("[QR] refreshCamerasBtn: camera is loading, ignoring");
+          if (statusEl) statusEl.textContent = "攝影機正在啟動中，請稍後...";
+          return;
+        }
+
+        try {
+          if (statusEl) statusEl.textContent = "正在重新整理相機列表...";
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter((d) => d.kind === "videoinput");
+
+          // 使用排序後的清單（實體相機優先）
+          const sorted = this.sortVideoDevices(videoDevices);
+          this.availableVideoDevices = sorted;
+          rebuildCameraOptions(filterInput?.value || "");
+          Logger.debug(
+            "[QR] refreshCamerasBtn: enumerateDevices result (sorted)",
+            sorted.map((d) => ({ deviceId: d.deviceId, label: d.label }))
+          );
+
+          // 智慧選擇：先用記憶 (ID / label) → 否則選排序後第一台
+          const savedId = localStorage.getItem("preferredCameraId");
+          const savedLabel = (
+            localStorage.getItem("preferredCameraLabel") || ""
+          ).toLowerCase();
+
+          let toStart = "";
+
+          if (savedId && sorted.some((d) => d.deviceId === savedId)) {
+            toStart = savedId;
+            Logger.debug("[QR] refreshCamerasBtn: hit savedId", savedId);
+          } else if (savedLabel) {
+            const labelMatch = sorted.find((d) =>
+              (d.label || "").toLowerCase().includes(savedLabel)
+            );
+            if (labelMatch) {
+              toStart = labelMatch.deviceId;
+              cameraSelect.value = toStart;
+              Logger.debug(
+                "[QR] refreshCamerasBtn: matched saved label to device",
+                { savedLabel, matched: toStart }
+              );
+            }
+          }
+
+          if (!toStart && sorted.length > 0) {
+            toStart = sorted[0].deviceId;
+            Logger.debug(
+              "[QR] refreshCamerasBtn: default to first sorted device",
+              toStart
+            );
+          }
+
+          if (toStart) {
+            if (statusEl) statusEl.textContent = "啟動選擇的相機...";
+            cameraSelect.value = toStart;
+            await this.startCamera(video, toStart);
+          } else {
+            if (statusEl) statusEl.textContent = "找不到可用的攝影機";
+          }
+        } catch (err) {
+          Logger.warn("[QR] refreshCamerasBtn error:", err);
+          if (statusEl) statusEl.textContent = "重新整理相機失敗";
+        }
+      });
+    }
 
     // 列出可用的相機
     try {
@@ -474,18 +874,78 @@ export class SyncManagerQR {
         (device) => device.kind === "videoinput"
       );
 
-      // 清空現有選項（保留自動選擇）
-      cameraSelect.innerHTML = '<option value="">自動選擇相機</option>';
+      // 優先排序：把已知的虛擬裝置（Meta Quest / OBS / Virtual 等）降到清單後面
+      const sorted = this.sortVideoDevices(videoDevices);
 
-      // 新增相機選項
-      videoDevices.forEach((device, index) => {
+      // 清空現有選項（只顯示具體裝置）
+      cameraSelect.innerHTML = "";
+
+      // 記錄可用相機並 debug 列表（已排序）
+      this.availableVideoDevices = sorted;
+      try {
+        Logger.debug(
+          "enumerateDevices found video devices (sorted):",
+          sorted.map((d) => ({ deviceId: d.deviceId, label: d.label }))
+        );
+      } catch (e) {}
+
+      // 新增相機選項（使用排序後的清單，實體相機在前）
+      sorted.forEach((device, index) => {
         const option = document.createElement("option");
         option.value = device.deviceId;
         option.textContent = device.label || `相機 ${index + 1}`;
         cameraSelect.appendChild(option);
       });
+
+      // 智慧預設：
+      // 1) 儲存的 ID 優先
+      // 2) 儲存的 label（substring）作為備援
+      // 3) 否則使用排序後第一台
+      const savedId = localStorage.getItem("preferredCameraId") || "";
+      const savedLabel = (
+        localStorage.getItem("preferredCameraLabel") || ""
+      ).toLowerCase();
+
+      let targetDeviceId = "";
+
+      if (savedId && sorted.some((d) => d.deviceId === savedId)) {
+        targetDeviceId = savedId;
+        Logger.debug("[QR] hit saved camera by id", { savedId });
+      } else if (savedLabel) {
+        const byLabel = sorted.find((d) =>
+          (d.label || "").toLowerCase().includes(savedLabel)
+        );
+        if (byLabel) {
+          targetDeviceId = byLabel.deviceId;
+          Logger.debug("[QR] hit saved camera by label", {
+            savedLabel,
+            matched: targetDeviceId
+          });
+        }
+      }
+
+      if (!targetDeviceId && sorted.length > 0) {
+        targetDeviceId = sorted[0].deviceId;
+        Logger.debug("[QR] defaulting to first sorted device", targetDeviceId);
+      }
+
+      // 設定選單並啟動目標相機
+      cameraSelect.value = targetDeviceId;
+      try {
+        if (statusEl) statusEl.textContent = "啟動選擇的相機...";
+        await this.startCamera(video, targetDeviceId);
+      } catch (e) {
+        Logger.warn("[QR] startCamera failed for initial selection:", e);
+      }
     } catch (error) {
       Logger.warn("無法列出相機裝置:", error);
+      try {
+        Logger.debug("enumerateDevices failed:", {
+          name: error && error.name,
+          message: error && error.message,
+          stack: error && error.stack
+        });
+      } catch (e) {}
     }
 
     // 相機選擇變更事件
@@ -495,75 +955,408 @@ export class SyncManagerQR {
         this.currentStream.getTracks().forEach((track) => track.stop());
       }
 
+      // 儲存使用者偏好（deviceId 與 label 作為備援），然後重新啟動相機
+      const val = cameraSelect.value;
+      if (val) {
+        localStorage.setItem("preferredCameraId", val);
+        const selOption =
+          cameraSelect.selectedOptions && cameraSelect.selectedOptions[0];
+        const selLabel = selOption ? selOption.textContent : "";
+        if (selLabel) localStorage.setItem("preferredCameraLabel", selLabel);
+        Logger.debug("[QR] 使用者手動切換相機，已儲存偏好", {
+          preferred: val,
+          label: selLabel
+        });
+      }
+
       // 重新啟動相機
       await this.startCamera(video, cameraSelect.value);
     });
 
-    // 啟動相機
-    await this.startCamera(video, cameraSelect.value);
-  }
-
-  /**
-   * 啟動指定的相機
-   */
-  async startCamera(video, deviceId) {
-    // 儲存目前的 stream 引用，用於稍後清理
-    const constraints = {
-      video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        facingMode: "environment",
-        // 某些 Android 瀏覽器支援
-        advanced: [{ focusMode: "continuous" }],
-      },
+    // 相機過濾與快速選取
+    const rebuildCameraOptions = (filter) => {
+      cameraSelect.innerHTML = "";
+      const lower = filter ? filter.toLowerCase() : "";
+      (this.availableVideoDevices || []).forEach((device, index) => {
+        if (
+          !lower ||
+          (device.label && device.label.toLowerCase().includes(lower)) ||
+          device.deviceId.toLowerCase().includes(lower)
+        ) {
+          const option = document.createElement("option");
+          option.value = device.deviceId;
+          option.textContent = device.label || `相機 ${index + 1}`;
+          cameraSelect.appendChild(option);
+        }
+      });
     };
 
-    navigator.mediaDevices
-      .getUserMedia(constraints)
-      .then((stream) => {
-        // 檢查元素是否還存在（可能在取得攝影機期間被關閉）
-        if (!this.qrScanner || !document.body.contains(this.qrScanner)) {
-          // 如果掃描器已被關閉，停止 stream
-          stream.getTracks().forEach((track) => track.stop());
+    if (filterInput) {
+      filterInput.addEventListener("input", (e) => {
+        rebuildCameraOptions(e.target.value);
+      });
+    }
+
+    if (applyFilterBtn) {
+      applyFilterBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const filter = filterInput?.value?.trim();
+        if (!filter) {
+          if (statusEl) statusEl.textContent = "請輸入過濾字串";
           return;
         }
 
-        video.srcObject = stream;
-        this.currentStream = stream; // 儲存 stream 引用
+        const matches = (this.availableVideoDevices || []).filter((d) => {
+          const fl = filter.toLowerCase();
+          return (
+            (d.label && d.label.toLowerCase().includes(fl)) ||
+            d.deviceId.toLowerCase().includes(fl)
+          );
+        });
 
-        // 使用 play() 並處理可能的錯誤
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              // Video 播放成功
-              this.startQRDetection(video);
-            })
-            .catch((err) => {
-              Logger.warn("Video play 被中斷:", err);
-              if (this.currentStream) {
-                this.currentStream.getTracks().forEach((track) => track.stop());
-              }
-              this.stopQRScanner();
-            });
-        } else {
-          // 舊版瀏覽器
-          this.startQRDetection(video);
+        if (!matches.length) {
+          if (statusEl) statusEl.textContent = "找不到匹配的相機";
+          return;
         }
-      })
-      .catch((error) => {
-        Logger.error("攝影機存取錯誤:", error);
-        this.stopQRScanner();
 
-        // 顯示更具體的錯誤訊息
-        let errorMsg = "無法存取攝影機。";
-        if (error.name === "NotAllowedError") {
-          errorMsg += "請允許網站使用您的攝影機。";
-        } else if (error.name === "NotFoundError") {
-          errorMsg += "您的裝置沒有可用的攝影機。";
-        }
-        alert(errorMsg);
+        // 選擇第一個匹配項並啟動（同時儲存為使用者偏好，包含 label 備援）
+        cameraSelect.value = matches[0].deviceId;
+        localStorage.setItem("preferredCameraId", matches[0].deviceId);
+        if (matches[0].label)
+          localStorage.setItem("preferredCameraLabel", matches[0].label);
+        if (statusEl)
+          statusEl.textContent = `選擇相機：${matches[0].label || matches[0].deviceId}`;
+        Logger.info("[QR] applyCameraFilter: selected device", {
+          deviceId: matches[0].deviceId,
+          label: matches[0].label
+        });
+        await this.startCamera(video, cameraSelect.value);
       });
+    }
+
+    // 初始啟動已在上方完成（依智慧選擇邏輯）
+  }
+
+  /**
+   * 啟動指定的相機 (startCamera)
+   *
+   * 行為說明：
+   * - 使用 getUserMedia 嘗試依 constraints 啟動相機
+   * - 若未指定 deviceId，會以 facingMode(環境鏡頭) 為優先
+   * - 若首次嘗試失敗（NotReadable 或 Overconstrained），會使用更寬鬆的 fallback
+   * - 若 fallback 仍失敗，會依 enumerateDevices 提供的 deviceId 列表逐一嘗試
+   * - 內部會使用互斥旗標 (this.cameraLoading) 防止重複啟動造成 race condition
+   *
+   * 參數：
+   * - video: HTMLVideoElement - 用於顯示流的 video 元素
+   * - deviceId: string (可選) - 精準指定要啟動的裝置 id
+   */
+  async startCamera(video, deviceId) {
+    // 停掉現有 stream（如果有）以釋放資源
+    if (this.currentStream) {
+      try {
+        this.currentStream.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        Logger.warn("stop currentStream failed:", e);
+      }
+      this.currentStream = null;
+    }
+
+    // 建立基本 constraints：保留解析度偏好，但若未指定 deviceId 時使用系統預設（避免強制 facingMode）
+    const baseVideo = {
+      width: { ideal: 640 },
+      height: { ideal: 480 }
+    };
+
+    let constraints = {
+      video: deviceId
+        ? { ...baseVideo, deviceId: { exact: deviceId } }
+        : { ...baseVideo },
+      audio: false
+    };
+
+    const statusEl = this.qrScanner?.querySelector(".sync-scanner-status");
+
+    // Prevent concurrent camera startup requests to avoid race conditions
+    if (this.cameraLoading) {
+      Logger.warn("[QR] camera already loading, ignoring new request");
+      if (statusEl) statusEl.textContent = "攝影機正在啟動中，請稍後...";
+      return;
+    }
+
+    this.cameraLoading = true; // lock to prevent concurrent starts
+
+    try {
+      // 主要嘗試：使用指定 constraints 啟動
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      // 檢查元素是否還存在（可能在取得攝影機期間被關閉）
+      if (!this.qrScanner || !document.body.contains(this.qrScanner)) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      video.srcObject = stream;
+      this.currentStream = stream; // 儲存 stream 引用
+
+      // 播放並開始檢測
+      try {
+        await video.play();
+        if (statusEl) statusEl.textContent = "請對準 QR Code 掃描";
+        this.startQRDetection(video);
+        return;
+      } catch (err) {
+        Logger.warn("Video play 被中斷:", err);
+        if (this.currentStream)
+          this.currentStream.getTracks().forEach((t) => t.stop());
+        this.stopQRScanner();
+        return;
+      }
+    } catch (error) {
+      Logger.error("攝影機存取錯誤:", error);
+      // 詳細 debug 日誌（包含錯誤名稱、訊息與堆疊資訊）
+      try {
+        Logger.debug("startCamera error details:", {
+          name: error && error.name,
+          message: error && error.message,
+          stack: error && error.stack,
+          constraints: constraints
+        });
+      } catch (e) {
+        // ignore if Logger.debug fails
+      }
+
+      // 顯示在 scanner UI（避免多餘 alert）
+      if (statusEl)
+        statusEl.textContent = `無法存取攝影機：${error.name || error.message}`;
+
+      // 若是可讀取資源被佔用或過度限制，嘗試 fallback（放寬限制）
+      if (
+        error.name === "NotReadableError" ||
+        error.name === "OverconstrainedError"
+      ) {
+        Logger.warn("startCamera fallback: 將嘗試使用放寬的 constraints");
+
+        // 放寬限制嘗試
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+
+          if (!this.qrScanner || !document.body.contains(this.qrScanner)) {
+            fallbackStream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+
+          video.srcObject = fallbackStream;
+          this.currentStream = fallbackStream;
+
+          try {
+            await video.play();
+            if (statusEl)
+              statusEl.textContent = "使用備援攝影機，請對準 QR Code ";
+            this.startQRDetection(video);
+            return;
+          } catch (err2) {
+            Logger.warn("Video play on fallback 被中斷:", err2);
+            fallbackStream.getTracks().forEach((t) => t.stop());
+            this.stopQRScanner();
+            return;
+          }
+        } catch (err2) {
+          Logger.error("fallback 仍然無法存取攝影機:", err2);
+          try {
+            Logger.debug("startCamera fallback error details:", {
+              name: err2 && err2.name,
+              message: err2 && err2.message,
+              stack: err2 && err2.stack
+            });
+          } catch (e) {}
+
+          // 嘗試利用 enumerateDevices 得到的 deviceId 列表逐一嘗試（新增多種 constraints variant 並紀錄每次失敗以便偵錯）
+          const devicesList = this.availableVideoDevices || [];
+          if (devicesList.length > 0) {
+            const attemptRecords = [];
+
+            for (let i = 0; i < devicesList.length; i++) {
+              const d = devicesList[i];
+              const deviceLabel = d.label || d.deviceId;
+
+              // variants：多種嘗試策略（由寬鬆到嚴格）
+              const variants = [
+                {
+                  desc: "exact-low-res",
+                  constraints: {
+                    video: {
+                      deviceId: { exact: d.deviceId },
+                      width: { ideal: 320 },
+                      height: { ideal: 240 },
+                      frameRate: { ideal: 15, max: 30 }
+                    },
+                    audio: false
+                  }
+                },
+                {
+                  desc: "exact-default",
+                  constraints: {
+                    video: { deviceId: { exact: d.deviceId } },
+                    audio: false
+                  }
+                },
+                {
+                  desc: "ideal-device-low-res",
+                  constraints: {
+                    video: {
+                      deviceId: { ideal: d.deviceId },
+                      width: { ideal: 320 },
+                      height: { ideal: 240 }
+                    },
+                    audio: false
+                  }
+                }
+              ];
+
+              for (let v = 0; v < variants.length; v++) {
+                const variant = variants[v];
+                try {
+                  if (statusEl)
+                    statusEl.textContent = `嘗試相機 ${i + 1}/${devicesList.length} (${deviceLabel}) - ${variant.desc}`;
+
+                  Logger.debug("[QR] startCamera attempting device variant", {
+                    deviceId: d.deviceId,
+                    label: deviceLabel,
+                    variant: variant.desc,
+                    constraints: variant.constraints
+                  });
+
+                  // 小延遲避免快速重試導致系統忙碌
+                  await new Promise((resolve) => setTimeout(resolve, 300));
+
+                  const deviceStream =
+                    await navigator.mediaDevices.getUserMedia(
+                      variant.constraints
+                    );
+
+                  if (
+                    !this.qrScanner ||
+                    !document.body.contains(this.qrScanner)
+                  ) {
+                    deviceStream.getTracks().forEach((t) => t.stop());
+                    this.lastCameraAttempts = attemptRecords;
+                    return;
+                  }
+
+                  video.srcObject = deviceStream;
+                  this.currentStream = deviceStream;
+
+                  try {
+                    await video.play();
+                    if (statusEl)
+                      statusEl.textContent = "使用相機完成，請對準 QR Code ";
+                    this.startQRDetection(video);
+                    this.lastCameraAttempts = attemptRecords;
+                    return;
+                  } catch (vErr) {
+                    Logger.warn("Video play failed for device variant:", vErr);
+                    deviceStream.getTracks().forEach((t) => t.stop());
+                    attemptRecords.push({
+                      deviceId: d.deviceId,
+                      label: deviceLabel,
+                      variant: variant.desc,
+                      name: vErr && vErr.name,
+                      message: vErr && vErr.message,
+                      time: Date.now()
+                    });
+                    continue; // 嘗試下一個 variant
+                  }
+                } catch (devErr) {
+                  Logger.warn(
+                    `device ${d.deviceId} variant ${variant.desc} 嘗試失敗:`,
+                    devErr
+                  );
+                  try {
+                    Logger.debug("device attempt error details:", {
+                      name: devErr && devErr.name,
+                      message: devErr && devErr.message,
+                      stack: devErr && devErr.stack
+                    });
+                  } catch (e) {}
+
+                  attemptRecords.push({
+                    deviceId: d.deviceId,
+                    label: deviceLabel,
+                    variant: variant.desc,
+                    name: devErr && devErr.name,
+                    message: devErr && devErr.message,
+                    time: Date.now()
+                  });
+                  continue;
+                }
+              }
+            }
+
+            // 若全部嘗試失敗，儲存嘗試記錄並提示使用者複製偵錯日誌
+            this.lastCameraAttempts = attemptRecords;
+            if (statusEl)
+              statusEl.textContent =
+                "所有相機嘗試失敗。請按右上資訊按鈕複製偵錯日誌以協助排查。";
+            Logger.debug("[QR] all device attempts failed", attemptRecords);
+            return;
+          }
+
+          if (statusEl)
+            statusEl.textContent =
+              "無法啟動攝影機（可能被其他應用佔用或權限被拒）。";
+          return;
+        }
+      }
+
+      // 一般錯誤處理與提示
+      if (error.name === "NotAllowedError") {
+        if (statusEl) statusEl.textContent = "請允許網站使用您的攝影機。";
+      } else if (error.name === "NotFoundError") {
+        if (statusEl) statusEl.textContent = "找不到可用的攝影機。";
+      } else {
+        if (statusEl) statusEl.textContent = "無法啟動攝影機。";
+      }
+    } finally {
+      // 最終清理：確保互斥鎖釋放
+      if (this.cameraLoading) this.cameraLoading = false;
+    }
+  }
+
+  /**
+   * 使用者觸發的相機重試：
+   * - 停止現有 stream（若有）並呼叫 startCamera
+   * - 回報狀態到 scanner UI 並寫入 Debug 日誌
+   *
+   * @param {string} deviceId - 指定 deviceId（空字串表示自動選擇）
+   * @param {HTMLVideoElement} video - 顯示用 video 元素
+   */
+  async retryCamera(deviceId = "", video) {
+    const statusEl = this.qrScanner?.querySelector(".sync-scanner-status");
+    if (this.cameraLoading) {
+      Logger.debug("[QR] retryCamera: camera is already loading, ignoring");
+      if (statusEl) statusEl.textContent = "攝影機正在啟動中，請稍後...";
+      return;
+    }
+
+    Logger.debug("[QR] retryCamera: user-initiated retry", { deviceId });
+    if (statusEl) statusEl.textContent = "使用者要求重新嘗試啟動相機...";
+
+    // 停掉目前 stream
+    if (this.currentStream) {
+      try {
+        this.currentStream.getTracks().forEach((t) => t.stop());
+      } catch (err) {
+        Logger.warn("[QR] retryCamera: 停止 stream 發生錯誤:", err);
+      }
+      this.currentStream = null;
+    }
+
+    // 使用既有機制啟動相機（會處理鎖、fallback 以及 device 列表逐一嘗試）
+    await this.startCamera(video, deviceId);
   }
 
   /**
@@ -573,7 +1366,7 @@ export class SyncManagerQR {
     if (typeof jsQR === "undefined") {
       Logger.error("jsQR庫未載入");
       this.stopQRScanner();
-      alert("QR掃描庫未載入，請重新整理頁面");
+      alert(" QR Code 掃描庫未載入，請重新整理頁面");
       return;
     }
 
@@ -590,7 +1383,7 @@ export class SyncManagerQR {
       }
 
       try {
-        // --- 優化點：降取樣 (Downsampling) ---
+        // --- 降取樣 (Downsampling) ---
         // 限制處理的最大尺寸（建議 480~640），jsQR 處理大圖非常吃力
         const maxScanSize = 640;
         let width = video.videoWidth;
@@ -613,11 +1406,11 @@ export class SyncManagerQR {
 
         // 分析 QR Code (耗時操作)
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert", // 若不需要掃反色碼，關閉此項可提升一倍速度
+          inversionAttempts: "dontInvert" // 若不需要掃反色碼，關閉此項可提升一倍速度
         });
 
         if (code && code.data) {
-          Logger.info("QR Code 識別成功");
+          Logger.info(" QR Code  識別成功");
           this.scanning = false;
           this.stopQRScanner();
           this.handleQRCodeScanned(code.data);
@@ -655,7 +1448,8 @@ export class SyncManagerQR {
         try {
           const url = new URL(qrData);
           shareCode = url.searchParams.get("shareCode");
-          role = url.searchParams.get("role") || "viewer";
+          role =
+            url.searchParams.get("role") || window.SyncManager?.ROLE?.VIEWER;
         } catch (e) {
           Logger.warn("URL 解析失敗:", e);
           return;
@@ -665,9 +1459,9 @@ export class SyncManagerQR {
         const code = qrData.trim().toUpperCase();
         // 作為分享代碼
         shareCode = code;
-        role = "viewer";
+        role = window.SyncManager?.ROLE?.VIEWER;
       } else {
-        // 非分享代碼相關的 QR Code，靜默忽略
+        // 非分享代碼相關的 QR Code ，靜默忽略
         return;
       }
 
@@ -690,7 +1484,7 @@ export class SyncManagerQR {
         this.showJoinConfirmation(codeToUse, role);
       }
     } catch (error) {
-      Logger.error("QR Code 處理錯誤:", error);
+      Logger.error(" QR Code  處理錯誤:", error);
       alert("掃描處理失敗，請重試");
     }
   }
@@ -721,13 +1515,15 @@ export class SyncManagerQR {
           try {
             track.stop();
           } catch (error) {
-            Logger.warn("停止媒體軌道失敗:", e);
+            Logger.warn("停止媒體軌道失敗:", error);
           }
         });
         this.currentStream = null;
       }
 
       // 延遲移除元素，確保 video 已完全停止
+      // 解除任何可能的 loading 鎖，避免停掉掃描器後無法再啟動
+      this.cameraLoading = false;
       setTimeout(() => {
         if (this.qrScanner && this.qrScanner.parentNode) {
           this.qrScanner.remove();
@@ -748,5 +1544,3 @@ export class SyncManagerQR {
     }
   }
 }
-
-export default SyncManagerQR;

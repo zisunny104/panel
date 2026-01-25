@@ -29,7 +29,7 @@ class Logger {
         if (match) {
           return {
             file: match[1],
-            line: match[2] || 0,
+            line: match[2] || 0
           };
         }
       }
@@ -50,7 +50,7 @@ class Logger {
       hour12: false,
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
+      second: "2-digit"
     }); // HH:MM:SS 格式的本機時間
     const prefix = `[${timestamp}] [${level.toUpperCase()}] [${caller.file}:${
       caller.line
@@ -141,7 +141,7 @@ class Logger {
       shouldLogDebug: this.shouldLog("debug"),
       shouldLogInfo: this.shouldLog("info"),
       shouldLogWarn: this.shouldLog("warn"),
-      shouldLogError: this.shouldLog("error"),
+      shouldLogError: this.shouldLog("error")
     };
   }
 }

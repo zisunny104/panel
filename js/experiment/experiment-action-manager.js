@@ -64,7 +64,7 @@ class ExperimentActionManager {
 
     // 綁定 this 上下文
     this.handleRemoteButtonBound = (e) => {
-      const { button, experimentId } = e.detail;
+      const { button: _button, experimentId } = e.detail;
       // 驗證實驗ID是否相同
       if (window.experiment?.currentExperimentId !== experimentId) {
         Logger.warn(
@@ -140,8 +140,8 @@ class ExperimentActionManager {
           action_sequence_progress: {
             current: this.currentActionIndex,
             total: this.currentActionSequence.length,
-            completed: Array.from(this.completedActions),
-          },
+            completed: Array.from(this.completedActions)
+          }
         });
       }
 
@@ -151,7 +151,7 @@ class ExperimentActionManager {
         window.panelExperiment.broadcastButtonAction({
           action_id: currentAction.action_id,
           button_id: currentAction.button_id || "",
-          action_name: currentAction.action_name || "",
+          action_name: currentAction.action_name || ""
         });
       }
 
@@ -179,7 +179,7 @@ class ExperimentActionManager {
       current: this.currentActionIndex,
       total: this.currentActionSequence.length,
       completed: Array.from(this.completedActions),
-      isComplete: this.currentActionIndex >= this.currentActionSequence.length,
+      isComplete: this.currentActionIndex >= this.currentActionSequence.length
     };
   }
 

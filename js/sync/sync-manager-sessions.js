@@ -26,7 +26,7 @@ export class SyncManagerSessions {
   }
 
   /**
-   * 取得 API 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
+   * 取得 API 路徑前綴（參考 QR Code 的動態路徑邏輯，完全避免硬編碼）
    */
   getApiBasePath() {
     // 根據頁面路徑動態決定 API 前綴（完全動態，無硬編碼）
@@ -72,7 +72,7 @@ export class SyncManagerSessions {
 
       Logger.info("[SyncManagerSessions] 工作階段失效，重新載入列表", {
         reason,
-        originalError,
+        originalError
       });
 
       // 如果面板正在顯示，重新載入工作階段列表
@@ -201,12 +201,12 @@ export class SyncManagerSessions {
     const createdTime = window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(session.created * 1000)
       : new Date(session.created * 1000).toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei"
         });
     const lastActivity = window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(session.lastActivity * 1000)
       : new Date(session.lastActivity * 1000).toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei"
         });
     const isActive = Date.now() / 1000 - session.lastActivity < 600; // 10分鐘內有活動
 
@@ -254,19 +254,19 @@ export class SyncManagerSessions {
         state = JSON.parse(state);
       } catch (error) {
         Logger.debug("解析同步狀態失敗:", error);
-        return '<span class="sync-state-empty">資料格式錯誤</span>';
+        return "<span class=\"sync-state-empty\">資料格式錯誤</span>";
       }
     }
 
     if (!state || typeof state !== "object") {
-      return '<span class="sync-state-empty">無資料</span>';
+      return "<span class=\"sync-state-empty\">無資料</span>";
     }
 
     const formatValue = (value, indent = 0) => {
       const indentStr = "  ".repeat(indent);
 
       if (value === null) {
-        return '<span class="sync-state-null">null</span>';
+        return "<span class=\"sync-state-null\">null</span>";
       }
 
       if (typeof value === "boolean") {
@@ -282,7 +282,7 @@ export class SyncManagerSessions {
         if (value.length > 50) {
           return `<span class="sync-state-string">"${value.substring(
             0,
-            47,
+            47
           )}..."</span>`;
         }
         return `<span class="sync-state-string">"${value}"</span>`;
@@ -290,7 +290,7 @@ export class SyncManagerSessions {
 
       if (Array.isArray(value)) {
         if (value.length === 0) {
-          return '<span class="sync-state-array">[]</span>';
+          return "<span class=\"sync-state-array\">[]</span>";
         }
 
         const items = value
@@ -307,7 +307,7 @@ ${indentStr}]</span>`;
       if (typeof value === "object") {
         const entries = Object.entries(value);
         if (entries.length === 0) {
-          return '<span class="sync-state-object">{}</span>';
+          return "<span class=\"sync-state-object\">{}</span>";
         }
 
         const formattedEntries = entries
@@ -316,8 +316,8 @@ ${indentStr}]</span>`;
             ([key, val]) =>
               `${indentStr}  <span class="sync-state-key">"${key}"</span>: ${formatValue(
                 val,
-                indent + 1,
-              )}`,
+                indent + 1
+              )}`
           );
 
         const remaining =
@@ -339,12 +339,12 @@ ${indentStr}}</span>`;
     // 處理分享代碼資訊（支援多個分享代碼）
     const shareCodeInfo = (() => {
       if (!session.shareCodes || session.shareCodes.length === 0) {
-        return '<div class="sync-session-info sync-session-info-no-code">無分享代碼</div>';
+        return "<div class=\"sync-session-info sync-session-info-no-code\">無分享代碼</div>";
       }
 
       // 依建立時間排序（最新的在前）
       const sortedCodes = [...session.shareCodes].sort(
-        (a, b) => b.createdAt - a.createdAt,
+        (a, b) => b.createdAt - a.createdAt
       );
 
       const codeList = sortedCodes
@@ -363,18 +363,18 @@ ${indentStr}}</span>`;
           const createdTime = window.timeSyncManager
             ? window.timeSyncManager.formatDateTime(code.createdAt * 1000)
             : new Date(code.createdAt * 1000).toLocaleString("zh-TW", {
-                timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+                timeZone: window.CONFIG?.timezone || "Asia/Taipei"
               });
           const expiresTime = window.timeSyncManager
             ? window.timeSyncManager.formatDateTime(code.expiresAt * 1000)
             : new Date(code.expiresAt * 1000).toLocaleString("zh-TW", {
-                timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+                timeZone: window.CONFIG?.timezone || "Asia/Taipei"
               });
           const usedTime = code.usedAt
             ? window.timeSyncManager
               ? window.timeSyncManager.formatDateTime(code.usedAt * 1000)
               : new Date(code.usedAt * 1000).toLocaleString("zh-TW", {
-                  timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+                  timeZone: window.CONFIG?.timezone || "Asia/Taipei"
                 })
             : null;
 
@@ -419,20 +419,23 @@ ${indentStr}}</span>`;
               const joinedTime = window.timeSyncManager
                 ? window.timeSyncManager.formatDateTime(client.joinedAt * 1000)
                 : new Date(client.joinedAt * 1000).toLocaleString("zh-TW", {
-                    timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+                    timeZone: window.CONFIG?.timezone || "Asia/Taipei"
                   });
               const lastActivityTime = window.timeSyncManager
                 ? window.timeSyncManager.formatDateTime(
-                    client.lastActivity * 1000,
+                    client.lastActivity * 1000
                   )
                 : new Date(client.lastActivity * 1000).toLocaleString("zh-TW", {
-                    timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+                    timeZone: window.CONFIG?.timezone || "Asia/Taipei"
                   });
               return `
         <div class="sync-session-client ${client.role}">
           <div><strong>裝置ID:</strong> ${client.id}</div>
           <div><strong>角色:</strong> ${
-            client.role === "operator" ? "操作者" : "檢視者"
+            window.SyncManager?.getRoleText(client.role) ||
+            (client.role === window.SyncManager?.ROLE?.OPERATOR
+              ? "操作者"
+              : "檢視者")
           }</div>
           <div><strong>加入時間:</strong> ${joinedTime}</div>
           <div><strong>最後活動:</strong> ${lastActivityTime}</div>
@@ -440,7 +443,7 @@ ${indentStr}}</span>`;
       `;
             })
             .join("")
-        : '<div class="sync-session-no-clients">無裝置</div>';
+        : "<div class=\"sync-session-no-clients\">無裝置</div>";
 
     const stateInfo = session.state
       ? (() => {
@@ -472,7 +475,7 @@ ${indentStr}}</span>`;
         </div>
       </div>`;
         })()
-      : '<div class="sync-session-info sync-session-info-no-state">無同步資料</div>';
+      : "<div class=\"sync-session-info sync-session-info-no-state\">無同步資料</div>";
 
     return `
       ${shareCodeInfo}
@@ -521,7 +524,7 @@ ${indentStr}}</span>`;
 
     // 刪除所有工作階段按鈕
     const clearAllBtn = this.sessionsPanel.querySelector(
-      "#clearAllSessionsBtn",
+      "#clearAllSessionsBtn"
     );
     clearAllBtn.addEventListener("click", () => {
       // 將所有操作（包括確認對話框）移到下一個事件循環
@@ -538,8 +541,8 @@ ${indentStr}}</span>`;
             `${this.getApiUrl()}/sync/sessions/clear`,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-            },
+              headers: { "Content-Type": "application/json" }
+            }
           );
           const data = await response.json();
 
@@ -571,7 +574,7 @@ ${indentStr}}</span>`;
 
     // 結束所有活動中工作階段按鈕
     const stopAllActiveBtn = this.sessionsPanel.querySelector(
-      "#stopAllActiveSessionsBtn",
+      "#stopAllActiveSessionsBtn"
     );
     stopAllActiveBtn.addEventListener("click", () => {
       setTimeout(async () => {
@@ -587,7 +590,7 @@ ${indentStr}}</span>`;
 
         if (
           !confirm(
-            `確定要結束所有 ${activeSessions.length} 個活動中工作階段嗎？`,
+            `確定要結束所有 ${activeSessions.length} 個活動中工作階段嗎？`
           )
         ) {
           return;
@@ -634,7 +637,7 @@ ${indentStr}}</span>`;
 
     // 選取無同步資料的工作階段
     const selectNoDataBtn = this.sessionsPanel.querySelector(
-      "#selectNoDataSessionsBtn",
+      "#selectNoDataSessionsBtn"
     );
     selectNoDataBtn.addEventListener("click", () => {
       const checkboxes =
@@ -662,7 +665,7 @@ ${indentStr}}</span>`;
 
     // 選取僅一個裝置的工作階段
     const selectSingleClientBtn = this.sessionsPanel.querySelector(
-      "#selectSingleClientSessionsBtn",
+      "#selectSingleClientSessionsBtn"
     );
     selectSingleClientBtn.addEventListener("click", () => {
       const checkboxes =
@@ -687,7 +690,7 @@ ${indentStr}}</span>`;
 
     // 下載選取工作階段
     const downloadSelectedBtn = this.sessionsPanel.querySelector(
-      "#downloadSelectedSessionsBtn",
+      "#downloadSelectedSessionsBtn"
     );
     downloadSelectedBtn.addEventListener("click", () => {
       if (this.selectedSessions.size === 0) {
@@ -696,7 +699,7 @@ ${indentStr}}</span>`;
       }
 
       const selectedData = this.sessionsData.filter((session) =>
-        this.selectedSessions.has(session.id),
+        this.selectedSessions.has(session.id)
       );
 
       const dataStr = JSON.stringify(selectedData, null, 2);
@@ -716,7 +719,7 @@ ${indentStr}}</span>`;
 
     // 刪除選取工作階段
     const deleteSelectedBtn = this.sessionsPanel.querySelector(
-      "#deleteSelectedSessionsBtn",
+      "#deleteSelectedSessionsBtn"
     );
     deleteSelectedBtn.addEventListener("click", () => {
       setTimeout(async () => {
@@ -727,7 +730,7 @@ ${indentStr}}</span>`;
 
         if (
           !confirm(
-            `確定要刪除選取的 ${this.selectedSessions.size} 個工作階段嗎？此操作無法還原。`,
+            `確定要刪除選取的 ${this.selectedSessions.size} 個工作階段嗎？此操作無法還原。`
           )
         ) {
           return;
@@ -740,19 +743,19 @@ ${indentStr}}</span>`;
           const deletePromises = Array.from(this.selectedSessions).map(
             (sessionId) =>
               fetch(`${this.getApiUrl()}/sync/session/${sessionId}`, {
-                method: "DELETE",
-              }).then((response) => response.json()),
+                method: "DELETE"
+              }).then((response) => response.json())
           );
 
           const results = await Promise.all(deletePromises);
           const successCount = results.filter(
-            (result) => result.success,
+            (result) => result.success
           ).length;
           const failCount = results.length - successCount;
 
           // 從本機資料中移除已刪除的工作階段
           this.sessionsData = this.sessionsData.filter(
-            (session) => !this.selectedSessions.has(session.id),
+            (session) => !this.selectedSessions.has(session.id)
           );
 
           // 清空選取狀態
@@ -810,15 +813,15 @@ ${indentStr}}</span>`;
             const response = await fetch(
               `${this.getApiUrl()}/sync/session/${sessionId}`,
               {
-                method: "DELETE",
-              },
+                method: "DELETE"
+              }
             );
             const data = await response.json();
 
             if (data.success) {
               // 從本機資料中移除已刪除的工作階段
               this.sessionsData = this.sessionsData.filter(
-                (session) => session.id !== sessionId,
+                (session) => session.id !== sessionId
               );
               this.expandedCards.delete(sessionId);
 
@@ -892,7 +895,7 @@ ${indentStr}}</span>`;
       if (event.target.closest(".sync-session-state-header")) {
         const stateToggle = event.target.closest(".sync-session-state-toggle");
         const stateDetails = stateToggle.querySelector(
-          ".sync-session-state-details",
+          ".sync-session-state-details"
         );
         const expandIcon = stateToggle.querySelector(".sync-state-expand-icon");
 
@@ -925,7 +928,7 @@ ${indentStr}}</span>`;
     if (!selectAllCheckbox || !checkboxes) return;
 
     const checkedCount = this.sessionsPanel.querySelectorAll(
-      ".session-checkbox:checked",
+      ".session-checkbox:checked"
     ).length;
     const totalCount = checkboxes.length;
 
@@ -939,10 +942,10 @@ ${indentStr}}</span>`;
    */
   updateBatchOperationButtons() {
     const downloadBtn = this.sessionsPanel?.querySelector(
-      "#downloadSelectedSessionsBtn",
+      "#downloadSelectedSessionsBtn"
     );
     const deleteBtn = this.sessionsPanel?.querySelector(
-      "#deleteSelectedSessionsBtn",
+      "#deleteSelectedSessionsBtn"
     );
 
     const hasSelection = this.selectedSessions.size > 0;

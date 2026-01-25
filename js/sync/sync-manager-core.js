@@ -3,23 +3,16 @@
  * 負責初始化、URL偵測、狀態管理、與sync-client通訊
  * 使用時間同步確保多裝置間的時序一致性
  */
+
 import { SyncEvents } from "../core/sync-events-constants.js";
 
 export class SyncManagerCore {
   constructor() {
-    // 使用全域物件而非 import（避免循環依賴）
-    const SyncClient = window.SyncClient;
-    const TimeSyncManager = window.TimeSyncManager;
+    // 初始化外部依賴（SyncClient / TimeSyncManager）
+    this._initDependencies();
 
-    if (!SyncClient) {
-      throw new Error("SyncClient 未載入，請確認 script 載入順序");
-    }
-
-    this.syncClient = new SyncClient();
-    this.currentRole = "viewer"; // 預設為僅檢視
-    this.timeSyncManager =
-      window.timeSyncManager ||
-      (TimeSyncManager ? new TimeSyncManager() : null);
+    // 預設角色
+    this.currentRole = window.SyncManager?.ROLE?.VIEWER; // 預設為僅檢視
 
     // 自動偵測目前URL - 支援任何部署環境
     this.baseUrl = this.getBaseUrl();
@@ -29,28 +22,57 @@ export class SyncManagerCore {
     this.isProcessingQueue = false;
   }
 
+  // ================== Initialization / URL helpers ==================
+
   /**
-   * 取得基礎URL - 自動適應部署環境
+   * 初始化外部依賴（SyncClient / TimeSyncManager）
+   * 將依賴提取到此處，便於檢查與單元測試
+   * @private
+   */
+  _initDependencies() {
+    // 使用全域物件而非 import（避免循環依賴）
+    const { SyncClient, TimeSyncManager } = window;
+
+    if (!SyncClient) {
+      throw new Error("SyncClient 未載入，請確認 script 載入順序");
+    }
+
+    this.syncClient = new SyncClient();
+    // 允許外部已經建立 timeSyncManager 的情況
+    this.timeSyncManager =
+      window.timeSyncManager ||
+      (TimeSyncManager ? new TimeSyncManager() : null);
+  }
+
+  /**
+   * 取得基礎URL - 使用 URL API 簡化並自動適應部署環境
    */
   getBaseUrl() {
-    const protocol = window.location.protocol; // http: 或 https:
-    const host = window.location.host; // hostname:port
-    let pathname = window.location.pathname; // /path/to/file.html 或 /
+    try {
+      const u = new URL(window.location.href);
+      let basePath = u.pathname;
 
-    // 確保 pathname 以 / 結尾
-    if (!pathname.endsWith("/")) {
-      // 如果 pathname 包含檔名，移除檔名
-      pathname = pathname.substring(0, pathname.lastIndexOf("/") + 1);
+      // 移除可能的檔名（若 pathname 未以 / 結尾）
+      if (!basePath.endsWith("/")) {
+        basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1) || "/";
+      }
+
+      return `${u.origin}${basePath}`;
+    } catch (error) {
+      // 若 URL API 不可用（極端瀏覽器情況），回退到較舊的方式
+      const protocol = window.location.protocol; // http: 或 https:
+      const host = window.location.host; // hostname:port
+      let pathname = window.location.pathname; // /path/to/file.html 或 /
+
+      if (!pathname.endsWith("/")) {
+        pathname = pathname.substring(0, pathname.lastIndexOf("/") + 1);
+      }
+      if (!pathname.endsWith("/")) {
+        pathname += "/";
+      }
+
+      return `${protocol}//${host}${pathname}`;
     }
-
-    // 確保最後以 / 結尾
-    if (!pathname.endsWith("/")) {
-      pathname += "/";
-    }
-
-    // 組合完整基礎URL
-    const baseUrl = `${protocol}//${host}${pathname}`;
-    return baseUrl;
   }
 
   /**
@@ -58,22 +80,35 @@ export class SyncManagerCore {
    * @param {string} code - 可以是 sessionId 或 shareCode
    * @param {string} role - 'viewer' 或 'operator'
    */
-  generateQRContent(code, role = "viewer") {
+  generateQRContent(
+    code,
+    role = window.SyncManager?.ROLE?.VIEWER,
+    target = window.SyncManager?.PAGE?.PANEL
+  ) {
     // 確保 baseUrl 以 / 結尾
     let url = this.baseUrl;
     if (!url.endsWith("/")) {
       url += "/";
     }
 
-    // 產生完整URL（自動包含 index.html）
-    // 確保分享代碼正確進行 URL 編碼
+    // 產生完整URL（可指定 target: 'index' 或 'experiment'）
     const encodedCode = encodeURIComponent(code);
-    const qrUrl = `${url}index.html?shareCode=${encodedCode}&role=${encodeURIComponent(
-      role,
-    )}`;
+    let qrUrl;
+    if (target === window.SyncManager?.PAGE?.EXPERIMENT) {
+      qrUrl = `${url}experiment.html?join=${encodedCode}&role=${encodeURIComponent(
+        role
+      )}`;
+    } else {
+      qrUrl = `${url}index.html?shareCode=${encodedCode}&role=${encodeURIComponent(
+        role
+      )}`;
+    }
+
     Logger.debug("產生的 QR URL:", qrUrl);
     return qrUrl;
   }
+
+  // ================== Session management ==================
 
   /**
    * 處理建立工作階段（建立者直接加入）
@@ -84,10 +119,10 @@ export class SyncManagerCore {
     try {
       const result = await this.syncClient.createSession(createCode);
       Logger.debug("[Sync] 工作階段建立成功", {
-        sessionId: result.sessionId,
+        sessionId: result.sessionId
       });
 
-      this.currentRole = "operator"; // 建立者預設為操作者
+      this.currentRole = window.SyncManager?.ROLE?.OPERATOR; // 建立者預設為操作者
       this.currentSessionId = result.sessionId;
       this.currentShareCode = null; // 尚未產生分享代碼
 
@@ -96,9 +131,9 @@ export class SyncManagerCore {
         new CustomEvent(SyncEvents.SESSION_JOINED, {
           detail: {
             sessionId: result.sessionId,
-            role: this.currentRole,
-          },
-        }),
+            role: this.currentRole
+          }
+        })
       );
 
       // 連線成功後，處理離線佇列
@@ -123,19 +158,19 @@ export class SyncManagerCore {
     try {
       const result = await this.syncClient.generateShareCode();
       Logger.debug("[Sync] 分享代碼已產生", {
-        shareCode: result.shareCode,
+        shareCode: result.shareCode
       });
 
       this.currentShareCode = result.shareCode;
 
       // 觸發分享代碼產生事件
       window.dispatchEvent(
-        new CustomEvent("sync:share-code-generated", {
+        new CustomEvent(SyncEvents.SHARE_CODE_GENERATED, {
           detail: {
             shareCode: result.shareCode,
-            expiresAt: result.expiresAt,
-          },
-        }),
+            expiresAt: result.expiresAt
+          }
+        })
       );
 
       return result;
@@ -148,14 +183,17 @@ export class SyncManagerCore {
   /**
    * 通過分享代碼加入工作階段
    */
-  async joinSessionByShareCode(shareCode, role = "viewer") {
+  async joinSessionByShareCode(
+    shareCode,
+    role = window.SyncManager?.ROLE?.VIEWER
+  ) {
     try {
       await this.syncClient.joinSessionByShareCode(shareCode, role);
       this.currentRole = role;
       this.currentShareCode = shareCode; // 記錄使用過的分享代碼
 
       Logger.debug(
-        `[SyncCore] 成功加入工作階段 - 代碼: ${shareCode}, 角色: ${role}, 工作階段ID: ${this.syncClient.sessionId}`,
+        `[SyncCore] 成功加入工作階段 - 代碼: ${shareCode}, 角色: ${role}, 工作階段ID: ${this.syncClient.sessionId}`
       );
 
       // 觸發工作階段加入事件
@@ -164,9 +202,9 @@ export class SyncManagerCore {
           detail: {
             sessionId: this.syncClient.sessionId,
             shareCode: shareCode,
-            role: role,
-          },
-        }),
+            role: role
+          }
+        })
       );
 
       // 連線成功後，處理離線佇列
@@ -184,12 +222,16 @@ export class SyncManagerCore {
   /**
    * 還原工作階段連線（同一裝置短期內）
    */
-  async restoreSession(sessionId, clientId, role = "viewer") {
+  async restoreSession(
+    sessionId,
+    clientId,
+    role = window.SyncManager?.ROLE?.VIEWER
+  ) {
     try {
       const result = await this.syncClient.restoreSession(
         sessionId,
         clientId,
-        role,
+        role
       );
       this.currentRole = role;
       // 新增：取得還原的分享代碼
@@ -199,14 +241,14 @@ export class SyncManagerCore {
 
       // 觸發工作階段還原事件
       window.dispatchEvent(
-        new CustomEvent("sync_session_restored", {
+        new CustomEvent(SyncEvents.SESSION_RESTORED, {
           detail: {
             sessionId: sessionId,
             clientId: clientId,
             role: role,
-            shareCode: result?.shareCode,
-          },
-        }),
+            shareCode: result?.shareCode
+          }
+        })
       );
 
       return result;
@@ -225,6 +267,8 @@ export class SyncManagerCore {
       throw error;
     }
   }
+
+  // ================== Getters / Status helpers ==================
 
   /**
    * 取得目前連線狀態文本
@@ -266,6 +310,8 @@ export class SyncManagerCore {
     this.syncClient.disconnect();
     // 注意：工作階段狀態由 SyncClient.clearState() 管理（sessionStorage）
   }
+
+  // ================== State syncing ==================
 
   /**
    * 同步狀態
@@ -322,7 +368,7 @@ export class SyncManagerCore {
       "experiment_started",
       "experiment_stopped",
       "experiment_paused",
-      "experiment_resumed",
+      "experiment_resumed"
     ];
 
     if (!strictDeduplicationTypes.includes(newState.type)) {
@@ -333,14 +379,14 @@ export class SyncManagerCore {
     const lastSimilar = this.offlineQueue.find(
       (item) =>
         item.state.type === newState.type &&
-        item.state.device_id === newState.device_id,
+        item.state.device_id === newState.device_id
     );
 
     if (lastSimilar) {
       // 如果時間戳相差不到 1 秒，認為是重複
       const timeDiff = Math.abs(
         (newState.timestamp || Date.now()) -
-          (lastSimilar.state.timestamp || lastSimilar.addedAt),
+          (lastSimilar.state.timestamp || lastSimilar.addedAt)
       );
       return timeDiff < 1000;
     }
@@ -348,12 +394,7 @@ export class SyncManagerCore {
     return false;
   }
 
-  /**
-   * 檢查連線狀態（定期檢查用）
-   */
-  async checkConnection() {
-    await this.syncClient.checkServerHealth();
-  }
+  // ================== Offline queue handling ==================
 
   /**
    * 將狀態加入離線佇列
@@ -376,7 +417,7 @@ export class SyncManagerCore {
     const duplicateIndex = this.offlineQueue.findIndex(
       (item) =>
         item.state.type === state.type &&
-        item.state.device_id === state.device_id,
+        item.state.device_id === state.device_id
     );
 
     if (duplicateIndex !== -1) {
@@ -386,7 +427,7 @@ export class SyncManagerCore {
         this.offlineQueue[duplicateIndex] = {
           state: state,
           addedAt: Date.now(),
-          retryCount: 0,
+          retryCount: 0
         };
       } else {
         Logger.debug(`忽略較舊的離線佇列項目 (type=${state.type})`);
@@ -396,7 +437,7 @@ export class SyncManagerCore {
       this.offlineQueue.push({
         state: state,
         addedAt: Date.now(),
-        retryCount: 0,
+        retryCount: 0
       });
     }
 
@@ -449,8 +490,8 @@ export class SyncManagerCore {
             `離線佇列項目發送成功: ${
               item.state.type || "unknown"
             } (時間戳: ${new Date(
-              item.state.timestamp || item.addedAt,
-            ).toISOString()})`,
+              item.state.timestamp || item.addedAt
+            ).toISOString()})`
           );
         } else {
           failCount++;
@@ -461,20 +502,20 @@ export class SyncManagerCore {
             this.offlineQueue.push(item);
           } else {
             Logger.warn(
-              `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`,
+              `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
             );
           }
         }
       } catch (error) {
         failCount++;
-        Logger.error(`離線佇列項目發送異常:`, error);
+        Logger.error("離線佇列項目發送異常:", error);
         // 重新加入佇列，但增加重試計數
         item.retryCount++;
         if (item.retryCount < 3) {
           this.offlineQueue.push(item);
         } else {
           Logger.warn(
-            `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`,
+            `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
           );
         }
       }
@@ -489,7 +530,7 @@ export class SyncManagerCore {
     this.isProcessingQueue = false;
 
     Logger.debug(
-      `離線佇列處理完成 (成功: ${successCount}, 失敗: ${failCount}, 耗時: ${duration}ms，剩餘: ${this.offlineQueue.length})`,
+      `離線佇列處理完成 (成功: ${successCount}, 失敗: ${failCount}, 耗時: ${duration}ms，剩餘: ${this.offlineQueue.length})`
     );
   }
 
@@ -502,7 +543,7 @@ export class SyncManagerCore {
       hasIssues: false,
       duplicateTimestamps: [],
       timeJumps: [],
-      totalItems: sortedItems.length,
+      totalItems: sortedItems.length
     };
 
     if (sortedItems.length < 2) return corrections;
@@ -524,7 +565,7 @@ export class SyncManagerCore {
         corrections.duplicateTimestamps.push({
           timestamp,
           count: timestampCounts.get(timestamp),
-          types: [item.state.type],
+          types: [item.state.type]
         });
         corrections.hasIssues = true;
       }
@@ -536,7 +577,7 @@ export class SyncManagerCore {
           from: lastTimestamp,
           to: timestamp,
           jump: timestamp - lastTimestamp,
-          type: item.state.type,
+          type: item.state.type
         });
         corrections.hasIssues = true;
       }
@@ -547,12 +588,23 @@ export class SyncManagerCore {
     return corrections;
   }
 
+  // ================== Health checks ==================
+
+  /**
+   * 檢查連線狀態（定期檢查用）
+   */
+  async checkConnection() {
+    await this.syncClient.checkServerHealth();
+  }
+
   /**
    * 檢查伺服器健康狀態
    */
   async checkServerHealth() {
     return await this.syncClient.checkServerHealth();
   }
+
+  // ================== Hub sync helpers ==================
 
   /**
    * 建立工作階段時，同步目前狀態到中樞
@@ -563,8 +615,12 @@ export class SyncManagerCore {
       const stateData = {
         type: "sessionState",
         experimentId: document.getElementById("experimentIdInput")?.value || "",
-        subjectName: document.getElementById("subjectName")?.value || "",
-        timestamp: new Date().toISOString(),
+        subjectName:
+          (
+            document.getElementById("subjectName") ||
+            document.getElementById("subjectNameInput")
+          )?.value || "",
+        timestamp: new Date().toISOString()
       };
 
       // 只在有受試者名稱時才同步（避免 null 污染）
@@ -585,12 +641,12 @@ export class SyncManagerCore {
     try {
       Logger.debug("[Sync] 加入工作階段後，開始同步中樞資料");
       Logger.debug(
-        "[Sync] 需要初始化的項目: 實驗ID、受試者名稱、實驗組合、實驗狀態",
+        "[Sync] 需要初始化的項目: 實驗ID、受試者名稱、實驗組合、實驗狀態"
       );
 
       // 觸發事件，讓各頁面同步加入後的初始化資料
       window.dispatchEvent(
-        new CustomEvent("sync_session_joined", {
+        new CustomEvent(SyncEvents.SESSION_JOINED, {
           detail: {
             sessionId: this.currentSessionId || this.syncClient.sessionId,
             shouldSyncFromHub: true,
@@ -598,15 +654,17 @@ export class SyncManagerCore {
               "experimentId",
               "subjectName",
               "combination",
-              "experimentState",
-            ],
-          },
-        }),
+              "experimentState"
+            ]
+          }
+        })
       );
     } catch (error) {
       Logger.warn("[Sync] 同步中樞資料失敗:", error);
     }
   }
+
+  // ================== Cleanup ==================
 
   /**
    * 清理資源
@@ -615,5 +673,3 @@ export class SyncManagerCore {
     this.syncClient.disconnect();
   }
 }
-
-export default SyncManagerCore;

@@ -3,12 +3,14 @@
  *
  * 功能:
  * - 管理工作階段即時客戶端連線（Session → Clients 映射）
- * - 客戶端加入/離開工作階段
+ * - 客戶端加入/退出工作階段
  * - 查詢工作階段客戶端
  * - 廣播工作階段狀態變更
  */
 
 import { Logger } from "../utils/logger.js";
+
+const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
 
 export class SessionManager {
   constructor(connectionManager, sessionService) {
@@ -47,9 +49,9 @@ export class SessionManager {
     let operatorCount = 0;
     let viewerCount = 0;
     for (const [id, client] of session.clients.entries()) {
-      if (client.role === "operator") {
+      if (client.role === ROLE.OPERATOR) {
         operatorCount++;
-      } else if (client.role === "viewer") {
+      } else if (client.role === ROLE.VIEWER) {
         viewerCount++;
       }
     }
@@ -70,7 +72,7 @@ export class SessionManager {
   }
 
   /**
-   * 客戶端離開工作階段
+   * 客戶端退出工作階段
    * @param {string} sessionId - 工作階段 ID
    * @param {string} clientId - 客戶端 ID
    */
@@ -89,9 +91,9 @@ export class SessionManager {
       let operatorCount = 0;
       let viewerCount = 0;
       for (const [id, client] of session.clients.entries()) {
-        if (client.role === "operator") {
+        if (client.role === ROLE.OPERATOR) {
           operatorCount++;
-        } else if (client.role === "viewer") {
+        } else if (client.role === ROLE.VIEWER) {
           viewerCount++;
         }
       }
@@ -100,7 +102,7 @@ export class SessionManager {
       Logger.event(
         "blue",
         "x",
-        `客戶端離開 | ${clientId} | 工作階段 ${sessionId} [<green>${operatorCount}</green>/<blue>${viewerCount}</blue>/<cyan>${totalCount}</cyan>]`,
+        `客戶端退出 | ${clientId} | 工作階段 ${sessionId} [<green>${operatorCount}</green>/<blue>${viewerCount}</blue>/<cyan>${totalCount}</cyan>]`,
       );
 
       // 如果工作階段空了，移除工作階段
@@ -114,9 +116,9 @@ export class SessionManager {
   }
 
   /**
-   * 根據 clientId 查找並離開工作階段
+   * 根據 clientId 查找並退出工作階段
    * @param {string} clientId - 客戶端 ID
-   * @returns {string|null} sessionId - 離開的工作階段 ID
+   * @returns {string|null} sessionId - 退出的工作階段 ID
    */
   removeClientById(clientId) {
     for (const [sessionId, session] of this.activeSessions.entries()) {

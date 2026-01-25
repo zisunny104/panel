@@ -11,6 +11,7 @@
 import { WebSocketServer } from "ws";
 import { SERVER_CONFIG } from "../config/server.js";
 import { Logger } from "../utils/logger.js";
+import { metrics } from "../metrics.js";
 
 export class WSServer {
   constructor(httpServer) {
@@ -96,8 +97,48 @@ export class WSServer {
         // 註冊連線到 ConnectionManager
         const wsConnectionId = this.connectionManager.register(ws, clientInfo);
 
-        // 設置訊息處理
+        // 設置訊息處理（含速率限制檢查，避免大量訊息造成 CPU 峰值）
+        //
+        // 行為說明：
+        // - 在解析訊息前先呼叫 ConnectionManager.allowMessage() 檢查 token
+        //   bucket。若不允許，會回傳速率限制錯誤供客戶端處理。
+        // - 若連續違規達到閾值，伺服器會移除該連線（移除連線與清理資源）。
+        // 這樣可阻止單一使用者或惡意代理將 CPU 時間佔滿。
         ws.on("message", (data) => {
+          try {
+            const res = this.connectionManager.allowMessage(wsConnectionId);
+            if (!res.allowed) {
+              // 回傳速率限制錯誤
+              this.sendError(ws, "RATE_LIMIT_EXCEEDED", "Too many messages");
+
+              // 增加 metrics 紀錄
+              try {
+                metrics.incrementRateLimitViolations();
+              } catch (e) {
+                // ignore
+              }
+
+              // 超過閾值則關閉連線並清理
+              if (
+                res.violations >=
+                (res.threshold ||
+                  SERVER_CONFIG.websocket.rateLimit.violationThreshold)
+              ) {
+                Logger.warn(`關閉連線: ${wsConnectionId} 因為超出速率限制`);
+                try {
+                  ws.close(1008, "Rate limit exceeded");
+                } catch (e) {
+                  // ignore
+                }
+                this.connectionManager.unregister(wsConnectionId);
+              }
+
+              return;
+            }
+          } catch (e) {
+            Logger.warn(`速率檢查失敗: ${e.message}`);
+          }
+
           this.handleMessage(ws, wsConnectionId, data);
         });
 

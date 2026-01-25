@@ -15,7 +15,7 @@ class PowerControl {
 
     Logger.debug(
       "[PowerControl] 構造函數 - powerLightOn 元素:",
-      this.powerLightOn,
+      this.powerLightOn
     );
 
     this.setupEventListeners();
@@ -86,7 +86,7 @@ class PowerControl {
       if (window.logger) {
         const action = trigger === "knob" ? "旋轉開關關機" : "按鈕關機";
         window.logger.logAction(
-          `${action}，所有影片已停止，媒體區已清空，按鈕狀態已重置`,
+          `${action}，所有影片已停止，媒體區已清空，按鈕狀態已重置`
         );
       }
 
@@ -125,7 +125,7 @@ class PowerControl {
       window.logger.logAction(
         trigger === "knob"
           ? "旋轉開關開機，開始播放開機影片"
-          : "按下開機，開始播放開機影片",
+          : "按下開機，開始播放開機影片"
       );
     }
 
@@ -169,7 +169,7 @@ class PowerControl {
           if (window.logger) {
             window.logger.logAction("開機影片載入失敗，請檢查路徑與檔案");
           }
-        },
+        }
       });
     }
   }
@@ -300,7 +300,7 @@ class PowerControl {
         } else {
           if (window.logger) {
             window.logger.logAction(
-              `綠色燈號點擊 - 目前狀態不符合快速開機條件 (播放中:${this.isPowerVideoPlaying}, 燈號亮:${this.isPowerOn})`,
+              `綠色燈號點擊 - 目前狀態不符合快速開機條件 (播放中:${this.isPowerVideoPlaying}, 燈號亮:${this.isPowerOn})`
             );
           }
         }
@@ -310,7 +310,7 @@ class PowerControl {
       this.powerLightOn.addEventListener(
         "click",
         greenLightClickHandler,
-        false,
+        false
       );
 
       // 確保元素可以接收點擊事件
@@ -356,7 +356,7 @@ class PowerControl {
       this.powerOnBtn,
       this.powerOffBtn,
       this.emergencyStopBtn,
-      this.quickPowerOnBtn,
+      this.quickPowerOnBtn
     ];
     powerButtons.forEach((button) => {
       if (button) {
@@ -399,7 +399,7 @@ class PowerControl {
     // 記錄日誌
     if (window.logger) {
       window.logger.logAction(
-        "🚨 緊急停止已啟動，所有系統已停止，媒體區已清空，按鈕狀態已重置",
+        "🚨 緊急停止已啟動，所有系統已停止，媒體區已清空，按鈕狀態已重置"
       );
     }
 
@@ -494,7 +494,7 @@ class PowerControl {
     const detail = {
       powerState: this.isPowerOn,
       isPowerVideoPlaying: this.isPowerVideoPlaying,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     };
 
     // 觸發自定義事件
@@ -511,7 +511,7 @@ class PowerControl {
         false,
         false,
         null,
-        detail,
+        detail
       );
     }
 
@@ -541,28 +541,28 @@ class PowerControl {
     const powerData = {
       powerState: this.isPowerOn,
       isPowerVideoPlaying: this.isPowerVideoPlaying,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     };
 
     // 本機廣播事件
     document.dispatchEvent(
       new CustomEvent("powerStateChange", {
-        detail: powerData,
-      }),
+        detail: powerData
+      })
     );
 
     // 向後端同步狀態（只有 operator 角色可以發送）
     if (
       window.syncClient &&
       window.syncClient.connected &&
-      window.syncClient.role === "operator"
+      window.syncClient.role === window.SyncManager?.ROLE?.OPERATOR
     ) {
       const syncResult = window.syncClient.syncState({
         type: "powerState",
         device_id: window.syncClient?.clientId || "power_control",
         powerState: this.isPowerOn,
         isPowerVideoPlaying: this.isPowerVideoPlaying,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       });
 
       if (!syncResult) {
@@ -581,7 +581,7 @@ class PowerControl {
 
     try {
       // 同步電源狀態但不觸發新的廣播
-      const oldState = this.isPowerOn;
+      const _oldState = this.isPowerOn;
       this.isPowerOn = data.powerState;
       this.isPowerVideoPlaying = data.isPowerVideoPlaying;
 
@@ -637,7 +637,7 @@ class PowerControl {
       oldVideoPlaying !== this.isPowerVideoPlaying
     ) {
       Logger.debug(
-        `[PowerControl] 套用遠端電源狀態: ${oldPowerState} -> ${this.isPowerOn}`,
+        `[PowerControl] 套用遠端電源狀態: ${oldPowerState} -> ${this.isPowerOn}`
       );
 
       // 更新UI但不觸發廣播事件
@@ -669,7 +669,7 @@ class PowerControl {
           false,
           false,
           null,
-          { oldState: oldPowerState, newState: this.isPowerOn },
+          { oldState: oldPowerState, newState: this.isPowerOn }
         );
       }
     }
@@ -705,7 +705,7 @@ class PowerControl {
           if (window.logger) {
             window.logger.logAction(
               `實驗模式自動開始第一個操作: ${firstInteractionKey}`,
-              "experiment_auto_start",
+              "experiment_auto_start"
             );
           }
 
@@ -713,7 +713,7 @@ class PowerControl {
           const interaction = step.interactions[firstInteractionKey];
           window.panelExperiment.handleStepTransition(
             interaction,
-            firstInteractionKey,
+            firstInteractionKey
           );
         }, 500);
       }

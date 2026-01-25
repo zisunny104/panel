@@ -244,7 +244,7 @@
                     ]
                 },
                 {
-                    "description": "按 [f2] 進入密碼頁面並檢查界面",
+                    "description": "按 [f2] 進入密碼頁面並檢查介面",
                     "buttons": [
                         "f2"
                     ]

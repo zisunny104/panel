@@ -250,14 +250,14 @@ class ExperimentStateManager {
       const oldCombination = this.currentCombination;
       this.currentCombination = combination;
       Logger.info(
-        `目前組合已更新 (${source}): ${combination?.combination_name || "null"}`,
+        `目前組合已更新 (${source}): ${combination?.combination_name || "null"}`
       );
 
       // 分發事件
       this._emit("currentCombinationChanged", {
         combination,
         oldCombination,
-        source,
+        source
       });
     }
   }
@@ -281,7 +281,7 @@ class ExperimentStateManager {
           this.subjectName || `受試者_${this.experimentId}`;
         window.experimentLogManager.initialize(
           this.experimentId,
-          defaultSubjectName,
+          defaultSubjectName
         );
         window.experimentLogManager.logExperimentStart();
       }
@@ -289,7 +289,7 @@ class ExperimentStateManager {
       this._emit("experimentStarted", {
         experimentId: this.experimentId,
         subjectName: this.subjectName,
-        combination: this.currentCombination,
+        combination: this.currentCombination
       });
     }
   }
@@ -311,7 +311,7 @@ class ExperimentStateManager {
 
       this._emit("experimentStopped", {
         experimentId: this.experimentId,
-        subjectName: this.subjectName,
+        subjectName: this.subjectName
       });
     }
   }
@@ -329,7 +329,7 @@ class ExperimentStateManager {
       }
 
       this._emit("experimentPaused", {
-        experimentId: this.experimentId,
+        experimentId: this.experimentId
       });
     }
   }
@@ -347,7 +347,7 @@ class ExperimentStateManager {
       }
 
       this._emit("experimentResumed", {
-        experimentId: this.experimentId,
+        experimentId: this.experimentId
       });
     }
   }
@@ -362,12 +362,12 @@ class ExperimentStateManager {
     // 只在同步模式下註冊到中樞
     if (window.experimentHubManager?.isInSyncMode?.()) {
       Logger.debug(
-        `[ExperimentStateManager] 同步模式，註冊實驗ID到中樞: ${newId}`,
+        `[ExperimentStateManager] 同步模式，註冊實驗ID到中樞: ${newId}`
       );
       window.experimentHubManager.registerExperimentId(newId, "state_manager");
     } else {
       Logger.debug(
-        `[ExperimentStateManager] 獨立模式，實驗ID僅存本機: ${newId}`,
+        `[ExperimentStateManager] 獨立模式，實驗ID僅存本機: ${newId}`
       );
     }
 
@@ -386,7 +386,7 @@ class ExperimentStateManager {
       isExperimentRunning: this.isExperimentRunning,
       experimentPaused: this.experimentPaused,
       experimentStartTime: this.experimentStartTime,
-      experimentElapsed: this.experimentElapsed,
+      experimentElapsed: this.experimentElapsed
     };
   }
 
@@ -435,8 +435,8 @@ class ExperimentStateManager {
     // 同時分發全域事件
     document.dispatchEvent(
       new CustomEvent(`state_${event}`, {
-        detail: data,
-      }),
+        detail: data
+      })
     );
 
     // 狀態變更後儲存快照
@@ -466,7 +466,7 @@ class ExperimentStateManager {
         if (state.currentCombination !== undefined) {
           this.currentCombination = state.currentCombination;
           restoredFields.push(
-            `currentCombination: ${state.currentCombination}`,
+            `currentCombination: ${state.currentCombination}`
           );
         }
         if (state.loadedUnits !== undefined) {
@@ -476,7 +476,7 @@ class ExperimentStateManager {
         if (state.isExperimentRunning !== undefined) {
           this.isExperimentRunning = state.isExperimentRunning;
           restoredFields.push(
-            `isExperimentRunning: ${state.isExperimentRunning}`,
+            `isExperimentRunning: ${state.isExperimentRunning}`
           );
         }
         if (state.experimentPaused !== undefined) {
@@ -489,16 +489,16 @@ class ExperimentStateManager {
             `experimentStartTime: ${
               state.experimentStartTime
                 ? window.timeSyncManager.formatDateTime(
-                    state.experimentStartTime,
+                    state.experimentStartTime
                   )
                 : "未開始"
-            }`,
+            }`
           );
         }
         if (state.experimentElapsed !== undefined) {
           this.experimentElapsed = state.experimentElapsed;
           restoredFields.push(
-            `experimentElapsed: ${state.experimentElapsed}ms`,
+            `experimentElapsed: ${state.experimentElapsed}ms`
           );
         }
 
@@ -527,7 +527,7 @@ class ExperimentStateManager {
       const snapshot = this.getCurrentState();
       sessionStorage.setItem(
         "experiment_state_snapshot",
-        JSON.stringify(snapshot),
+        JSON.stringify(snapshot)
       );
 
       // 詳細記錄儲存的內容
@@ -542,7 +542,7 @@ class ExperimentStateManager {
         savedFields.push(`loadedUnits: [${snapshot.loadedUnits.join(", ")}]`);
       if (snapshot.isExperimentRunning !== undefined)
         savedFields.push(
-          `isExperimentRunning: ${snapshot.isExperimentRunning}`,
+          `isExperimentRunning: ${snapshot.isExperimentRunning}`
         );
       if (snapshot.experimentPaused !== undefined)
         savedFields.push(`experimentPaused: ${snapshot.experimentPaused}`);

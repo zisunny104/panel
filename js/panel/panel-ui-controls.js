@@ -10,14 +10,7 @@ class UIControlsManager {
     this.refCard = document.getElementById("refCard");
     this.powerSwitchArea = document.getElementById("powerSwitchArea");
     this.powerLightArea = document.getElementById("powerLightArea");
-
-    this.initializeElements();
-    this.setupEventListeners();
-  }
-
-  // 初始化元素狀態
-  initializeElements() {
-    if (this.refCard) this.refCard.style.display = "none";
+    this.panelBottomRow = document.getElementById("panelBottomRow");
     if (this.powerSwitchArea) this.powerSwitchArea.style.display = "block";
     if (this.powerLightArea) this.powerLightArea.style.display = "block";
     if (this.settingsPanel) this.settingsPanel.classList.add("hidden");
@@ -34,26 +27,66 @@ class UIControlsManager {
         this.mediaArea.classList.add("hidden-indicator");
       }
     }
+
+    // 監聽器要在建構時綁定，確保 UI 控制項能即時生效
+    this.setupEventListeners();
+
+    // 當設定被重置為預設值時，更新 UI 控制項以反映新的預設值
+    document.addEventListener("userSettingsReset", () => {
+      const s = window.configManager?.userSettings || {};
+      // Apply numeric values through existing methods
+      if (s.powerSwitchScale !== undefined)
+        this.updatePowerScale(s.powerSwitchScale);
+      if (s.bottomSpacerHeight !== undefined)
+        this.updateBottomSpacer(s.bottomSpacerHeight);
+      if (s.mainScale !== undefined) this.updateScale(s.mainScale);
+      if (s.topSpacerHeight !== undefined)
+        this.updateTopSpacer(s.topSpacerHeight);
+
+      // Toggle-style settings - update via the manager methods (some methods exist in this file)
+      if (s.showButtonLabels !== undefined)
+        this.updateButtonLabelVisibility(s.showButtonLabels);
+      if (s.showButtonColors !== undefined)
+        this.updateButtonColorVisibility(s.showButtonColors);
+      if (s.showTouchVisuals !== undefined)
+        this.updateTouchVisuals(s.showTouchVisuals);
+      if (s.showMediaAreaMarker !== undefined)
+        this.updateMediaAreaMarkerVisibility(s.showMediaAreaMarker);
+      if (s.showMediaContent !== undefined)
+        this.updateMediaContentVisibility(s.showMediaContent);
+
+      // Beep sound stored in localStorage; let other code read it
+      if (s.playBeepSound !== undefined)
+        localStorage.setItem(
+          "playBeepSound",
+          s.playBeepSound ? "true" : "false"
+        );
+
+      if (window.logger) window.logger.logAction("已套用預設設定");
+    });
   }
 
   // 更新主縮放比例
   updateScale(value) {
     const scaleRange = document.getElementById("scaleRange");
-    const scaleValueSpan = document.getElementById("scaleValueSpan");
     const scaleNumberInput = document.getElementById("scaleNumberInput");
 
     value = Math.max(0.5, Math.min(2, parseFloat(value)));
     if (this.scalable) this.scalable.style.transform = `scale(${value})`;
-    if (scaleValueSpan) scaleValueSpan.textContent = value.toFixed(2);
     if (scaleRange) scaleRange.value = value;
     if (scaleNumberInput) scaleNumberInput.value = value.toFixed(2);
     localStorage.setItem("mainScale", value);
+    // keep settings panel aligned after scale changes
+    if (
+      window.panelManager &&
+      typeof window.panelManager.alignPanelToButton === "function"
+    ) {
+      window.panelManager.alignPanelToButton("settings");
+    }
   }
-
   // 更新上方間隔高度
   updateTopSpacer(value) {
     const topSpacerRange = document.getElementById("topSpacerRange");
-    const topSpacerValueSpan = document.getElementById("topSpacerValueSpan");
     const topSpacerNumberInput = document.getElementById(
       "topSpacerNumberInput"
     );
@@ -61,12 +94,54 @@ class UIControlsManager {
     value = Math.max(0, Math.min(50, parseFloat(value)));
     if (this.topSpacerPlaceholder)
       this.topSpacerPlaceholder.style.height = `${value}vh`;
-    if (topSpacerValueSpan) topSpacerValueSpan.textContent = value;
     if (topSpacerRange) topSpacerRange.value = value;
     if (topSpacerNumberInput) topSpacerNumberInput.value = value;
     localStorage.setItem("topSpacerHeight", value);
+    if (
+      window.panelManager &&
+      typeof window.panelManager.alignPanelToButton === "function"
+    ) {
+      window.panelManager.alignPanelToButton("settings");
+    }
   }
 
+  // 更新底部間距高度（針對 panelBottomRow）
+  updateBottomSpacer(value) {
+    const bottomSpacerRange = document.getElementById("bottomSpacerRange");
+    const bottomSpacerNumberInput = document.getElementById(
+      "bottomSpacerNumberInput"
+    );
+
+    value = Math.max(0, Math.min(50, parseFloat(value)));
+    console.debug(`[UIControls] updateBottomSpacer => ${value}vh`);
+    if (this.panelBottomRow) this.panelBottomRow.style.marginTop = `${value}vh`;
+    if (bottomSpacerRange) bottomSpacerRange.value = value;
+    if (bottomSpacerNumberInput) bottomSpacerNumberInput.value = value;
+    localStorage.setItem("bottomSpacerHeight", value);
+    if (
+      window.panelManager &&
+      typeof window.panelManager.alignPanelToButton === "function"
+    ) {
+      window.panelManager.alignPanelToButton("settings");
+    }
+  }
+
+  // 更新電源按鈕縮放
+  updatePowerScale(value) {
+    const powerScaleRange = document.getElementById("powerScaleRange");
+    const powerScaleNumberInput = document.getElementById(
+      "powerScaleNumberInput"
+    );
+
+    value = Math.max(0.5, Math.min(2, parseFloat(value)));
+    console.debug(`[UIControls] updatePowerScale => ${value}`);
+    // apply transform on container so all internal images scale uniformly
+    if (this.powerSwitchArea)
+      this.powerSwitchArea.style.transform = `scale(${value})`;
+    if (powerScaleRange) powerScaleRange.value = value;
+    if (powerScaleNumberInput) powerScaleNumberInput.value = value.toFixed(2);
+    localStorage.setItem("powerSwitchScale", value);
+  }
   // 切換按鈕標籤顯示
   updateButtonLabelVisibility(visible) {
     document.querySelectorAll(".button-label-text").forEach((label) => {
@@ -89,7 +164,7 @@ class UIControlsManager {
   updateTouchVisuals(visible) {
     const buttonOverlays = document.querySelectorAll(".button-overlay");
     const shiftButtonOverlay = document.querySelector(
-      '.button-overlay[data-label="B1"]'
+      ".button-overlay[data-label=\"B1\"]"
     );
     const mediaArea = document.getElementById("mediaArea");
     localStorage.setItem("showTouchVisuals", visible ? "true" : "false");
@@ -153,8 +228,7 @@ class UIControlsManager {
   showSettingsPanel() {
     if (this.settingsPanel) this.settingsPanel.classList.remove("hidden");
     if (this.refCard) this.refCard.style.display = "block";
-    if (this.powerSwitchArea) this.powerSwitchArea.style.display = "none";
-    if (this.powerLightArea) this.powerLightArea.style.display = "none";
+    // keep power switch visible so user can preview scaling
   }
 
   // 隱藏設定面板
@@ -229,6 +303,34 @@ class UIControlsManager {
     if (topSpacerNumberInput)
       topSpacerNumberInput.addEventListener("change", (e) =>
         this.updateTopSpacer(e.target.value)
+      );
+
+    // 底部間距控制
+    const bottomSpacerRange = document.getElementById("bottomSpacerRange");
+    const bottomSpacerNumberInput = document.getElementById(
+      "bottomSpacerNumberInput"
+    );
+    if (bottomSpacerRange)
+      bottomSpacerRange.addEventListener("input", (e) =>
+        this.updateBottomSpacer(e.target.value)
+      );
+    if (bottomSpacerNumberInput)
+      bottomSpacerNumberInput.addEventListener("change", (e) =>
+        this.updateBottomSpacer(e.target.value)
+      );
+
+    // 電源按鈕縮放控制
+    const powerScaleRange = document.getElementById("powerScaleRange");
+    const powerScaleNumberInput = document.getElementById(
+      "powerScaleNumberInput"
+    );
+    if (powerScaleRange)
+      powerScaleRange.addEventListener("input", (e) =>
+        this.updatePowerScale(e.target.value)
+      );
+    if (powerScaleNumberInput)
+      powerScaleNumberInput.addEventListener("change", (e) =>
+        this.updatePowerScale(e.target.value)
       );
 
     // 關閉設定面板按鈕
@@ -320,6 +422,26 @@ class UIControlsManager {
       savedTopSpacerHeight !== null ? savedTopSpacerHeight : 5
     );
 
+    // 載入並套用底部間距
+    const savedBottomSpacerHeight =
+      configSettings.bottomSpacerHeight ||
+      localStorage.getItem("bottomSpacerHeight");
+    Logger.debug(
+      `載入底部間距: ${savedBottomSpacerHeight !== null ? savedBottomSpacerHeight : "預設 0"}`
+    );
+    this.updateBottomSpacer(
+      savedBottomSpacerHeight !== null ? savedBottomSpacerHeight : 3
+    );
+
+    // 載入並套用電源按鈕縮放
+    const savedPowerScale =
+      configSettings.powerSwitchScale ||
+      localStorage.getItem("powerSwitchScale");
+    Logger.debug(
+      `載入電源按鈕縮放: ${savedPowerScale !== null ? savedPowerScale : "預設 0.90"}`
+    );
+    this.updatePowerScale(savedPowerScale !== null ? savedPowerScale : 0.9);
+
     // 控制項初始狀態
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
@@ -329,6 +451,29 @@ class UIControlsManager {
     );
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
+
+    // 還原預設按鈕
+    const resetSettingsBtn = document.getElementById("resetSettingsBtn");
+    if (resetSettingsBtn) {
+      resetSettingsBtn.addEventListener("click", async () => {
+        // 保守做法：呼叫 ConfigManager 的 reset 方法
+        if (
+          window.configManager &&
+          typeof window.configManager.resetUserSettingsToDefaults === "function"
+        ) {
+          await window.configManager.resetUserSettingsToDefaults();
+          // 更新本機 UIControls 的狀態
+          if (
+            window.uiControls &&
+            typeof window.uiControls.loadControlsFromDOM === "function"
+          ) {
+            window.uiControls.loadControlsFromDOM();
+          }
+          // 顯示短暫通知
+          if (window.logger) window.logger.logAction("已還原設定為預設值");
+        }
+      });
+    }
 
     if (toggleButtonLabels) {
       toggleButtonLabels.checked =
@@ -341,8 +486,9 @@ class UIControlsManager {
       this.updateButtonColorVisibility(toggleButtonColors.checked);
     }
     if (toggleTouchVisuals) {
+      // default to true unless explicitly set to "false" in localStorage
       toggleTouchVisuals.checked =
-        localStorage.getItem("showTouchVisuals") === "true";
+        localStorage.getItem("showTouchVisuals") !== "false";
       this.updateTouchVisuals(toggleTouchVisuals.checked);
     }
     if (toggleMediaAreaMarker) {

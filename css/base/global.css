@@ -30,6 +30,15 @@ body {
     font-family: sans-serif;
 }
 
+/* 確保按鈕、輸入框、下拉選單繼承全域字體，避免 Arial */
+button,
+input,
+select,
+textarea,
+optgroup {
+    font-family: inherit;
+}
+
 /* ================= 全域 SVG 樣式 ================= */
 /* 基礎SVG屬性 - 不包含具體尺寸和顏色 */
 svg {

@@ -32,21 +32,21 @@ async function loadUnitsFromScenarios() {
                       unit_id: unit.unit_id,
                       step_id: step.step_id,
                       step_name: step.step_name,
-                      isLastActionInStep: action.isLastActionInStep,
+                      isLastActionInStep: action.isLastActionInStep
                     });
                   });
                 }
                 return {
                   step_id: step.step_id,
                   step_name: step.step_name,
-                  actions: step.actions || [],
+                  actions: step.actions || []
                 };
               });
 
               unitsMap.set(unit.unit_id, {
                 unit_id: unit.unit_id,
                 unit_name: unit.unit_name,
-                steps: processedSteps,
+                steps: processedSteps
               });
             }
           });
@@ -58,7 +58,7 @@ async function loadUnitsFromScenarios() {
       units: Array.from(unitsMap.values()),
       unit_combinations: scenariosData.unit_combinations || [],
       actions: actionsMap,
-      actionToStep: actionToStepMap,
+      actionToStep: actionToStepMap
     };
   } catch (error) {
     Logger.error("載入 scenarios.json 失敗:", error);

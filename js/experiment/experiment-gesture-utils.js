@@ -38,7 +38,7 @@ const markGesture = function (idx, status, gestureName) {
         gesture_name: gestureName,
         mark_status: status,
         timer_value: timerValue,
-        timestamp: timestamp,
+        timestamp: timestamp
       })
       .catch((error) => {
         Logger.warn("同步手勢標記失敗:", error);
@@ -83,7 +83,7 @@ const markGesture = function (idx, status, gestureName) {
       gesture: gestureName,
       status: status,
       timer: timerValue,
-      timestamp: timestamp,
+      timestamp: timestamp
     });
   }
 
@@ -140,7 +140,7 @@ const goToNextStep = function (idx, gestureName) {
         step_index: idx,
         gesture_name: gestureName,
         timer_value: timerValue,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       })
       .catch((error) => {
         Logger.warn("同步下一步動作失敗:", error);
@@ -153,7 +153,7 @@ const goToNextStep = function (idx, gestureName) {
       from_step: idx,
       gesture: gestureName,
       final_timer: timerValue,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     });
   }
 
@@ -198,7 +198,7 @@ const goToNextStep = function (idx, gestureName) {
               if (experimentSection) {
                 experimentSection.scrollIntoView({
                   behavior: "smooth",
-                  block: "start",
+                  block: "start"
                 });
               }
             }, 300);
@@ -234,7 +234,7 @@ const goToNextStep = function (idx, gestureName) {
     nextCard.classList.remove("gesture-card-inactive");
     nextCard.classList.add("gesture-card-active");
 
-    // 暫時的邊框高亮效果
+    // 邊框高亮效果
     const timerCard = nextCard.querySelector(`#timer-card-${idx + 1}`);
     if (timerCard) {
       timerCard.style.boxShadow = "0 0 0 3px #667eea";

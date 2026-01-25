@@ -146,7 +146,7 @@ class RealtimeCommunication {
         const response = await this.sendRequest("poll_updates", {
           sessionId: this.sessionId,
           lastUpdate: this.lastKnownState,
-          clientId: this.clientId,
+          clientId: this.clientId
         });
 
         if (response.success && response.updates) {
@@ -269,7 +269,7 @@ class RealtimeCommunication {
   async sendRequest(action, params = {}) {
     const queryString = new URLSearchParams({
       action,
-      ...params,
+      ...params
     }).toString();
 
     const response = await fetch(`${this.apiUrl}?${queryString}`);

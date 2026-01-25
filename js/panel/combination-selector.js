@@ -5,6 +5,7 @@
  */
 
 import { RandomUtils } from "../core/random-utils.js";
+import { SyncEvents } from "../core/sync-events-constants.js";
 
 class CombinationSelector {
   constructor() {
@@ -34,12 +35,12 @@ class CombinationSelector {
     });
 
     // 監聽同步連線變化
-    window.addEventListener("sync_session_joined", () => {
+    window.addEventListener(SyncEvents.SESSION_JOINED, () => {
       this.onSyncConnected();
     });
 
     // 監聽遠端同步狀態更新 - 接收遠端的組合選擇廣播
-    window.addEventListener("sync_state_update", (e) => {
+    window.addEventListener(SyncEvents.STATE_UPDATE, (e) => {
       const state = e.detail;
       if (state?.type === "combination_selected" && state?.combination) {
         this.handleRemoteCombinationSelected(state.combination);
@@ -215,7 +216,7 @@ class CombinationSelector {
     );
 
     // 更新單元選擇狀態
-    const allCheckboxes = unitList.querySelectorAll('input[type="checkbox"]');
+    const allCheckboxes = unitList.querySelectorAll("input[type=\"checkbox\"]");
     allCheckboxes.forEach((checkbox) => {
       const li = checkbox.closest("li");
       const unitId = li.dataset.unitId;
@@ -309,9 +310,9 @@ class CombinationSelector {
           combination_name: combination.combination_name,
           units: combination.units,
           is_randomizable: combination.is_randomizable,
-          description: combination.description,
+          description: combination.description
         },
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       });
     }
   }
@@ -324,8 +325,8 @@ class CombinationSelector {
       detail: {
         combinationId: combination.combination_id,
         combinationName: combination.combination_name,
-        combination: combination,
-      },
+        combination: combination
+      }
     });
     document.dispatchEvent(event);
     window.dispatchEvent(event);
@@ -374,7 +375,7 @@ class CombinationSelector {
           units: combination.units,
           is_randomizable: combination.is_randomizable,
           description: combination.description,
-          savedAt: Date.now(),
+          savedAt: Date.now()
         })
       );
     } catch (error) {

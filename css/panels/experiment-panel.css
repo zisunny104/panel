@@ -25,6 +25,21 @@
     justify-content: space-between;
     font-weight: bold;
     flex-shrink: 0;
+    /* horizontal padding removed to align with panel content */
+}
+
+/* 滾動主體：保持標題與底部操作區固定 */
+.experiment-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0;
+    /* body padding removed — panel padding handles spacing */
+    box-sizing: border-box;
+    /* Ensure body can scroll by constraining its max-height relative to viewport */
+    max-height: calc(85vh - 3.5rem);
+    /* subtract header + small margin */
 }
 
 .experiment-divider {
@@ -272,14 +287,7 @@
     padding-right: 0;
 }
 
-.experiment-content-scroll {
-    flex: 1 1 0%;
-    min-height: 0;
-    overflow-y: auto;
-    padding-right: 0.5rem;
-    margin-left: 0;
-    margin-right: 0;
-}
+/* .experiment-content-scroll removed — styles merged into .experiment-panel-body */
 
 .experiment-close-btn {
     width: 32px;
@@ -307,14 +315,17 @@
     flex-shrink: 0;
     flex-grow: 0;
     height: auto;
-    padding: 0.5rem 0 0 0;
+    /* outer padding removed to avoid double spacing with card elements */
+    padding: 0;
     border-top: 0.0625rem solid #444;
     background: transparent;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     margin-left: 0;
     margin-right: 0;
+
+
 }
 
 /* ================= 實驗 ID 及控制 ================= */
@@ -328,11 +339,65 @@
     margin-right: 0;
 }
 
+/* Make start button full-width inside the input card and allow fluid buttons */
+.experiment-panel-actions .experiment-start-row .experiment-start-btn {
+    width: 100%;
+    max-width: none;
+}
+
+/* control buttons layout: default hidden (JS toggles display); when visible, stack on narrow and two-col on wider */
+.experiment-panel-actions .experiment-control-buttons {
+    display: none;
+    /* default hidden; JS will set to 'flex' or add .visible */
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+@media (min-width: 480px) {
+    .experiment-panel-actions .experiment-control-buttons.visible {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Panel does not override .input-section; keep the original card styles from experiment forms */
+/* (Previously we overrode this here; to preserve the original card appearance
+   we intentionally avoid changing .input-section styles inside the panel.) */
+
+/* Remove the bottom margin of input cards when rendered inside the panel to avoid extra whitespace */
+.experiment-panel-actions .input-section {
+    margin-bottom: 0;
+    /* overrides default page card spacing */
+}
+
+/* Adjust control buttons spacing inside panel to avoid double margins when Start is replaced by Pause/Stop */
+.experiment-panel-actions .experiment-start-row {
+    margin-bottom: 0;
+}
+
+.experiment-panel-actions .experiment-control-buttons {
+    margin-top: 0.25rem;
+}
+
+/* Remove top divider from experiment control area inside the panel */
+.experiment-panel-actions {
+    border-top: none;
+}
+
+/* Ensure the panel body has a bit of inner bottom spacing so last card isn't flush against scroll edge */
+.experiment-panel-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.5rem;
+}
+
 .experiment-id-input-group {
     display: flex;
     align-items: center;
     gap: 6px;
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    /* allow shrinking in tight layouts */
 }
 
 .experiment-id-input-group label {
@@ -463,60 +528,9 @@
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.experiment-panel .experiment-start-btn {
-    flex-shrink: 0;
-    width: auto;
-    min-width: 120px;
-    height: 3rem;
-    font-size: 1.1rem;
-    background: #ff8c00;
-    color: #fff;
-    border: none;
-    border-radius: 0.75rem;
-    cursor: pointer;
-    font-weight: bold;
-    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.12);
-    transition: background 0.2s;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+/* Panel no longer overrides experiment button styles: use the shared .experiment CSS in experiment-forms.css */
 
-.experiment-panel .experiment-start-btn:hover {
-    background: #ff9800;
-}
 
-.experiment-panel .experiment-pause-btn,
-.experiment-panel .experiment-stop-btn {
-    width: 48%;
-    padding: 12px 0;
-    font-size: 1.05rem;
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    font-weight: bold;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transition: background 0.2s;
-}
-
-.experiment-panel .experiment-pause-btn {
-    background: #888;
-    margin-right: 4%;
-}
-
-.experiment-panel .experiment-pause-btn:hover {
-    background: #aaa;
-}
-
-.experiment-panel .experiment-stop-btn {
-    background: #d32f2f;
-}
-
-.experiment-panel .experiment-stop-btn:hover {
-    background: #e53935;
-}
 
 .experiment-timer {
     font-size: 0.9rem;

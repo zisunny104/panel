@@ -16,7 +16,7 @@ class LogPanel {
       currentX: 0,
       currentY: 0,
       initialX: 0,
-      initialY: 0,
+      initialY: 0
     };
 
     this.setupEventListeners();
@@ -123,7 +123,7 @@ class LogPanel {
       is_combo_operation: isCombo,
       combo_details: comboDetails,
       experiment_info: experimentInfo,
-      additional_data: additionalData,
+      additional_data: additionalData
     };
 
     this.logEntries.push(logEntry);
@@ -145,7 +145,7 @@ class LogPanel {
         unit_index: null,
         step_index: null,
         total_units: null,
-        total_steps_in_unit: null,
+        total_steps_in_unit: null
       };
     }
 
@@ -162,7 +162,7 @@ class LogPanel {
         experiment_id: exp.currentExperimentId,
         mode: "action-based",
         current_action: currentAction,
-        action_progress: progressInfo,
+        action_progress: progressInfo
       };
     } else {
       // 傳統步驟模式
@@ -178,15 +178,15 @@ class LogPanel {
           id: unitId,
           name: unit?.unit_name || "未知單元",
           index: exp.currentUnitIndex,
-          total: exp.loadedUnits?.length || 0,
+          total: exp.loadedUnits?.length || 0
         },
         current_step: {
           id: step?.step_id || "未知步驟",
           name: step?.step_name || "未知步驟",
           index: exp.currentStepIndex,
           total: unit?.steps?.length || 0,
-          media: step?.media || null,
-        },
+          media: step?.media || null
+        }
       };
     }
   }
@@ -208,7 +208,7 @@ class LogPanel {
       "面板",
       "設定面板",
       "實驗面板",
-      "日誌",
+      "日誌"
     ];
 
     // 實驗相關操作（高重要性）
@@ -222,7 +222,7 @@ class LogPanel {
       "關機",
       "等待指令",
       "按鈕",
-      "功能",
+      "功能"
     ];
 
     // 電源相關操作（中重要性）
@@ -237,31 +237,31 @@ class LogPanel {
     ) {
       return {
         type: "experiment_action",
-        isExperimentRelevant: true,
+        isExperimentRelevant: true
       };
     } else if (
       powerActions.some((keyword) => message.includes(keyword.toLowerCase()))
     ) {
       return {
         type: "power_action",
-        isExperimentRelevant: true,
+        isExperimentRelevant: true
       };
     } else if (buttonId && functionName) {
       return {
         type: "button_interaction",
-        isExperimentRelevant: true,
+        isExperimentRelevant: true
       };
     } else if (
       systemActions.some((keyword) => message.includes(keyword.toLowerCase()))
     ) {
       return {
         type: "system_action",
-        isExperimentRelevant: false,
+        isExperimentRelevant: false
       };
     } else {
       return {
         type: "general_action",
-        isExperimentRelevant: false,
+        isExperimentRelevant: false
       };
     }
   }
@@ -293,15 +293,15 @@ class LogPanel {
           this.logEntries
             .filter((entry) => entry.button_id)
             .map((entry) => entry.button_id)
-        ),
+        )
       ].length,
       unique_functions: [
         ...new Set(
           this.logEntries
             .filter((entry) => entry.function_name)
             .map((entry) => entry.function_name)
-        ),
-      ].length,
+        )
+      ].length
     };
   }
 

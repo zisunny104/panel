@@ -136,7 +136,7 @@ export const RandomUtils = {
   createSeededRandom,
   shuffleArray,
   getCombinationUnitIds,
-  generateNewExperimentId,
+  generateNewExperimentId
 };
 
 // 保持向後相容的全域物件

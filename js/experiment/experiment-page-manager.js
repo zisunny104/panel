@@ -2,20 +2,20 @@
 // 專門用於 experiment.html 頁面
 
 import { getExperimentHubManager } from "../sync/experiment-hub-manager.js";
-import { SyncEvents } from "../core/sync-events-constants.js";
+
 import { ExperimentExportManager } from "./experiment-export-manager.js";
 import {
   toggleTimer,
   formatDuration,
   resetTimer,
   timerLongPressStart,
-  timerLongPressEnd,
+  timerLongPressEnd
 } from "./experiment-timer-utils.js";
 import { loadUnitsFromScenarios } from "../core/data-loader.js";
 import { markGesture, goToNextStep } from "./experiment-gesture-utils.js";
 import {
   toggleLeftPanel,
-  toggleGestureStats,
+  toggleGestureStats
 } from "./experiment-ui-controls.js";
 
 class ExperimentPageManager {
@@ -92,7 +92,7 @@ class ExperimentPageManager {
   /** 產生新的實驗ID 並在同步模式下註冊到中樞 */
   async generateNewExperimentIdWithHub() {
     try {
-      Logger.debug(`[ExperimentPageManager] 產生新的實驗ID...`);
+      Logger.debug("[ExperimentPageManager] 產生新的實驗ID...");
 
       // 產生新的實驗ID
       const newId = RandomUtils.generateNewExperimentId();
@@ -107,12 +107,12 @@ class ExperimentPageManager {
       const hubManager = getExperimentHubManager();
       if (hubManager?.isInSyncMode?.()) {
         Logger.debug(
-          `[ExperimentPageManager] 同步模式: 註冊新ID到中樞: ${newId}`,
+          `[ExperimentPageManager] 同步模式: 註冊新ID到中樞: ${newId}`
         );
         await this.registerExperimentIdToHub(newId);
       } else {
         Logger.debug(
-          `[ExperimentPageManager] 獨立模式: 新ID僅存本機: ${newId}`,
+          `[ExperimentPageManager] 獨立模式: 新ID僅存本機: ${newId}`
         );
       }
 
@@ -122,7 +122,7 @@ class ExperimentPageManager {
       Logger.info(`[ExperimentPageManager] 新的實驗ID已產生: ${newId}`);
       return newId;
     } catch (error) {
-      Logger.error(`[ExperimentPageManager] 產生新實驗ID失敗:`, error);
+      Logger.error("[ExperimentPageManager] 產生新實驗ID失敗:", error);
       throw error;
     }
   }
@@ -133,7 +133,7 @@ class ExperimentPageManager {
 
     // 檢查是否在同步模式
     if (!hubManager?.isInSyncMode?.()) {
-      Logger.debug(`[獨立模式] 直接產生新的實驗ID`);
+      Logger.debug("[獨立模式] 直接產生新的實驗ID");
       await this.generateNewExperimentIdWithHub();
       this.selectDefaultCombination();
       return;
@@ -147,7 +147,7 @@ class ExperimentPageManager {
         ?.value?.trim();
 
       Logger.debug(
-        `[智慧重新產生] 中樞ID: ${hubExperimentId}, 本機ID: ${currentExperimentId}`,
+        `[智慧重新產生] 中樞ID: ${hubExperimentId}, 本機ID: ${currentExperimentId}`
       );
 
       if (
@@ -157,7 +157,7 @@ class ExperimentPageManager {
       ) {
         // 實驗ID與中樞不同，同步到中樞的ID
         Logger.info(
-          `[智慧重新產生] 實驗ID與中樞不同，同步到中樞ID: ${hubExperimentId}`,
+          `[智慧重新產生] 實驗ID與中樞不同，同步到中樞ID: ${hubExperimentId}`
         );
         this.experimentId = hubExperimentId;
         const experimentIdInput = document.getElementById("experimentIdInput");
@@ -174,13 +174,13 @@ class ExperimentPageManager {
         this.broadcastExperimentIdUpdate(hubExperimentId);
       } else {
         // 實驗ID與中樞相同或中樞沒有ID，產生新的ID
-        Logger.info(`[智慧重新產生] 產生新的實驗ID並廣播`);
+        Logger.info("[智慧重新產生] 產生新的實驗ID並廣播");
         await this.generateNewExperimentIdWithHub();
       }
 
       this.selectDefaultCombination();
     } catch (error) {
-      Logger.error(`[智慧重新產生] 檢查中樞狀態失敗:`, error);
+      Logger.error("[智慧重新產生] 檢查中樞狀態失敗:", error);
       // 出錯時仍產生新的ID
       await this.generateNewExperimentIdWithHub();
       this.selectDefaultCombination();
@@ -191,23 +191,23 @@ class ExperimentPageManager {
   async registerExperimentIdToHub(experimentId) {
     try {
       Logger.debug(
-        `[ExperimentPageManager] 開始註冊實驗ID到中樞: ${experimentId}`,
+        `[ExperimentPageManager] 開始註冊實驗ID到中樞: ${experimentId}`
       );
       const hubManager = getExperimentHubManager();
       const success = await hubManager.registerExperimentId(
         experimentId,
-        "experiment_manager",
+        "experiment_manager"
       );
       if (success) {
         Logger.info(
-          `[ExperimentPageManager] 實驗ID已成功註冊到中樞: ${experimentId}`,
+          `[ExperimentPageManager] 實驗ID已成功註冊到中樞: ${experimentId}`
         );
       } else {
         Logger.warn(`[ExperimentPageManager] 實驗ID註冊失敗: ${experimentId}`);
       }
     } catch (error) {
       Logger.warn(
-        `[ExperimentPageManager] 無法連線到實驗中樞: ${error.message}`,
+        `[ExperimentPageManager] 無法連線到實驗中樞: ${error.message}`
       );
     }
   }
@@ -224,7 +224,7 @@ class ExperimentPageManager {
     const selectAllUnits = document.getElementById("selectAllUnits");
     if (selectAllUnits) {
       selectAllUnits.addEventListener("change", (e) =>
-        this.toggleSelectAllUnits(e.target.checked),
+        this.toggleSelectAllUnits(e.target.checked)
       );
     }
 
@@ -232,7 +232,7 @@ class ExperimentPageManager {
     const experimentIdInput = document.getElementById("experimentIdInput");
     const regenerateIdBtn = document.getElementById("regenerateIdButton");
 
-    Logger.debug(`[ExperimentPageManager] 初始化實驗ID...`);
+    Logger.debug("[ExperimentPageManager] 初始化實驗ID...");
 
     let experimentId = null;
 
@@ -242,19 +242,19 @@ class ExperimentPageManager {
 
     if (isInSyncMode && hubManager?.hubClient) {
       Logger.debug(
-        `[ExperimentPageManager] 第1優先：檢測到同步模式，嘗試從中樞讀取ID`,
+        "[ExperimentPageManager] 第1優先：檢測到同步模式，嘗試從中樞讀取ID"
       );
       try {
         experimentId = await hubManager.getExperimentId();
         if (experimentId) {
           Logger.debug(
-            `[ExperimentPageManager] 從中樞取得實驗ID: ${experimentId}`,
+            `[ExperimentPageManager] 從中樞取得實驗ID: ${experimentId}`
           );
           experimentIdInput.value = experimentId;
         }
       } catch (error) {
         Logger.debug(
-          `[ExperimentPageManager] 中樞讀取失敗: ${error.message}，嘗試其他來源`,
+          `[ExperimentPageManager] 中樞讀取失敗: ${error.message}，嘗試其他來源`
         );
       }
     }
@@ -263,7 +263,7 @@ class ExperimentPageManager {
     if (!experimentId && window.experimentStateManager?.experimentId) {
       experimentId = window.experimentStateManager.experimentId;
       Logger.debug(
-        `[ExperimentPageManager] 第2優先：使用快照ID: ${experimentId}`,
+        `[ExperimentPageManager] 第2優先：使用快照ID: ${experimentId}`
       );
       experimentIdInput.value = experimentId;
     }
@@ -274,7 +274,7 @@ class ExperimentPageManager {
       if (inputValue) {
         experimentId = inputValue;
         Logger.debug(
-          `[ExperimentPageManager] 第3優先：使用輸入框ID: ${experimentId}`,
+          `[ExperimentPageManager] 第3優先：使用輸入框ID: ${experimentId}`
         );
       }
     }
@@ -282,10 +282,10 @@ class ExperimentPageManager {
     // 第4步：都沒有ID，根據模式決定是否產生新ID
     if (!experimentId) {
       if (isInSyncMode) {
-        Logger.debug(`[ExperimentPageManager] 第4步：同步模式無ID，產生新ID`);
+        Logger.debug("[ExperimentPageManager] 第4步：同步模式無ID，產生新ID");
         await this.generateNewExperimentIdWithHub();
       } else {
-        Logger.debug(`[ExperimentPageManager] 第4步：本機模式無ID，產生新ID`);
+        Logger.debug("[ExperimentPageManager] 第4步：本機模式無ID，產生新ID");
         this.generateNewExperimentId();
       }
     }
@@ -302,16 +302,16 @@ class ExperimentPageManager {
 
       const newExperimentId = experimentIdInput.value.trim();
       Logger.debug(
-        `[ExperimentPageManager] 使用者手動輸入實驗ID: ${newExperimentId}`,
+        `[ExperimentPageManager] 使用者手動輸入實驗ID: ${newExperimentId}`
       );
 
       // 只在同步模式下註冊到中樞
       const hubManager = getExperimentHubManager();
       if (hubManager?.isInSyncMode?.()) {
-        Logger.debug(`[同步模式] 註冊手動輸入的實驗ID到中樞`);
+        Logger.debug("[同步模式] 註冊手動輸入的實驗ID到中樞");
         await this.registerExperimentIdToHub(newExperimentId);
       } else {
-        Logger.debug(`[獨立模式] 實驗ID僅存本機`);
+        Logger.debug("[獨立模式] 實驗ID僅存本機");
       }
 
       if (this.currentCombination) {
@@ -319,7 +319,7 @@ class ExperimentPageManager {
           this.scriptData.combinations[
             this.scriptData.combinations.findIndex(
               (c) =>
-                c.combination_id === this.currentCombination.combination_id,
+                c.combination_id === this.currentCombination.combination_id
             )
           ];
         await this.loadScriptForCombination(combination, newExperimentId);
@@ -349,12 +349,12 @@ class ExperimentPageManager {
       const convertedData = await loadUnitsFromScenarios();
 
       this.scenariosData = await fetch("data/scenarios.json").then((r) =>
-        r.json(),
+        r.json()
       );
 
       // 載入手勢多語言資料
       this.gesturesData = await fetch("data/gestures.json").then((r) =>
-        r.json(),
+        r.json()
       );
 
       // 儲存 actions 相關資料
@@ -366,7 +366,7 @@ class ExperimentPageManager {
         combinations: convertedData.unit_combinations,
         gestures: this.scenariosData.gesture_list,
         sections: this.scenariosData.sections,
-        units: convertedData.units,
+        units: convertedData.units
       };
     } catch (error) {
       Logger.error("載入 scenarios.json 失敗:", error);
@@ -408,7 +408,7 @@ class ExperimentPageManager {
                         <span class="gesture-type-desc">${g.gesture_description}</span>
                         <span style="font-size: 11px; color: #999; margin-left: auto;">${g.gesture_key}</span>
                     </div>
-                `,
+                `
                   )
                   .join("")}
             </div>
@@ -458,7 +458,7 @@ class ExperimentPageManager {
     // 如果設定中有預設組合ID，查找對應的索引
     if (defaultCombinationId) {
       defaultIndex = this.scriptData.combinations.findIndex(
-        (c) => c.combination_id === defaultCombinationId,
+        (c) => c.combination_id === defaultCombinationId
       );
       // 如果找不到，使用第一個
       if (defaultIndex === -1) {
@@ -483,11 +483,11 @@ class ExperimentPageManager {
 
     // 優先檢查本機快取
     const cachedCombinationId = localStorage.getItem(
-      "last_selected_combination_id",
+      "last_selected_combination_id"
     );
     if (cachedCombinationId) {
       const cachedIndex = this.scriptData.combinations.findIndex(
-        (c) => c.combination_id === cachedCombinationId,
+        (c) => c.combination_id === cachedCombinationId
       );
       if (cachedIndex !== -1) {
         selectedIndex = cachedIndex;
@@ -500,7 +500,7 @@ class ExperimentPageManager {
         window.CONFIG?.experiment?.defaultCombinationId;
       if (defaultCombinationId) {
         const defaultIndex = this.scriptData.combinations.findIndex(
-          (c) => c.combination_id === defaultCombinationId,
+          (c) => c.combination_id === defaultCombinationId
         );
         if (defaultIndex !== -1) {
           selectedIndex = defaultIndex;
@@ -534,7 +534,7 @@ class ExperimentPageManager {
     // 儲存到本機快取
     localStorage.setItem(
       "last_selected_combination_id",
-      combination.combination_id,
+      combination.combination_id
     );
 
     // 更新 UI 顯示選中狀態
@@ -580,20 +580,20 @@ class ExperimentPageManager {
       document.getElementById("experimentIdInput").value.trim() || "default";
     const combinationUnitIds = RandomUtils.getCombinationUnitIds(
       combination,
-      experimentId,
+      experimentId
     );
 
     // 更新單元選擇狀態
     // 先取消全部選擇
     unitList
-      .querySelectorAll('li:not(.power-option-card) input[type="checkbox"]')
+      .querySelectorAll("li:not(.power-option-card) input[type=\"checkbox\"]")
       .forEach((checkbox) => {
         checkbox.checked = false;
       });
 
     // 然後只選擇該組合中的單元
     unitList.querySelectorAll("li:not(.power-option-card)").forEach((li) => {
-      const checkbox = li.querySelector('input[type="checkbox"]');
+      const checkbox = li.querySelector("input[type=\"checkbox\"]");
       if (combinationUnitIds.includes(li.dataset.unitId)) {
         checkbox.checked = true;
       }
@@ -601,9 +601,9 @@ class ExperimentPageManager {
 
     // 重新排序單元列表以配對組合順序
     const normalItems = Array.from(
-      unitList.querySelectorAll("li:not(.power-option-card)"),
+      unitList.querySelectorAll("li:not(.power-option-card)")
     );
-    const startupCard = unitList.querySelector(".startup-card");
+    const _startupCard = unitList.querySelector(".startup-card");
     const shutdownCard = unitList.querySelector(".shutdown-card");
 
     // 按照 combinationUnitIds 的順序重新排列
@@ -643,26 +643,26 @@ class ExperimentPageManager {
         description: combination.description,
         experiment_id: experimentId,
         units_sequence: [],
-        gestures: [],
+        gestures: []
       };
 
       // 建立單元序列
       const unitIds = RandomUtils.getCombinationUnitIds(
         combination,
-        experimentId,
+        experimentId
       );
 
       const confirmGesture = this.scenariosData.gesture_list.find(
-        (g) => g.gesture_id === "confirm",
+        (g) => g.gesture_id === "confirm"
       );
       const nextGesture = this.scenariosData.gesture_list.find(
-        (g) => g.gesture_id === "next",
+        (g) => g.gesture_id === "next"
       );
       const prevGesture = this.scenariosData.gesture_list.find(
-        (g) => g.gesture_id === "prev",
+        (g) => g.gesture_id === "prev"
       );
       const openGesture = this.scenariosData.gesture_list.find(
-        (g) => g.gesture_id === "open",
+        (g) => g.gesture_id === "open"
       );
       const section = this.scenariosData.sections[0];
 
@@ -677,7 +677,7 @@ class ExperimentPageManager {
             reason: "[num1] + [num2] | 開啟教學維護系統，進入章節列表",
             step_id: "SYSTEM_OPEN",
             step_name: "開啟教學維護系統",
-            actions: [],
+            actions: []
           });
         }
 
@@ -691,7 +691,7 @@ class ExperimentPageManager {
             reason: `進入章節：${section.section_name}`,
             step_id: "SECTION_ENTER",
             step_name: `確認進入「${section.section_name}」`,
-            actions: [],
+            actions: []
           });
         }
 
@@ -699,10 +699,10 @@ class ExperimentPageManager {
         if (unitIds.length > 0 && section) {
           const firstUnitId = unitIds[0];
           const firstUnit = section.units.find(
-            (u) => u.unit_id === firstUnitId,
+            (u) => u.unit_id === firstUnitId
           );
           const firstUnitIndexInJson = section.units.findIndex(
-            (u) => u.unit_id === firstUnitId,
+            (u) => u.unit_id === firstUnitId
           );
 
           if (firstUnitIndexInJson > 0 && nextGesture) {
@@ -712,9 +712,9 @@ class ExperimentPageManager {
               name: nextGesture.gesture_name,
               description: nextGesture.gesture_description,
               reason: `[num6] x${firstUnitIndexInJson} | 導航至「${firstUnit.unit_name}」 | 列表 -> ${firstUnitId}`,
-              step_id: `FIRST_UNIT_NAV`,
+              step_id: "FIRST_UNIT_NAV",
               step_name: `單元列表導航 ([num6] x${firstUnitIndexInJson})`,
-              actions: [],
+              actions: []
             });
           }
 
@@ -731,7 +731,7 @@ class ExperimentPageManager {
               step_id: step0.step_id || `UNIT_ENTER_${firstUnitId}`,
               step_name:
                 step0.step_name || `確認進入「${firstUnit.unit_name}」`,
-              actions: step0.actions || [],
+              actions: step0.actions || []
             });
           }
         }
@@ -744,13 +744,13 @@ class ExperimentPageManager {
           script.units_sequence.push({
             unit_id: unit.unit_id,
             unit_name: unit.unit_name,
-            description: unit.unit_description,
+            description: unit.unit_description
           });
 
           // SA04 單元特殊處理：在第一步後加入 reload 手勢
           if (unitId === "SA04") {
             const reloadG = this.scenariosData.gesture_list.find(
-              (g) => g.gesture_id === "reload",
+              (g) => g.gesture_id === "reload"
             );
             if (reloadG) {
               script.gestures.push({
@@ -762,7 +762,7 @@ class ExperimentPageManager {
                 reason: "[num5] | 重新開始顯示此次教學步驟提示",
                 step_id: "SA04_REVIEW_RELOAD",
                 step_name: "重新檢視教學內容",
-                actions: [],
+                actions: []
               });
             }
           }
@@ -775,7 +775,7 @@ class ExperimentPageManager {
 
               const gestureId = step.gesture || "next";
               const gesture = this.scenariosData.gesture_list.find(
-                (g) => g.gesture_id === gestureId,
+                (g) => g.gesture_id === gestureId
               );
               if (gesture) {
                 script.gestures.push({
@@ -787,7 +787,7 @@ class ExperimentPageManager {
                   reason: step.step_description || null,
                   step_id: step.step_id || null,
                   step_name: step.step_name || null,
-                  actions: step.actions || [],
+                  actions: step.actions || []
                 });
               }
             });
@@ -804,7 +804,7 @@ class ExperimentPageManager {
               reason: `完成「${unit.unit_name}」單元`,
               step_id: `UNIT_COMPLETE_${unitId}`,
               step_name: `完成「${unit.unit_name}」`,
-              actions: [],
+              actions: []
             });
           }
 
@@ -812,13 +812,13 @@ class ExperimentPageManager {
           if (unitIdx < unitIds.length - 1) {
             const nextUnitId = unitIds[unitIdx + 1];
             const nextUnit = section.units.find(
-              (u) => u.unit_id === nextUnitId,
+              (u) => u.unit_id === nextUnitId
             );
 
             // 第一個單元結束後加入放大手勢
             if (unitIdx === 0) {
               const zoomInG = this.scenariosData.gesture_list.find(
-                (g) => g.gesture_id === "zoom_in",
+                (g) => g.gesture_id === "zoom_in"
               );
               if (zoomInG) {
                 script.gestures.push({
@@ -829,7 +829,7 @@ class ExperimentPageManager {
                   reason: "[num9] x2 | 完成第一個教學單元後，操作放大說明文字",
                   step_id: "FIRST_UNIT_ZOOM_IN",
                   step_name: "文字放大操作",
-                  actions: [],
+                  actions: []
                 });
               }
             }
@@ -843,17 +843,17 @@ class ExperimentPageManager {
                 description: prevGesture.gesture_description,
                 reason: `完成「${unit.unit_name}」後回傳單元列表`,
                 step_id: `UNIT_EXIT_${unitId}`,
-                step_name: `回傳單元列表`,
-                actions: [],
+                step_name: "回傳單元列表",
+                actions: []
               });
             }
 
             // 列表導航
             const currentIdxInJson = section.units.findIndex(
-              (u) => u.unit_id === unitId,
+              (u) => u.unit_id === unitId
             );
             const nextIdxInJson = section.units.findIndex(
-              (u) => u.unit_id === nextUnitId,
+              (u) => u.unit_id === nextUnitId
             );
             const dist = nextIdxInJson - currentIdxInJson;
             const navG = dist > 0 ? nextGesture : prevGesture;
@@ -865,7 +865,7 @@ class ExperimentPageManager {
                 name: navG.gesture_name,
                 description: navG.gesture_description,
                 reason: `[${dist > 0 ? "num6" : "num4"}] x${Math.abs(
-                  dist,
+                  dist
                 )} | 導航至「${
                   nextUnit.unit_name
                 }」 | ${unitId} -> ${nextUnitId}`,
@@ -873,7 +873,7 @@ class ExperimentPageManager {
                 step_name: `單元列表導航 ([${
                   dist > 0 ? "num6" : "num4"
                 }] x${Math.abs(dist)})`,
-                actions: [],
+                actions: []
               });
             }
 
@@ -890,7 +890,7 @@ class ExperimentPageManager {
                 step_id: nextStep0.step_id || `UNIT_ENTER_${nextUnitId}`,
                 step_name:
                   nextStep0.step_name || `確認進入「${nextUnit.unit_name}」`,
-                actions: nextStep0.actions || [],
+                actions: nextStep0.actions || []
               });
             }
           }
@@ -898,7 +898,7 @@ class ExperimentPageManager {
 
         // 結尾手勢
         const zoomOutG = this.scenariosData.gesture_list.find(
-          (g) => g.gesture_id === "zoom_out",
+          (g) => g.gesture_id === "zoom_out"
         );
         if (zoomOutG) {
           script.gestures.push({
@@ -909,12 +909,12 @@ class ExperimentPageManager {
             reason: "[num7] x2 | 完成最後一個教學單元後，操作縮小說明文字",
             step_id: "LAST_UNIT_ZOOM_OUT",
             step_name: "文字縮小操作",
-            actions: [],
+            actions: []
           });
         }
 
         const captureG = this.scenariosData.gesture_list.find(
-          (g) => g.gesture_id === "capture",
+          (g) => g.gesture_id === "capture"
         );
         if (captureG) {
           script.gestures.push({
@@ -925,12 +925,12 @@ class ExperimentPageManager {
             reason: "[num8] | 完成所有教學單元後，拍攝機台最終狀態作為記錄",
             step_id: "FINAL_CAPTURE",
             step_name: "拍攝機台狀態",
-            actions: [],
+            actions: []
           });
         }
 
         const closeG = this.scenariosData.gesture_list.find(
-          (g) => g.gesture_id === "close",
+          (g) => g.gesture_id === "close"
         );
         if (closeG) {
           script.gestures.push({
@@ -941,7 +941,7 @@ class ExperimentPageManager {
             reason: "[num1] + [num3] | 關閉教學維護系統並回傳正常操作模式",
             step_id: "SYSTEM_CLOSE",
             step_name: "關閉教學維護系統",
-            actions: [],
+            actions: []
           });
         }
       }
@@ -968,25 +968,26 @@ class ExperimentPageManager {
       return text
         .replace(
           /\[orange\](.*?)\[\/orange\]/g,
-          '<span style="color: #ff9800; font-weight: 700;">$1</span>',
+          "<span style=\"color: #ff9800; font-weight: 700;\">$1</span>"
         )
         .replace(
           /\[red\](.*?)\[\/red\]/g,
-          '<span style="color: #f44336; font-weight: 700;">$1</span>',
+          "<span style=\"color: #f44336; font-weight: 700;\">$1</span>"
         )
         .replace(
           /\[green\](.*?)\[\/green\]/g,
-          '<span style="color: #4caf50; font-weight: 700;">$1</span>',
+          "<span style=\"color: #4caf50; font-weight: 700;\">$1</span>"
         )
         .replace(
           /\[blue\](.*?)\[\/blue\]/g,
-          '<span style="color: #2196f3; font-weight: 700;">$1</span>',
+          "<span style=\"color: #2196f3; font-weight: 700;\">$1</span>"
         );
     };
 
-    let html = `<div class="right-section"><h2>實驗手勢序列</h2>`;
+    let html = "<div class=\"right-section\"><h2>實驗手勢序列</h2>";
     if (script.gestures) {
-      html += `<div style="display: grid; grid-template-columns: 1fr; gap: 12px;">`;
+      html +=
+        "<div style=\"display: grid; grid-template-columns: 1fr; gap: 12px;\">";
 
       script.gestures.forEach((gesture, idx) => {
         // 判斷手勢類型
@@ -1097,7 +1098,7 @@ class ExperimentPageManager {
                                         : ""
                                     }</div>
                                     <div style="font-size: 11px; color: #555; margin-top: 2px; word-break: break-word;">${convertColorTags(
-                                      gesture.description,
+                                      gesture.description
                                     )}</div>
                                 </div>
                             </div>
@@ -1136,7 +1137,7 @@ class ExperimentPageManager {
                             <div style="margin-bottom: 15px; padding: 10px; background: #fef5f0; border: 2px solid #ff9800; border-radius: 6px; overflow: hidden;">
                                 <div style="font-size: 11px; color: #666; margin-bottom: 5px;">對應步驟</div>
                                 <div style="font-size: 12px; color: #333; font-weight: 500; word-break: break-word;">${convertColorTags(
-                                  gesture.reason,
+                                  gesture.reason
                                 )}</div>
                             </div>
                         `
@@ -1164,7 +1165,7 @@ class ExperimentPageManager {
                                           gesture.step_id || "N/A"
                                         }</div>
                                         <div style="font-size: 11px; color: #333; font-weight: 500; word-break: break-word;">${convertColorTags(
-                                          gesture.step_name,
+                                          gesture.step_name
                                         )}</div>
                                     </div>
                                 `
@@ -1194,10 +1195,10 @@ class ExperimentPageManager {
                                                   action.action_id
                                                 }</div>
                                                 <div style="font-size: 12px; color: #2c3e50; font-weight: 500; white-space: nowrap;">${convertColorTags(
-                                                  action.action_name,
+                                                  action.action_name
                                                 )}</div>
                                             </button>
-                                        `,
+                                        `
                                           )
                                           .join("")}
                                     </div>
@@ -1220,7 +1221,7 @@ class ExperimentPageManager {
                     </div>
                 `;
       });
-      html += `</div></div>`;
+      html += "</div></div>";
     }
 
     contentArea.innerHTML = html;
@@ -1257,7 +1258,7 @@ class ExperimentPageManager {
             completed: 0, // 實際完成次數（點擊下一步）
             correct: 0, // 正確標記次數
             uncertain: 0, // 不確定標記次數
-            incorrect: 0, // 錯誤標記次數
+            incorrect: 0 // 錯誤標記次數
           };
         }
         this.gestureStats[gestureName].planned++;
@@ -1285,12 +1286,12 @@ class ExperimentPageManager {
 
     let html = "";
     const sortedGestures = Object.entries(this.gestureStats).sort(
-      (a, b) => b[1].planned - a[1].planned,
+      (a, b) => b[1].planned - a[1].planned
     );
 
     if (sortedGestures.length === 0) {
       html =
-        '<div style="color: #999; font-size: 12px; text-align: center; padding: 10px;">尚無手勢統計記錄</div>';
+        "<div style=\"color: #999; font-size: 12px; text-align: center; padding: 10px;\">尚無手勢統計記錄</div>";
     } else {
       sortedGestures.forEach(([gestureName, stats]) => {
         const completionRate =
@@ -1379,7 +1380,7 @@ class ExperimentPageManager {
       // 取得單元ID序列 - 使用統一的 RandomUtils
       const unitIds = RandomUtils.getCombinationUnitIds(
         combination,
-        experimentId,
+        experimentId
       );
       // 初始化 Action 序列，實驗ID: experimentId, 單元序列: unitIds
 
@@ -1387,7 +1388,7 @@ class ExperimentPageManager {
       this.currentActionSequence = buildActionSequenceFromUnits(
         unitIds,
         this.actionsMap,
-        this.scriptData.units,
+        this.scriptData.units
       );
       this.currentActionIndex = 0;
       this.completedActions.clear();
@@ -1421,7 +1422,7 @@ class ExperimentPageManager {
         start_ms: Date.now(),
         end_time: null,
         end_ms: null,
-        duration_ms: null,
+        duration_ms: null
       });
       // 開始追蹤 Action: actionId
     }
@@ -1472,8 +1473,8 @@ class ExperimentPageManager {
           unit_id: stepInfo?.unit_id,
           duration_ms: timingData?.duration_ms || null,
           start_time: timingData?.start_time || null,
-          end_time: timingData?.end_time || null,
-        },
+          end_time: timingData?.end_time || null
+        }
       );
     }
 
@@ -1487,7 +1488,7 @@ class ExperimentPageManager {
         step_id: stepInfo?.step_id,
         unit_id: stepInfo?.unit_id,
         duration_ms: timingData?.duration_ms || null,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -1520,8 +1521,8 @@ class ExperimentPageManager {
       total: this.currentActionSequence.length,
       current_index: this.currentActionIndex,
       completion_rate: Math.round(
-        (this.completedActions.size / this.currentActionSequence.length) * 100,
-      ),
+        (this.completedActions.size / this.currentActionSequence.length) * 100
+      )
     };
   }
 
@@ -1703,7 +1704,7 @@ class ExperimentPageManager {
     // 只考慮普通單元項目，排除電源卡片
     const normalItems = unitList.querySelectorAll("li:not(.power-option-card)");
     const checkboxes = Array.from(normalItems)
-      .map((li) => li.querySelector('input[type="checkbox"]'))
+      .map((li) => li.querySelector("input[type=\"checkbox\"]"))
       .filter((cb) => cb);
     const checkedBoxes = checkboxes.filter((cb) => cb.checked);
 
@@ -1729,7 +1730,7 @@ class ExperimentPageManager {
     // 只對普通單元項目進行全選操作，排除電源卡片
     const normalItems = unitList.querySelectorAll("li:not(.power-option-card)");
     normalItems.forEach((li) => {
-      const checkbox = li.querySelector('input[type="checkbox"]');
+      const checkbox = li.querySelector("input[type=\"checkbox\"]");
       if (checkbox) {
         checkbox.checked = checked;
       }
@@ -1764,7 +1765,7 @@ class ExperimentPageManager {
     if (target && target !== this.draggedElement) {
       const unitList = document.querySelector("#experimentUnitsList");
       const allItems = Array.from(
-        unitList.querySelectorAll("li:not(.power-option-card)"),
+        unitList.querySelectorAll("li:not(.power-option-card)")
       );
 
       const draggedIndex = allItems.indexOf(this.draggedElement);
@@ -1798,7 +1799,7 @@ class ExperimentPageManager {
     if (!unitList) return;
 
     const allItems = Array.from(
-      unitList.querySelectorAll("li:not(.power-option-card)"),
+      unitList.querySelectorAll("li:not(.power-option-card)")
     );
     const currentIndex = allItems.indexOf(li);
     const newIndex = currentIndex + direction;
@@ -1821,7 +1822,7 @@ class ExperimentPageManager {
     if (!unitList) return;
 
     const allItems = Array.from(
-      unitList.querySelectorAll("li:not(.power-option-card)"),
+      unitList.querySelectorAll("li:not(.power-option-card)")
     );
 
     allItems.forEach((li, index) => {
@@ -1849,7 +1850,7 @@ class ExperimentPageManager {
 
     const selectedUnits = [];
     unitList.querySelectorAll("li:not(.power-option-card)").forEach((li) => {
-      const checkbox = li.querySelector('input[type="checkbox"]');
+      const checkbox = li.querySelector("input[type=\"checkbox\"]");
       if (checkbox && checkbox.checked) {
         selectedUnits.push(li.dataset.unitId);
       }
@@ -1857,13 +1858,13 @@ class ExperimentPageManager {
 
     // 產生新的組合順序
     if (selectedUnits.length > 0) {
-      // 建立一個自定義的臨時組合
+      // 建立一個自定義組合
       const customCombination = {
         combination_id: "custom",
         combination_name: "自訂組合",
         description: "根據選擇和排序產生的自訂組合",
         units: selectedUnits,
-        is_randomizable: false,
+        is_randomizable: false
       };
 
       // 更新目前組合並重新載入腳本
@@ -1882,7 +1883,7 @@ class ExperimentPageManager {
   startExperiment() {
     // 驗證至少選擇一個教學單元
     const checkedUnits = document.querySelectorAll(
-      '.unit-checkbox input[type="checkbox"]:checked',
+      ".unit-checkbox input[type=\"checkbox\"]:checked"
     );
     const validUnits = Array.from(checkedUnits).filter((cb) => {
       const li = cb.closest("li");
@@ -1938,7 +1939,7 @@ class ExperimentPageManager {
         subjectNameInput.value = subjectName;
       }
       Logger.debug(
-        `[ExperimentPageManager] 自動產生受試者名稱: ${subjectName}`,
+        `[ExperimentPageManager] 自動產生受試者名稱: ${subjectName}`
       );
     }
 
@@ -1949,7 +1950,7 @@ class ExperimentPageManager {
       combination_name: this.currentCombination.combination_name,
       unit_count: validUnits.length,
       gesture_count: this.currentCombination.gestures.length,
-      start_time: new Date().toISOString(),
+      start_time: new Date().toISOString()
     };
 
     // 初始化日誌管理器
@@ -1998,9 +1999,9 @@ class ExperimentPageManager {
           combinationName: experimentData.combination_name,
           gestureSequence: this.currentCombination.gestures, // 完整的手勢序列
           unitCount: experimentData.unit_count,
-          gestureCount: experimentData.gesture_count,
-        },
-      }),
+          gestureCount: experimentData.gesture_count
+        }
+      })
     );
 
     this.toggleExperimentUI(true); // 鎖定 UI
@@ -2012,7 +2013,7 @@ class ExperimentPageManager {
       combination_name: experimentData.combination_name,
       combination_id: experimentData.combination_id,
       gesture_count: experimentData.gesture_count,
-      is_running: true,
+      is_running: true
     });
 
     // 啟動計時器
@@ -2036,7 +2037,7 @@ class ExperimentPageManager {
         const seconds = totalSeconds % 60;
         const milliseconds = this.experimentElapsedTime % 1000;
         const timeString = `${String(minutes).padStart(2, "0")}:${String(
-          seconds,
+          seconds
         ).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
 
         if (experimentTimerDisplay) {
@@ -2086,7 +2087,7 @@ class ExperimentPageManager {
         this.loadedUnits = loadedUnits;
       }
       Logger.info(
-        `[ExperimentPageManager] 套用等待中的組合更新: ${currentCombination?.combination_name || "未知組合"}`,
+        `[ExperimentPageManager] 套用等待中的組合更新: ${currentCombination?.combination_name || "未知組合"}`
       );
       this.pendingCombinationUpdate = null;
     }
@@ -2098,9 +2099,9 @@ class ExperimentPageManager {
           experimentId:
             document.getElementById("experimentIdInput")?.value || "",
           subjectName: document.getElementById("subjectName")?.value || "",
-          combinationName: this.currentCombination?.combination_name || "",
-        },
-      }),
+          combinationName: this.currentCombination?.combination_name || ""
+        }
+      })
     );
 
     // 記錄實驗結束
@@ -2108,7 +2109,7 @@ class ExperimentPageManager {
       experiment_id: document.getElementById("experimentIdInput")?.value || "",
       subject_name: document.getElementById("subjectName")?.value || "",
       combination: this.currentCombination?.combination_name || "",
-      end_time: new Date().toISOString(),
+      end_time: new Date().toISOString()
     };
 
     if (window.experimentLogManager) {
@@ -2209,8 +2210,8 @@ class ExperimentPageManager {
       // 分發暫停事件
       document.dispatchEvent(
         new CustomEvent("experiment_paused", {
-          detail: { isPaused: true },
-        }),
+          detail: { isPaused: true }
+        })
       );
       //廣播暫停狀態到其他連線裝置
       this.broadcastExperimentPauseState(true);
@@ -2223,8 +2224,8 @@ class ExperimentPageManager {
       // 分發還原事件
       document.dispatchEvent(
         new CustomEvent("experiment_resumed", {
-          detail: { isPaused: false },
-        }),
+          detail: { isPaused: false }
+        })
       );
       //廣播還原狀態到其他連線裝置
       this.broadcastExperimentPauseState(false);
@@ -2250,7 +2251,7 @@ class ExperimentPageManager {
 
     // 單元勾選框
     document
-      .querySelectorAll('.unit-checkbox input[type="checkbox"]')
+      .querySelectorAll(".unit-checkbox input[type=\"checkbox\"]")
       .forEach((cb) => {
         cb.disabled = locked;
       });
@@ -2262,7 +2263,7 @@ class ExperimentPageManager {
     // 切換開始/停止按鈕顯示
     const experimentIdRow = document.getElementById("experimentIdRow");
     const experimentControlButtons = document.getElementById(
-      "experimentControlButtons",
+      "experimentControlButtons"
     );
 
     if (experimentIdRow) {
@@ -2304,7 +2305,7 @@ class ExperimentPageManager {
         // 記錄日誌
         this.logAction("subject_name_updated", {
           subject_name: newValue,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date().toISOString()
         });
       }
     });
@@ -2396,7 +2397,7 @@ class ExperimentPageManager {
         // 接收面板實驗啟動訊號
         this.logAction("panel_experiment_started", {
           device_id: state.device_id,
-          timestamp: state.timestamp,
+          timestamp: state.timestamp
         });
       }
       //處理面板的暫停訊號
@@ -2465,7 +2466,7 @@ class ExperimentPageManager {
       }
 
       Logger.debug(
-        `[ExperimentPageManager] 收到遠程實驗ID廣播: ${experimentId}`,
+        `[ExperimentPageManager] 收到遠程實驗ID廣播: ${experimentId}`
       );
 
       // 更新本機UI
@@ -2473,7 +2474,7 @@ class ExperimentPageManager {
       if (experimentIdInput && experimentIdInput.value !== experimentId) {
         experimentIdInput.value = experimentId;
         Logger.info(
-          `[ExperimentPageManager] 已同步實驗ID到UI: ${experimentId}`,
+          `[ExperimentPageManager] 已同步實驗ID到UI: ${experimentId}`
         );
       }
     });
@@ -2511,7 +2512,7 @@ class ExperimentPageManager {
 
     // 在experiment.html中觸發事件，更新虛擬面板的狀態顯示
     const event = new CustomEvent("remote_panel_state_update", {
-      detail: data,
+      detail: data
     });
     document.dispatchEvent(event);
   }
@@ -2530,7 +2531,7 @@ class ExperimentPageManager {
       action_id: action_id,
       source: source,
       device_id: device_id,
-      timestamp: timestamp,
+      timestamp: timestamp
     });
 
     // 在實驗進行中時，檢查是否有對應的步驟
@@ -2542,7 +2543,7 @@ class ExperimentPageManager {
         // 如果 action 對應的步驟在目前或已完成的步驟中，可以進行狀態同步
         // 例如：自動推進到下一步、更新進度等
         const stepIndex = this.currentCombination.steps?.findIndex(
-          (s) => s.step_id === stepInfo.step_id,
+          (s) => s.step_id === stepInfo.step_id
         );
 
         if (stepIndex !== undefined && stepIndex >= 0) {
@@ -2570,7 +2571,7 @@ class ExperimentPageManager {
       button_function,
       remote_device_id,
       deviceId,
-      timestamp,
+      timestamp
     } = data;
 
     const currentExperimentId =
@@ -2608,7 +2609,7 @@ class ExperimentPageManager {
       this.showRemoteActionFeedback(
         actionId,
         { button: btn, function: func },
-        timestamp,
+        timestamp
       );
     }
   }
@@ -2647,7 +2648,7 @@ class ExperimentPageManager {
       // 如果目前實驗正在進行中，等待實驗結束後再同步新的組合
       if (this.experimentRunning) {
         Logger.debug(
-          `[ExperimentPageManager] 實驗進行中，將組合更新請求加入佇列`,
+          "[ExperimentPageManager] 實驗進行中，將組合更新請求加入佇列"
         );
         // 將更新請求加入佇列，等待實驗結束
         this.pendingCombinationUpdate = { currentCombination, loadedUnits };
@@ -2701,7 +2702,7 @@ class ExperimentPageManager {
       // 將更新請求加入佇列，等待實驗結束
       this.pendingExperimentIdUpdate = data;
       Logger.debug(
-        `[ExperimentPageManager] 實驗進行中，等待實驗結束後套用ID更新: ${data.experimentId}`,
+        `[ExperimentPageManager] 實驗進行中，等待實驗結束後套用ID更新: ${data.experimentId}`
       );
       return;
     }
@@ -2718,12 +2719,12 @@ class ExperimentPageManager {
       if (window.experimentStateManager) {
         window.experimentStateManager.setExperimentId(
           experimentId,
-          "sync_update",
+          "sync_update"
         );
       }
 
       Logger.info(
-        `[ExperimentPageManager] 實驗ID已同步並儲存: ${experimentId}`,
+        `[ExperimentPageManager] 實驗ID已同步並儲存: ${experimentId}`
       );
     }
   }
@@ -2847,14 +2848,14 @@ class ExperimentPageManager {
             card,
             targetActionId,
             gestureIndex,
-            true, // isRemote = true，表示來自遠端
+            true // isRemote = true，表示來自遠端
           );
         }
 
-        // 新增臨時高亮效果（視覺回饋）
+        // 新增高亮效果（視覺回饋）
         card.classList.add("remote-action-completed");
 
-        // 2秒後移除臨時高亮（保留綠色完成狀態）
+        // 2秒後移除高亮（保留綠色完成狀態）
         setTimeout(() => {
           card.classList.remove("remote-action-completed");
         }, 2000);
@@ -2874,14 +2875,14 @@ class ExperimentPageManager {
       matchedActionId = currentGesture.actions.find(
         (action) =>
           action.action_name.includes(buttonName) ||
-          action.action_id.includes(buttonName),
+          action.action_id.includes(buttonName)
       )?.action_id;
 
       if (!matchedActionId) {
         return;
       }
       const matchedCard = document.querySelector(
-        `.action-button[data-action-id="${matchedActionId}"]`,
+        `.action-button[data-action-id="${matchedActionId}"]`
       );
 
       if (matchedCard) {
@@ -2894,7 +2895,7 @@ class ExperimentPageManager {
             matchedActionId,
             this.currentStep,
             null,
-            remoteDeviceId,
+            remoteDeviceId
           );
         }
         setTimeout(() => {
@@ -2926,7 +2927,7 @@ class ExperimentPageManager {
       device_id: window.syncManager?.deviceId || "experiment_panel",
       experimentId: document.getElementById("experimentIdInput")?.value || "",
       subjectName: subjectName.trim(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
 
     // 同步到伺服器
@@ -2937,15 +2938,15 @@ class ExperimentPageManager {
     // 分派事件供本機同步管理器捕獲
     document.dispatchEvent(
       new CustomEvent("experimentStateChange", {
-        detail: updateData,
-      }),
+        detail: updateData
+      })
     );
   }
 
   /** 註冊實驗狀態到中樞 */
   async registerExperimentStateToHub(stateData) {
     try {
-      const params = new URLSearchParams({
+      const _params = new URLSearchParams({
         action: "register",
         experiment_id: stateData.experiment_id || "",
         subject_name: stateData.subject_name || "",
@@ -2955,7 +2956,7 @@ class ExperimentPageManager {
         gesture_sequence: JSON.stringify(stateData.gesture_sequence || []),
         current_step: stateData.current_step || 0,
         is_running: stateData.is_running ? "true" : "false",
-        source: "experiment_manager",
+        source: "experiment_manager"
       });
 
       // 移除 PHP 調用
@@ -2978,7 +2979,7 @@ class ExperimentPageManager {
       device_id:
         window.syncManager?.core?.syncClient?.clientId || "experiment_panel",
       experimentId: experimentId,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
 
     // 使用統一的同步機制
@@ -2989,8 +2990,8 @@ class ExperimentPageManager {
     // 分派事件供本機同步管理器捕獲
     document.dispatchEvent(
       new CustomEvent("experimentStateChange", {
-        detail: updateData,
-      }),
+        detail: updateData
+      })
     );
   }
 
@@ -3006,7 +3007,7 @@ class ExperimentPageManager {
       device_id: window.syncManager?.deviceId || "experiment_panel",
       experimentId: document.getElementById("experimentIdInput")?.value || "",
       isPaused: isPaused,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
 
     // 同步到伺服器
@@ -3017,8 +3018,8 @@ class ExperimentPageManager {
     // 分派事件供本機同步管理器捕獲
     document.dispatchEvent(
       new CustomEvent("experimentStateChange", {
-        detail: updateData,
-      }),
+        detail: updateData
+      })
     );
   }
 
@@ -3033,7 +3034,7 @@ class ExperimentPageManager {
       type: "experimentStopped",
       device_id: window.syncManager?.deviceId || "experiment_panel",
       experimentId: document.getElementById("experimentIdInput")?.value || "",
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
 
     // 同步到伺服器
@@ -3044,8 +3045,8 @@ class ExperimentPageManager {
     // 分派事件供本機同步管理器捕獲
     document.dispatchEvent(
       new CustomEvent("experimentStateChange", {
-        detail: updateData,
-      }),
+        detail: updateData
+      })
     );
   }
 
@@ -3059,7 +3060,7 @@ class ExperimentPageManager {
     // 記錄日誌
     this.logAction("remote_experiment_started_received", {
       remote_device_id: detail.remote_device_id,
-      experiment_id: detail.experiment_id,
+      experiment_id: detail.experiment_id
     });
 
     // 檢查本機的實驗 ID 是否配對
@@ -3084,7 +3085,7 @@ class ExperimentPageManager {
     // 同步單元組合設定
     if (detail.combination_id) {
       const combinationSelect = document.getElementById(
-        "unitCombinationSelect",
+        "unitCombinationSelect"
       );
       if (combinationSelect) {
         combinationSelect.value = detail.combination_id;
@@ -3098,7 +3099,7 @@ class ExperimentPageManager {
       remote_device_id: detail.remote_device_id,
       experiment_id: detail.experiment_id,
       combination_id: detail.combination_id,
-      combination_name: detail.combination_name,
+      combination_name: detail.combination_name
     });
   }
 
@@ -3133,7 +3134,7 @@ class ExperimentPageManager {
     }
 
     this.logAction("remote_experiment_paused", {
-      remote_device_id: detail.remote_device_id,
+      remote_device_id: detail.remote_device_id
     });
   }
 
@@ -3168,7 +3169,7 @@ class ExperimentPageManager {
     }
 
     this.logAction("remote_experiment_resumed", {
-      remote_device_id: detail.remote_device_id,
+      remote_device_id: detail.remote_device_id
     });
   }
 
@@ -3181,7 +3182,7 @@ class ExperimentPageManager {
 
     // 記錄日誌
     this.logAction("remote_experiment_stopped_started", {
-      remote_device_id: detail.remote_device_id,
+      remote_device_id: detail.remote_device_id
     });
 
     //響應遠端停止訊號時不廣播（false = 不廣播）
@@ -3189,16 +3190,16 @@ class ExperimentPageManager {
 
     // 記錄停止完成
     this.logAction("remote_experiment_stopped_completed", {
-      remote_device_id: detail.remote_device_id,
+      remote_device_id: detail.remote_device_id
     });
   }
 
   logAction(action, data) {
-    const logEntry = {
+    const _logEntry = {
       timestamp: new Date().toISOString(),
       session_id: this.sessionId,
       action: action,
-      data: data,
+      data: data
     };
 
     if (window.logger) {
@@ -3213,7 +3214,7 @@ window.experimentPageManager = new ExperimentPageManager();
 
 // 為實驗頁面提供相容性
 globalThis.app = window.experimentPageManager;
-const app = globalThis.app; // 為了向後相容
+const _app = globalThis.app; // 為了向後相容
 
 // 暴露工具函式到全域作用域供 HTML 使用
 window.toggleTimer = toggleTimer;
@@ -3233,7 +3234,7 @@ window.handleActionClick = function (buttonElement, actionId, gestureIndex) {
   const isCompleted = buttonElement.getAttribute("data-completed") === "true";
   const now = Date.now();
   const lastClickTime = parseInt(
-    buttonElement.getAttribute("data-last-click") || "0",
+    buttonElement.getAttribute("data-last-click") || "0"
   );
   const clickDelay = now - lastClickTime;
 
@@ -3263,7 +3264,7 @@ window.markActionCompleted = function (
   buttonElement,
   actionId,
   gestureIndex,
-  isRemote = false,
+  isRemote = false
 ) {
   // 取得裝置 ID
   let deviceId = null;
@@ -3283,7 +3284,7 @@ window.markActionCompleted = function (
       actionId,
       gestureIndex,
       null,
-      deviceId,
+      deviceId
     );
   }
 
@@ -3295,7 +3296,7 @@ window.markActionCompleted = function (
         action_id: actionId,
         gesture_index: gestureIndex,
         device_id: deviceId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       })
       .catch((error) => {
         Logger.warn("同步動作完成狀態失敗:", error);
@@ -3312,7 +3313,7 @@ window.markActionCompleted = function (
 window.cancelActionCompletion = function (
   buttonElement,
   actionId,
-  gestureIndex,
+  gestureIndex
 ) {
   // 取得裝置 ID
   let deviceId = null;
@@ -3332,7 +3333,7 @@ window.cancelActionCompletion = function (
       `${actionId}_CANCELLED`,
       gestureIndex,
       null,
-      deviceId,
+      deviceId
     );
   }
 
@@ -3344,7 +3345,7 @@ window.cancelActionCompletion = function (
         action_id: actionId,
         gesture_index: gestureIndex,
         device_id: deviceId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       })
       .catch((error) => {
         Logger.warn("同步動作取消狀態失敗:", error);

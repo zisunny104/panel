@@ -17,7 +17,7 @@ import { SyncEvents } from "../core/sync-events-constants.js";
 export class ExperimentHubManager {
   constructor() {
     this.hubClient = null; // 延遲初始化，避免雙重實例化
-    this.currentRole = "viewer";
+    this.currentRole = window.SyncManager?.ROLE?.VIEWER;
     this.baseUrl = this.getBaseUrl();
     this.offlineQueue = [];
     this.isProcessingQueue = false;
@@ -37,7 +37,7 @@ export class ExperimentHubManager {
     const initializeClient = () => {
       if (!this.hubClient) {
         Logger.debug(
-          "[ExperimentHubManager] 工作階段可用，初始化 ExperimentHubClient",
+          "[ExperimentHubManager] 工作階段可用，初始化 ExperimentHubClient"
         );
         // 使用全域物件而非 import
         const ExperimentHubClient = window.ExperimentHubClient;
@@ -75,7 +75,7 @@ export class ExperimentHubManager {
         hasSession ? "是" : "否"
       } (sessionId: ${sessionId ? "已設定" : "未設定"}, clientId: ${
         clientId ? "已設定" : "未設定"
-      })`,
+      })`
     );
 
     return hasSession;
@@ -101,9 +101,9 @@ export class ExperimentHubManager {
   }
 
   /**
-   * 產生QR碼內容
+   * 產生 QR Code 內容
    */
-  generateQRContent(code, role = "viewer") {
+  generateQRContent(code, role = window.SyncManager?.ROLE?.VIEWER) {
     const joinUrl = `${this.baseUrl}experiment.html?join=${code}&role=${role}`;
     return joinUrl;
   }
@@ -118,14 +118,14 @@ export class ExperimentHubManager {
     }
     try {
       const result = await this.hubClient.createSession(createCode);
-      this.currentRole = "operator";
+      this.currentRole = window.SyncManager?.ROLE?.OPERATOR;
 
       // 觸發向後相容事件
-      window.dispatchEvent(new CustomEvent("sync_session_joined"));
+      window.dispatchEvent(new CustomEvent(SyncEvents.SESSION_JOINED));
       window.dispatchEvent(
-        new CustomEvent("sync_session_created", {
-          detail: result,
-        }),
+        new CustomEvent(SyncEvents.SESSION_CREATED, {
+          detail: result
+        })
       );
 
       return result;
@@ -138,23 +138,23 @@ export class ExperimentHubManager {
    * 加入工作階段（僅同步模式可用）
    * @throws {Error} 如果處於本機模式會拋出錯誤
    */
-  async joinSession(shareCode, role = "viewer") {
+  async joinSession(shareCode, role = window.SyncManager?.ROLE?.VIEWER) {
     if (!this.hubClient) {
       throw new Error("ExperimentHubClient 尚未初始化，無法加入工作階段");
     }
     try {
       const success = await this.hubClient.joinSessionByShareCode(
         shareCode,
-        role,
+        role
       );
       this.currentRole = role;
 
       if (success) {
-        window.dispatchEvent(new CustomEvent("sync_session_joined"));
+        window.dispatchEvent(new CustomEvent(SyncEvents.SESSION_JOINED));
         window.dispatchEvent(
-          new CustomEvent("sync_session_joined_by_code", {
-            detail: { shareCode, role },
-          }),
+          new CustomEvent(SyncEvents.SESSION_JOINED_BY_CODE, {
+            detail: { shareCode, role }
+          })
         );
       }
 
@@ -168,20 +168,24 @@ export class ExperimentHubManager {
    * 還原工作階段（僅同步模式可用）
    * @throws {Error} 如果處於本機模式會拋出錯誤
    */
-  async restoreSession(sessionId, clientId, role = "viewer") {
+  async restoreSession(
+    sessionId,
+    clientId,
+    role = window.SyncManager?.ROLE?.VIEWER
+  ) {
     try {
       const result = await this.hubClient.restoreSession(
         sessionId,
         clientId,
-        role,
+        role
       );
       this.currentRole = role;
 
-      window.dispatchEvent(new CustomEvent("sync_session_joined"));
+      window.dispatchEvent(new CustomEvent(SyncEvents.SESSION_JOINED));
       window.dispatchEvent(
-        new CustomEvent("sync_session_restored", {
-          detail: result,
-        }),
+        new CustomEvent(SyncEvents.SESSION_RESTORED, {
+          detail: result
+        })
       );
 
       return result;
@@ -213,7 +217,7 @@ export class ExperimentHubManager {
         data: data,
         priority: priority,
         deviceId: this.hubClient.clientId,
-        timestamp: Date.now(),
+        timestamp: Date.now()
       });
     }
     Logger.warn("同步管理器不可用，無法廣播更新");
@@ -253,9 +257,9 @@ export class ExperimentHubManager {
     window.addEventListener("experiment_hub_state_update", (event) => {
       // 轉發為舊的sync_state_update事件
       window.dispatchEvent(
-        new CustomEvent("sync_state_update", {
-          detail: event.detail,
-        }),
+        new CustomEvent(SyncEvents.STATE_UPDATE, {
+          detail: event.detail
+        })
       );
     });
 
@@ -263,25 +267,25 @@ export class ExperimentHubManager {
       // 處理實驗ID更新 - 廣播給其他組件
       const { experimentId, device_id, timestamp } = event.detail;
       Logger.debug(
-        `[ExperimentHubManager] 處理實驗ID更新: ${experimentId} (來自: ${device_id})`,
+        `[ExperimentHubManager] 處理實驗ID更新: ${experimentId} (來自: ${device_id})`
       );
       Logger.debug("實驗ID更新詳情:", event.detail);
 
       // 觸發事件讓實驗頁面管理器更新UI
       Logger.debug(
-        `[ExperimentHubManager] 轉發 experiment_id_broadcasted 事件`,
+        "[ExperimentHubManager] 轉發 experiment_id_broadcasted 事件"
       );
       window.dispatchEvent(
         new CustomEvent("experiment_id_broadcasted", {
           detail: {
             experimentId,
             device_id,
-            timestamp,
-          },
-        }),
+            timestamp
+          }
+        })
       );
       Logger.debug(
-        `[ExperimentHubManager] 已轉發 experiment_id_broadcasted 事件`,
+        "[ExperimentHubManager] 已轉發 experiment_id_broadcasted 事件"
       );
     });
 
@@ -297,7 +301,7 @@ export class ExperimentHubManager {
     if (this.hubClient) {
       this.hubClient.disconnect();
     }
-    this.currentRole = "viewer";
+    this.currentRole = window.SyncManager?.ROLE?.VIEWER;
     window.dispatchEvent(new CustomEvent("sync_session_left"));
   }
 
@@ -319,7 +323,7 @@ export class ExperimentHubManager {
   async registerExperimentId(experimentId, source = "manager") {
     if (!this.hubClient) {
       Logger.debug(
-        `[ExperimentHubManager] 本機模式，不需要註冊實驗ID: ${experimentId}`,
+        `[ExperimentHubManager] 本機模式，不需要註冊實驗ID: ${experimentId}`
       );
       return true; // 本機模式，視為成功
     }
@@ -332,7 +336,7 @@ export class ExperimentHubManager {
    */
   async getExperimentId() {
     if (!this.hubClient) {
-      Logger.debug(`[ExperimentHubManager] 本機模式，無法從中樞取得實驗ID`);
+      Logger.debug("[ExperimentHubManager] 本機模式，無法從中樞取得實驗ID");
       return null; // 本機模式，回傳 null
     }
     return await this.hubClient.getExperimentId();
@@ -352,7 +356,11 @@ export class ExperimentHubManager {
    * @returns {string} 本機模式回傳 "viewer"，同步模式回傳實際角色
    */
   getRole() {
-    return this.hubClient?.getRole?.() || "viewer";
+    return (
+      this.hubClient?.getRole?.() ||
+      window.SyncManager?.ROLE?.VIEWER ||
+      "viewer"
+    );
   }
 
   /**
@@ -386,7 +394,7 @@ export class ExperimentHubManager {
     // 嘗試從URL參數還原工作階段
     const urlParams = new URLSearchParams(window.location.search);
     const joinCode = urlParams.get("join");
-    const role = urlParams.get("role") || "viewer";
+    const role = urlParams.get("role") || window.SyncManager?.ROLE?.VIEWER;
 
     if (joinCode) {
       try {
@@ -419,13 +427,13 @@ export async function initializeExperimentHub() {
     globalHubManager = new ExperimentHubManager();
   } else {
     Logger.debug(
-      "[initializeExperimentHub] ExperimentHubManager 已存在，使用現有實例",
+      "[initializeExperimentHub] ExperimentHubManager 已存在，使用現有實例"
     );
   }
 
   Logger.debug("[initializeExperimentHub] 初始化完成", {
     hasSyncClient: !!globalHubManager.hubClient,
-    isInSyncMode: globalHubManager.isInSyncMode(),
+    isInSyncMode: globalHubManager.isInSyncMode()
   });
 
   return globalHubManager;

@@ -63,8 +63,8 @@ class SyncConfirmDialogManager {
               <div class="sync-confirm-item">
                 <span class="sync-confirm-label">模式</span>
                 <div class="sync-confirm-mode-selector">
-                  <button class="sync-confirm-mode-btn" data-role="viewer">檢視模式</button>
-                  <button class="sync-confirm-mode-btn" data-role="operator">同步操作</button>
+                  <button class="sync-confirm-mode-btn" data-role="${window.SyncManager?.ROLE?.VIEWER}">檢視模式</button>
+                  <button class="sync-confirm-mode-btn" data-role="${window.SyncManager?.ROLE?.OPERATOR}">同步操作</button>
                 </div>
               </div>
             </div>
@@ -92,7 +92,7 @@ class SyncConfirmDialogManager {
     const btnClose = confirmDialog.querySelector(".modal-close-btn");
     const overlay = confirmDialog; // confirmDialog itself is the overlay
     const modeButtons = confirmDialog.querySelectorAll(
-      ".sync-confirm-mode-btn",
+      ".sync-confirm-mode-btn"
     );
     const codeInput = confirmDialog.querySelector(".sync-confirm-code-input");
     const resetBtn = confirmDialog.querySelector(".sync-confirm-code-reset");
@@ -115,7 +115,7 @@ class SyncConfirmDialogManager {
 
       // 取得驗證狀態顯示區域
       const statusEl = confirmDialog.querySelector(
-        ".sync-confirm-checksum-status",
+        ".sync-confirm-checksum-status"
       );
 
       // 如果代碼為空，隱藏驗證狀態
@@ -146,7 +146,7 @@ class SyncConfirmDialogManager {
 
           // 確保元素仍存在且對話框未關閉
           const currentStatus = confirmDialog.querySelector(
-            ".sync-confirm-checksum-status",
+            ".sync-confirm-checksum-status"
           );
           if (!currentStatus) return;
 
@@ -156,35 +156,35 @@ class SyncConfirmDialogManager {
             currentStatus.classList.add("valid");
             currentStatus.classList.remove("invalid");
             currentStatus.querySelector(
-              ".sync-confirm-checksum-icon",
+              ".sync-confirm-checksum-icon"
             ).textContent = "有效";
             currentStatus.querySelector(
-              ".sync-confirm-checksum-text",
+              ".sync-confirm-checksum-text"
             ).textContent = "代碼有效";
           } else {
             Logger.debug("[Dialog] 分享代碼驗證失敗:", result);
             currentStatus.classList.add("invalid");
             currentStatus.classList.remove("valid");
             currentStatus.querySelector(
-              ".sync-confirm-checksum-icon",
+              ".sync-confirm-checksum-icon"
             ).textContent = "✗";
             currentStatus.querySelector(
-              ".sync-confirm-checksum-text",
+              ".sync-confirm-checksum-text"
             ).textContent = "代碼無效或格式錯誤";
           }
         } catch (error) {
           Logger.error("[Dialog] 驗證分享代碼時發生錯誤:", error);
           const currentStatus = confirmDialog.querySelector(
-            ".sync-confirm-checksum-status",
+            ".sync-confirm-checksum-status"
           );
           if (currentStatus) {
             currentStatus.classList.add("invalid");
             currentStatus.classList.remove("valid");
             currentStatus.querySelector(
-              ".sync-confirm-checksum-icon",
+              ".sync-confirm-checksum-icon"
             ).textContent = "!";
             currentStatus.querySelector(
-              ".sync-confirm-checksum-text",
+              ".sync-confirm-checksum-text"
             ).textContent = "驗證錯誤";
           }
         }
@@ -203,7 +203,7 @@ class SyncConfirmDialogManager {
       btn.addEventListener("click", (e) => {
         selectedRole = e.target.dataset.role;
         modeButtons.forEach((b) =>
-          b.classList.remove("sync-confirm-mode-active"),
+          b.classList.remove("sync-confirm-mode-active")
         );
         e.target.classList.add("sync-confirm-mode-active");
       });
@@ -219,7 +219,7 @@ class SyncConfirmDialogManager {
       try {
         // 顯示驗證中的狀態
         const confirmBtn = confirmDialog.querySelector(
-          ".sync-confirm-btn-confirm",
+          ".sync-confirm-btn-confirm"
         );
         const originalText = confirmBtn.textContent;
         confirmBtn.disabled = true;
@@ -252,7 +252,7 @@ class SyncConfirmDialogManager {
 
         // 驗證通過，關閉對話框並執行Callback
         Logger.debug(
-          `[Dialog] 分享代碼驗證通過，準備執行加入Callback - 代碼: ${editedCode}, 角色: ${selectedRole}`,
+          `[Dialog] 分享代碼驗證通過，準備執行加入Callback - 代碼: ${editedCode}, 角色: ${selectedRole}`
         );
         confirmDialog.remove();
         if (onConfirm) onConfirm(editedCode, selectedRole);

@@ -4,6 +4,8 @@
  * 允許面板作為同步操作者控制實驗的開始/停止
  */
 
+import { SyncEvents } from "../core/sync-events-constants.js";
+
 class PanelSyncOperator {
   constructor() {
     this.experimentRunning = false;
@@ -26,7 +28,7 @@ class PanelSyncOperator {
   }
 
   /**
-   * 取得 API 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
+   * 取得 API 路徑前綴（參考 QR Code 的動態路徑邏輯，完全避免硬編碼）
    */
   getApiBasePath() {
     // 根據頁面路徑動態決定 API 前綴（完全動態，無硬編碼）
@@ -74,7 +76,7 @@ class PanelSyncOperator {
    */
   initialize() {
     // 監聽連線狀態變化
-    window.addEventListener("sync_session_joined", () => {
+    window.addEventListener(SyncEvents.SESSION_JOINED, () => {
       this.updateSyncControls();
     });
 
@@ -159,7 +161,7 @@ class PanelSyncOperator {
     if (!controlsDiv) return;
 
     // 只有在同步操作角色且已連線時才顯示
-    if (isConnected && role === "operator") {
+    if (isConnected && role === window.SyncManager?.ROLE?.OPERATOR) {
       controlsDiv.style.display = "block";
       this.syncControlsEnabled = true;
     } else {
@@ -187,7 +189,7 @@ class PanelSyncOperator {
     const connectedOperators = await this.checkMultipleOperators();
     if (connectedOperators > 1) {
       const confirmed = confirm(
-        `偵測到 ${connectedOperators} 個同步操作面板。\n確認要由此裝置開始實驗嗎？\n(裝置 ID: ${this.deviceId})`,
+        `偵測到 ${connectedOperators} 個同步操作面板。\n確認要由此裝置開始實驗嗎？\n(裝置 ID: ${this.deviceId})`
       );
       if (!confirmed) {
         this.updateStatus("操作已取消");
@@ -209,7 +211,7 @@ class PanelSyncOperator {
       // 構建完整的同步資料（包含手勢序列）
       const syncData = {
         type: "experiment_started",
-        source: "panel",
+        source: window.SyncManager?.PAGE?.PANEL,
         device_id: this.deviceId,
         experiment_id: experimentManager?.getCurrentExperimentId?.() || null,
         subject_name: subjectName,
@@ -221,13 +223,17 @@ class PanelSyncOperator {
         unit_count: experimentManager?.loadedUnits?.length || 0,
         gesture_count:
           experimentManager?.currentCombination?.gestures?.length || 0,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       };
 
+      const gestureSeq =
+        syncData.gesture_sequence || syncData.gestureSequence || [];
+      const experimentIdForLog =
+        syncData.experiment_id || syncData.experimentId || null;
       Logger.info("[PanelSyncOp] 準備發送實驗開始資料:", {
-        experimentId: syncData.experimentId,
-        gestureCount: syncData.gestureCount,
-        hasGestureSequence: syncData.gestureSequence.length > 0,
+        experimentId: experimentIdForLog,
+        gestureCount: gestureSeq.length,
+        hasGestureSequence: gestureSeq.length > 0
       });
 
       // 發送同步狀態
@@ -273,7 +279,7 @@ class PanelSyncOperator {
         type: "experiment_stopped",
         source: "panel",
         device_id: this.deviceId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       };
 
       await window.syncManager.core.syncState(syncData);
@@ -303,7 +309,7 @@ class PanelSyncOperator {
         const clients = window.syncManager.core.connectedClients;
         // 計數操作者角色的客戶端
         const operatorCount = Object.values(clients).filter(
-          (client) => client.role === "operator",
+          (client) => client.role === window.SyncManager?.ROLE?.OPERATOR
         ).length;
         return operatorCount;
       }
@@ -313,13 +319,15 @@ class PanelSyncOperator {
         const sessionId = window.syncManager.core.syncClient.sessionId;
         try {
           const response = await fetch(
-            `${this.getApiUrl()}/sync/session/${sessionId}/clients`,
+            `${this.getApiUrl()}/sync/session/${sessionId}/clients`
           );
 
           if (response.ok) {
             const data = await response.json();
             if (data.clients && Array.isArray(data.clients)) {
-              return data.clients.filter((c) => c.role === "operator").length;
+              return data.clients.filter(
+                (c) => c.role === window.SyncManager?.ROLE?.OPERATOR
+              ).length;
             }
           }
         } catch (err) {
@@ -388,15 +396,6 @@ class PanelSyncOperator {
       this.updateStatus(`已同步停止 (${syncData.device_id})`);
     }
   }
-
-  /**
-   * [已移除] syncPanelAction - 改用 panel-experiment-manager.broadcastButtonAction()
-   * [已移除] handleRemotePanelAction - 統一使用 button_action 事件
-   *
-   * 按鈕動作同步流程已統一為：
-   * buttonPressed 事件 → panel-experiment-manager.broadcastButtonAction()
-   * → button_action 事件 → WebSocket 廣播
-   */
 }
 
 // 初始化

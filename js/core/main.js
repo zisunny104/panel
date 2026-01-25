@@ -18,7 +18,7 @@ class MainApp {
       // 等待 DOM 完全載入
       if (document.readyState !== "complete") {
         await new Promise((resolve) =>
-          window.addEventListener("load", resolve, { once: true }),
+          window.addEventListener("load", resolve, { once: true })
         );
       }
 
@@ -35,7 +35,7 @@ class MainApp {
             "[MainApp] SyncManager 已初始化（檢查標記）",
             window.syncManager?.core?.syncClient?.sessionId
               ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
-              : "本機模式",
+              : "本機模式"
           );
           resolve();
           return;
@@ -49,14 +49,14 @@ class MainApp {
               "[MainApp] SyncManager 已就緒（收到 CLIENT_INITIALIZED 事件）",
               window.syncManager?.core?.syncClient?.sessionId
                 ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
-                : "本機模式",
+                : "本機模式"
             );
             resolve();
           }
         };
 
         window.addEventListener("sync:client-initialized", handleClientInit, {
-          once: true,
+          once: true
         });
 
         // 設置超時保護（最多等 10 秒）
@@ -66,7 +66,7 @@ class MainApp {
             Logger.warn("[MainApp] 等待 SyncManager 超時（10秒），繼續初始化");
             window.removeEventListener(
               "sync:client-initialized",
-              handleClientInit,
+              handleClientInit
             );
             resolve();
           }
@@ -110,16 +110,16 @@ class MainApp {
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => {
               reject(new Error("ExperimentHubManager 初始化超時 (5秒)"));
-            }, 5000),
+            }, 5000)
           );
 
           window.experimentHubManager = await Promise.race([
             initializeExperimentHub(),
-            timeoutPromise,
+            timeoutPromise
           ]);
 
           Logger.info("ExperimentHubManager 已初始化（全域單一實例）", {
-            syncMode: window.experimentHubManager.isInSyncMode(),
+            syncMode: window.experimentHubManager.isInSyncMode()
           });
         } catch (error) {
           Logger.warn("ExperimentHubManager 初始化失敗或超時:", error.message);
@@ -179,7 +179,7 @@ class MainApp {
       logger: window.logger,
       experiment: window.panelExperiment, // 修正：使用正確的實驗管理器
       powerControl: window.powerControl,
-      syncManager: window.syncManager || {},
+      syncManager: window.syncManager || {}
     };
 
     // 建立動作管理器實例以支援action-based實驗
@@ -310,7 +310,7 @@ class MainApp {
         } catch (error) {
           Logger.error(
             "[MainApp] panelExperiment.startExperiment() 失敗:",
-            error,
+            error
           );
         }
       }
@@ -329,7 +329,7 @@ class MainApp {
         false,
         false,
         null,
-        { device_id: deviceId, source: source },
+        { device_id: deviceId, source: source }
       );
     }
   }
@@ -360,7 +360,7 @@ class MainApp {
       } catch (error) {
         Logger.error(
           "[MainApp] panelExperiment.togglePauseExperiment() 失敗:",
-          error,
+          error
         );
       }
     }
@@ -376,7 +376,7 @@ class MainApp {
         false,
         false,
         null,
-        { device_id: deviceId, source: source },
+        { device_id: deviceId, source: source }
       );
     }
   }
@@ -408,7 +408,7 @@ class MainApp {
       } catch (error) {
         Logger.error(
           "[MainApp] panelExperiment.togglePauseExperiment() 失敗:",
-          error,
+          error
         );
       }
     }
@@ -424,14 +424,14 @@ class MainApp {
         false,
         false,
         null,
-        { device_id: deviceId, source: source },
+        { device_id: deviceId, source: source }
       );
     }
   }
 
   //處理同步的實驗停止狀態
   handleSyncExperimentStopped(syncData) {
-    const source = syncData.source || "unknown";
+    const _source = syncData.source || "unknown";
 
     // 優先檢查是否在 experiment.html
     if (this.modules.experimentPageManager) {
@@ -472,8 +472,8 @@ class MainApp {
       // 分派事件通知其他模組（如果需要）
       document.dispatchEvent(
         new CustomEvent("experimentIdChanged", {
-          detail: { experimentId, timestamp },
-        }),
+          detail: { experimentId, timestamp }
+        })
       );
     }
   }

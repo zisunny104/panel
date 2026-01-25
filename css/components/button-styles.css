@@ -98,11 +98,6 @@
     margin-right: 0.5rem;
 }
 
-/* 控制群組變體 */
-.control-group.indented {
-    margin-left: 1.25rem;
-}
+/* 控制群組變體：已移除 indented 變體，統一使用 .control-group 與 .control-group.section-title 進行區隔 */
 
-.control-group.indented.with-gap {
-    gap: 0.625rem;
-}
+/* 如果需要局部間距，請使用 .control-group.section-title 或自訂類別 */

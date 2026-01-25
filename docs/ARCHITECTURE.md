@@ -167,7 +167,7 @@ panel/
 │   │   ├── sync-manager.js           # 工作階段管理
 │   │   ├── sync-manager-ui.js        # UI 管理（膠囊指示器）
 │   │   ├── sync-manager-sessions.js  # 工作階段UI管理
-│   │   ├── sync-manager-qr.js        # QR碼管理
+│   │   ├── sync-manager-qr.js        # QR Code 管理
 │   │   ├── sync-confirm-dialog.js    # 確認對話框
 │   │   ├── sync-manager-core.js      # 同步核心邏輯
 │   │   └── experiment-hub-manager.js # 實驗中樞管理
@@ -188,7 +188,7 @@ panel/
 
 ## 版本管理系統
 
-專案使用 git commit hash 作為版本識別碼，提供更好的版本追蹤和重現性。
+專案使用 git commit hash 作為版本識別碼，提供更好的版本追蹤和
 
 ### 自動化版本更新
 
@@ -1014,7 +1014,7 @@ async handleAuth(wsConnectionId, data, ws) {
 | `experiment_stopped`   | 實驗停止     | `{ experimentId, source }`            |
 | `experiment_id_update` | 實驗 ID 更新 | `{ experimentId, timestamp }`         |
 | `client_joined`        | 客戶端加入   | `{ clientId, role }`                  |
-| `client_left`          | 客戶端離開   | `{ clientId }`                        |
+| `client_left`          | 客戶端退出   | `{ clientId }`                        |
 | `error`                | 錯誤訊息     | `{ code, message }`                   |
 
 ---
@@ -1108,7 +1108,7 @@ const db = new DatabaseSync("./runtime/database/experiment.db");
 db.exec("PRAGMA journal_mode = WAL;"); // 寫前日誌模式（提高並發）
 db.exec("PRAGMA synchronous = NORMAL;"); // 適度同步（性能與安全平衡）
 db.exec("PRAGMA cache_size = -64000;"); // 64MB 快取
-db.exec("PRAGMA temp_store = MEMORY;"); // 臨時表在記憶體中
+db.exec("PRAGMA temp_store = MEMORY;"); // 將暫存表放在記憶體中
 ---
 
 ## package.json 設定

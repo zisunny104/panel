@@ -18,7 +18,7 @@ class WebSocketClient {
       reconnectInterval: options.reconnectInterval || 3000, // 3秒
       maxReconnectAttempts: options.maxReconnectAttempts || 5,
       storagePrefix: options.storagePrefix || "panel_", // sessionStorage 前綴
-      autoReconnect: options.autoReconnect !== false,
+      autoReconnect: options.autoReconnect !== false
     };
 
     // 連接狀態
@@ -62,7 +62,7 @@ class WebSocketClient {
   }
 
   /**
-   * 取得 WebSocket 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
+   * 取得 WebSocket 路徑前綴（參考 QR Code 的動態路徑邏輯，完全避免硬編碼）
    */
   getWebSocketBasePath() {
     // 根據頁面路徑動態決定 WebSocket 前綴（完全動態，無硬編碼）
@@ -95,7 +95,8 @@ class WebSocketClient {
     // 2. 合併認證資料（優先使用傳入的，再使用儲存的）
     this.sessionId = authData.sessionId || savedData.sessionId;
     this.clientId = authData.clientId || savedData.clientId;
-    this.role = authData.role || savedData.role || "viewer";
+    this.role =
+      authData.role || savedData.role || window.SyncManager?.ROLE?.VIEWER;
 
     // 3. 檢查必要欄位
     if (!this.sessionId) {
@@ -105,7 +106,7 @@ class WebSocketClient {
     // 4. 建立 WebSocket 連接
     Logger.info(
       "[WebSocketClient] 正在連接到 WebSocket 伺服器...",
-      this.config.url,
+      this.config.url
     );
 
     try {
@@ -139,7 +140,7 @@ class WebSocketClient {
   handleMessage(event) {
     try {
       const message = JSON.parse(event.data);
-      const { type, data, timestamp } = message;
+      const { type, data, timestamp: _timestamp } = message;
 
       Logger.debug(`[WebSocketClient] 收到訊息 [${type}]:`, data);
 
@@ -230,7 +231,7 @@ class WebSocketClient {
     Logger.debug("[WebSocketClient] 正在認證...", {
       sessionId: this.sessionId,
       clientId: this.clientId,
-      role: this.role,
+      role: this.role
     });
 
     this.send({
@@ -238,8 +239,8 @@ class WebSocketClient {
       data: {
         sessionId: this.sessionId,
         clientId: this.clientId,
-        role: this.role,
-      },
+        role: this.role
+      }
     });
   }
 
@@ -287,7 +288,7 @@ class WebSocketClient {
     const { reason, message } = data;
 
     Logger.warn(
-      `[WebSocketClient] 接收到清除同步數據命令 [${reason}]: ${message}`,
+      `[WebSocketClient] 接收到清除同步數據命令 [${reason}]: ${message}`
     );
 
     // 禁用自動重連，避免無限重連循環
@@ -302,13 +303,13 @@ class WebSocketClient {
       detail: {
         reason,
         message,
-        timestamp: Date.now(),
-      },
+        timestamp: Date.now()
+      }
     });
 
     Logger.debug("[WebSocketClient] 準備派發 sync_data_cleared 事件", {
       reason,
-      message,
+      message
     });
 
     window.dispatchEvent(clearEvent);
@@ -318,11 +319,11 @@ class WebSocketClient {
     this.emit("sync_data_cleared", {
       reason,
       message,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     });
 
     Logger.info(
-      `[WebSocketClient] 已派發內部 sync_data_cleared 事件 [${reason}]`,
+      `[WebSocketClient] 已派發內部 sync_data_cleared 事件 [${reason}]`
     );
 
     // 延遲斷開連線，給 SyncManager 時間處理事件
@@ -357,7 +358,7 @@ class WebSocketClient {
    */
   handleClose(event) {
     Logger.info(
-      `[WebSocketClient] WebSocket 連接已關閉 [${event.code}]: ${event.reason}`,
+      `[WebSocketClient] WebSocket 連接已關閉 [${event.code}]: ${event.reason}`
     );
 
     this.isAuthenticated = false;
@@ -395,9 +396,9 @@ class WebSocketClient {
         new CustomEvent("websocket_session_invalid", {
           detail: {
             reason: "session_not_found",
-            originalError: data,
-          },
-        }),
+            originalError: data
+          }
+        })
       );
     }
 
@@ -412,7 +413,7 @@ class WebSocketClient {
     const delay = this.config.reconnectInterval * this.reconnectAttempts;
 
     Logger.info(
-      `[WebSocketClient] 將在 ${delay}ms 後嘗試重新連接 (第 ${this.reconnectAttempts} 次)`,
+      `[WebSocketClient] 將在 ${delay}ms 後嘗試重新連接 (第 ${this.reconnectAttempts} 次)`
     );
 
     this.reconnectTimer = setTimeout(() => {
@@ -420,7 +421,7 @@ class WebSocketClient {
       this.connect({
         sessionId: this.sessionId,
         clientId: this.clientId,
-        role: this.role,
+        role: this.role
       });
     }, delay);
   }
@@ -437,14 +438,14 @@ class WebSocketClient {
           type: "heartbeat",
           data: {
             clientId: this.clientId,
-            timestamp: Date.now(),
-          },
+            timestamp: Date.now()
+          }
         });
       }
     }, this.config.heartbeatInterval);
 
     Logger.debug(
-      `[WebSocketClient] 心跳已啟動 (間隔: ${this.config.heartbeatInterval}ms)`,
+      `[WebSocketClient] 心跳已啟動 (間隔: ${this.config.heartbeatInterval}ms)`
     );
   }
 
@@ -491,7 +492,7 @@ class WebSocketClient {
     if (this.messageQueue.length === 0) return;
 
     Logger.debug(
-      `[WebSocketClient] 發送佇列中的 ${this.messageQueue.length} 條訊息`,
+      `[WebSocketClient] 發送佇列中的 ${this.messageQueue.length} 條訊息`
     );
 
     while (this.messageQueue.length > 0) {
@@ -509,8 +510,8 @@ class WebSocketClient {
       data: {
         sessionId: this.sessionId,
         clientId: this.clientId,
-        state,
-      },
+        state
+      }
     });
   }
 
@@ -521,8 +522,8 @@ class WebSocketClient {
     this.send({
       type: "get_session_state",
       data: {
-        sessionId: this.sessionId,
-      },
+        sessionId: this.sessionId
+      }
     });
   }
 
@@ -535,8 +536,8 @@ class WebSocketClient {
       data: {
         sessionId: this.sessionId,
         action,
-        ...data,
-      },
+        ...data
+      }
     });
   }
 
@@ -611,7 +612,7 @@ class WebSocketClient {
         Logger.debug("[WebSocketClient] 從 sessionStorage 恢復連接資訊:", {
           clientId,
           sessionId,
-          role,
+          role
         });
         return { clientId, sessionId, role };
       }
@@ -649,7 +650,7 @@ class WebSocketClient {
     this.connect({
       sessionId: this.sessionId,
       clientId: this.clientId,
-      role: this.role,
+      role: this.role
     });
   }
 
@@ -695,7 +696,7 @@ class WebSocketClient {
       clientId: this.clientId,
       sessionId: this.sessionId,
       role: this.role,
-      reconnectAttempts: this.reconnectAttempts,
+      reconnectAttempts: this.reconnectAttempts
     };
   }
 }

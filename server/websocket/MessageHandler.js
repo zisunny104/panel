@@ -12,6 +12,9 @@ import SessionService from "../services/SessionService.js";
 import ShareCodeService from "../services/ShareCodeService.js";
 import Logger from "../utils/logger.js";
 
+// 本檔使用的角色常數，避免硬編碼字串
+const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
+
 export class MessageHandler {
   constructor(connectionManager, sessionManager, broadcastManager) {
     this.connectionManager = connectionManager;
@@ -72,7 +75,7 @@ export class MessageHandler {
    * @param {WebSocket} ws - WebSocket 連線
    */
   async handleAuth(wsConnectionId, data, ws) {
-    const { sessionId, clientId, role = "viewer" } = data;
+    const { sessionId, clientId, role = ROLE.VIEWER } = data;
 
     // 驗證必要欄位
     if (!sessionId || !clientId) {

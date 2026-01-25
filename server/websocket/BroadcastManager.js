@@ -10,6 +10,8 @@
 
 import { Logger } from "../utils/logger.js";
 
+const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
+
 export class BroadcastManager {
   constructor(connectionManager, sessionManager) {
     this.connectionManager = connectionManager;
@@ -104,9 +106,9 @@ export class BroadcastManager {
       let operatorCount = 0;
       let viewerCount = 0;
       for (const member of members) {
-        if (member.role === "operator") {
+        if (member.role === ROLE.OPERATOR) {
           operatorCount++;
-        } else if (member.role === "viewer") {
+        } else if (member.role === ROLE.VIEWER) {
           viewerCount++;
         }
       }
@@ -182,9 +184,9 @@ export class BroadcastManager {
   }
 
   /**
-   * 發送客戶端離開通知
+   * 發送客戶端退出通知
    * @param {string} sessionId - 工作階段 ID
-   * @param {string} clientId - 離開的客戶端 ID
+   * @param {string} clientId - 退出的客戶端 ID
    * @returns {Object} 發送結果
    */
   broadcastClientLeft(sessionId, clientId) {
