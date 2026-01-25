@@ -248,35 +248,36 @@
 @media (max-width: 768px) {
     .metadata-grid {
         grid-template-columns: 1fr;
-
-        .stats-view-grid {
-            grid-template-columns: 1fr;
-            gap: 0.75rem;
-        }
-
-        .gesture-stats-header,
-        .gesture-stats .stat-item {
-            grid-template-columns: 1fr;
-            gap: 0.25rem;
-        }
-
-        .header-label,
-        .header-record,
-        .header-accuracy,
-        .header-concordance,
-        .gesture-stats .stat-label,
-        .gesture-stats .stat-record,
-        .gesture-stats .stat-accuracy,
-        .gesture-stats .stat-concordance {
-            text-align: left;
-        }
-
-        .jsonl-section {
-            min-height: 200px;
-        }
-
-        .jsonl-content pre {
-            font-size: 0.75rem;
-            padding: 0.75rem;
-        }
     }
+
+    .stats-view-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .gesture-stats-header,
+    .gesture-stats .stat-item {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+    }
+
+    .header-label,
+    .header-record,
+    .header-accuracy,
+    .header-concordance,
+    .gesture-stats .stat-label,
+    .gesture-stats .stat-record,
+    .gesture-stats .stat-accuracy,
+    .gesture-stats .stat-concordance {
+        text-align: left;
+    }
+
+    .jsonl-section {
+        min-height: 200px;
+    }
+
+    .jsonl-content pre {
+        font-size: 0.75rem;
+        padding: 0.75rem;
+    }
+}
