@@ -105,102 +105,118 @@
             </button>
         </div>
         <hr class="panel-divider">
+        <div class="settings-panel-body">
 
-        <!-- 面板縮放控制 -->
-        <div class="control-group">
-            面板縮放:
-            <input type="range" id="scaleRange" min="0.5" max="2" step="0.01" value="1.29" />
-            <span id="scaleValueSpan">1.29</span>
-            <input type="number" id="scaleNumberInput" min="0.5" max="2" step="0.01" value="1.29" />
-        </div>
+            <!-- 面板縮放控制 -->
+            <div class="control-group">
+                <span class="control-label">面板區域縮放</span>
+                <input type="range" id="scaleRange" min="0.5" max="2" step="0.01" value="1.29" />
+                <input type="number" id="scaleNumberInput" min="0.5" max="2" step="0.01" value="1.29" />
+            </div>
 
-        <!-- 頂部空間控制 -->
-        <div class="control-group">
-            頂部空間 (vh):
-            <input type="range" id="topSpacerRange" min="0" max="50" step="1" value="5" />
-            <span id="topSpacerValueSpan">5</span>
-            <input type="number" id="topSpacerNumberInput" min="0" max="50" step="1" value="5" />
-        </div>
+            <!-- 頂部空間控制 -->
+            <div class="control-group">
+                <span class="control-label">面板頂部(vh)</span>
+                <input type="range" id="topSpacerRange" min="0" max="50" step="1" value="5" />
+                <input type="number" id="topSpacerNumberInput" min="0" max="50" step="1" value="5" />
+            </div>
+
+            <!-- 底部間距控制 -->
+            <div class="control-group">
+                <span class="control-label">面板底部(vh)</span>
+                <input type="range" id="bottomSpacerRange" min="0" max="50" step="1" value="3" />
+                <input type="number" id="bottomSpacerNumberInput" min="0" max="50" step="1" value="3" />
+            </div>
+
+            <!-- 電源按鈕縮放 -->
+            <div class="control-group">
+                <span class="control-label">電源按鈕縮放</span>
+                <input type="range" id="powerScaleRange" min="0.5" max="2" step="0.01" value="0.9" />
+                <input type="number" id="powerScaleNumberInput" min="0.5" max="2" step="0.01" value="0.90" />
+            </div>
 
 
-        <!-- 顯示按鈕標記開關 -->
-        <div class="control-group">
-            <label class="switch">
-                <input type="checkbox" id="toggleButtonLabels">
-                <div class="slider">
-                    <div class="circle"></div>
+            <!-- 顯示按鈕標記開關 -->
+            <div class="control-group">
+                <label class="switch">
+                    <input type="checkbox" id="toggleButtonLabels">
+                    <div class="slider">
+                        <div class="circle"></div>
+                    </div>
+                </label>按鈕標記
+            </div>
+
+            <!-- 顯示按鈕顏色開關 -->
+            <div class="control-group">
+                <label class="switch">
+                    <input type="checkbox" id="toggleButtonColors">
+                    <div class="slider">
+                        <div class="circle"></div>
+                    </div>
+                </label>按鈕顏色
+            </div>
+
+            <!-- 顯示視覺提示開關 -->
+            <div class="control-group">
+                <label class="switch">
+                    <input type="checkbox" id="toggleTouchVisuals" checked>
+                    <div class="slider">
+                        <div class="circle"></div>
+                    </div>
+                </label>視覺提示
+            </div>
+
+            <hr class="panel-divider">
+
+            <!-- 媒體控制區 -->
+            <div class="control-group">媒體控制</div>
+            <div class="control-group">
+                <button id="powerOnBtn" class="media-power-btn power-on">開機</button>
+                <button id="quickPowerOnBtn" class="media-power-btn quick-power">快速開機</button>
+            </div>
+            <div class="control-group">
+                <button id="powerOffBtn" class="media-power-btn power-off">關機</button>
+                <button id="emergencyStopBtn" class="media-power-btn emergency-stop">緊急停止</button>
+            </div>
+            <div class="control-group">
+                <label class="switch">
+                    <input type="checkbox" id="toggleMediaAreaMarker">
+                    <div class="slider">
+                        <div class="circle"></div>
+                    </div>
+                </label>顯示媒體區域標記
+            </div>
+            <div class="control-group">
+                <label class="switch">
+                    <input type="checkbox" id="toggleMediaContent" checked>
+                    <div class="slider">
+                        <div class="circle"></div>
+                    </div>
+                </label>顯示媒體內容
+            </div>
+
+            <hr class="panel-divider">
+
+            <!-- 聲音設定區 -->
+            <div class="control-group">音效設定</div>
+            <div class="control-group">
+                <label class="switch">
+                    <input type="checkbox" id="toggleBeepSound" checked>
+                    <div class="slider">
+                        <div class="circle"></div>
+                    </div>
+                </label>開啟音效
+            </div>
+
+            <hr class="panel-divider">
+
+            <!-- 還原預設值按鈕與版本資訊 -->
+            <div class="reset-settings-compact">
+                <button id="resetSettingsBtn" class="btn-secondary">還原預設值</button>
+                <div class="version-info-inline">
+                    <span class="version-value" id="appVersion">載入中...</span>
                 </div>
-            </label>按鈕標記
-        </div>
-
-        <!-- 顯示按鈕顏色開關 -->
-        <div class="control-group">
-            <label class="switch">
-                <input type="checkbox" id="toggleButtonColors">
-                <div class="slider">
-                    <div class="circle"></div>
-                </div>
-            </label>按鈕顏色
-        </div>
-
-        <!-- 顯示視覺提示開關 -->
-        <div class="control-group">
-            <label class="switch">
-                <input type="checkbox" id="toggleTouchVisuals">
-                <div class="slider">
-                    <div class="circle"></div>
-                </div>
-            </label>視覺提示
-        </div>
-
-        <hr class="panel-divider">
-
-        <!-- 媒體控制區 -->
-        <div class="control-group">媒體控制</div>
-        <div class="control-group indented with-gap">
-            <button id="powerOnBtn" class="media-power-btn power-on">開機</button>
-            <button id="powerOffBtn" class="media-power-btn power-off">關機</button>
-        </div>
-        <div class="control-group indented with-gap">
-            <button id="quickPowerOnBtn" class="media-power-btn quick-power">快速開機</button>
-            <button id="emergencyStopBtn" class="media-power-btn emergency-stop">緊急停止</button>
-        </div>
-        <div class="control-group indented">
-            <label class="switch">
-                <input type="checkbox" id="toggleMediaAreaMarker">
-                <div class="slider">
-                    <div class="circle"></div>
-                </div>
-            </label>顯示媒體區域標記
-        </div>
-        <div class="control-group indented">
-            <label class="switch">
-                <input type="checkbox" id="toggleMediaContent">
-                <div class="slider">
-                    <div class="circle"></div>
-                </div>
-            </label>顯示媒體內容
-        </div>
-
-        <hr class="panel-divider">
-
-        <!-- 聲音設定區 -->
-        <div class="control-group">音效設定</div>
-        <div class="control-group indented">
-            <label class="switch">
-                <input type="checkbox" id="toggleBeepSound">
-                <div class="slider">
-                    <div class="circle"></div>
-                </div>
-            </label>開啟音效
-        </div>
-
-        <hr class="panel-divider">
-
-        <!-- 版本資訊 -->
-        <div class="version-info-compact">
-            <span class="version-label">版本:</span>
-            <span class="version-value" id="appVersion">載入中...</span>
+            </div>
         </div>
     </div>
 
@@ -257,7 +273,7 @@
         </div>
 
         <!-- 實驗內容 -->
-        <div class="experiment-content-scroll">
+        <div class="experiment-panel-body">
             <!-- 單元組合選擇區域 -->
             <div class="combination-selector-section">
                 <h3>單元組合</h3>
@@ -295,135 +311,146 @@
                     </ul>
                 </div>
             </div>
-        </div>
 
-        <!-- 實驗控制區 -->
-        <div class="experiment-panel-actions" id="experimentPanelActions">
-            <!-- 實驗ID輸入與開始 -->
-            <div class="experiment-id-row">
-                <div class="experiment-id-input-group">
-                    <label for="experimentIdInput">實驗ID</label>
-                    <input type="text" id="experimentIdInput" class="experiment-id-input" maxlength="10"
-                        placeholder="載入中...">
-                    <button id="regenerateIdButton" class="regenerate-id-btn" title="重新產生ID">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-                            <path d="M21 3v5h-5"></path>
-                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-                            <path d="M3 21v-5h5"></path>
-                        </svg>
-                    </button>
-                    <div id="experimentTimer" class="experiment-timer" style="display:none;">花費時間：00:00</div>
+            <!-- 實驗控制區 -->
+            <div class="experiment-panel-actions" id="experimentPanelActions">
+                <div class="input-section">
+                    <div class="form-group">
+                        <label for="experimentIdInput">實驗ID:</label>
+                        <div class="experiment-id-group">
+                            <input type="text" id="experimentIdInput" class="form-input" maxlength="10"
+                                placeholder="載入中...">
+                            <button id="regenerateIdButton" class="btn-secondary" title="重新產生實驗ID">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                    stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
+                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                                    <path d="M21 3v5h-5"></path>
+                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                                    <path d="M3 21v-5h5"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subjectNameInput">受試者名稱:</label>
+                        <input type="text" id="subjectNameInput" class="form-input" placeholder="受試者名稱">
+                    </div>
+
+                    <div class="form-group experiment-control-group">
+                        <div class="experiment-control-header">
+                            <label>實驗控制</label>
+                            <div id="experimentTimer" class="experiment-timer">00:00.000</div>
+                        </div>
+
+                        <div id="experimentIdRow" class="experiment-start-row">
+                            <button id="startExperimentBtn" class="experiment-start-btn btn-success" title="">▶
+                                開始實驗</button>
+                        </div>
+
+                        <div id="experimentControlButtons" class="experiment-control-buttons">
+                            <button id="pauseExperimentBtn" class="experiment-pause-btn btn-primary" title="">⏸
+                                暫停</button>
+                            <button id="stopExperimentBtn" class="experiment-stop-btn btn-danger" title="">⏹
+                                停止</button>
+                        </div>
+                    </div>
                 </div>
-                <button id="startExperimentButton" class="experiment-start-btn">開始實驗</button>
-            </div>
-            <!-- 受試者名稱輸入 -->
-            <div class="experiment-subject-row">
-                <label for="subjectNameInput">受試者名稱:</label>
-                <input type="text" id="subjectNameInput" class="experiment-subject-input" placeholder="受試者名稱">
-            </div>
-            <!-- 實驗進行中控制按鈕 -->
-            <div id="experimentControlButtons" style="display:none; gap:10px;">
-                <button id="pauseExperimentButton" class="experiment-pause-btn">暫停實驗</button>
-                <button id="stopExperimentButton" class="experiment-stop-btn">停止實驗</button>
             </div>
         </div>
-    </div>
-    </div>
 
-    <!-- 操作日誌面板 -->
-    <div class="logger-output" id="loggerOutput" style="display:none;">
-        <div class="logger-panel-header">
-            <strong>操作日誌</strong>
-            <button id="copyLogButton" class="logger-panel-btn" title="複製日誌">
-                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="11" y="11" width="10" height="10" rx="1" ry="1"></rect>
-                    <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
-                </svg>
-            </button>
-            <button id="minimizeLoggerPanel" class="logger-panel-btn" title="最小化">
-                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M7 13l5 5 5-5M12 18V6"></path>
-                </svg>
-            </button>
-            <button id="closeLoggerPanel" class="logger-panel-btn" title="關閉">
-                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
+        <!-- 操作日誌面板 -->
+        <div class="logger-output" id="loggerOutput" style="display:none;">
+            <div class="logger-panel-header">
+                <strong>操作日誌</strong>
+                <button id="copyLogButton" class="logger-panel-btn" title="複製日誌">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="11" y="11" width="10" height="10" rx="1" ry="1"></rect>
+                        <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+                <button id="minimizeLoggerPanel" class="logger-panel-btn" title="最小化">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M7 13l5 5 5-5M12 18V6"></path>
+                    </svg>
+                </button>
+                <button id="closeLoggerPanel" class="logger-panel-btn" title="關閉">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <hr class="panel-divider">
+            <div class="log-content" id="logContent"></div>
+            <button id="clearLogButton">清空日誌</button>
+            <button id="exportLogButton">匯出日誌 (JSON)</button>
+            <button id="showStatsButton">顯示統計</button>
         </div>
-        <hr class="panel-divider">
-        <div class="log-content" id="logContent"></div>
-        <button id="clearLogButton">清空日誌</button>
-        <button id="exportLogButton">匯出日誌 (JSON)</button>
-        <button id="showStatsButton">顯示統計</button>
-    </div>
 
-    <!-- 左側控制按鈕 -->
-    <button class="circular-button circular-button.accent logger-fab-position" id="loggerFabButton" title="操作日誌">
-        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14,2 14,8 20,8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10,9 9,9 8,9"></polyline>
-        </svg>
-    </button>
+        <!-- 左側控制按鈕 -->
+        <button class="circular-button circular-button.accent logger-fab-position" id="loggerFabButton" title="操作日誌">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14,2 14,8 20,8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10,9 9,9 8,9"></polyline>
+            </svg>
+        </button>
 
-    <!-- BEEP 音效 -->
-    <audio id="beepSound" src="assets/audio/beep.mp3" preload="auto"></audio>
+        <!-- BEEP 音效 -->
+        <audio id="beepSound" src="assets/audio/beep.mp3" preload="auto"></audio>
 
-    <!-- 全域核心 -->
-    <script src="js/core/console-manager.js"></script>
-    <script src="js/core/config.js"></script>
+        <!-- 全域核心 -->
+        <script src="js/core/console-manager.js"></script>
+        <script src="js/core/config.js"></script>
 
-    <!-- WebSocket 客戶端（必須在 SyncClient 之前載入） -->
-    <script src="js/core/websocket-client.js"></script>
+        <!-- WebSocket 客戶端（必須在 SyncClient 之前載入） -->
+        <script src="js/core/websocket-client.js"></script>
 
-    <!-- 同步客戶端 -->
-    <script src="js/sync/sync-client.js"></script>
+        <!-- 同步客戶端 -->
+        <script src="js/sync/sync-client.js"></script>
 
-    <!-- 實驗中樞客戶端 -->
-    <script src="js/core/experiment-hub-client.js"></script>
-    <script type="module" src="js/sync/experiment-hub-manager.js"></script>
+        <!-- 實驗中樞客戶端 -->
+        <script src="js/core/experiment-hub-client.js"></script>
+        <script type="module" src="js/sync/experiment-hub-manager.js"></script>
 
-    <!-- 基礎工具 -->
-    <script type="module" src="js/core/random-utils.js"></script>
-    <script type="module" src="js/core/data-loader.js"></script>
+        <!-- 基礎工具 -->
+        <script type="module" src="js/core/random-utils.js"></script>
+        <script type="module" src="js/core/data-loader.js"></script>
 
-    <!-- 狀態管理 -->
-    <script src="js/core/experiment-state-manager.js"></script>
+        <!-- 狀態管理 -->
+        <script src="js/core/experiment-state-manager.js"></script>
 
-    <!-- 面板 UI 控制 -->
-    <script src="js/panel/panel-manager.js"></script>
-    <script src="js/panel/panel-ui-controls.js"></script>
-    <script src="js/panel/panel-button-manager.js"></script>
+        <!-- 面板 UI 控制 -->
+        <script src="js/panel/panel-manager.js"></script>
+        <script src="js/panel/panel-ui-controls.js"></script>
+        <script src="js/panel/panel-button-manager.js"></script>
 
-    <!-- 面板電源與媒體 -->
-    <script src="js/panel/panel-media-manager.js"></script>
-    <script src="js/panel/power-logger.js"></script>
-    <script src="js/panel/panel-power-control.js"></script>
+        <!-- 面板電源與媒體 -->
+        <script src="js/panel/panel-media-manager.js"></script>
+        <script src="js/panel/power-logger.js"></script>
+        <script src="js/panel/panel-power-control.js"></script>
 
-    <!-- 面板功能 -->
-    <script src="js/panel/panel-action-manager.js"></script>
-    <script type="module" src="js/panel/combination-selector.js"></script>
-    <script src="js/panel/panel-experiment-log.js"></script>
-    <script type="module" src="js/panel/panel-experiment-manager.js"></script>
-    <script src="js/panel/panel-experiment-sync-receiver.js"></script>
+        <!-- 面板功能 -->
+        <script src="js/panel/panel-action-manager.js"></script>
+        <script type="module" src="js/panel/combination-selector.js"></script>
+        <script src="js/panel/panel-experiment-log.js"></script>
+        <script type="module" src="js/panel/panel-experiment-manager.js"></script>
+        <script src="js/panel/panel-experiment-sync-receiver.js"></script>
 
-    <!-- 同步系統 -->
-    <script src="js/sync/sync-confirm-dialog.js"></script>
-    <script src="js/experiment/experiment-sync-manager.js"></script>
-    <script type="module" src="js/sync/sync-manager.js"></script>
+        <!-- 同步系統 -->
+        <script src="js/sync/sync-confirm-dialog.js"></script>
+        <script src="js/experiment/experiment-sync-manager.js"></script>
+        <script type="module" src="js/sync/sync-manager.js"></script>
 
-    <!-- 應用啟動 -->
-    <script src="js/core/main.js"></script>
+        <!-- 應用啟動 -->
+        <script src="js/core/main.js"></script>
 
 </body>
 

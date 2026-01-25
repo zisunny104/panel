@@ -27,13 +27,13 @@ if (typeof window !== "undefined" && window.SyncClient) {
       this.wsConfig = {
         url: config.wsUrl,
         storagePrefix: "panel_sync_",
-        autoReconnect: true,
+        autoReconnect: true
       };
 
       // 狀態
       this.sessionId = null;
       this.clientId = null;
-      this.role = "viewer";
+      this.role = window.SyncManager?.ROLE?.LOCAL;
       this.connected = false;
       this.serverOnline = true;
       this.previousServerOnline = true;
@@ -71,7 +71,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         const { reason, originalError } = event.detail;
         Logger.warn("[SyncClient] 收到全域工作階段失效事件", {
           reason,
-          originalError,
+          originalError
         });
 
         // 標記工作階段已失效
@@ -85,9 +85,9 @@ if (typeof window !== "undefined" && window.SyncClient) {
           new CustomEvent("sync_session_invalid", {
             detail: {
               reason,
-              originalError,
-            },
-          }),
+              originalError
+            }
+          })
         );
       });
     }
@@ -135,7 +135,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
     }
 
     /**
-     * 取得 API 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
+     * 取得 API 路徑前綴（參考 QR Code 的動態路徑邏輯，完全避免硬編碼）
      */
     getApiBasePath() {
       // 根據頁面路徑動態決定 API 前綴（完全動態，無硬編碼）
@@ -174,8 +174,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
         // 觸發連線成功事件
         window.dispatchEvent(
           new CustomEvent("sync_connected", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -186,8 +186,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
         window.dispatchEvent(
           new CustomEvent("sync_reconnected", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -198,8 +198,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
         window.dispatchEvent(
           new CustomEvent("sync_disconnected", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -214,18 +214,18 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.debug("[SyncClient] 新客戶端加入", data);
         window.dispatchEvent(
           new CustomEvent("sync_client_joined", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
-      // 客戶端離開
+      // 客戶端退出
       this.wsClient.on("client_left", (data) => {
-        Logger.debug("[SyncClient] 客戶端離開", data);
+        Logger.debug("[SyncClient] 客戶端退出", data);
         window.dispatchEvent(
           new CustomEvent("sync_client_left", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -234,8 +234,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.debug("[SyncClient] 客戶端重新連接", data);
         window.dispatchEvent(
           new CustomEvent("sync_client_reconnected", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -246,7 +246,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         // 檢查是否為工作階段不存在錯誤
         if (data && data.message && data.message.includes("工作階段不存在")) {
           Logger.warn(
-            "[SyncClient] 偵測到工作階段不存在錯誤，自動清理工作階段資訊",
+            "[SyncClient] 偵測到工作階段不存在錯誤，自動清理工作階段資訊"
           );
 
           // 標記工作階段已失效
@@ -260,16 +260,16 @@ if (typeof window !== "undefined" && window.SyncClient) {
             new CustomEvent("sync_session_invalid", {
               detail: {
                 reason: "session_not_found",
-                originalError: data,
-              },
-            }),
+                originalError: data
+              }
+            })
           );
         }
 
         window.dispatchEvent(
           new CustomEvent("sync_server_error", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -278,8 +278,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.debug("[SyncClient] 收到實驗開始事件", data);
         window.dispatchEvent(
           new CustomEvent("remote_experiment_started", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -288,8 +288,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.debug("[SyncClient] 收到實驗暫停事件", data);
         window.dispatchEvent(
           new CustomEvent("remote_experiment_paused", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -298,8 +298,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.debug("[SyncClient] 收到實驗恢復事件", data);
         window.dispatchEvent(
           new CustomEvent("remote_experiment_resumed", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -308,8 +308,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.debug("[SyncClient] 收到實驗停止事件", data);
         window.dispatchEvent(
           new CustomEvent("remote_experiment_stopped", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -318,8 +318,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.debug("[SyncClient] 收到實驗ID更新事件", data);
         window.dispatchEvent(
           new CustomEvent("experiment_id_updated", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
 
@@ -328,8 +328,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
         Logger.debug("[SyncClient] 收到工作階段狀態", data);
         window.dispatchEvent(
           new CustomEvent("sync_session_state", {
-            detail: data,
-          }),
+            detail: data
+          })
         );
       });
     }
@@ -354,11 +354,11 @@ if (typeof window !== "undefined" && window.SyncClient) {
         const response = await fetch(`${this.apiBaseUrl}/sync/session`, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            createCode,
-          }),
+            createCode
+          })
         });
 
         if (!response.ok) {
@@ -378,12 +378,12 @@ if (typeof window !== "undefined" && window.SyncClient) {
         await this.wsClient.connect({
           sessionId: this.sessionId,
           clientId: this.clientId,
-          role: this.role,
+          role: this.role
         });
 
         // 回傳工作階段ID（不包含分享代碼）
         return {
-          sessionId: data.data.sessionId,
+          sessionId: data.data.sessionId
         };
       } catch (error) {
         Logger.error("[SyncClient] 建立工作階段失敗:", error);
@@ -413,13 +413,13 @@ if (typeof window !== "undefined" && window.SyncClient) {
           {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type": "application/json"
             },
             body: JSON.stringify({
               sessionId: this.sessionId,
-              clientId: this.clientId,
-            }),
-          },
+              clientId: this.clientId
+            })
+          }
         );
 
         if (!response.ok) {
@@ -433,7 +433,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
         return {
           shareCode: data.data.share_code,
-          expiresAt: data.data.expires_at,
+          expiresAt: data.data.expires_at
         };
       } catch (error) {
         Logger.error("[SyncClient] 產生分享代碼失敗:", error);
@@ -447,7 +447,10 @@ if (typeof window !== "undefined" && window.SyncClient) {
      * @param {string} role - 角色 ('viewer' 或 'operator')
      * @returns {Promise<boolean>}
      */
-    async joinSessionByShareCode(shareCode, role = "viewer") {
+    async joinSessionByShareCode(
+      shareCode,
+      role = window.SyncManager?.ROLE?.VIEWER
+    ) {
       try {
         // 如果之前工作階段失效，重置標記允許重新加入
         if (this.sessionInvalid) {
@@ -468,13 +471,13 @@ if (typeof window !== "undefined" && window.SyncClient) {
         const response = await fetch(`${this.apiBaseUrl}/sync/join`, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({
             shareCode,
             role,
-            clientId: this.clientId,
-          }),
+            clientId: this.clientId
+          })
         });
 
         if (!response.ok) {
@@ -494,7 +497,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         await this.wsClient.connect({
           sessionId: this.sessionId,
           clientId: this.clientId,
-          role: this.role,
+          role: this.role
         });
 
         // 如果有初始狀態，立即觸發更新事件
@@ -536,7 +539,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
         // 驗證工作階段是否仍然有效（調用 REST API）
         const response = await fetch(
-          `${this.apiBaseUrl}/sync/session/${this.sessionId}/validate?clientId=${this.clientId}`,
+          `${this.apiBaseUrl}/sync/session/${this.sessionId}/validate?clientId=${this.clientId}`
         );
 
         if (!response.ok) {
@@ -557,7 +560,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         await this.wsClient.connect({
           sessionId: this.sessionId,
           clientId: this.clientId,
-          role: this.role,
+          role: this.role
         });
 
         Logger.info("[SyncClient] 工作階段還原成功");
@@ -577,7 +580,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
     async getShareCodeInfo(shareCode) {
       try {
         const response = await fetch(
-          `${this.apiBaseUrl}/sync/share-code/${shareCode}`,
+          `${this.apiBaseUrl}/sync/share-code/${shareCode}`
         );
 
         if (!response.ok) {
@@ -603,7 +606,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
           throw new Error("未連線到工作階段");
         }
 
-        if (this.role !== "operator") {
+        if (this.role !== window.SyncManager?.ROLE?.OPERATOR) {
           throw new Error("僅操作者可以重新產生分享代碼");
         }
 
@@ -612,12 +615,12 @@ if (typeof window !== "undefined" && window.SyncClient) {
           {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              clientId: this.clientId,
-            }),
-          },
+              clientId: this.clientId
+            })
+          }
         );
 
         if (!response.ok) {
@@ -628,7 +631,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         const data = await response.json();
         return {
           shareCode: data.data.shareCode,
-          sessionId: data.data.sessionId,
+          sessionId: data.data.sessionId
         };
       } catch (error) {
         Logger.error("[SyncClient] 重新產生分享代碼失敗:", error);
@@ -647,7 +650,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         }
 
         const response = await fetch(
-          `${this.apiBaseUrl}/sync/session/${this.sessionId}/clients`,
+          `${this.apiBaseUrl}/sync/session/${this.sessionId}/clients`
         );
 
         if (!response.ok) {
@@ -679,7 +682,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         return false;
       }
 
-      if (this.role !== "operator") {
+      if (this.role !== window.SyncManager?.ROLE?.OPERATOR) {
         Logger.warn("[SyncClient] 僅操作者可以發送狀態更新");
         return false;
       }
@@ -697,8 +700,8 @@ if (typeof window !== "undefined" && window.SyncClient) {
       try {
         const parsedState =
           typeof state === "string" ? JSON.parse(state) : state;
-        const event = new CustomEvent("sync_state_update", {
-          detail: parsedState,
+        const event = new CustomEvent(window.SyncEvents.STATE_UPDATE, {
+          detail: parsedState
         });
         window.dispatchEvent(event);
       } catch (error) {
@@ -725,7 +728,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
       try {
         const response = await fetch(`${this.apiBaseUrl}/health`, {
           method: "HEAD", // 使用 HEAD 更輕量
-          signal: AbortSignal.timeout(2000), // 2秒超時（快速失敗）
+          signal: AbortSignal.timeout(2000) // 2秒超時（快速失敗）
         });
 
         const newOnlineStatus = response.ok;
@@ -740,13 +743,13 @@ if (typeof window !== "undefined" && window.SyncClient) {
               detail: {
                 online: this.serverOnline,
                 previousOnline: this.previousServerOnline,
-                timestamp: new Date().toISOString(),
-              },
-            }),
+                timestamp: new Date().toISOString()
+              }
+            })
           );
 
           Logger.debug(
-            `[SyncClient] 伺服器狀態變化: ${this.previousServerOnline} → ${this.serverOnline}`,
+            `[SyncClient] 伺服器狀態變化: ${this.previousServerOnline} → ${this.serverOnline}`
           );
         }
 
@@ -764,9 +767,9 @@ if (typeof window !== "undefined" && window.SyncClient) {
                 online: false,
                 previousOnline: wasOnline,
                 timestamp: new Date().toISOString(),
-                error: error.message,
-              },
-            }),
+                error: error.message
+              }
+            })
           );
           Logger.warn(`[SyncClient] 伺服器狀態變化: ${wasOnline} → 離線`);
         }
@@ -799,7 +802,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
       // 同步模式不需要 HTTP 心跳檢測，直接回傳
       if (this.healthCheckMethod === "websocket") {
         Logger.debug(
-          "[SyncClient] 同步模式，使用 WebSocket 狀態監視，不啟動 HTTP 心跳檢測",
+          "[SyncClient] 同步模式，使用 WebSocket 狀態監視，不啟動 HTTP 心跳檢測"
         );
         return;
       }
@@ -825,7 +828,10 @@ if (typeof window !== "undefined" && window.SyncClient) {
       try {
         sessionStorage.setItem("sync_sessionId", this.sessionId || "");
         sessionStorage.setItem("sync_clientId", this.clientId || "");
-        sessionStorage.setItem("sync_role", this.role || "viewer");
+        sessionStorage.setItem(
+          "sync_role",
+          this.role || window.SyncManager?.ROLE?.VIEWER
+        );
         Logger.debug("[SyncClient] 狀態已儲存至 sessionStorage");
       } catch (error) {
         Logger.error("[SyncClient] 儲存狀態失敗:", error);
@@ -834,7 +840,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
     /**
      * 儲存角色到 sessionStorage（用於角色切換時更新）
-     * @param {string} role - 角色 ('viewer' 或 'operator')
+     * @param {string} role - 角色 ('viewer', 'operator' 或 'local')
      */
     saveRole(role) {
       try {
@@ -853,13 +859,15 @@ if (typeof window !== "undefined" && window.SyncClient) {
       try {
         this.sessionId = sessionStorage.getItem("sync_sessionId") || null;
         this.clientId = sessionStorage.getItem("sync_clientId") || null;
-        this.role = sessionStorage.getItem("sync_role") || "viewer";
+        this.role =
+          sessionStorage.getItem("sync_role") ||
+          window.SyncManager?.ROLE?.LOCAL;
 
         if (this.sessionId && this.clientId) {
           Logger.debug("[SyncClient] 從 sessionStorage 載入狀態:", {
             sessionId: this.sessionId,
             clientId: this.clientId,
-            role: this.role,
+            role: this.role
           });
         }
       } catch (error) {
@@ -878,7 +886,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
         this.sessionId = null;
         this.clientId = null;
-        this.role = "viewer";
+        this.role = window.SyncManager?.ROLE?.LOCAL; // 清除狀態後回到本機模式
 
         Logger.debug("[SyncClient] 已清除 sessionStorage 狀態");
       } catch (error) {
@@ -913,7 +921,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
      * 檢查是否可以操作
      */
     canOperate() {
-      return this.connected && this.role === "operator";
+      return this.connected && this.role === window.SyncManager?.ROLE?.OPERATOR;
     }
 
     /**
@@ -933,7 +941,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
       }
 
       if (this.connected && this.sessionId) {
-        return this.role; // 'viewer' 或 'operator'
+        return this.role; // 'viewer', 'operator' 或 'local'
       }
 
       return "idle";
@@ -967,7 +975,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         // 重置內部狀態
         this.sessionId = null;
         this.clientId = null;
-        this.role = "viewer";
+        this.role = window.SyncManager?.ROLE?.LOCAL; // 重置後回到本機模式
         this.connected = false;
 
         // 如果 WebSocket 連線存在，斷開它

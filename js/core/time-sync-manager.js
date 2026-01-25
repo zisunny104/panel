@@ -114,7 +114,7 @@ class TimeSyncManager {
       timeOffset: this.timeOffset,
       lastSyncTime: this.lastSyncTime,
       samplesCount: this.syncSamples.length,
-      samples: this.syncSamples,
+      samples: this.syncSamples
     };
   }
 
@@ -130,7 +130,7 @@ class TimeSyncManager {
     this.syncSamples.push({
       offset: offset,
       delay: 0, // WebSocket 延遲忽略不計
-      timestamp: clientTime,
+      timestamp: clientTime
     });
 
     if (this.syncSamples.length > this.maxSamples) {
@@ -140,96 +140,18 @@ class TimeSyncManager {
     // 計算平均偏差
     this.timeOffset = Math.round(
       this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
-        this.syncSamples.length,
+        this.syncSamples.length
     );
 
     this.isSynced = true;
     this.lastSyncTime = Date.now();
 
     Logger.debug(
-      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`,
+      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`
     );
   }
 
-  /**
-   * 格式化時間戳為可讀格式
-   * @param {Date|number|string} dateInput - 日期物件、時間戳或 ISO 字串
-   * @param {Object} options - 格式化選項
-   * @returns {string} 格式化後的時間字串
-   */
-  formatDateTime(dateInput, options = {}) {
-    const {
-      includeDate = true,
-      includeTime = true,
-      includeMilliseconds = false,
-      use24Hour = true,
-      separator = " ",
-    } = options;
-
-    let date;
-    if (dateInput instanceof Date) {
-      date = dateInput;
-    } else if (typeof dateInput === "number") {
-      date = new Date(dateInput);
-    } else if (typeof dateInput === "string") {
-      date = new Date(dateInput);
-    } else {
-      date = new Date();
-    }
-
-    const parts = [];
-
-    if (includeDate) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      parts.push(`${year}-${month}-${day}`);
-    }
-
-    if (includeTime) {
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      const seconds = String(date.getSeconds()).padStart(2, "0");
-      let timePart = `${hours}:${minutes}:${seconds}`;
-
-      if (includeMilliseconds) {
-        const ms = String(date.getMilliseconds()).padStart(3, "0");
-        timePart += `.${ms}`;
-      }
-
-      parts.push(timePart);
-    }
-
-    return parts.join(separator);
-  }
-
-  /**
-   * 格式化為 ISO 8601 格式
-   * @param {Date|number} dateInput - 日期物件或時間戳
-   * @returns {string} ISO 格式字串
-   */
-  formatISO(dateInput) {
-    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
-    return date.toISOString();
-  }
-
-  /**
-   * 格式化時間長度（持續時間）
-   * @param {number} milliseconds - 毫秒數
-   * @returns {string} 格式化的時間長度 (HH:MM:SS)
-   */
-  formatDuration(milliseconds) {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    return [
-      String(hours).padStart(2, "0"),
-      String(minutes).padStart(2, "0"),
-      String(seconds).padStart(2, "0"),
-    ].join(":");
-  }
+  // 由於 file 中先前含有兩組重複的簡易時間格式化實作，現已移除，並保留下方的 Intl-based 實作以統一時區、格式與行為。
 
   /**
    * 透過 WebSocket 進行一次性校時
@@ -243,7 +165,7 @@ class TimeSyncManager {
     this.syncSamples.push({
       offset: offset,
       delay: 0, // WebSocket 延遲忽略不計
-      timestamp: clientTime,
+      timestamp: clientTime
     });
 
     if (this.syncSamples.length > this.maxSamples) {
@@ -253,69 +175,16 @@ class TimeSyncManager {
     // 計算平均偏差
     this.timeOffset = Math.round(
       this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
-        this.syncSamples.length,
+        this.syncSamples.length
     );
 
     this.isSynced = true;
     this.lastSyncTime = Date.now();
 
     Logger.debug(
-      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`,
+      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`
     );
   }
-
-  /**
-   * 格式化時間戳為可讀格式
-   * @param {Date|number|string} dateInput - 日期物件、時間戳或 ISO 字串
-   * @param {Object} options - 格式化選項
-   * @returns {string} 格式化後的時間字串
-   */
-  formatDateTime(dateInput, options = {}) {
-    const {
-      includeDate = true,
-      includeTime = true,
-      includeMilliseconds = false,
-      use24Hour = true,
-      separator = " ",
-    } = options;
-
-    let date;
-    if (dateInput instanceof Date) {
-      date = dateInput;
-    } else if (typeof dateInput === "number") {
-      date = new Date(dateInput);
-    } else if (typeof dateInput === "string") {
-      date = new Date(dateInput);
-    } else {
-      date = new Date();
-    }
-
-    const parts = [];
-
-    if (includeDate) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      parts.push(`${year}-${month}-${day}`);
-    }
-
-    if (includeTime) {
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      const seconds = String(date.getSeconds()).padStart(2, "0");
-      let timePart = `${hours}:${minutes}:${seconds}`;
-
-      if (includeMilliseconds) {
-        const ms = String(date.getMilliseconds()).padStart(3, "0");
-        timePart += `.${ms}`;
-      }
-
-      parts.push(timePart);
-    }
-
-    return parts.join(separator);
-  }
-
   /**
    * 格式化為 ISO 8601 格式
    * @param {Date|number} dateInput - 日期物件或時間戳
@@ -340,7 +209,7 @@ class TimeSyncManager {
     return [
       String(hours).padStart(2, "0"),
       String(minutes).padStart(2, "0"),
-      String(seconds).padStart(2, "0"),
+      String(seconds).padStart(2, "0")
     ].join(":");
   }
 
@@ -373,7 +242,7 @@ class TimeSyncManager {
         minute: "2-digit",
         second: "2-digit",
         timeZone: this.timezone,
-        hour12: false,
+        hour12: false
       });
 
       let result = formatter.format(date).replace(/\//g, "-");

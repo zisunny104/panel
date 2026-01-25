@@ -55,10 +55,20 @@ export const SyncEvents = {
   QR_GENERATED: "sync_qr_generated",
   QR_SCANNED: "sync_qr_scanned",
 
+  // 分享代碼事件
+  SHARE_CODE_GENERATED: "sync_share_code_generated",
+  // 透過分享代碼加入的事件（帶入 shareCode）
+  SESSION_JOINED_BY_CODE: "sync_session_joined_by_code",
+
   // 錯誤事件
   SYNC_ERROR: "sync_error",
-  CONNECTION_ERROR: "sync_connection_error",
+  CONNECTION_ERROR: "sync_connection_error"
 };
+
+// 暴露至全域以供非 module 腳本使用（例如直接載入的 panel 腳本）
+if (typeof window !== "undefined") {
+  window.SyncEvents = SyncEvents;
+}
 
 /**
  * 取得事件名稱（用於動態事件分發）
@@ -80,5 +90,3 @@ export function isSyncEvent(eventName) {
 export function getAllSyncEvents() {
   return Object.values(SyncEvents);
 }
-
-export default SyncEvents;

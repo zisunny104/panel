@@ -180,7 +180,7 @@ body.visual-hints-enabled #powerSwitchArea.next-step-highlight {
     border: 2px solid #28a745;
 }
 
-/* 按鈕暫時停用狀態（step 完成時的冷卻期間） */
+/* 按鈕停用狀態（step 完成時的冷卻期間） */
 .button-overlay.temporarily-disabled {
     cursor: not-allowed;
     pointer-events: none;

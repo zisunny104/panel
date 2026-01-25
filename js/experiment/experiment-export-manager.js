@@ -17,10 +17,10 @@ class ExperimentExportManager {
       experiment_metadata: {
         total_duration_ms: this.calculateTotalDuration(),
         gesture_count: this.app.currentCombination?.gestures?.length || 0,
-        action_count: this.app.currentActionSequence?.length || 0,
+        action_count: this.app.currentActionSequence?.length || 0
       },
       gesture_statistics: this.generateGestureStatistics(),
-      action_statistics: this.generateActionStatistics(),
+      action_statistics: this.generateActionStatistics()
     };
   }
 
@@ -30,7 +30,7 @@ class ExperimentExportManager {
   getStartTime() {
     if (window.logger?.logEntries?.length > 0) {
       const startEntry = window.logger.logEntries.find(
-        (entry) => entry.action_type === "experiment_started",
+        (entry) => entry.action_type === "experiment_started"
       );
       if (startEntry) {
         return startEntry.timestamp;
@@ -46,7 +46,7 @@ class ExperimentExportManager {
     if (!window.logger?.logEntries || window.logger.logEntries.length < 2)
       return 0;
     const startEntry = window.logger.logEntries.find(
-      (entry) => entry.action_type === "experiment_started",
+      (entry) => entry.action_type === "experiment_started"
     );
     const endEntry = [...window.logger.logEntries]
       .reverse()
@@ -71,7 +71,7 @@ class ExperimentExportManager {
       Object.keys(this.app.gestureStats).length > 0
     ) {
       for (const [gestureName, stats] of Object.entries(
-        this.app.gestureStats,
+        this.app.gestureStats
       )) {
         const total = stats.planned || 0;
         const correct = stats.correct || 0;
@@ -92,7 +92,7 @@ class ExperimentExportManager {
           concordance_rate:
             total > 0
               ? (((correct + uncertain) / total) * 100).toFixed(2) + "%"
-              : "0%",
+              : "0%"
         };
       }
     }
@@ -116,12 +116,12 @@ class ExperimentExportManager {
             if (!actionStats[actionId]) {
               actionStats[actionId] = {
                 times: [],
-                count: 0,
+                count: 0
               };
             }
             actionStats[actionId].times.push({
               timestamp: entry.timestamp,
-              duration: entry.additional_data.duration || null,
+              duration: entry.additional_data.duration || null
             });
             actionStats[actionId].count++;
           }
@@ -172,7 +172,7 @@ class ExperimentExportManager {
         <h3 style="margin: 0 0 5px 0; color: #333; font-size: 14px;">實驗統計</h3>
         <div style="color: #666; font-size: 12px;">
           <div>花費時間: <strong>${this.formatDurationSimple(
-            data.experiment_metadata.total_duration_ms,
+            data.experiment_metadata.total_duration_ms
           )}</strong></div>
           <div>手勢總數: <strong>${
             data.experiment_metadata.gesture_count
@@ -192,7 +192,7 @@ class ExperimentExportManager {
       `;
 
       for (const [gestureName, stats] of Object.entries(
-        data.gesture_statistics,
+        data.gesture_statistics
       )) {
         const accuracyNum = parseFloat(stats.accuracy_rate);
         const accuracyColor =
@@ -220,7 +220,7 @@ class ExperimentExportManager {
         `;
       }
 
-      html += `</div>`;
+      html += "</div>";
     }
 
     // Action 統計
@@ -247,7 +247,7 @@ class ExperimentExportManager {
         `;
       }
 
-      html += `</div>`;
+      html += "</div>";
     }
 
     statsPanel.innerHTML = html;
@@ -266,7 +266,7 @@ class ExperimentExportManager {
     const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
       2,
-      "0",
+      "0"
     )}`;
   }
 }

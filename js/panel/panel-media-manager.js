@@ -81,7 +81,7 @@ class MediaManager {
     } else {
       Logger.error(`不支援的媒體格式: ${src}`);
       this.mediaArea.innerHTML =
-        '<div class="media-error-message">不支援的媒體格式</div>';
+        "<div class=\"media-error-message\">不支援的媒體格式</div>";
       return null;
     }
 
@@ -165,7 +165,7 @@ class MediaManager {
 
     // 儲存原始路徑供錯誤處理使用
     const originalSrc = src;
-    const resolvedSrc = finalSrc;
+    const _resolvedSrc = finalSrc;
 
     video.addEventListener("error", (e) => {
       // 檢查是否為真正的載入錯誤（排除空 src 或被清除的情況）
@@ -349,7 +349,7 @@ class MediaManager {
                                     <span class="media-load-error-file">
                                         檔案: assets/units/SYSTEM/home_page.mp4<br>
                                         ${
-                                          errorInfo.onlineStatus === "離線"
+                                          errorInfo.onlineStatus === "已離線"
                                             ? "裝置離線"
                                             : ""
                                         }
@@ -359,7 +359,7 @@ class MediaManager {
                         `;
           }
         }
-      },
+      }
     });
 
     if (video) {
@@ -379,7 +379,7 @@ class MediaManager {
       muted: true,
       autoplay: true,
       loop: false,
-      scrollIntoView: true,
+      scrollIntoView: true
     });
 
     return mediaElement;
@@ -449,7 +449,7 @@ class MediaManager {
       element.remove();
     });
 
-    Logger.debug(`已清除預先載入的媒體`);
+    Logger.debug("已清除預先載入的媒體");
   }
 
   // 顯示媒體（實驗模式用的別名方法）
@@ -499,7 +499,7 @@ class MediaManager {
     const timestamp = window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(Date.now())
       : new Date().toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei"
         });
 
     const errorInfo = {
@@ -507,9 +507,9 @@ class MediaManager {
       originalSrc: originalSrc,
       currentSrc: mediaElement.src,
       mediaType: mediaElement.tagName.toLowerCase(),
-      onlineStatus: navigator.onLine ? "線上" : "離線",
+      onlineStatus: navigator.onLine ? "線上" : "已離線",
       errorCode: null,
-      errorMessage: "載入失敗",
+      errorMessage: "載入失敗"
     };
 
     // 取得具體錯誤代碼
@@ -539,7 +539,7 @@ class MediaManager {
       1: "載入被中止",
       2: "網路錯誤",
       3: "解碼錯誤",
-      4: "不支援的檔案格式",
+      4: "不支援的檔案格式"
     };
     return errors[errorCode] || "載入失敗";
   }
@@ -795,9 +795,8 @@ class MediaManager {
 
     try {
       // 收集目前組合的媒體檔案
-      const combinationFiles = await this.collectCombinationMediaFiles(
-        currentCombination
-      );
+      const combinationFiles =
+        await this.collectCombinationMediaFiles(currentCombination);
 
       if (combinationFiles.length === 0) {
         Logger.debug("目前組合沒有需要預先載入的媒體檔案");
@@ -1129,7 +1128,7 @@ class MediaManager {
       cachedCount: this.mediaCache.size,
       preloadingCount: this.preloadPromises.size,
       isPreloading: this.isPreloading,
-      cachedFiles: Array.from(this.mediaCache.keys()),
+      cachedFiles: Array.from(this.mediaCache.keys())
     };
   }
 

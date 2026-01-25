@@ -29,6 +29,33 @@ export const SERVER_CONFIG = {
       10,
     ),
     heartbeatTimeout: parseInt(process.env.WS_HEARTBEAT_TIMEOUT || "60000", 10),
+    // Rate limiting for incoming messages (tokens)
+    // 說明：每個連線有獨立 token bucket，用以限制單一連線的速率
+    // - capacity：突發可用 token 數
+    // - refillPerSec：每秒補回的 token 數（長期平均速率）
+    // - violationThreshold：違規次數達此值則會關閉該連線
+    rateLimit: {
+      // 預設值（已微調為較保守設定，適合 100~300 連線常態）：
+      // - capacity: 突發容錯（短時間 burst 容許的最大 token），
+      // - refillPerSec: 長期平均速率（每秒補回 token），
+      // - violationThreshold: 違規次數達此值則關閉該連線
+      capacity: parseInt(process.env.WS_RATE_LIMIT_CAPACITY || "20", 10),
+      refillPerSec: parseInt(
+        process.env.WS_RATE_LIMIT_REFILL_PER_SEC || "10",
+        10,
+      ),
+      violationThreshold: parseInt(
+        process.env.WS_RATE_LIMIT_VIOLATION_THRESHOLD || "5",
+        10,
+      ),
+    },
+    // Interval for low-frequency session validation (ms)
+    // 說明：較高成本的 session 驗證（例如查 DB 是否仍有效）應以此排程處理，
+    // 避免心跳時直接查 DB 導致高頻 I/O。
+    sessionValidationInterval: parseInt(
+      process.env.WS_SESSION_VALIDATION_INTERVAL || "300000",
+      10,
+    ),
   },
 
   // 工作階段設定

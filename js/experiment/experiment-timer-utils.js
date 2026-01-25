@@ -40,7 +40,7 @@ window.toggleTimer = function (idx) {
   const state = window.timerStates[idx] || {
     running: false,
     startTime: 0,
-    elapsedTime: 0,
+    elapsedTime: 0
   };
 
   const card = document.getElementById(`timer-card-${idx}`);
@@ -139,7 +139,7 @@ window.resetTimer = function (idx) {
     running: false,
     startTime: 0,
     elapsedTime: 0,
-    justReset: true,
+    justReset: true
   };
 
   const display = document.getElementById(`timer-display-${idx}`);

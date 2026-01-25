@@ -11,6 +11,9 @@ import { SHARE_CODE_CONSTANTS } from "../config/constants.js";
 import Logger from "../utils/logger.js";
 import { query, execute } from "../database/connection.js";
 
+// 本檔使用的角色常數，避免在多處硬編碼
+const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
+
 const router = express.Router();
 
 /**
@@ -36,7 +39,7 @@ router.post("/session", (req, res) => {
       data: {
         sessionId: session.sessionId,
         clientId: session.clientId,
-        role: "operator", // 建立者預設為操作者
+        role: ROLE.OPERATOR, // 建立者預設為操作者
         created_at: session.created_at,
       },
     });
@@ -111,7 +114,7 @@ router.post("/generate_share_code", (req, res) => {
     const codeData = ShareCodeService.generateCode(sessionId, clientId);
 
     // 組裝完整分享 URL
-    const shareUrl = `${req.baseUrl}/index.html?shareCode=${encodeURIComponent(codeData.share_code)}&role=viewer`;
+    const shareUrl = `${req.baseUrl}/index.html?shareCode=${encodeURIComponent(codeData.share_code)}&role=${ROLE.VIEWER}`;
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
@@ -191,14 +194,14 @@ router.post("/join", (req, res) => {
     SessionService.updateLastActive(validation.session_id);
 
     console.log(
-      `[Join] 加入成功 - 工作階段ID: ${validation.session_id}, 角色: ${role || "viewer"}`,
+      `[Join] 加入成功 - 工作階段ID: ${validation.session_id}, 角色: ${role || ROLE.VIEWER}`,
     );
     res.status(HTTP_STATUS.OK).json({
       success: true,
       data: {
         sessionId: validation.session_id,
         clientId: finalClientId,
-        role: role || "viewer",
+        role: role || ROLE.VIEWER,
       },
     });
   } catch (error) {

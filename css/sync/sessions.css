@@ -1,14 +1,14 @@
 /**
- * 同步工作階段管理樣式
- * 包含工作階段列表、批次操作、狀態顯示等相關樣式
+ * Sync - Sessions 管理樣式
+ * 說明：作為工作階段列表與批次操作的樣式集合
  */
 
 .sync-sessions-actions {
     display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
     align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
     flex-shrink: 0;
 }
 
@@ -16,12 +16,12 @@
     background: #007bff;
     color: white;
     border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
     font-size: 14px;
     font-weight: 500;
+    padding: 10px 16px;
     min-width: 120px;
+    border-radius: 6px;
+    cursor: pointer;
     transition: all 0.2s ease;
 }
 
@@ -53,21 +53,23 @@
 
 /* 批次操作區域 */
 .sync-sessions-batch-actions {
-    margin-bottom: 20px;
-    padding: 16px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
     display: flex;
     flex-direction: column;
     gap: 16px;
+
+    padding: 16px;
+    margin-bottom: 20px;
+
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
 }
 
 .sync-batch-controls {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 16px;
-    flex-wrap: wrap;
 }
 
 .sync-batch-checkbox {
@@ -96,13 +98,13 @@
     background: #6c757d;
     color: white;
     border: none;
-    padding: 8px 12px;
-    border-radius: 6px;
-    cursor: pointer;
     font-size: 14px;
     font-weight: 500;
-    transition: all 0.2s ease;
+    padding: 8px 12px;
     min-width: 120px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
 .sync-batch-select-btn:hover {

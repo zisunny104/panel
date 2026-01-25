@@ -36,7 +36,7 @@ class PanelExperimentLog {
       experiment_id: experimentId,
       subject_name: this.subjectName,
       combination: combinationName,
-      device: "panel",
+      device: "panel"
     });
 
     // console.log(
@@ -70,7 +70,7 @@ class PanelExperimentLog {
       button_id: buttonId,
       function_name: functionName,
       action_index: actionIndex,
-      total_actions: totalActions,
+      total_actions: totalActions
     });
   }
 
@@ -87,7 +87,7 @@ class PanelExperimentLog {
       type: "step_change",
       unit_id: unitId,
       step_index: stepIndex,
-      step_id: stepId,
+      step_id: stepId
     });
   }
 
@@ -104,7 +104,7 @@ class PanelExperimentLog {
       type: "unit_change",
       unit_id: unitId,
       unit_index: unitIndex,
-      total_units: totalUnits,
+      total_units: totalUnits
     });
   }
 
@@ -122,7 +122,7 @@ class PanelExperimentLog {
       type: "button_click",
       button_id: buttonId,
       function_name: functionName,
-      is_correct: isCorrect,
+      is_correct: isCorrect
     };
 
     if (!isCorrect && expectedButton) {
@@ -143,7 +143,7 @@ class PanelExperimentLog {
     this._addLog({
       type: "power_change",
       is_power_on: isPowerOn,
-      reason: reason,
+      reason: reason
     });
   }
 
@@ -154,7 +154,7 @@ class PanelExperimentLog {
     if (!this.isRecording) return;
 
     this._addLog({
-      type: "experiment_pause",
+      type: "experiment_pause"
     });
   }
 
@@ -165,7 +165,7 @@ class PanelExperimentLog {
     if (!this.isRecording) return;
 
     this._addLog({
-      type: "experiment_resume",
+      type: "experiment_resume"
     });
   }
 
@@ -180,13 +180,13 @@ class PanelExperimentLog {
     this.syncDevices.set(deviceId, {
       connected: true,
       experimentCompleted: false,
-      type: deviceType,
+      type: deviceType
     });
 
     this._addLog({
       type: "sync_device_connected",
       device_id: deviceId,
-      device_type: deviceType,
+      device_type: deviceType
     });
   }
 
@@ -203,7 +203,7 @@ class PanelExperimentLog {
 
     this._addLog({
       type: "sync_device_disconnected",
-      device_id: deviceId,
+      device_id: deviceId
     });
   }
 
@@ -239,7 +239,7 @@ class PanelExperimentLog {
       experiment_id: this.startExperimentId,
       total_elapsed_seconds: totalElapsedSeconds,
       is_auto_stop: isAutoStop,
-      total_logs: this.logs.length,
+      total_logs: this.logs.length
     });
 
     this.isRecording = false;
@@ -319,7 +319,7 @@ class PanelExperimentLog {
   _addLog(entry) {
     const logEntry = {
       ts: Date.now(),
-      ...entry,
+      ...entry
     };
     this.logs.push(logEntry);
   }
@@ -371,7 +371,7 @@ class PanelExperimentLog {
       return true;
     }
 
-    for (const [deviceId, status] of this.syncDevices) {
+    for (const [_deviceId, status] of this.syncDevices) {
       // 只檢查還連線著的裝置
       if (status.connected && !status.experimentCompleted) {
         return false;
@@ -393,8 +393,8 @@ class PanelExperimentLog {
       document.dispatchEvent(
         new CustomEvent("panelExperimentLog:allDevicesCompleted", {
           detail: {
-            experimentId: this.startExperimentId,
-          },
+            experimentId: this.startExperimentId
+          }
         })
       );
     }

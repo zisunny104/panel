@@ -7,17 +7,46 @@ class PanelManager {
       settings: {
         element: null,
         button: null,
-        closeButton: null,
+        closeButton: null
       },
       experiment: {
         element: null,
         button: null,
-        closeButton: null,
-      },
+        closeButton: null
+      }
     };
 
     this.initializePanels();
     this.setupEventListeners();
+
+    // reposition settings panel on resize to keep it aligned with the toggle button
+    window.addEventListener("resize", () => {
+      if (this.currentOpenPanel === "settings")
+        this.alignPanelToButton("settings");
+    });
+  }
+
+  // Align a panel (settings) vertically to its toggle button to avoid misplacement when scale/zoom changes
+  alignPanelToButton(panelName) {
+    const panel = this.panels[panelName];
+    if (!panel || !panel.element || !panel.button) return;
+
+    try {
+      const btnRect = panel.button.getBoundingClientRect();
+      // compute bottom in px so panel bottom aligns to the button's bottom + small offset
+      const offset = 8; // px
+      let bottomPx = Math.max(
+        8,
+        Math.round(window.innerHeight - btnRect.bottom + offset)
+      );
+      panel.element.style.bottom = `${bottomPx}px`;
+      // keep right offset as defined in CSS; if button moves horizontally due to scale, optionally align right
+      // const rightPx = Math.round(window.innerWidth - btnRect.right + offset);
+      // panel.element.style.right = `${rightPx}px`;
+    } catch (e) {
+      // if anything goes wrong, gracefully ignore and leave CSS defaults
+      Logger && Logger.warn && Logger.warn("alignPanelToButton failed:", e);
+    }
   }
 
   // 初始化面板引用
@@ -144,7 +173,9 @@ class PanelManager {
         panel.element.classList.remove("hidden");
       }
       panel.element.style.display = "block";
-    } else if (panelName === "experiment") {
+      // align to the settings toggle button to prevent vertical misplacement when UI scale changes
+      this.alignPanelToButton("settings");
+    } else if (panelName === window.SyncManager?.PAGE?.EXPERIMENT) {
       panel.element.style.display = "block";
     }
 
@@ -152,7 +183,7 @@ class PanelManager {
 
     // 只記錄設定面板的操作，實驗面板不記錄
     if (window.logger && panelName === "settings") {
-      window.logger.logAction(`開啟設定面板`);
+      window.logger.logAction("開啟設定面板");
     }
   }
 
@@ -167,7 +198,7 @@ class PanelManager {
     if (panelName === "settings") {
       panel.element.classList.add("hidden");
       panel.element.style.display = "none";
-    } else if (panelName === "experiment") {
+    } else if (panelName === window.SyncManager?.PAGE?.EXPERIMENT) {
       panel.element.style.display = "none";
     }
 
@@ -178,7 +209,7 @@ class PanelManager {
 
     // 只記錄設定面板的操作，實驗面板不記錄
     if (window.logger && panelName === "settings") {
-      window.logger.logAction(`關閉設定面板`);
+      window.logger.logAction("關閉設定面板");
     }
   }
 

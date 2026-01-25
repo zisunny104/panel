@@ -24,8 +24,8 @@ class ConfigManager {
       const response = await fetch("./data/config.json", {
         headers: {
           Accept: "application/json",
-          "Cache-Control": "no-cache",
-        },
+          "Cache-Control": "no-cache"
+        }
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -61,12 +61,31 @@ class ConfigManager {
       this.configData = {
         version: "1.1.dev",
         author: "開發版本",
-        description: "虛擬操作面板",
+        description: "虛擬操作面板"
       };
       // 仍然嘗試載入版本資訊
       if (window.Logger) {
         this.loadVersionInfo();
       }
+    }
+  }
+
+  /**
+   * 重設使用者設定到預設值（會清除 localStorage 的 userSettings）
+   */
+  async resetUserSettingsToDefaults() {
+    // silently reset to defaults without additional browser confirmation
+    try {
+      localStorage.removeItem("userSettings");
+      this.userSettings = { ...this.defaultSettings };
+      await this.applySettings(this.userSettings);
+      // 一旦應用到 DOM，上面的 saveUserSettings() 監聽器會儲存新的值
+      this.saveUserSettings();
+      if (window.Logger) Logger.info("使用者設定已還原為預設值");
+      // 通知 UI
+      document.dispatchEvent(new CustomEvent("userSettingsReset", {}));
+    } catch (e) {
+      Logger.error("重設設定失敗:", e);
     }
   }
 
@@ -84,12 +103,18 @@ class ConfigManager {
 
     // 取得所有相關 DOM 元素
     const scaleRange = document.getElementById("scaleRange");
-    const scaleValueSpan = document.getElementById("scaleValueSpan");
     const scaleNumberInput = document.getElementById("scaleNumberInput");
     const topSpacerRange = document.getElementById("topSpacerRange");
-    const topSpacerValueSpan = document.getElementById("topSpacerValueSpan");
     const topSpacerNumberInput = document.getElementById(
       "topSpacerNumberInput"
+    );
+    const bottomSpacerRange = document.getElementById("bottomSpacerRange");
+    const bottomSpacerNumberInput = document.getElementById(
+      "bottomSpacerNumberInput"
+    );
+    const powerScaleRange = document.getElementById("powerScaleRange");
+    const powerScaleNumberInput = document.getElementById(
+      "powerScaleNumberInput"
     );
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
@@ -103,7 +128,6 @@ class ConfigManager {
     // 主縮放設定
     if (settings.mainScale !== undefined && scaleRange) {
       scaleRange.value = settings.mainScale;
-      if (scaleValueSpan) scaleValueSpan.textContent = settings.mainScale;
       if (scaleNumberInput) scaleNumberInput.value = settings.mainScale;
       // 套用縮放
       if (window.uiControls) {
@@ -113,13 +137,31 @@ class ConfigManager {
     // 上方間距設定
     if (settings.topSpacerHeight !== undefined && topSpacerRange) {
       topSpacerRange.value = settings.topSpacerHeight;
-      if (topSpacerValueSpan)
-        topSpacerValueSpan.textContent = settings.topSpacerHeight;
       if (topSpacerNumberInput)
         topSpacerNumberInput.value = settings.topSpacerHeight;
       // 套用頂部間距
       if (window.uiControls) {
         window.uiControls.updateTopSpacer(settings.topSpacerHeight);
+      }
+    }
+
+    // 底部間距設定
+    if (settings.bottomSpacerHeight !== undefined && bottomSpacerRange) {
+      bottomSpacerRange.value = settings.bottomSpacerHeight;
+      if (bottomSpacerNumberInput)
+        bottomSpacerNumberInput.value = settings.bottomSpacerHeight;
+      if (window.uiControls) {
+        window.uiControls.updateBottomSpacer(settings.bottomSpacerHeight);
+      }
+    }
+
+    // 電源按鈕縮放
+    if (settings.powerSwitchScale !== undefined && powerScaleRange) {
+      powerScaleRange.value = settings.powerSwitchScale;
+      if (powerScaleNumberInput)
+        powerScaleNumberInput.value = settings.powerSwitchScale;
+      if (window.uiControls) {
+        window.uiControls.updatePowerScale(settings.powerSwitchScale);
       }
     }
     // 按鈕標籤顯示
@@ -148,6 +190,8 @@ class ConfigManager {
   saveUserSettings() {
     const scaleRange = document.getElementById("scaleRange");
     const topSpacerRange = document.getElementById("topSpacerRange");
+    const bottomSpacerRange = document.getElementById("bottomSpacerRange");
+    const powerScaleRange = document.getElementById("powerScaleRange");
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
@@ -160,6 +204,10 @@ class ConfigManager {
     this.userSettings = {
       mainScale: scaleRange ? Number(scaleRange.value) : 1.29,
       topSpacerHeight: topSpacerRange ? Number(topSpacerRange.value) : 5,
+      bottomSpacerHeight: bottomSpacerRange
+        ? Number(bottomSpacerRange.value)
+        : 3,
+      powerSwitchScale: powerScaleRange ? Number(powerScaleRange.value) : 0.9,
       showButtonLabels: toggleButtonLabels ? toggleButtonLabels.checked : true,
       showButtonColors: toggleButtonColors ? toggleButtonColors.checked : true,
       showTouchVisuals: toggleTouchVisuals ? toggleTouchVisuals.checked : true,
@@ -167,7 +215,7 @@ class ConfigManager {
         ? toggleMediaAreaMarker.checked
         : true,
       showMediaContent: toggleMediaContent ? toggleMediaContent.checked : true,
-      playBeepSound: toggleBeepSound ? toggleBeepSound.checked : true,
+      playBeepSound: toggleBeepSound ? toggleBeepSound.checked : true
     };
     localStorage.setItem("userSettings", JSON.stringify(this.userSettings));
   }
@@ -197,11 +245,15 @@ class ConfigManager {
       scaleNumberInput,
       topSpacerRange,
       topSpacerNumberInput,
+      bottomSpacerRange,
+      bottomSpacerNumberInput,
+      powerScaleRange,
+      powerScaleNumberInput,
       toggleButtonLabels,
       toggleButtonColors,
       toggleTouchVisuals,
       toggleMediaAreaMarker,
-      toggleMediaContent,
+      toggleMediaContent
     ].forEach((el) => {
       if (el) el.addEventListener("input", () => this.saveUserSettings());
     });
@@ -221,7 +273,7 @@ class ConfigManager {
       Logger.debug("載入版本資訊:", {
         element: !!versionElement,
         version: this.configData.version,
-        configData: this.configData,
+        configData: this.configData
       });
     }
 
@@ -309,7 +361,7 @@ class ConfigManager {
       return {
         oldVersion: currentVersion,
         newVersion: newVersion,
-        updateTime: updateTime,
+        updateTime: updateTime
       };
     } catch (error) {
       Logger.error("版本更新失敗:", error);
@@ -326,7 +378,7 @@ class ConfigManager {
       author: this.configData.author,
       created_at: this.configData.created_at,
       updated_at: this.configData.updated_at,
-      description: this.configData.description,
+      description: this.configData.description
     };
   }
 }

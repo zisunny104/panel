@@ -11,7 +11,7 @@ class ExperimentSyncManager {
       running: false,
       paused: false,
       startTime: null,
-      actions: [],
+      actions: []
     };
     this.initialize();
   }
@@ -35,12 +35,12 @@ class ExperimentSyncManager {
    */
   initialize() {
     // 監聽同步連線狀態
-    window.addEventListener("sync_session_joined", () => {
+    window.addEventListener(window.SyncEvents.SESSION_JOINED, () => {
       this.isConnected = true;
     });
 
     // 監聽來自其他裝置的實驗狀態變化
-    window.addEventListener("sync_state_update", (event) => {
+    window.addEventListener(window.SyncEvents.STATE_UPDATE, (event) => {
       const state = event.detail;
       if (state?.type === "request_experiment_state") {
         this.handleExperimentStateRequest(state);
@@ -136,13 +136,13 @@ class ExperimentSyncManager {
         gesture_count:
           details?.gestureCount || details?.gestureSequence?.length || 0,
         timestamp: new Date().toISOString(),
-        state: { running: true, paused: false },
+        state: { running: true, paused: false }
       };
 
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗開始失敗: ${error.message}，但本機實驗繼續進行`,
+        `[ExperimentSyncManager] 廣播實驗開始失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -160,13 +160,13 @@ class ExperimentSyncManager {
         event: "experiment_paused",
         device_id: this.deviceId,
         timestamp: new Date().toISOString(),
-        state: { running: true, paused: true },
+        state: { running: true, paused: true }
       };
 
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗暫停失敗: ${error.message}，但本機實驗繼續進行`,
+        `[ExperimentSyncManager] 廣播實驗暫停失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -184,13 +184,13 @@ class ExperimentSyncManager {
         event: "experiment_resumed",
         device_id: this.deviceId,
         timestamp: new Date().toISOString(),
-        state: { running: true, paused: false },
+        state: { running: true, paused: false }
       };
 
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗還原失敗: ${error.message}，但本機實驗繼續進行`,
+        `[ExperimentSyncManager] 廣播實驗還原失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -207,7 +207,7 @@ class ExperimentSyncManager {
       event: "experiment_stopped",
       device_id: this.deviceId,
       timestamp: new Date().toISOString(),
-      state: { running: false, paused: false },
+      state: { running: false, paused: false }
     };
 
     await this.syncState(syncData);
@@ -225,7 +225,7 @@ class ExperimentSyncManager {
       unit_id: actionData?.unit_id,
       button_pressed: actionData?.button_pressed,
       timestamp: new Date().toISOString(),
-      details: actionData,
+      details: actionData
     };
 
     await this.syncState(syncData);
@@ -246,7 +246,7 @@ class ExperimentSyncManager {
       button_id: buttonData?.buttonData?.button,
       function: buttonData?.buttonData?.function,
       button_function: buttonData?.buttonData?.function,
-      timestamp: buttonData?.timestamp || new Date().toISOString(),
+      timestamp: buttonData?.timestamp || new Date().toISOString()
     };
 
     await this.syncState(syncData);
@@ -319,7 +319,7 @@ class ExperimentSyncManager {
         gestureCount: gestures.length,
         gesture_count: gestures.length,
         device_id: this.deviceId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       });
     }
   }
@@ -343,9 +343,9 @@ class ExperimentSyncManager {
           gestures: syncData.gesture_sequence || syncData.gestures,
           unit_count: syncData.unit_count,
           gesture_count: syncData.gesture_count,
-          timestamp: syncData.timestamp,
-        },
-      }),
+          timestamp: syncData.timestamp
+        }
+      })
     );
   }
 
@@ -364,7 +364,7 @@ class ExperimentSyncManager {
       experiment_started: "remote_experiment_started",
       experiment_paused: "remote_experiment_paused",
       experiment_resumed: "remote_experiment_resumed",
-      experiment_stopped: "remote_experiment_stopped",
+      experiment_stopped: "remote_experiment_stopped"
     };
 
     const eventName = eventMap[syncData.event];
@@ -388,9 +388,9 @@ class ExperimentSyncManager {
             gestureCount: syncData.gesture_count,
             gesture_count: syncData.gesture_count,
             state: syncData.state,
-            timestamp: syncData.timestamp,
-          },
-        }),
+            timestamp: syncData.timestamp
+          }
+        })
       );
     }
   }
@@ -408,7 +408,7 @@ class ExperimentSyncManager {
       experimentId: syncData.experiment_id,
       experiment_id: syncData.experiment_id,
       remote_device_id: syncData.device_id,
-      timestamp: syncData.timestamp,
+      timestamp: syncData.timestamp
     };
 
     // 調用面板管理器的處理函數
@@ -437,19 +437,19 @@ class ExperimentSyncManager {
   handleRemoteExperimentIdChange(syncData) {
     if (syncData.device_id === this.deviceId) {
       Logger.debug(
-        `[ExperimentSyncManager] 略過自己的實驗ID更新: ${syncData.device_id}`,
+        `[ExperimentSyncManager] 略過自己的實驗ID更新: ${syncData.device_id}`
       );
       return;
     }
 
-    Logger.debug(`[ExperimentSyncManager] 收到遠端實驗ID更新:`, syncData);
+    Logger.debug("[ExperimentSyncManager] 收到遠端實驗ID更新:", syncData);
 
     // 直接調用對應管理器的處理函數，避免重複事件
     const data = {
       experimentId: syncData.experiment_id,
       experiment_id: syncData.experiment_id,
       remote_device_id: syncData.device_id,
-      timestamp: syncData.timestamp,
+      timestamp: syncData.timestamp
     };
 
     // 調用面板管理器的處理函數
@@ -459,7 +459,7 @@ class ExperimentSyncManager {
         "function"
     ) {
       Logger.debug(
-        `[ExperimentSyncManager] 路由到 panelExperiment.handleRemoteExperimentIdUpdate`,
+        "[ExperimentSyncManager] 路由到 panelExperiment.handleRemoteExperimentIdUpdate"
       );
       window.panelExperiment.handleRemoteExperimentIdUpdate(data);
     }
@@ -470,7 +470,7 @@ class ExperimentSyncManager {
       typeof window.app.handleRemoteExperimentIdUpdate === "function"
     ) {
       Logger.debug(
-        `[ExperimentSyncManager] 路由到 app.handleRemoteExperimentIdUpdate`,
+        "[ExperimentSyncManager] 路由到 app.handleRemoteExperimentIdUpdate"
       );
       window.app.handleRemoteExperimentIdUpdate(data);
     }
@@ -482,12 +482,12 @@ class ExperimentSyncManager {
   handleRemoteCombinationSelected(syncData) {
     if (syncData.device_id === this.deviceId) {
       Logger.debug(
-        `[ExperimentSyncManager] 略過自己的組合選擇: ${syncData.device_id}`,
+        `[ExperimentSyncManager] 略過自己的組合選擇: ${syncData.device_id}`
       );
       return;
     }
 
-    Logger.debug(`[ExperimentSyncManager] 收到遠端組合選擇:`, syncData);
+    Logger.debug("[ExperimentSyncManager] 收到遠端組合選擇:", syncData);
 
     // 分派事件供各管理器處理
     window.dispatchEvent(
@@ -495,9 +495,9 @@ class ExperimentSyncManager {
         detail: {
           combination: syncData.combination,
           device_id: syncData.device_id,
-          timestamp: syncData.timestamp,
-        },
-      }),
+          timestamp: syncData.timestamp
+        }
+      })
     );
 
     // 調用面板管理器的處理函數
@@ -507,12 +507,12 @@ class ExperimentSyncManager {
         "function"
     ) {
       Logger.debug(
-        `[ExperimentSyncManager] 路由到 panelExperiment.handleRemoteCombinationSelected`,
+        "[ExperimentSyncManager] 路由到 panelExperiment.handleRemoteCombinationSelected"
       );
       window.panelExperiment.handleRemoteCombinationSelected({
         combination: syncData.combination,
         device_id: syncData.device_id,
-        timestamp: syncData.timestamp,
+        timestamp: syncData.timestamp
       });
     }
 
@@ -523,10 +523,10 @@ class ExperimentSyncManager {
         "function"
     ) {
       Logger.debug(
-        `[ExperimentSyncManager] 路由到 combinationSelector.handleRemoteCombinationSelected`,
+        "[ExperimentSyncManager] 路由到 combinationSelector.handleRemoteCombinationSelected"
       );
       window.combinationSelector.handleRemoteCombinationSelected(
-        syncData.combination,
+        syncData.combination
       );
     }
   }
@@ -547,9 +547,9 @@ class ExperimentSyncManager {
           button_id: syncData.button,
           function: syncData.function,
           button_function: syncData.function,
-          timestamp: syncData.timestamp,
-        },
-      }),
+          timestamp: syncData.timestamp
+        }
+      })
     );
   }
 
@@ -568,9 +568,9 @@ class ExperimentSyncManager {
           unit_id: syncData.unit_id,
           button_pressed: syncData.button_pressed,
           timestamp: syncData.timestamp,
-          details: syncData.details,
-        },
-      }),
+          details: syncData.details
+        }
+      })
     );
   }
 
@@ -581,7 +581,7 @@ class ExperimentSyncManager {
     if (syncData.device_id === this.deviceId) return;
 
     const buttons = document.querySelectorAll(
-      `.action-button[data-action-id="${syncData.action_id}"][data-gesture-index="${syncData.gesture_index}"]`,
+      `.action-button[data-action-id="${syncData.action_id}"][data-gesture-index="${syncData.gesture_index}"]`
     );
 
     buttons.forEach((button) => {
@@ -590,7 +590,7 @@ class ExperimentSyncManager {
           button,
           syncData.action_id,
           syncData.gesture_index,
-          true,
+          true
         );
       }
     });
@@ -603,7 +603,7 @@ class ExperimentSyncManager {
     if (syncData.device_id === this.deviceId) return;
 
     const buttons = document.querySelectorAll(
-      `.action-button[data-action-id="${syncData.action_id}"][data-gesture-index="${syncData.gesture_index}"]`,
+      `.action-button[data-action-id="${syncData.action_id}"][data-gesture-index="${syncData.gesture_index}"]`
     );
 
     buttons.forEach((button) => {
@@ -627,9 +627,9 @@ class ExperimentSyncManager {
           step_index: syncData.step_index,
           gesture_name: syncData.gesture_name,
           timer_value: syncData.timer_value,
-          timestamp: syncData.timestamp,
-        },
-      }),
+          timestamp: syncData.timestamp
+        }
+      })
     );
   }
 
@@ -640,7 +640,7 @@ class ExperimentSyncManager {
     return {
       connected: this.isConnected,
       deviceId: this.deviceId,
-      experimentState: this.experimentState,
+      experimentState: this.experimentState
     };
   }
 }

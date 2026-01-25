@@ -28,6 +28,7 @@ import { MessageHandler } from "./websocket/MessageHandler.js";
 
 // 匯入日誌工具
 import { Logger } from "./utils/logger.js";
+import { metrics } from "./metrics.js";
 
 // ES module 中取得目前檔案路徑
 const __filename = fileURLToPath(import.meta.url);
@@ -59,7 +60,7 @@ app.use((req, res, next) => {
 
 // 請求日誌
 app.use((req, res, next) => {
-  // 過濾掉 HEAD 請求（心跳檢測），減少日誌噪音
+  // 過濾掉 HEAD 請求（心跳檢測），減少日誌雜訊
   if (req.method !== "HEAD") {
     Logger.http(req.method, req.path);
   }
@@ -109,24 +110,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// 404處理
-app.use((req, res) => {
-  res.status(404).json({
-    error: "NOT_FOUND",
-    message: `路徑不存在: ${req.path}`,
-  });
-});
-
-// 錯誤處理
-app.use((err, req, res, next) => {
-  console.error("伺服器錯誤:", err);
-  res.status(500).json({
-    error: "INTERNAL_ERROR",
-    message: "伺服器內部錯誤",
-    details: SERVER_CONFIG.nodeEnv === "development" ? err.message : undefined,
-  });
-});
-
 // ===== 資料庫初始化 =====
 try {
   Logger.info("初始化資料庫連線");
@@ -161,6 +144,10 @@ Logger.info("初始化 WebSocket 系統");
 // 建立管理器
 const connectionManager = new ConnectionManager();
 const sessionManager = new SessionManager(connectionManager, SessionService);
+
+// 將 in-memory SessionManager 指派給 ConnectionManager（避免 heartbeat 觸發 DB）
+connectionManager.sessionManager = sessionManager;
+
 const broadcastManager = new BroadcastManager(
   connectionManager,
   sessionManager,
@@ -184,6 +171,90 @@ app.locals.connectionManager = connectionManager;
 
 Logger.success("WebSocket 系統已初始化");
 
+// ===== Metrics endpoint (/metrics) 與週期性更新
+// 說明：Prometheus 等監控系統會定期抓取本端點（scrape）以取得最新指標。
+// 本端點回傳為 Prometheus text format，可直接被 Prometheus 抓取。
+// Metrics endpoint
+app.get("/metrics", async (req, res) => {
+  try {
+    Logger.debug(`[metrics] request from ${req.ip}`);
+    res.set("Content-Type", metrics.register.contentType);
+    const body = await metrics.register.metrics();
+    // Log minimal info for troubleshooting
+    Logger.debug(`[metrics] length=${body.length}`);
+    res.send(body);
+  } catch (e) {
+    Logger.error(`[metrics] error: ${e.message}`);
+    res.status(500).send("Metrics error");
+  }
+});
+
+// Simple health check for metrics route debugging
+app.get("/_metrics_test", (req, res) => {
+  res.send("ok");
+});
+
+// 週期性更新 connection stats（每 5 秒）
+// 說明：定期將 in-memory 統計資料寫入 metrics，以反映即時連線/工作階段狀態。
+setInterval(() => {
+  try {
+    metrics.setConnectionStats(connectionManager.getStats());
+  } catch (e) {
+    // ignore metric update errors
+  }
+}, 5000);
+
+// ===== 低頻 Session 驗證排程（每隔 sessionValidationInterval）
+const sessionValidationInterval =
+  SERVER_CONFIG.websocket.sessionValidationInterval || 300000; // ms
+setInterval(() => {
+  try {
+    const sessions = sessionManager.getAllSessions();
+    let removed = 0;
+    for (const s of sessions) {
+      const { sessionId } = s;
+      const session = SessionService.getSession(sessionId);
+      if (!session || !session.is_active) {
+        Logger.warn(`發現失效 session，正在清理: ${sessionId}`);
+
+        // 清理該 session 底下所有連線
+        const wsIds = connectionManager.getConnectionIdsBySessionId(sessionId);
+        for (const id of wsIds) {
+          connectionManager.unregister(id);
+        }
+
+        // 同步移除 in-memory session
+        sessionManager.clearSession(sessionId);
+        removed++;
+      }
+    }
+
+    if (removed > 0) {
+      Logger.event("red", "-", `已清理 ${removed} 個失效 session`);
+    }
+  } catch (e) {
+    Logger.error(`Session 驗證排程失敗: ${e.message}`);
+  }
+}, sessionValidationInterval);
+
+// 404處理（在所有路由與 middleware 註冊後）
+app.use((req, res) => {
+  res.status(404).json({
+    error: "NOT_FOUND",
+    message: `路徑不存在: ${req.path}`,
+  });
+});
+
+// 錯誤處理（放在所有路由與 404 之後）
+app.use((err, req, res, next) => {
+  Logger.error("伺服器錯誤:", err.message || err);
+  res.status(500).json({
+    error: "INTERNAL_ERROR",
+    message: "伺服器內部錯誤",
+    details: SERVER_CONFIG.nodeEnv === "development" ? err.message : undefined,
+  });
+});
+
 // ===== 啟動伺服器 =====
 const server = httpServer.listen(SERVER_CONFIG.port, () => {
   Logger.success("Panel Backend Server 已啟動");
@@ -197,7 +268,7 @@ const server = httpServer.listen(SERVER_CONFIG.port, () => {
   Logger.info(
     `  WebSocket <yellow>|</yellow> <cyan>/ws</cyan> <dim>(ws://host:port/ws)</dim>`,
   );
-  Logger.info(`  健康檢測  <yellow>|</yellow> <cyan>/api/health</cyan>`);
+  Logger.info(`  心跳檢測  <yellow>|</yellow> <cyan>/api/health</cyan>`);
   Logger.info(
     `工作階段超時: <cyan>${SERVER_CONFIG.session.timeout}</cyan> 秒 <yellow>|</yellow> 分享代碼超時: <cyan>${SERVER_CONFIG.shareCode.timeout}</cyan> 秒`,
   );

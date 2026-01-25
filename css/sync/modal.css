@@ -1,4 +1,5 @@
-/* modal.css - 通用模態視窗框架 */
+/* ===== 通用模態視窗框架（供同步使用） ===== */
+/* 說明：使用 .modal-container / .modal-header / .modal-body / .modal-footer 作為結構化容器 */
 
 /* 通用隱藏類別 */
 .hidden {
@@ -33,13 +34,20 @@
 }
 
 /* 模態視窗容器 */
+/*
+  說明：
+  - 使用 overflow: hidden 以避免內容溢出容器邊界；內部內容需在
+    .modal-body 使用 overflow-y:auto 來滾動（避免整個 modal 跳動）。
+  - 保持 flex layout（column），header 固定（flex-shrink:0），body 可捲動。
+*/
 .modal-container {
     border-radius: 0.75rem;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     width: min(85vw, calc(100vw - 2rem));
     max-width: 60rem;
     max-height: 90vh;
-    overflow: visible;
+    overflow: hidden;
+    /* 保護內部滾動區域 */
     transform: scale(0.9);
     transition: transform 0.3s ease;
     display: flex;
@@ -66,6 +74,12 @@
 /* 同步控制面板的特殊佈局 */
 .sync-control-panel .modal-header {
     justify-content: space-between;
+}
+
+/* 在同步控制面板中，讓 body 的內容置中（水平與垂直置中） */
+.sync-control-panel .modal-body {
+    align-items: center;
+    justify-content: center;
 }
 
 .sync-control-panel .modal-header>.modal-title {
@@ -116,12 +130,19 @@
 
 /* 模態視窗內容區域 */
 .modal-body {
+    box-sizing: border-box;
     padding: 1.5rem;
     flex: 1;
-    overflow-y: auto;
+    min-height: 0;
+
+    /* layout */
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
+
+    /* overflow */
+    overflow-y: auto;
+
     background: #ffffff;
 }
 

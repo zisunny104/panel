@@ -1,6 +1,6 @@
 {
     "name": "panel-experiment",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "description": "虛擬操作面板實驗設定範例 (多裝置同步系統優化版)",
     "main": "index.html",
     "scripts": {
@@ -9,7 +9,8 @@
         "version:hash": "node scripts/update-version.js hash",
         "version:version": "node scripts/update-version.js version",
         "server": "cd server && node index.js",
-        "dev": "npm run server"
+        "dev": "npm run server",
+        "lint": "eslint \"js/**/*.js\" --fix"
     },
     "keywords": [
         "experiment",
@@ -22,5 +23,8 @@
     "repository": {
         "type": "git",
         "url": "."
+    },
+    "devDependencies": {
+        "eslint": "^9.39.2"
     }
 }

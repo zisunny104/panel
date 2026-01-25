@@ -27,7 +27,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
 
       // 狀態
       this.connected = false;
-      this.role = "viewer";
+      this.role = window.SyncManager?.ROLE?.VIEWER;
       this.syncClientReady = false;
 
       // 快速更新限制器（防止過度頻繁的更新）
@@ -51,7 +51,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
     }
 
     /**
-     * 取得 API 路徑前綴（參考 QR code 的動態路徑邏輯，完全避免硬編碼）
+     * 取得 API 路徑前綴（參考 QR Code 的動態路徑邏輯，完全避免硬編碼）
      */
     getApiBasePath() {
       // 根據頁面路徑動態決定 API 前綴（完全動態，無硬編碼）
@@ -181,7 +181,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
     async registerExperimentId(experimentId, source = "client") {
       try {
         Logger.debug(
-          `[ExperimentHubClient] 註冊實驗 ID: ${experimentId} (來自: ${source})`,
+          `[ExperimentHubClient] 註冊實驗 ID: ${experimentId} (來自: ${source})`
         );
 
         // 使用 SyncClient 的 syncState 方法來廣播實驗ID更新
@@ -192,17 +192,17 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
             device_id: this.getClientId(),
             experimentId: experimentId,
             source: source,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
           };
 
           Logger.debug(
-            `[ExperimentHubClient] 透過 SyncClient 廣播實驗ID更新: ${experimentId}`,
+            `[ExperimentHubClient] 透過 SyncClient 廣播實驗ID更新: ${experimentId}`
           );
 
           const syncResult = window.syncClient.syncState(updateData);
           if (!syncResult) {
             Logger.debug(
-              "[ExperimentHubClient] 本機模式或未連線，跳過同步廣播",
+              "[ExperimentHubClient] 本機模式或未連線，跳過同步廣播"
             );
           }
         } else {
@@ -246,7 +246,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
         return false;
       }
 
-      if (this.role !== "operator") {
+      if (this.role !== window.SyncManager?.ROLE?.OPERATOR) {
         Logger.warn("[ExperimentHubClient] 僅操作者可以發送實驗操作");
         return false;
       }
@@ -254,7 +254,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
       this.wsClient.sendExperimentAction(action, {
         ...data,
         sessionId: this.getSessionId(),
-        clientId: this.getClientId(),
+        clientId: this.getClientId()
       });
 
       return true;
@@ -283,7 +283,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      */
     disconnect() {
       this.connected = false;
-      this.role = "viewer";
+      this.role = window.SyncManager?.ROLE?.VIEWER;
     }
 
     // ==================== 輔助方法 ====================
@@ -313,7 +313,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      * 檢查是否可以操作
      */
     canOperate() {
-      return this.connected && this.role === "operator";
+      return this.connected && this.role === window.SyncManager?.ROLE?.OPERATOR;
     }
 
     /**
@@ -351,7 +351,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      */
     triggerStateUpdate(state) {
       const event = new CustomEvent("experiment_hub_state_update", {
-        detail: state,
+        detail: state
       });
       window.dispatchEvent(event);
     }
@@ -360,9 +360,9 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      * 觸發實驗 ID 更新事件
      */
     triggerExperimentIdUpdate(data) {
-      Logger.debug(`[ExperimentHubClient] 觸發實驗 ID 更新事件:`, data);
+      Logger.debug("[ExperimentHubClient] 觸發實驗 ID 更新事件:", data);
       const event = new CustomEvent("experiment_hub_id_update", {
-        detail: data,
+        detail: data
       });
       window.dispatchEvent(event);
     }
@@ -372,7 +372,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      */
     triggerExperimentStateChange(data) {
       const event = new CustomEvent("experiment_hub_state_change", {
-        detail: data,
+        detail: data
       });
       window.dispatchEvent(event);
     }
