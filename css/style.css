@@ -31,7 +31,6 @@
 /* ===== 功能/工具 ===== */
 @import url('./utilities/animations.css');
 @import url('./utilities/responsive.css');
-@import url('./utilities/version-info.css');
 
 /* ===== 多螢幕同步 ===== */
 @import url('./sync/indicator.css');
@@ -50,5 +49,4 @@
 @import url('./experiment/gestures.css');
 @import url('./experiment/stats.css');
 @import url('./experiment/units.css');
-@import url('./experiment/sync.css');
 @import url('./experiment/log-view-modal.css');
