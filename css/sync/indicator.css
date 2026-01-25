@@ -1296,21 +1296,22 @@
     background: #e8e8e8;
 }
 
-.sync-card-label {
+/* 基礎資訊卡片標籤/值：以 indicator 樣式為權威 */
+.sync-info-card .sync-card-label {
     font-size: 11px;
     font-weight: 600;
+    letter-spacing: 0.3px;
     color: #666;
     margin-bottom: 4px;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
 }
 
-.sync-card-value {
+.sync-info-card .sync-card-value {
     font-size: 13px;
     font-weight: bold;
+    line-height: 1.3;
     color: #333;
     word-break: break-all;
-    line-height: 1.3;
 }
 
 /* 角色卡片特殊樣式 */
@@ -1416,11 +1417,11 @@
         gap: 8px;
     }
 
-    .sync-card-label {
+    .sync-info-card .sync-card-label {
         font-size: 10px;
     }
 
-    .sync-card-value {
+    .sync-info-card .sync-card-value {
         font-size: 12px;
     }
 }
@@ -1604,11 +1605,11 @@
         padding: 12px 14px;
     }
 
-    .sync-card-label {
+    .sync-info-card .sync-card-label {
         font-size: 11px;
     }
 
-    .sync-card-value {
+    .sync-info-card .sync-card-value {
         font-size: 13px;
     }
 
@@ -1789,11 +1790,11 @@
     background: #e9ecef;
 }
 
-.sync-card-label {
+.sync-session-card .sync-card-label {
+    font-size: 0.95rem;
     font-weight: 600;
     color: #1a1a1a;
     margin: 0;
-    font-size: 0.95rem;
 }
 
 .sync-card-hint {

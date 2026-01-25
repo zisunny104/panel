@@ -1,26 +1,3 @@
 /* ================= 版本資訊樣式 ================= */
 
-.version-info-compact {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 8px;
-    background: transparent;
-    border: none;
-    margin: 4px 0;
-    font-size: 0.875rem;
-    opacity: 0.6;
-}
-
-.version-info-compact .version-label {
-    color: #999;
-    font-weight: normal;
-}
-
-.version-info-compact .version-value {
-    color: #666;
-    background: transparent;
-    padding: 0;
-    border: none;
-    font-size: 0.875rem;
-}
+/* `version-info-compact` variant removed (unused). Use `.version-info-inline` where needed. */

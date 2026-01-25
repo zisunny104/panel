@@ -24,19 +24,17 @@
     height: 16px;
 }
 
-.scale-controls.hidden,
+/* `.scale-controls` variant removed — 未在 HTML/JS 中使用，保留 `settings-panel` 行為 */
 .settings-panel.hidden {
     display: none;
 }
 
-.scale-controls input[type="range"],
 .settings-panel input[type="range"] {
     width: 7.5rem;
     vertical-align: middle;
     margin-bottom: 0.3125rem;
 }
 
-.scale-controls input[type="number"],
 .settings-panel input[type="number"] {
     width: 3.125rem;
     margin-left: 0.3125rem;
@@ -51,15 +49,14 @@
     vertical-align: middle;
 }
 
-.settings-panel-header,
-.scale-controls-header {
+.settings-panel-header {
     font-size: 1.1rem;
     margin-bottom: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     font-weight: bold;
-}
+} 
 
 .panel-divider {
     border: none;
