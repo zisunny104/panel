@@ -1,6 +1,6 @@
 {
     "name": "panel-experiment",
-    "version": "2.2.0",
+    "version": "2.1.5d6c7ea",
     "description": "虛擬操作面板實驗設定範例 (多裝置同步系統優化版)",
     "main": "index.html",
     "scripts": {
