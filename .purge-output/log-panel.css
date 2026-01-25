@@ -1,0 +1,125 @@
+/* ================= 操作日誌面板 ================= */
+.logger-output {
+    position: fixed;
+    bottom: 4.5rem;
+    left: 5.5rem;
+    width: 300px;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 0.625rem;
+    border-radius: 0.625rem;
+    font-size: 0.8rem;
+    z-index: 10;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+    display: none;
+    flex-direction: column;
+    touch-action: auto;
+    user-select: none;
+    gap: 0;
+}
+
+.logger-panel-header {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    font-weight: bold;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.logger-panel-header strong {
+    flex: 1;
+    text-align: left;
+}
+
+.logger-panel-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.25rem;
+    background: #333;
+    color: #fff;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    margin-left: 0.375rem;
+    padding: 0.125rem;
+}
+
+.logger-panel-btn svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.logger-fab-position {
+    position: fixed;
+    left: 1.2rem;
+    bottom: 1.2rem;
+    z-index: 30;
+    transition: background 0.2s;
+}
+
+.logger-fab-position:hover {
+    background: #ffa733 !important;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* 排除 .logger-panel-btn 按钮，仅适用于日誌內容区的按钮 */
+.logger-output>button,
+.logger-output .log-content~button {
+    background-color: #555;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+    touch-action: manipulation;
+}
+
+.logger-output>button:hover,
+.logger-output .log-content~button:hover {
+    background-color: #777;
+}
+
+.logger-output>button:active,
+.logger-output .log-content~button:active {
+    background-color: #333;
+}
+
+/* 確保面板按鈕維持正方形樣式 */
+.logger-panel-btn {
+    background: #333 !important;
+    padding: 2px !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 4px !important;
+}
+
+.logger-panel-btn:hover {
+    background: #555 !important;
+}
+
+.logger-panel-btn:active {
+    background: #222 !important;
+}
+
+.logger-output .log-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 5px;
+    padding-right: 5px;
+    touch-action: pan-y;
+}
+
+.logger-output a {
+    color: #ffcc00;
+}

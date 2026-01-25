@@ -1,0 +1,80 @@
+/* ================= 全域設定 ================= */
+/* 頁面基本樣式與防止選取 */
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-text-size-adjust: none;
+    -webkit-tap-highlight-color: transparent;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    /* 啟用多點觸控支援 */
+    touch-action: manipulation;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: #ddd;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+    /* 確保多點觸控可以正常工作 */
+    touch-action: manipulation;
+    /* 設置為非襯線字體 */
+    font-family: sans-serif;
+}
+
+/* 確保按鈕、輸入框、下拉選單繼承全域字體，避免 Arial */
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
+/* ================= 全域 SVG 樣式 ================= */
+/* 基礎SVG屬性 - 不包含具體尺寸和顏色 */
+svg {
+    box-sizing: border-box;
+}
+
+/* SVG圖標統一基礎樣式 */
+.svg-icon {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    margin: 0;
+    padding: 0;
+    display: block;
+}
+
+/* ================= 共用佈局類別 ================= */
+/* Flexbox 共用類別 */
+.flex {
+    display: flex;
+}
+
+.flex-wrap {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* 間距共用類別 */
+
+/* 文字對齊共用類別 */
+
+/* ================= 共用外觀類別 ================= */
+/* 圓角共用類別 */
+.rounded {
+    border-radius: 4px;
+}
+
+/* 陰影共用類別 */

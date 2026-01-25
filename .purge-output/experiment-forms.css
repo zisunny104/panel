@@ -1,0 +1,454 @@
+/* ================= 實驗表單樣式 ================= */
+
+/* ========== 表單樣式 ========== */
+
+/* 實驗ID輸入區域 */
+.experiment-id-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.experiment-id-group .form-input {
+    flex: 1;
+    height: 40px;
+    box-sizing: border-box;
+}
+
+.experiment-id-group .btn-secondary {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.experiment-id-group .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
+}
+
+.experiment-id-group .experiment-timer {
+    display: none;
+    font-size: 0.9rem;
+    color: #666;
+    white-space: nowrap;
+}
+
+/* 受試者名稱輸入區域 */
+
+/* ===== 實驗控制區域 ===== */
+.experiment-control-group {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.experiment-control-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.experiment-control-header label {
+    font-weight: 600;
+}
+
+.experiment-control-header .experiment-timer {
+    display: none;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #667eea;
+    background: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.experiment-start-row {
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+    margin-top: 10px;
+}
+
+.experiment-start-row .experiment-start-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.experiment-start-row .experiment-start-btn:hover {
+    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+.experiment-control-buttons {
+    display: none;
+    gap: 8px;
+    flex-direction: row;
+    margin-top: 10px;
+}
+
+.experiment-control-buttons button {
+    flex: 1;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.experiment-control-buttons .experiment-pause-btn {
+    background: #667eea;
+    color: white;
+}
+
+.experiment-control-buttons .experiment-pause-btn:hover {
+    background: #5568d3;
+}
+
+.experiment-control-buttons .experiment-stop-btn {
+    background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.experiment-control-buttons .experiment-stop-btn:hover {
+    background: linear-gradient(135deg, #da190b 0%, #c41a0a 100%);
+    box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4);
+}
+
+/* ========== 表單樣式 ========== */
+.input-section {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    border: 2px solid #ddd;
+}
+
+.input-section h2 {
+    font-size: 18px;
+    color: #2c3e50;
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-weight: 700;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.3s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* 待處理更新指示器 */
+.form-input.pending-update {
+    border-color: #ffc107;
+    background-color: #fff3cd;
+    animation: pending-pulse 2s infinite;
+}
+
+@keyframes pending-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* 實驗日誌面板 */
+.log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.log-header label {
+    font-weight: 600;
+    margin: 0;
+}
+
+.log-download-buttons {
+    display: none;
+}
+
+.log-display {
+    font-size: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    border: 2px solid #ddd;
+    color: #666;
+}
+
+/* 實驗日誌列表 */
+.logs-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: #e8e8e8;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.log-item {
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #ffffff;
+    border-radius: 0.375rem;
+    border: 2px solid #ddd;
+    transition: all 0.2s;
+    position: relative;
+    margin-bottom: 0.375rem;
+}
+
+.log-item:hover {
+    background: #f9f9f9;
+    border-color: #bbb;
+}
+
+.log-item input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.log-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.log-checkbox input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: #667eea;
+    width: 16px;
+    height: 16px;
+}
+
+.log-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.log-filename {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 2px;
+    word-break: break-word;
+}
+
+.log-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    color: #666;
+}
+
+.log-size,
+.log-date {
+    color: #888;
+}
+
+.log-content {
+    flex: 1;
+    word-break: break-word;
+}
+
+.log-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+/* 日誌過濾器 */
+
+/* 日誌統計 */
+
+/* 日誌區域標題和按鈕同一列 */
+.logs-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+}
+
+.logs-section-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #2c3e50;
+    font-weight: 700;
+}
+
+/* 列表操作按鈕 - 統一大小和高度 */
+.logs-list-header .btn-secondary,
+.logs-list-header .btn-danger {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logs-list-header .btn-secondary {
+    background: #f5f5f5;
+    color: #333;
+}
+
+.logs-list-header .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logs-list-header .btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 日誌顯示區域的內容 */
+.log-display-empty,
+.logs-list-loading {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+}
+
+.log-display-empty {
+    padding: 40px 10px;
+}
+
+/* SVG 圖示 */
+svg.icon-sm {
+    width: 14px;
+    height: 14px;
+}
+
+/* 組合選擇器樣式 */
+.combination-selector {
+    margin-bottom: 15px;
+}
+
+.combination-selector label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.combination-selector select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+}
+
+.combination-selector select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* 組合描述 */
+
+/* 組合統計 */
+
+/* 組合動作按鈕 */
+
+/* 組合清單容器 */
+
+/* 組合搜尋 */
+
+/* 組合分頁 */
+
+/* 組合載入狀態 */
+
+/* 組合過濾器 */
+
+/* 組合標籤 */
+
+/* 組合進度指示器 */
+
+/* 組合狀態指示器 */
+
+/* 組合依賴圖 */
+
+/* 組合執行歷史 */

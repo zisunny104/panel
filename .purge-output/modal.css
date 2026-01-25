@@ -1,0 +1,262 @@
+/* ===== 通用模態視窗框架（供同步使用） ===== */
+/* 說明：使用 .modal-container / .modal-header / .modal-body / .modal-footer 作為結構化容器 */
+
+/* 通用隱藏類別 */
+.hidden {
+    display: none !important;
+}
+
+/* 模態視窗遮罩 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1300;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+/* 工作階段管理面板 - 比同步面板更高 */
+.modal-overlay.sync-sessions-overlay {
+    z-index: 1350;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 模態視窗容器 */
+/*
+  說明：
+  - 使用 overflow: hidden 以避免內容溢出容器邊界；內部內容需在
+    .modal-body 使用 overflow-y:auto 來滾動（避免整個 modal 跳動）。
+  - 保持 flex layout（column），header 固定（flex-shrink:0），body 可捲動。
+*/
+.modal-container {
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    width: min(85vw, calc(100vw - 2rem));
+    max-width: 60rem;
+    max-height: 90vh;
+    overflow: hidden;
+    /* 保護內部滾動區域 */
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.modal-overlay.active .modal-container {
+    transform: scale(1);
+}
+
+/* 模態視窗標題區域 */
+.modal-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8f9fa;
+    flex-shrink: 0;
+    border-radius: 0.75rem 0.75rem 0 0;
+}
+
+/* 同步控制面板的特殊佈局 */
+.sync-control-panel .modal-header {
+    justify-content: space-between;
+}
+
+/* 在同步控制面板中，讓 body 的內容置中（水平與垂直置中） */
+.sync-control-panel .modal-body {
+    align-items: center;
+    justify-content: center;
+}
+
+.sync-control-panel .modal-header>.modal-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    word-wrap: break-word;
+    hyphens: auto;
+}
+
+.sync-control-panel .modal-header>.sync-page-toggle-group {
+    flex: 0 0 auto;
+    margin-right: 8px;
+}
+
+.sync-control-panel .modal-header>.modal-close-btn {
+    flex: 0 0 auto;
+}
+
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #6c757d;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.modal-close-btn:hover {
+    background: #e9ecef;
+    color: #495057;
+}
+
+/* 模態視窗內容區域 */
+.modal-body {
+    box-sizing: border-box;
+    padding: 1.5rem;
+    flex: 1;
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+
+    overflow-y: auto;
+
+    background: #ffffff;
+}
+
+/* 當modal-body是最後一個子元素時（沒有footer），新增底部圓角 */
+.modal-body:last-child {
+    border-radius: 0 0 0.75rem 0.75rem;
+}
+
+/* 模態視窗底部按鈕區域 */
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 0 0 0.75rem 0.75rem;
+}
+
+/* 通用按鈕樣式 */
+.modal-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 80px;
+}
+
+.modal-btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.modal-btn-primary:hover {
+    background: #0056b3;
+}
+
+.modal-btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.modal-btn-secondary:hover {
+    background: #545b62;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .modal-container {
+        max-width: 95vw;
+        max-height: 95vh;
+        border-radius: 0.75rem;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: 0.75rem;
+    }
+
+    .modal-header {
+        gap: 8px;
+    }
+
+    /* 響應式同步控制面板調整 */
+    .sync-control-panel .modal-header {
+        gap: 6px;
+    }
+
+    .sync-control-panel .modal-header>.sync-page-toggle-group {
+        flex: 0 0 auto;
+        margin-right: 4px;
+    }
+
+    .modal-title {
+        font-size: 1.125rem;
+    }
+
+    .modal-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .modal-btn {
+        width: 100%;
+    }
+}
+
+/* 極端小螢幕的額外優化 */
+@media (max-width: 480px) {
+    .modal-container {
+        max-width: 98vw;
+        max-height: 98vh;
+        margin: 1vh;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: 0.5rem;
+    }
+
+    .modal-title {
+        font-size: 1rem;
+    }
+
+    /* 極小螢幕同步控制面板調整 */
+    .sync-control-panel .modal-header {
+        padding: 0.5rem;
+        gap: 4px;
+    }
+
+    .sync-control-panel .modal-header>.sync-page-toggle-group {
+        margin-right: 2px;
+    }
+}

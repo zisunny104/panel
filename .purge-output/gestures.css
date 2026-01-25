@@ -1,0 +1,33 @@
+/* ========== 手勢參考樣式 ========== */
+.gesture-types-list {
+    display: none;
+}
+
+.gesture-type-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px;
+    margin: 5px 0;
+    background: white;
+    border-radius: 4px;
+    font-size: 12px;
+    align-items: flex-start;
+}
+
+.gesture-type-code {
+    font-weight: 600;
+    color: #2c3e50;
+    min-width: 70px;
+    text-transform: uppercase;
+}
+
+.gesture-type-name {
+    font-weight: 600;
+    color: #333;
+    min-width: 60px;
+}
+
+.gesture-type-desc {
+    color: #555;
+    flex: 1;
+}

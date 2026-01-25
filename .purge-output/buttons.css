@@ -1,0 +1,143 @@
+/* ========== 面板收合按鈕 - 圓形設計，與右側同步指示器對稱 ========== */
+.panel-toggle-btn {
+    position: fixed;
+    left: 15px;
+    top: 15px;
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    z-index: 100;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.panel-toggle-btn:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #4757c3 100%);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 預設狀態（展開）：顯示 ☰ 漢堡包圖示 */
+.panel-toggle-btn span {
+    width: 16px;
+    height: 2px;
+    background: white;
+    border-radius: 1px;
+    transition: all 0.3s ease;
+    display: block;
+}
+
+.panel-toggle-btn span:nth-child(1) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.panel-toggle-btn span:nth-child(2) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.panel-toggle-btn span:nth-child(3) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* 收起狀態（.collapsed）：顯示 — 最小化圖示 */
+.panel-toggle-btn.collapsed span:nth-child(1) {
+    transform: translateY(0);
+    opacity: 0;
+}
+
+.panel-toggle-btn.collapsed span:nth-child(2) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.panel-toggle-btn.collapsed span:nth-child(3) {
+    transform: translateY(0);
+    opacity: 0;
+}
+
+/* ========== Action 按鈕樣式 ========== */
+/* Action 按鈕基礎樣式 */
+.action-button {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-width: fit-content;
+    width: auto;
+    height: auto;
+    padding: 8px 12px;
+    background: #e8eeff;
+    border: 2px solid #667eea;
+    border-radius: 6px;
+    color: #2c3e50;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+/* Action 按鈕已完成狀態 */
+.action-button[data-completed="true"] {
+    background: #c8e6c9 !important;
+    border-color: #4caf50 !important;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3) !important;
+}
+
+/* Action 按鈕已完成狀態 - 文字顏色調整 */
+.action-button[data-completed="true"]>div:first-child {
+    color: #2e7d32 !important;
+}
+
+.action-button[data-completed="true"]>div:last-child {
+    color: #1b5e20 !important;
+}
+
+/* Action 按鈕 hover 效果 */
+.action-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.action-button[data-completed="true"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 12px rgba(76, 175, 80, 0.4) !important;
+}
+
+/* Action 按鈕點擊動畫 */
+.action-button:active {
+    transform: translateY(0);
+}
+
+/* 完成標記動畫（可選的視覺增強） */
+@keyframes actionCompleted {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.action-button[data-completed="true"] {
+    animation: actionCompleted 0.3s ease-out;
+}

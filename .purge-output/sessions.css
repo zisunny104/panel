@@ -1,0 +1,381 @@
+/**
+ * Sync - Sessions 管理樣式
+ * 說明：作為工作階段列表與批次操作的樣式集合
+ */
+
+.sync-sessions-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    flex-shrink: 0;
+}
+
+.sync-action-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 16px;
+    min-width: 120px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sync-action-btn:hover {
+    background: #0056b3;
+}
+
+.sync-action-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+.sync-action-btn-warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.sync-action-btn-warning:hover {
+    background: #e0a800;
+}
+
+.sync-action-btn-danger {
+    background: #dc3545;
+}
+
+.sync-action-btn-danger:hover {
+    background: #c82333;
+}
+
+/* 批次操作區域 */
+.sync-sessions-batch-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    padding: 16px;
+    margin-bottom: 20px;
+
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
+
+.sync-batch-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+}
+
+.sync-batch-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.sync-batch-checkbox:hover {
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.sync-batch-checkbox input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.sync-batch-select-btn {
+    background: #6c757d;
+    color: white;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 12px;
+    min-width: 120px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sync-batch-select-btn:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.sync-batch-operations {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px solid #dee2e6;
+    flex-wrap: wrap;
+}
+
+.sync-batch-op-btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 140px;
+    transition: all 0.2s ease;
+}
+
+.sync-batch-op-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.sync-batch-op-download {
+    background: #28a745;
+    color: white;
+}
+
+.sync-batch-op-download:hover {
+    background: #218838;
+}
+
+.sync-batch-op-delete {
+    background: #dc3545;
+    color: white;
+}
+
+.sync-batch-op-delete:hover {
+    background: #c82333;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .sync-sessions-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .sync-action-btn {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .sync-sessions-batch-actions {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .sync-batch-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .sync-batch-operations {
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 8px;
+    }
+
+    .sync-batch-op-btn {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .sync-batch-select-btn {
+        min-width: auto;
+        width: 100%;
+    }
+}
+
+.sync-sessions-list {
+    flex: 1;
+}
+
+.sync-session-card {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: white;
+    overflow: hidden;
+}
+
+.sync-session-header {
+    padding: 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sync-session-header:hover {
+    background: #f8f9fa;
+}
+
+.sync-session-selection {
+    margin-right: 12px;
+}
+
+.sync-session-info {
+    flex: 1;
+}
+
+/* ===== 注意：.sync-card-label / .sync-card-value 的視覺樣式已統一由 "css/sync/indicator.css" 管理 ===== */
+/* 移除會造成與 indicator.css 覆蓋衝突的定義，若 session 卡片需要不同樣式，請改用更具範圍的選擇器 .sync-session-card .sync-card-label */
+
+.sync-card-hint {
+    font-size: 14px;
+    color: #999;
+}
+
+.sync-session-details {
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border-top: 1px solid #eee;
+}
+
+.sync-session-card.expanded .sync-session-details {
+    padding: 12px;
+    max-height: 800px;
+    background: white;
+    overflow-y: auto;
+}
+
+/* 新的按鈕佈局容器 */
+.sync-session-buttons-container {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+/* 分享按鈕獨立行 */
+.sync-session-share-row {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+/* 其他按鈕行 */
+.sync-session-action-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+}
+
+.sync-session-action-row .sync-delete-session-btn {
+    background: #dc3545;
+}
+
+.sync-session-action-row .sync-delete-session-btn:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
+.sync-delete-session-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.sync-delete-session-btn:hover {
+    background: #c82333;
+}
+
+/* ===== 空狀態樣式 ===== */
+.sync-sessions-empty {
+    text-align: center;
+    color: #666;
+    padding: 20px 0;
+    font-style: italic;
+}
+
+/* 工作階段狀態標籤 */
+.sync-session-status {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 14px;
+    color: white;
+}
+
+.sync-session-status.active {
+    background: #28a745;
+}
+
+.sync-session-status.inactive {
+    background: #6c757d;
+}
+
+/* 工作階段卡片狀態區域 */
+.sync-session-card-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 展開/收起圖標 */
+.sync-session-expand-icon {
+    font-size: 18px;
+    color: #666;
+}
+
+/* 工作階段客戶端資訊 */
+.sync-session-client {
+    padding: 8px;
+    margin: 5px 0;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 2px solid #007bff;
+}
+
+.sync-session-client.operator {
+    border-color: #007bff;
+}
+
+.sync-session-client.viewer {
+    border-color: #28a745;
+}
+
+/* 工作階段詳細資訊區域 */
+.sync-session-details .sync-session-info {
+    margin-bottom: 8px;
+}
+
+.sync-session-info strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.sync-session-info-no-code {
+    color: #666;
+}
+
+.sync-session-info-no-state {
+    color: #666;
+}
+
+.sync-session-clients {
+    margin-top: 8px;
+}
+
+.sync-session-no-clients {
+    color: #666;
+    font-style: italic;
+}

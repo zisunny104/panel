@@ -142,14 +142,6 @@
 }
 
 /* 在設定面板中，標題型控制群組 (section) 的樣式 */
-.settings-panel .control-group.section-title {
-    font-weight: 600;
-    color: #f1f1f1;
-    padding-top: 0.5rem;
-    padding-bottom: 0.25rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.02);
-    margin-top: 0.5rem;
-}
 
 /* 內縮變體已移除：統一使用一般 .control-group 排版 */
 

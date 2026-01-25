@@ -1,0 +1,128 @@
+/* ================= Toggle Switch 樣式 ================= */
+:root {
+    --svg-checkmark: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='currentColor' d='M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z'%3E%3C/path%3E%3C/svg%3E");
+    --svg-cross: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='currentColor' d='M18 6L6 18M6 6l12 12'%3E%3C/path%3E%3C/svg%3E");
+}
+
+.switch {
+    --switch-width: 46px;
+    --switch-height: 24px;
+    --switch-bg: rgb(131, 131, 131);
+    --switch-checked-bg: rgb(0, 218, 80);
+    --circle-diameter: 18px;
+    --circle-bg: #fff;
+    --icon-cross-color: var(--switch-bg);
+    --icon-checkmark-color: var(--switch-checked-bg);
+    --icon-cross-size: 12px;
+    --icon-checkmark-size: 16px;
+    --switch-offset: calc((var(--switch-height) - var(--circle-diameter)) / 2);
+    --switch-transition: all .2s cubic-bezier(0.27, 0.2, 0.25, 1.51);
+    --circle-shadow: 1px 1px 2px rgba(146, 146, 146, 0.45);
+    --circle-checked-shadow: -1px 1px 2px rgba(163, 163, 163, 0.45);
+    --effect-width: calc(var(--circle-diameter) / 2);
+    --effect-height: calc(var(--effect-width) / 2 - 1px);
+    --effect-bg: var(--circle-bg);
+    --icon-transition: var(--switch-transition);
+    display: inline-block;
+    cursor: pointer;
+}
+
+.switch input {
+    display: none;
+}
+
+.slider {
+    box-sizing: border-box;
+    width: var(--switch-width);
+    height: var(--switch-height);
+    background: var(--switch-bg);
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    transition: var(--switch-transition);
+}
+
+.circle {
+    width: var(--circle-diameter);
+    height: var(--circle-diameter);
+    background: var(--circle-bg);
+    border-radius: inherit;
+    box-shadow: var(--circle-shadow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--switch-transition);
+    position: absolute;
+    left: var(--switch-offset);
+    z-index: 1;
+}
+
+.circle::before,
+.circle::after {
+    content: '';
+    position: absolute;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    background-color: currentColor;
+    transition: var(--icon-transition);
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.circle::before {
+    mask-image: var(--svg-cross);
+    -webkit-mask-image: var(--svg-cross);
+    mask-size: var(--icon-cross-size);
+    -webkit-mask-size: var(--icon-cross-size);
+    opacity: 1;
+    transform: scale(1);
+    color: var(--icon-cross-color);
+}
+
+.circle::after {
+    mask-image: var(--svg-checkmark);
+    -webkit-mask-image: var(--svg-checkmark);
+    mask-size: var(--icon-checkmark-size);
+    -webkit-mask-size: var(--icon-checkmark-size);
+    opacity: 0;
+    transform: scale(0);
+    color: var(--icon-checkmark-color);
+}
+
+.slider::before {
+    content: "";
+    position: absolute;
+    width: var(--effect-width);
+    height: var(--effect-height);
+    left: calc(var(--switch-offset) + (var(--effect-width) / 2));
+    background: transparent !important;
+    border-radius: 1px;
+    transition: var(--switch-transition);
+}
+
+.switch input:checked+.slider {
+    background: var(--switch-checked-bg);
+}
+
+.switch input:checked+.slider .circle {
+    left: calc(100% - var(--circle-diameter) - var(--switch-offset));
+    box-shadow: var(--circle-checked-shadow);
+}
+
+.switch input:checked+.slider::before {
+    left: calc(100% - var(--effect-width) - (var(--effect-width) / 2) - var(--switch-offset));
+}
+
+.switch input:checked+.slider .circle::before {
+    opacity: 0;
+    transform: scale(0);
+}
+
+.switch input:checked+.slider .circle::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* 客製化範例 */

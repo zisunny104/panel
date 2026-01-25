@@ -1,0 +1,52 @@
+/* ========== 佈局容器 ========== */
+.container {
+    width: 100%;
+    max-width: 1400px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    display: flex;
+    min-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+}
+
+.left-panel {
+    flex: 0 0 40%;
+    border-right: 2px solid #e0e0e0;
+    padding: 30px;
+    overflow-y: auto;
+    background: #f9f9f9;
+    transition: flex 0.3s ease, margin-left 0.3s ease;
+}
+
+.left-panel.collapsed {
+    flex: 0 0 0;
+    padding: 0;
+    overflow: hidden;
+    border-right: none;
+}
+
+.right-panel {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+    background: transparent;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        flex-direction: column;
+    }
+
+    .left-panel {
+        flex: 0 0 auto;
+        border-right: none;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .right-panel {
+        flex: 0 0 auto;
+    }
+}

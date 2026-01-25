@@ -1,0 +1,74 @@
+/* ================= 通用按鈕樣式 ================= */
+
+/* 圖標按鈕 - 正常尺寸 */
+.btn.btn-icon-only {
+    min-width: 40px !important;
+    height: 40px !important;
+    padding: 8px 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    border: none !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: all 0.2s !important;
+    white-space: nowrap !important;
+}
+
+/* SVG 圖標樣式 */
+.icon-view svg,
+.icon-download svg,
+.icon-delete svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* 檢視圖標 - 輪廓樣式 */
+.icon-view svg {
+    stroke: currentColor;
+    fill: none;
+}
+
+/* 下載圖標 - 輪廓樣式 */
+.icon-download svg {
+    stroke: currentColor;
+    fill: none;
+}
+
+/* 刪除圖標 - 實心樣式 */
+.icon-delete svg {
+    fill: currentColor;
+    stroke: currentColor;
+}
+
+.reference-card {
+    width: 8.56cm;
+    height: 5.398cm;
+    background: #999;
+    text-align: center;
+    color: transparent;
+    margin-top: 1rem;
+    border-radius: 0.318cm;
+}
+
+/* ================= 控制群組 ================= */
+.control-group {
+    margin-bottom: 0.625rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.control-group span {
+    margin-right: 0.3125rem;
+}
+
+/* Switch 和文字間距 */
+.control-group .switch {
+    margin-right: 0.5rem;
+}
+
+/* 控制群組變體：已移除 indented 變體，統一使用 .control-group 與 .control-group.section-title 進行區隔 */
+
+/* 如果需要局部間距，請使用 .control-group.section-title 或自訂類別 */
