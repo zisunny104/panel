@@ -875,7 +875,7 @@ class ExperimentLogUI {
           return JSON.stringify(obj, null, 2)
             .split("\n")
             .map((l, i, arr) => {
-              // 限制每行的文本長度
+              // 限制每行的文字長度
               if (l.length > 100) {
                 return l.substring(0, 100) + "...";
               }
@@ -891,8 +891,8 @@ class ExperimentLogUI {
 
   /**
    * 轉義 HTML 特殊字符
-   * @param {string} text - 文本
-   * @returns {string} 轉義後的文本
+   * @param {string} text - 文字
+   * @returns {string} 轉義後的文字
    */
   escapeHtml(text) {
     const div = document.createElement("div");
@@ -901,7 +901,7 @@ class ExperimentLogUI {
   }
 
   /**
-   * 格式化持續時間（中文文本格式）
+   * 格式化持續時間（中文文字格式）
    * @param {number} seconds - 秒數
    * @returns {string} 格式化的持續時間
    */

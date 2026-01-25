@@ -349,7 +349,7 @@
   background: #4555bd;
 }
 
-/* 小螢幕適配 */
+/* 小螢幕響應式調整 */
 @media (max-width: 500px) {
   .sync-confirm-content {
     width: 95%;

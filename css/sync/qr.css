@@ -152,7 +152,7 @@
     }
 }
 
-/* ===== 掃描狀態文本 ===== */
+/* ===== 掃描狀態文字 ===== */
 .sync-scanner-status {
     position: absolute;
     bottom: 20px;
@@ -287,7 +287,7 @@
     transform: translateY(0);
 }
 
-/* ===== 行動裝置適配 ===== */
+/* ===== 行動裝置響應式調整 ===== */
 @media (max-width: 600px) {
 
     .sync-scanner-ui {

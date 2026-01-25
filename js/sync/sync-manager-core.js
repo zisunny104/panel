@@ -83,7 +83,7 @@ export class SyncManagerCore {
   generateQRContent(
     code,
     role = window.SyncManager?.ROLE?.VIEWER,
-    target = window.SyncManager?.PAGE?.PANEL
+    target = window.SyncManager?.PAGE?.PANEL,
   ) {
     // 確保 baseUrl 以 / 結尾
     let url = this.baseUrl;
@@ -96,11 +96,11 @@ export class SyncManagerCore {
     let qrUrl;
     if (target === window.SyncManager?.PAGE?.EXPERIMENT) {
       qrUrl = `${url}experiment.html?join=${encodedCode}&role=${encodeURIComponent(
-        role
+        role,
       )}`;
     } else {
       qrUrl = `${url}index.html?shareCode=${encodedCode}&role=${encodeURIComponent(
-        role
+        role,
       )}`;
     }
 
@@ -119,7 +119,7 @@ export class SyncManagerCore {
     try {
       const result = await this.syncClient.createSession(createCode);
       Logger.debug("[Sync] 工作階段建立成功", {
-        sessionId: result.sessionId
+        sessionId: result.sessionId,
       });
 
       this.currentRole = window.SyncManager?.ROLE?.OPERATOR; // 建立者預設為操作者
@@ -131,9 +131,9 @@ export class SyncManagerCore {
         new CustomEvent(SyncEvents.SESSION_JOINED, {
           detail: {
             sessionId: result.sessionId,
-            role: this.currentRole
-          }
-        })
+            role: this.currentRole,
+          },
+        }),
       );
 
       // 連線成功後，處理離線佇列
@@ -158,7 +158,7 @@ export class SyncManagerCore {
     try {
       const result = await this.syncClient.generateShareCode();
       Logger.debug("[Sync] 分享代碼已產生", {
-        shareCode: result.shareCode
+        shareCode: result.shareCode,
       });
 
       this.currentShareCode = result.shareCode;
@@ -168,9 +168,9 @@ export class SyncManagerCore {
         new CustomEvent(SyncEvents.SHARE_CODE_GENERATED, {
           detail: {
             shareCode: result.shareCode,
-            expiresAt: result.expiresAt
-          }
-        })
+            expiresAt: result.expiresAt,
+          },
+        }),
       );
 
       return result;
@@ -185,7 +185,7 @@ export class SyncManagerCore {
    */
   async joinSessionByShareCode(
     shareCode,
-    role = window.SyncManager?.ROLE?.VIEWER
+    role = window.SyncManager?.ROLE?.VIEWER,
   ) {
     try {
       await this.syncClient.joinSessionByShareCode(shareCode, role);
@@ -193,7 +193,7 @@ export class SyncManagerCore {
       this.currentShareCode = shareCode; // 記錄使用過的分享代碼
 
       Logger.debug(
-        `[SyncCore] 成功加入工作階段 - 代碼: ${shareCode}, 角色: ${role}, 工作階段ID: ${this.syncClient.sessionId}`
+        `[SyncCore] 成功加入工作階段 - 代碼: ${shareCode}, 角色: ${role}, 工作階段ID: ${this.syncClient.sessionId}`,
       );
 
       // 觸發工作階段加入事件
@@ -202,9 +202,9 @@ export class SyncManagerCore {
           detail: {
             sessionId: this.syncClient.sessionId,
             shareCode: shareCode,
-            role: role
-          }
-        })
+            role: role,
+          },
+        }),
       );
 
       // 連線成功後，處理離線佇列
@@ -225,13 +225,13 @@ export class SyncManagerCore {
   async restoreSession(
     sessionId,
     clientId,
-    role = window.SyncManager?.ROLE?.VIEWER
+    role = window.SyncManager?.ROLE?.VIEWER,
   ) {
     try {
       const result = await this.syncClient.restoreSession(
         sessionId,
         clientId,
-        role
+        role,
       );
       this.currentRole = role;
       // 新增：取得還原的分享代碼
@@ -246,9 +246,9 @@ export class SyncManagerCore {
             sessionId: sessionId,
             clientId: clientId,
             role: role,
-            shareCode: result?.shareCode
-          }
-        })
+            shareCode: result?.shareCode,
+          },
+        }),
       );
 
       return result;
@@ -271,7 +271,7 @@ export class SyncManagerCore {
   // ================== Getters / Status helpers ==================
 
   /**
-   * 取得目前連線狀態文本
+   * 取得目前連線狀態文字
    * 區分四種狀態：
    * - offline: PHP伺服器無法連線
    * - idle: PHP伺服器正常，但未加入多螢幕同步
@@ -368,7 +368,7 @@ export class SyncManagerCore {
       "experiment_started",
       "experiment_stopped",
       "experiment_paused",
-      "experiment_resumed"
+      "experiment_resumed",
     ];
 
     if (!strictDeduplicationTypes.includes(newState.type)) {
@@ -379,14 +379,14 @@ export class SyncManagerCore {
     const lastSimilar = this.offlineQueue.find(
       (item) =>
         item.state.type === newState.type &&
-        item.state.device_id === newState.device_id
+        item.state.device_id === newState.device_id,
     );
 
     if (lastSimilar) {
       // 如果時間戳相差不到 1 秒，認為是重複
       const timeDiff = Math.abs(
         (newState.timestamp || Date.now()) -
-          (lastSimilar.state.timestamp || lastSimilar.addedAt)
+          (lastSimilar.state.timestamp || lastSimilar.addedAt),
       );
       return timeDiff < 1000;
     }
@@ -417,7 +417,7 @@ export class SyncManagerCore {
     const duplicateIndex = this.offlineQueue.findIndex(
       (item) =>
         item.state.type === state.type &&
-        item.state.device_id === state.device_id
+        item.state.device_id === state.device_id,
     );
 
     if (duplicateIndex !== -1) {
@@ -427,7 +427,7 @@ export class SyncManagerCore {
         this.offlineQueue[duplicateIndex] = {
           state: state,
           addedAt: Date.now(),
-          retryCount: 0
+          retryCount: 0,
         };
       } else {
         Logger.debug(`忽略較舊的離線佇列項目 (type=${state.type})`);
@@ -437,7 +437,7 @@ export class SyncManagerCore {
       this.offlineQueue.push({
         state: state,
         addedAt: Date.now(),
-        retryCount: 0
+        retryCount: 0,
       });
     }
 
@@ -490,8 +490,8 @@ export class SyncManagerCore {
             `離線佇列項目發送成功: ${
               item.state.type || "unknown"
             } (時間戳: ${new Date(
-              item.state.timestamp || item.addedAt
-            ).toISOString()})`
+              item.state.timestamp || item.addedAt,
+            ).toISOString()})`,
           );
         } else {
           failCount++;
@@ -502,7 +502,7 @@ export class SyncManagerCore {
             this.offlineQueue.push(item);
           } else {
             Logger.warn(
-              `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
+              `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`,
             );
           }
         }
@@ -515,7 +515,7 @@ export class SyncManagerCore {
           this.offlineQueue.push(item);
         } else {
           Logger.warn(
-            `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`
+            `離線佇列項目重試次數過多，放棄: ${item.state.type || "unknown"}`,
           );
         }
       }
@@ -530,7 +530,7 @@ export class SyncManagerCore {
     this.isProcessingQueue = false;
 
     Logger.debug(
-      `離線佇列處理完成 (成功: ${successCount}, 失敗: ${failCount}, 耗時: ${duration}ms，剩餘: ${this.offlineQueue.length})`
+      `離線佇列處理完成 (成功: ${successCount}, 失敗: ${failCount}, 耗時: ${duration}ms，剩餘: ${this.offlineQueue.length})`,
     );
   }
 
@@ -543,7 +543,7 @@ export class SyncManagerCore {
       hasIssues: false,
       duplicateTimestamps: [],
       timeJumps: [],
-      totalItems: sortedItems.length
+      totalItems: sortedItems.length,
     };
 
     if (sortedItems.length < 2) return corrections;
@@ -565,7 +565,7 @@ export class SyncManagerCore {
         corrections.duplicateTimestamps.push({
           timestamp,
           count: timestampCounts.get(timestamp),
-          types: [item.state.type]
+          types: [item.state.type],
         });
         corrections.hasIssues = true;
       }
@@ -577,7 +577,7 @@ export class SyncManagerCore {
           from: lastTimestamp,
           to: timestamp,
           jump: timestamp - lastTimestamp,
-          type: item.state.type
+          type: item.state.type,
         });
         corrections.hasIssues = true;
       }
@@ -620,7 +620,7 @@ export class SyncManagerCore {
             document.getElementById("subjectName") ||
             document.getElementById("subjectNameInput")
           )?.value || "",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       // 只在有受試者名稱時才同步（避免 null 污染）
@@ -641,7 +641,7 @@ export class SyncManagerCore {
     try {
       Logger.debug("[Sync] 加入工作階段後，開始同步中樞資料");
       Logger.debug(
-        "[Sync] 需要初始化的項目: 實驗ID、受試者名稱、實驗組合、實驗狀態"
+        "[Sync] 需要初始化的項目: 實驗ID、受試者名稱、實驗組合、實驗狀態",
       );
 
       // 觸發事件，讓各頁面同步加入後的初始化資料
@@ -654,10 +654,10 @@ export class SyncManagerCore {
               "experimentId",
               "subjectName",
               "combination",
-              "experimentState"
-            ]
-          }
-        })
+              "experimentState",
+            ],
+          },
+        }),
       );
     } catch (error) {
       Logger.warn("[Sync] 同步中樞資料失敗:", error);

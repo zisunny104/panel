@@ -51,17 +51,11 @@ panel/
 
 ## 版本
 
-**2.1.5d6c7ea** (2026-01-25)
+#### v2.1.5d6c7ea - 改進同步系統，強化後端功能
 
-### 更新日誌（精簡）
-
-#### v2.1.5d6c7ea - 2026-01-25
-
-- 更新版本與 commit hash（自動化腳本更新 `data/config.json`）
-- 同步系統改進：統一事件常數（SyncEvents）、新增 LOCAL 角色與斷線/還原流程
-- QR 改善：相機排序/過濾、掃描器重試與偵錯資訊、QR 產生 target 支援
-- 後端強化：新增 /metrics、rate limiting、低頻 Session 驗證與心跳穩定性修正
-- UI/用語一致性：將手動「退出工作階段」與網路「斷線」用語分別對應，並將 CSS 註解翻譯與整理
+- **同步系統改進**：統一事件常數（SyncEvents）、新增 LOCAL 角色與斷線/還原流程
+- **QR Code 系統改善**：相機排序/過濾、掃描器重試與偵錯資訊、QR Code 產生 target 支援
+- **後端強化**：新增 /metrics、rate limiting、低頻 Session 驗證與心跳穩定性修正
 
 #### v2.1.0a7dec8 - 同步系統架構完善
 
