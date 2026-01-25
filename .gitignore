@@ -1,2 +1,17 @@
-﻿# PurgeCSS output
-.purge-output/
+# Node
+node_modules/
+package-lock.json
+npm-debug.log
+
+# Runtime data
+runtime/
+runtime/database/
+runtime/experiment-data/
+*.db
+*.db-shm
+*.db-wal
+*.jsonl
+
+# Editor
+.vscode/
+.DS_Store
