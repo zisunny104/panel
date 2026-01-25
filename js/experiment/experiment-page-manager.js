@@ -1,5 +1,8 @@
-// experiment-page-manager.js - 實驗頁面管理器
-// 專門用於 experiment.html 頁面
+/**
+ * ExperimentPageManager - 實驗頁面管理器
+ *
+ * 專門用於 experiment.html 頁面
+ */
 
 import { getExperimentHubManager } from "../sync/experiment-hub-manager.js";
 
@@ -92,7 +95,7 @@ class ExperimentPageManager {
   /** 產生新的實驗ID 並在同步模式下註冊到中樞 */
   async generateNewExperimentIdWithHub() {
     try {
-      Logger.debug("[ExperimentPageManager] 產生新的實驗ID...");
+      Logger.debug("產生新的實驗ID...");
 
       // 產生新的實驗ID
       const newId = RandomUtils.generateNewExperimentId();
@@ -107,22 +110,22 @@ class ExperimentPageManager {
       const hubManager = getExperimentHubManager();
       if (hubManager?.isInSyncMode?.()) {
         Logger.debug(
-          `[ExperimentPageManager] 同步模式: 註冊新ID到中樞: ${newId}`
+          `同步模式: 註冊新ID到中樞: ${newId}`
         );
         await this.registerExperimentIdToHub(newId);
       } else {
         Logger.debug(
-          `[ExperimentPageManager] 獨立模式: 新ID僅存本機: ${newId}`
+          `獨立模式: 新ID僅存本機: ${newId}`
         );
       }
 
       // 廣播新的實驗ID
       this.broadcastExperimentIdUpdate(newId);
 
-      Logger.info(`[ExperimentPageManager] 新的實驗ID已產生: ${newId}`);
+      Logger.info(`新的實驗ID已產生: ${newId}`);
       return newId;
     } catch (error) {
-      Logger.error("[ExperimentPageManager] 產生新實驗ID失敗:", error);
+      Logger.error("產生新實驗ID失敗:", error);
       throw error;
     }
   }
@@ -133,7 +136,7 @@ class ExperimentPageManager {
 
     // 檢查是否在同步模式
     if (!hubManager?.isInSyncMode?.()) {
-      Logger.debug("[獨立模式] 直接產生新的實驗ID");
+      Logger.debug("直接產生新的實驗ID");
       await this.generateNewExperimentIdWithHub();
       this.selectDefaultCombination();
       return;
@@ -147,7 +150,7 @@ class ExperimentPageManager {
         ?.value?.trim();
 
       Logger.debug(
-        `[智慧重新產生] 中樞ID: ${hubExperimentId}, 本機ID: ${currentExperimentId}`
+        `中樞ID: ${hubExperimentId}, 本機ID: ${currentExperimentId}`
       );
 
       if (
@@ -157,7 +160,7 @@ class ExperimentPageManager {
       ) {
         // 實驗ID與中樞不同，同步到中樞的ID
         Logger.info(
-          `[智慧重新產生] 實驗ID與中樞不同，同步到中樞ID: ${hubExperimentId}`
+          `實驗ID與中樞不同，同步到中樞ID: ${hubExperimentId}`
         );
         this.experimentId = hubExperimentId;
         const experimentIdInput = document.getElementById("experimentIdInput");
@@ -174,13 +177,13 @@ class ExperimentPageManager {
         this.broadcastExperimentIdUpdate(hubExperimentId);
       } else {
         // 實驗ID與中樞相同或中樞沒有ID，產生新的ID
-        Logger.info("[智慧重新產生] 產生新的實驗ID並廣播");
+        Logger.info("產生新的實驗ID並廣播");
         await this.generateNewExperimentIdWithHub();
       }
 
       this.selectDefaultCombination();
     } catch (error) {
-      Logger.error("[智慧重新產生] 檢查中樞狀態失敗:", error);
+      Logger.error("檢查中樞狀態失敗:", error);
       // 出錯時仍產生新的ID
       await this.generateNewExperimentIdWithHub();
       this.selectDefaultCombination();
@@ -191,7 +194,7 @@ class ExperimentPageManager {
   async registerExperimentIdToHub(experimentId) {
     try {
       Logger.debug(
-        `[ExperimentPageManager] 開始註冊實驗ID到中樞: ${experimentId}`
+        `開始註冊實驗ID到中樞: ${experimentId}`
       );
       const hubManager = getExperimentHubManager();
       const success = await hubManager.registerExperimentId(
@@ -200,14 +203,14 @@ class ExperimentPageManager {
       );
       if (success) {
         Logger.info(
-          `[ExperimentPageManager] 實驗ID已成功註冊到中樞: ${experimentId}`
+          `實驗ID已成功註冊到中樞: ${experimentId}`
         );
       } else {
-        Logger.warn(`[ExperimentPageManager] 實驗ID註冊失敗: ${experimentId}`);
+        Logger.warn(`實驗ID註冊失敗: ${experimentId}`);
       }
     } catch (error) {
       Logger.warn(
-        `[ExperimentPageManager] 無法連線到實驗中樞: ${error.message}`
+        `無法連線到實驗中樞: ${error.message}`
       );
     }
   }
@@ -232,7 +235,7 @@ class ExperimentPageManager {
     const experimentIdInput = document.getElementById("experimentIdInput");
     const regenerateIdBtn = document.getElementById("regenerateIdButton");
 
-    Logger.debug("[ExperimentPageManager] 初始化實驗ID...");
+    Logger.debug("初始化實驗ID...");
 
     let experimentId = null;
 
@@ -242,19 +245,19 @@ class ExperimentPageManager {
 
     if (isInSyncMode && hubManager?.hubClient) {
       Logger.debug(
-        "[ExperimentPageManager] 第1優先：檢測到同步模式，嘗試從中樞讀取ID"
+        "第1優先：檢測到同步模式，嘗試從中樞讀取ID"
       );
       try {
         experimentId = await hubManager.getExperimentId();
         if (experimentId) {
           Logger.debug(
-            `[ExperimentPageManager] 從中樞取得實驗ID: ${experimentId}`
+            `從中樞取得實驗ID: ${experimentId}`
           );
           experimentIdInput.value = experimentId;
         }
       } catch (error) {
         Logger.debug(
-          `[ExperimentPageManager] 中樞讀取失敗: ${error.message}，嘗試其他來源`
+          `中樞讀取失敗: ${error.message}，嘗試其他來源`
         );
       }
     }
@@ -263,7 +266,7 @@ class ExperimentPageManager {
     if (!experimentId && window.experimentStateManager?.experimentId) {
       experimentId = window.experimentStateManager.experimentId;
       Logger.debug(
-        `[ExperimentPageManager] 第2優先：使用快照ID: ${experimentId}`
+        `第2優先：使用快照ID: ${experimentId}`
       );
       experimentIdInput.value = experimentId;
     }
@@ -274,7 +277,7 @@ class ExperimentPageManager {
       if (inputValue) {
         experimentId = inputValue;
         Logger.debug(
-          `[ExperimentPageManager] 第3優先：使用輸入框ID: ${experimentId}`
+          `第3優先：使用輸入框ID: ${experimentId}`
         );
       }
     }
@@ -282,10 +285,10 @@ class ExperimentPageManager {
     // 第4步：都沒有ID，根據模式決定是否產生新ID
     if (!experimentId) {
       if (isInSyncMode) {
-        Logger.debug("[ExperimentPageManager] 第4步：同步模式無ID，產生新ID");
+        Logger.debug("第4步：同步模式無ID，產生新ID");
         await this.generateNewExperimentIdWithHub();
       } else {
-        Logger.debug("[ExperimentPageManager] 第4步：本機模式無ID，產生新ID");
+        Logger.debug("第4步：本機模式無ID，產生新ID");
         this.generateNewExperimentId();
       }
     }
@@ -302,16 +305,16 @@ class ExperimentPageManager {
 
       const newExperimentId = experimentIdInput.value.trim();
       Logger.debug(
-        `[ExperimentPageManager] 使用者手動輸入實驗ID: ${newExperimentId}`
+        `使用者手動輸入實驗ID: ${newExperimentId}`
       );
 
       // 只在同步模式下註冊到中樞
       const hubManager = getExperimentHubManager();
       if (hubManager?.isInSyncMode?.()) {
-        Logger.debug("[同步模式] 註冊手動輸入的實驗ID到中樞");
+        Logger.debug("註冊手動輸入的實驗ID到中樞");
         await this.registerExperimentIdToHub(newExperimentId);
       } else {
-        Logger.debug("[獨立模式] 實驗ID僅存本機");
+        Logger.debug("實驗ID僅存本機");
       }
 
       if (this.currentCombination) {
@@ -544,7 +547,7 @@ class ExperimentPageManager {
     if (window.CombinationSelector) {
       window.CombinationSelector.selectCombination(combination);
     } else {
-      Logger.warn("[ExperimentPageManager] CombinationSelector 未載入");
+      Logger.warn("CombinationSelector 未載入");
       // 降級方案：使用內部邏輯
       this.updateUnitListForCombination(combination);
     }
@@ -1368,7 +1371,7 @@ class ExperimentPageManager {
     listContainer.innerHTML = html;
   }
 
-  // ========== Action-Based 實驗流程管理 ==========
+  // ========== 動作序列實驗流程管理 ==========
 
   /**
    * 初始化指定組合的 action 序列
@@ -1652,8 +1655,7 @@ class ExperimentPageManager {
 
     // 控制按鈕組
     const controlsGroup = document.createElement("div");
-    controlsGroup.style.cssText =
-      "display: flex; align-items: center; gap: 4px; margin-left: auto;";
+    controlsGroup.className = "unit-controls";
 
     // 上移按鈕
     const upBtn = document.createElement("button");
@@ -1939,7 +1941,7 @@ class ExperimentPageManager {
         subjectNameInput.value = subjectName;
       }
       Logger.debug(
-        `[ExperimentPageManager] 自動產生受試者名稱: ${subjectName}`
+        `自動產生受試者名稱: ${subjectName}`
       );
     }
 
@@ -2087,7 +2089,7 @@ class ExperimentPageManager {
         this.loadedUnits = loadedUnits;
       }
       Logger.info(
-        `[ExperimentPageManager] 套用等待中的組合更新: ${currentCombination?.combination_name || "未知組合"}`
+        `套用等待中的組合更新: ${currentCombination?.combination_name || "未知組合"}`
       );
       this.pendingCombinationUpdate = null;
     }
@@ -2466,7 +2468,7 @@ class ExperimentPageManager {
       }
 
       Logger.debug(
-        `[ExperimentPageManager] 收到遠程實驗ID廣播: ${experimentId}`
+        `收到遠程實驗ID廣播: ${experimentId}`
       );
 
       // 更新本機UI
@@ -2474,7 +2476,7 @@ class ExperimentPageManager {
       if (experimentIdInput && experimentIdInput.value !== experimentId) {
         experimentIdInput.value = experimentId;
         Logger.info(
-          `[ExperimentPageManager] 已同步實驗ID到UI: ${experimentId}`
+          `已同步實驗ID到UI: ${experimentId}`
         );
       }
     });
@@ -2621,7 +2623,7 @@ class ExperimentPageManager {
     // 設置實驗ID
     if (experimentId) {
       this.experimentId = experimentId;
-      Logger.info(`[接收] 從機台面板同步的實驗ID: ${experimentId}`);
+      Logger.info(`從機台面板同步的實驗ID: ${experimentId}`);
 
       // 更新輸入框
       const experimentIdInput = document.getElementById("experimentId");
@@ -2648,7 +2650,7 @@ class ExperimentPageManager {
       // 如果目前實驗正在進行中，等待實驗結束後再同步新的組合
       if (this.experimentRunning) {
         Logger.debug(
-          "[ExperimentPageManager] 實驗進行中，將組合更新請求加入佇列"
+          "實驗進行中，將組合更新請求加入佇列"
         );
         // 將更新請求加入佇列，等待實驗結束
         this.pendingCombinationUpdate = { currentCombination, loadedUnits };
@@ -2702,13 +2704,13 @@ class ExperimentPageManager {
       // 將更新請求加入佇列，等待實驗結束
       this.pendingExperimentIdUpdate = data;
       Logger.debug(
-        `[ExperimentPageManager] 實驗進行中，等待實驗結束後套用ID更新: ${data.experimentId}`
+        `實驗進行中，等待實驗結束後套用ID更新: ${data.experimentId}`
       );
       return;
     }
 
     const { experimentId } = data;
-    Logger.debug(`[ExperimentPageManager] 套用遠端實驗ID更新: ${experimentId}`);
+    Logger.debug(`套用遠端實驗ID更新: ${experimentId}`);
 
     const experimentIdInput = document.getElementById("experimentIdInput");
     if (experimentIdInput && experimentIdInput.value.trim() !== experimentId) {
@@ -2724,7 +2726,7 @@ class ExperimentPageManager {
       }
 
       Logger.info(
-        `[ExperimentPageManager] 實驗ID已同步並儲存: ${experimentId}`
+        `實驗ID已同步並儲存: ${experimentId}`
       );
     }
   }
@@ -2741,16 +2743,6 @@ class ExperimentPageManager {
     // 建立手勢卡片容器
     const cardsContainer = document.createElement("div");
     cardsContainer.className = "gestures-cards-container";
-    cardsContainer.style.cssText = `
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 10px;
-      padding: 20px;
-      background: #f5f5f5;
-      border-radius: 8px;
-      max-height: calc(100vh - 200px);
-      overflow-y: auto;
-    `;
 
     // 如果沒有載入手勢序列，顯示提示
     if (
@@ -2773,33 +2765,18 @@ class ExperimentPageManager {
       card.id = `gesture-card-${index}`;
       card.className = "gesture-card gesture-card-inactive";
       card.setAttribute("data-gesture-id", gestureObj.gesture || "");
+      card.className = "gesture-card";
       card.setAttribute("data-gesture-index", index);
-      card.style.cssText = `
-        background: white;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        padding: 12px;
-        text-align: center;
-        cursor: default;
-        transition: all 0.3s ease;
-        min-height: 100px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        font-size: 12px;
-      `;
 
       // 從手勢對象直接取得名稱 (loadScriptForCombination 已經設置了)
       const gestureName = gestureObj.name || gestureObj.gesture || "未知手勢";
 
       const title = document.createElement("div");
-      title.style.cssText =
-        "font-weight: 700; color: #333; margin-bottom: 6px; word-break: break-word;";
+      title.className = "gesture-card-title";
       title.textContent = gestureName;
 
       const desc = document.createElement("div");
-      desc.style.cssText = "font-size: 11px; color: #666;";
+      desc.className = "gesture-card-desc";
       desc.textContent = `步驟 ${index + 1}`;
 
       card.appendChild(title);
@@ -2918,7 +2895,7 @@ class ExperimentPageManager {
 
     // 如果受試者名稱為空，不進行同步（避免 null 污染）
     if (!subjectName || !subjectName.trim()) {
-      Logger.debug("[ExperimentPageManager] 受試者名稱為空，跳過同步");
+      Logger.debug("受試者名稱為空，跳過同步");
       return;
     }
 
@@ -2961,7 +2938,7 @@ class ExperimentPageManager {
 
       // 移除 PHP 調用
       // 狀態管理由 ExperimentStateManager 和 WebSocket 處理
-      Logger.debug("[ExperimentPageManager] 跳過 PHP API 調用");
+      Logger.debug("跳過 PHP API 調用");
     } catch (error) {
       Logger.warn("註冊實驗狀態失敗:", error);
     }
@@ -3356,3 +3333,8 @@ window.markGesture = markGesture;
 window.goToNextStep = goToNextStep;
 window.toggleLeftPanel = toggleLeftPanel;
 window.toggleGestureStats = toggleGestureStats;
+
+
+
+
+

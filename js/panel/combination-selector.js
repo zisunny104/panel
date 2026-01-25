@@ -65,7 +65,7 @@ class CombinationSelector {
       this.scriptData = await response.json();
       return this.scriptData;
     } catch (error) {
-      Logger.error("[CombinationSelector] 載入 scenarios.json 失敗:", error);
+      Logger.error("載入 scenarios.json 失敗:", error);
       return null;
     }
   }
@@ -88,7 +88,7 @@ class CombinationSelector {
     // 確保 script 資料已載入
     await this.loadScriptData();
     if (!this.scriptData) {
-      Logger.error("[CombinationSelector] scriptData 載入失敗");
+      Logger.error("scriptData 載入失敗");
       return;
     }
 
@@ -108,7 +108,7 @@ class CombinationSelector {
         this.selectCombination(fullCombination, experimentId);
       } else {
         Logger.warn(
-          "[CombinationSelector] 本機快取的組合找不到:",
+          "本機快取的組合找不到:",
           savedCombination.combination_id
         );
       }
@@ -128,7 +128,7 @@ class CombinationSelector {
         return;
       } else {
         Logger.warn(
-          "[CombinationSelector] 設定的預設組合找不到:",
+          "設定的預設組合找不到:",
           defaultCombinationId
         );
       }
@@ -141,7 +141,7 @@ class CombinationSelector {
       return;
     }
 
-    Logger.error("[CombinationSelector] 沒有任何可用的組合");
+    Logger.error("沒有任何可用的組合");
   }
 
   /**
@@ -292,7 +292,7 @@ class CombinationSelector {
   broadcastCombinationSelection(combination) {
     // 離線狀態下不廣播
     if (!this.isOnline()) {
-      Logger.info("[CombinationSelector] 離線狀態，不進行同步廣播");
+      Logger.info("離線狀態，不進行同步廣播");
       return;
     }
 
@@ -379,7 +379,7 @@ class CombinationSelector {
         })
       );
     } catch (error) {
-      Logger.warn("[CombinationSelector] 無法儲存到本機快取");
+      Logger.warn("無法儲存到本機快取");
     }
   }
 
@@ -394,7 +394,7 @@ class CombinationSelector {
         return combination;
       }
     } catch (error) {
-      Logger.warn("[CombinationSelector] 無法讀取本機快取");
+      Logger.warn("無法讀取本機快取");
     }
     return null;
   }
@@ -406,7 +406,7 @@ class CombinationSelector {
     try {
       localStorage.removeItem("selectedCombination");
     } catch (error) {
-      Logger.warn("[CombinationSelector] 無法清除本機快取");
+      Logger.warn("無法清除本機快取");
     }
   }
 
@@ -433,3 +433,8 @@ class CombinationSelector {
 
 // 全域實例化
 window.CombinationSelector = new CombinationSelector();
+
+
+
+
+

@@ -48,6 +48,29 @@
     padding: 20px 20px 20px 20px;
     overflow-x: hidden;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #bbb #f5f5f5;
+}
+
+.sync-panel-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sync-panel-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sync-panel-body::-webkit-scrollbar-thumb {
+    background: #bbb;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
+}
+
+.sync-panel-body::-webkit-scrollbar-thumb:hover {
+    background: #999;
+    background-clip: padding-box;
 }
 
 /* 統一的面板控制區域 */

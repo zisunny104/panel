@@ -1,7 +1,7 @@
 /* ================= 設定面板 ================= */
 .settings-panel {
     position: fixed;
-    right: 5.5rem;
+    right: 4rem;
     bottom: 7rem;
     width: 23.75rem;
     max-height: 70vh;
@@ -121,6 +121,29 @@
     box-sizing: border-box;
     /* space for scrollbar */
     max-height: calc(70vh - 4.25rem);
+    scrollbar-width: thin;
+    scrollbar-color: #bbb #f5f5f5;
+}
+
+.settings-panel-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.settings-panel-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.settings-panel-body::-webkit-scrollbar-thumb {
+    background: #bbb;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
+}
+
+.settings-panel-body::-webkit-scrollbar-thumb:hover {
+    background: #999;
+    background-clip: padding-box;
 }
 
 .settings-panel-body .control-group:last-child {

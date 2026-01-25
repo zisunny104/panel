@@ -1,4 +1,6 @@
-// console-manager.js - 統一的日誌管理模塊
+/**
+ * Logger - 統一的日誌管理模塊
+ */
 
 class Logger {
   static LOG_LEVEL = "debug"; // 'debug', 'info', 'warn', 'error', 'none'
@@ -149,3 +151,8 @@ class Logger {
 window.Logger = Logger;
 
 window.ConsoleManager = Logger;
+
+
+
+
+

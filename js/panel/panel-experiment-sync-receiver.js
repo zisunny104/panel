@@ -113,7 +113,7 @@ class PanelExperimentSyncReceiver {
     const { combination } = detail;
 
     Logger.info(
-      "[PanelExperimentSyncReceiver] 接收到遠端組合選擇:",
+      "接收到遠端組合選擇:",
       combination
     );
 
@@ -126,7 +126,7 @@ class PanelExperimentSyncReceiver {
       );
     } else {
       Logger.warn(
-        "[PanelExperimentSyncReceiver] CombinationSelector 未載入，無法套用遠端組合選擇"
+        "CombinationSelector 未載入，無法套用遠端組合選擇"
       );
     }
   }
@@ -136,7 +136,7 @@ class PanelExperimentSyncReceiver {
    */
   showSyncNotification(message, type = "info") {
     // 簡單的紀錄行為以便日後擴充 UI
-    Logger.info(`[PanelExperimentSyncReceiver] ${message}`, { type });
+    Logger.info(`${message}`, { type });
   }
 
   /**
@@ -160,3 +160,8 @@ if (document.readyState === "loading") {
 } else {
   window.panelExperimentSyncReceiver = new PanelExperimentSyncReceiver();
 }
+
+
+
+
+

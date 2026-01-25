@@ -1,6 +1,16 @@
-// experiment-action-manager.js - 實驗頁面動作管理器
-// 提供 action-based 實驗的核心動作管理功能
-// 專門用於 experiment.html
+/**
+ * ExperimentActionManager - 實驗頁面動作管理器
+ *
+ * 提供動作序列管理功能，專門用於 experiment.html
+ * 負責管理實驗過程中按鈕動作的序列、執行狀態和遠端同步
+ *
+ * 主要功能：
+ * - 動作序列構建與管理
+ * - 動作執行狀態追蹤
+ * - 遠端按鈕動作同步
+ * - 重複動作排除機制
+ * - 動作執行時間記錄
+ */
 
 class ExperimentActionManager {
   constructor() {

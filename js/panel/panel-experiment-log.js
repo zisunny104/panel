@@ -40,7 +40,7 @@ class PanelExperimentLog {
     });
 
     // console.log(
-    //   `[PanelExperimentLog] 開始記錄 - ID: ${experimentId}, 受試者: ${this.participantName}`
+    //   `開始記錄 - ID: ${experimentId}, 受試者: ${this.participantName}`
     // );
   }
 
@@ -214,7 +214,7 @@ class PanelExperimentLog {
   markSyncDeviceCompleted(deviceId) {
     if (this.syncDevices.has(deviceId)) {
       this.syncDevices.get(deviceId).experimentCompleted = true;
-      Logger.info(`[PanelExperimentLog] 同步裝置 ${deviceId} 已完成實驗`);
+      Logger.info(`同步裝置 ${deviceId} 已完成實驗`);
     }
 
     // 檢查是否所有同步裝置都已完成
@@ -229,7 +229,7 @@ class PanelExperimentLog {
    */
   async stopRecording(totalElapsedSeconds = 0, isAutoStop = false) {
     if (!this.isRecording) {
-      Logger.warn("[PanelExperimentLog] 尚未開始記錄");
+      Logger.warn("尚未開始記錄");
       return false;
     }
 
@@ -249,7 +249,7 @@ class PanelExperimentLog {
       const allCompleted = this._areAllSyncDevicesCompleted();
       if (!allCompleted) {
         // console.log(
-        //   "[PanelExperimentLog] 等待同步裝置完成實驗後再更新實驗 ID..."
+        //   "等待同步裝置完成實驗後再更新實驗 ID..."
         // );
         this.waitingForSyncDevices = true;
         // 先下載日誌，但不更新實驗 ID
@@ -262,7 +262,7 @@ class PanelExperimentLog {
     this._downloadJSONL();
 
     // console.log(
-    //   `[PanelExperimentLog] 記錄結束 - 共 ${this.logs.length} 條日誌`
+    //   `記錄結束 - 共 ${this.logs.length} 條日誌`
     // );
 
     return true;
@@ -285,7 +285,7 @@ class PanelExperimentLog {
    */
   confirmExperimentIdUpdate() {
     this.waitingForSyncDevices = false;
-    //console.log("[PanelExperimentLog] 所有同步裝置已完成，可以更新實驗 ID");
+    //console.log("所有同步裝置已完成，可以更新實驗 ID");
   }
 
   /**
@@ -330,7 +330,7 @@ class PanelExperimentLog {
    */
   _downloadJSONL() {
     if (this.logs.length === 0) {
-      Logger.warn("[PanelExperimentLog] 沒有日誌可下載");
+      Logger.warn("沒有日誌可下載");
       return;
     }
 
@@ -358,7 +358,7 @@ class PanelExperimentLog {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    // console.log(`[PanelExperimentLog] JSONL 日誌已下載: ${fileName}`);
+    // console.log(`JSONL 日誌已下載: ${fileName}`);
   }
 
   /**
@@ -412,10 +412,15 @@ class PanelExperimentLog {
     this.isRecording = false;
     this.syncDevices.clear();
     this.waitingForSyncDevices = false;
-    //console.log("[PanelExperimentLog] 已重設");
+    //console.log("已重設");
   }
 }
 
 // 全域暴露
 window.PanelExperimentLog = PanelExperimentLog;
 window.panelExperimentLog = new PanelExperimentLog();
+
+
+
+
+

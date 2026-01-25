@@ -183,6 +183,13 @@
     pointer-events: none;
 }
 
+.unit-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
 .unit-drag-handle {
     cursor: grab;
     font-size: 14px;

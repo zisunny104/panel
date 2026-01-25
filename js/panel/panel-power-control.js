@@ -14,7 +14,7 @@ class PowerControl {
     this.powerLightOn = document.getElementById("powerLightOn");
 
     Logger.debug(
-      "[PowerControl] 構造函數 - powerLightOn 元素:",
+      "構造函數 - powerLightOn 元素:",
       this.powerLightOn
     );
 
@@ -320,7 +320,7 @@ class PowerControl {
       this.powerLightOn.style.zIndex = "1000";
       this.powerLightOn.title = "點擊可快速開機（開機動畫進行中時）";
     } else {
-      Logger.debug("[PowerControl] 找不到綠色燈號元素 (powerLightOn)");
+      Logger.debug("找不到綠色燈號元素 (powerLightOn)");
     }
 
     // 設定同步事件監聽器
@@ -566,9 +566,9 @@ class PowerControl {
       });
 
       if (!syncResult) {
-        Logger.debug("[PowerControl] 作為本機模式，電源狀態僅儲存本機");
+        Logger.debug("作為本機模式，電源狀態僅儲存本機");
       } else {
-        Logger.debug("[PowerControl] 電源狀態已成功廣播");
+        Logger.debug("電源狀態已成功廣播");
       }
     }
   }
@@ -637,7 +637,7 @@ class PowerControl {
       oldVideoPlaying !== this.isPowerVideoPlaying
     ) {
       Logger.debug(
-        `[PowerControl] 套用遠端電源狀態: ${oldPowerState} -> ${this.isPowerOn}`
+        `套用遠端電源狀態: ${oldPowerState} -> ${this.isPowerOn}`
       );
 
       // 更新UI但不觸發廣播事件
@@ -723,3 +723,8 @@ class PowerControl {
 
 // 匯出單例
 window.powerControl = new PowerControl();
+
+
+
+
+

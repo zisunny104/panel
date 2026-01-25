@@ -1,4 +1,8 @@
-// data-loader.js - 從 scenarios.json 載入資料
+/**
+ * DataLoader - 從 scenarios.json 載入資料
+ *
+ * 從 scenarios.json 載入實驗資料
+ */
 
 /**
  * 從 scenarios.json 載入實驗資料
@@ -89,3 +93,8 @@ export { loadUnitsFromScenarios, buildActionSequenceFromUnits };
 // 為了向後相容性，也將函數新增到全域範圍
 window.loadUnitsFromScenarios = loadUnitsFromScenarios;
 window.buildActionSequenceFromUnits = buildActionSequenceFromUnits;
+
+
+
+
+

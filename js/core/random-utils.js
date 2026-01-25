@@ -1,5 +1,6 @@
 /**
- * 隨機化工具模組
+ * RandomUtils - 隨機化工具模組
+ *
  * 提供可重現的隨機化功能，確保相同的種子產生相同的隨機序列
  */
 
@@ -141,3 +142,8 @@ export const RandomUtils = {
 
 // 保持向後相容的全域物件
 window.RandomUtils = RandomUtils;
+
+
+
+
+

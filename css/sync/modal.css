@@ -140,8 +140,31 @@
     align-items: stretch;
 
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #bbb #f5f5f5;
 
     background: #ffffff;
+}
+
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: #bbb;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: #999;
+    background-clip: padding-box;
 }
 
 /* 當modal-body是最後一個子元素時（沒有footer），新增底部圓角 */

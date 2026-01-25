@@ -1,5 +1,5 @@
 // js/panel/panel-action-manager.js - 面板動作管理器
-// 專門用於主面板的 action-based 實驗邏輯
+// 專門用於主面板的動作序列管理邏輯
 // 專門用於 index.html
 
 /**
@@ -198,3 +198,8 @@ window.PanelActionManager = PanelActionManager;
 
 // 向後相容：也將 ActionManager 指向 PanelActionManager （會被 experiment 版本覆寫）
 window.ActionManager = PanelActionManager;
+
+
+
+
+

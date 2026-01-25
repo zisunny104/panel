@@ -156,7 +156,7 @@ class PanelManager {
   openPanel(panelName) {
     const panel = this.panels[panelName];
     if (!panel || !panel.element) {
-      Logger.warn(`[PanelManager] Panel not found: ${panelName}`);
+      Logger.warn(`Panel not found: ${panelName}`);
       return;
     }
 
@@ -240,3 +240,8 @@ class PanelManager {
 
 // 匯出單例
 window.panelManager = new PanelManager();
+
+
+
+
+

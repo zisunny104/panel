@@ -175,13 +175,13 @@ class PanelSyncOperator {
    */
   async startExperimentFromPanel() {
     if (this.experimentRunning) {
-      Logger.warn("[PanelSyncOp] 實驗已在進行中");
+      Logger.warn("實驗已在進行中");
       return;
     }
 
     // 檢查是否可以同步操作
     if (!this.syncControlsEnabled) {
-      Logger.warn("[PanelSyncOp] 無法同步操作實驗");
+      Logger.warn("無法同步操作實驗");
       return;
     }
 
@@ -230,7 +230,7 @@ class PanelSyncOperator {
         syncData.gesture_sequence || syncData.gestureSequence || [];
       const experimentIdForLog =
         syncData.experiment_id || syncData.experimentId || null;
-      Logger.info("[PanelSyncOp] 準備發送實驗開始資料:", {
+      Logger.info("準備發送實驗開始資料:", {
         experimentId: experimentIdForLog,
         gestureCount: gestureSeq.length,
         hasGestureSequence: gestureSeq.length > 0
@@ -240,7 +240,7 @@ class PanelSyncOperator {
       await window.syncManager.core.syncState(syncData);
 
       this.updateStatus("實驗已開始（已同步）");
-      Logger.info("[PanelSyncOp] 面板已開始實驗並同步");
+      Logger.info("面板已開始實驗並同步");
 
       // 5 秒後清空狀態訊息
       setTimeout(() => {
@@ -249,7 +249,7 @@ class PanelSyncOperator {
         }
       }, 5000);
     } catch (error) {
-      Logger.error("[PanelSyncOp] 同步實驗開始失敗:", error);
+      Logger.error("同步實驗開始失敗:", error);
       this.updateStatus("同步失敗: " + error.message);
       this.experimentRunning = false;
       this.updateExperimentUI();
@@ -261,12 +261,12 @@ class PanelSyncOperator {
    */
   async stopExperimentFromPanel() {
     if (!this.experimentRunning) {
-      Logger.warn("[PanelSyncOp] 實驗未在進行中");
+      Logger.warn("實驗未在進行中");
       return;
     }
 
     if (!this.syncControlsEnabled) {
-      Logger.warn("[PanelSyncOp] 無法同步操作實驗");
+      Logger.warn("無法同步操作實驗");
       return;
     }
 
@@ -285,13 +285,13 @@ class PanelSyncOperator {
       await window.syncManager.core.syncState(syncData);
 
       this.updateStatus("實驗已停止（已同步）");
-      Logger.info("[PanelSyncOp] 面板已停止實驗並同步:", syncData);
+      Logger.info("面板已停止實驗並同步:", syncData);
 
       setTimeout(() => {
         this.updateStatus("");
       }, 5000);
     } catch (error) {
-      Logger.error("[PanelSyncOp] 同步實驗停止失敗:", error);
+      Logger.error("同步實驗停止失敗:", error);
       this.updateStatus("同步失敗: " + error.message);
       this.experimentRunning = true;
       this.updateExperimentUI();
@@ -331,14 +331,14 @@ class PanelSyncOperator {
             }
           }
         } catch (err) {
-          Logger.warn("[PanelSyncOp] 無法查詢操作者數量:", err);
+          Logger.warn("無法查詢操作者數量:", err);
         }
       }
 
       // 預設回傳 1（表示只有目前操作者）
       return 1;
     } catch (error) {
-      Logger.warn("[PanelSyncOp] 檢查操作者數量失敗:", error);
+      Logger.warn("檢查操作者數量失敗:", error);
       return 1;
     }
   }
@@ -375,11 +375,11 @@ class PanelSyncOperator {
    * 處理來自其他裝置的實驗開始
    */
   handleRemoteExperimentStart(syncData) {
-    Logger.info("[PanelSyncOp] 接收到遠端實驗開始:", syncData);
+    Logger.info("接收到遠端實驗開始:", syncData);
 
     // 如果來自其他裝置，只做狀態更新
     if (syncData.device_id !== this.deviceId) {
-      Logger.info(`[PanelSyncOp] 實驗由裝置 ${syncData.device_id} 開始`);
+      Logger.info(`實驗由裝置 ${syncData.device_id} 開始`);
       this.updateStatus(`已同步開始 (${syncData.device_id})`);
     }
   }
@@ -388,11 +388,11 @@ class PanelSyncOperator {
    * 處理來自其他裝置的實驗停止
    */
   handleRemoteExperimentStop(syncData) {
-    Logger.info("[PanelSyncOp] 接收到遠端實驗停止:", syncData);
+    Logger.info("接收到遠端實驗停止:", syncData);
 
     // 如果來自其他裝置，更新狀態
     if (syncData.device_id !== this.deviceId) {
-      Logger.info(`[PanelSyncOp] 實驗由裝置 ${syncData.device_id} 停止`);
+      Logger.info(`實驗由裝置 ${syncData.device_id} 停止`);
       this.updateStatus(`已同步停止 (${syncData.device_id})`);
     }
   }
@@ -406,3 +406,8 @@ if (document.readyState === "loading") {
 } else {
   window.panelSyncOperator = new PanelSyncOperator();
 }
+
+
+
+
+

@@ -37,7 +37,7 @@
 }
 
 .experiment-default-list::-webkit-scrollbar {
-    height: 6px;
+    height: 4px;
 }
 
 .experiment-default-list::-webkit-scrollbar-track {

@@ -112,6 +112,52 @@ class ExperimentLogManager {
   }
 
   /**
+   * 清理本機快取：刪除 IndexedDB（ExperimentLogsDB）與常見 localStorage 鍵
+   * 使用方式（在瀏覽器 console 執行）：
+   *   await window.experimentLogManager.clearLocalCache();
+   * @returns {Promise<boolean>} 成功回傳 true
+   */
+  async clearLocalCache() {
+    return new Promise((resolve, reject) => {
+      try {
+        // 刪除 IndexedDB
+        const req = indexedDB.deleteDatabase(this.dbName);
+        req.onsuccess = () => {
+          Logger.info("IndexedDB 已刪除");
+          // 重設狀態
+          this.logs = [];
+          this.pendingLogs = [];
+          this.db = null;
+
+          // 清除常見的 localStorage 鍵
+          const keys = [
+            "loggerMinimized",
+            "sync_session_backup",
+            "sync_session_id",
+            "sync_client_id",
+            "sync_preferred_role",
+            "preferredCameraId",
+            "preferredCameraLabel"
+          ];
+          keys.forEach((k) => localStorage.removeItem(k));
+
+          resolve(true);
+        };
+        req.onerror = (e) => {
+          Logger.error("刪除 IndexedDB 失敗:", e);
+          reject(e);
+        };
+        req.onblocked = () => {
+          Logger.warn("IndexedDB 刪除被阻塞");
+        };
+      } catch (err) {
+        Logger.error("clearLocalCache 例外:", err);
+        reject(err);
+      }
+    });
+  }
+
+  /**
    * 設定實驗ID
    * @param {string} experimentId - 新的實驗ID
    * @param {string} source - 更新來源 (用於記錄)
@@ -574,20 +620,18 @@ class ExperimentLogManager {
    */
   async _flushLogs() {
     if (this.pendingLogs.length === 0) {
-      Logger.debug("[ExperimentLogManager] 沒有待處理的日誌");
+      Logger.debug("沒有待處理的日誌");
       return;
     }
 
-    Logger.debug(
-      `[ExperimentLogManager] 將 ${this.pendingLogs.length} 條日誌寫入 IndexedDB`
-    );
+    Logger.debug(`將 ${this.pendingLogs.length} 條日誌寫入 IndexedDB`);
 
     try {
       await this._savePendingLogsToIndexedDB();
       this.pendingLogs = [];
-      Logger.debug("[ExperimentLogManager] 日誌已儲存到 IndexedDB");
+      Logger.debug("日誌已儲存到 IndexedDB");
     } catch (error) {
-      Logger.error("[ExperimentLogManager] 寫入 IndexedDB 失敗:", error);
+      Logger.error("寫入 IndexedDB 失敗:", error);
     }
   }
 
@@ -637,7 +681,7 @@ class ExperimentLogManager {
       // 廣播同步事件
       this._broadcastMessage("logsSynced", { count: this.pendingLogs.length });
     } catch (error) {
-      Logger.error("[ExperimentLogManager] 批次儲存日誌失敗:", error);
+      Logger.error("批次儲存日誌失敗:", error);
       throw error;
     }
   }
@@ -656,17 +700,15 @@ class ExperimentLogManager {
       if (this.pendingLogs.length > 0) {
         await this._savePendingLogsToIndexedDB();
         this.pendingLogs = [];
-        Logger.info(
-          `[ExperimentLogManager] ${this.logs.length} 條日誌已全部儲存到 IndexedDB`
-        );
+        Logger.info(`${this.logs.length} 條日誌已全部儲存到 IndexedDB`);
       } else {
-        Logger.debug("[ExperimentLogManager] 沒有待處理的日誌");
+        Logger.debug("沒有待處理的日誌");
       }
 
       // 同時儲存為 JSONL 檔案到 runtime 資料夾（使用 PHP API）
       await this._saveToRuntimeFolder();
     } catch (error) {
-      Logger.error("[ExperimentLogManager] flushAll 發生錯誤:", error);
+      Logger.error("flushAll 發生錯誤:", error);
     }
   }
 
@@ -676,7 +718,7 @@ class ExperimentLogManager {
    */
   async _saveToRuntimeFolder() {
     if (this.logs.length === 0) {
-      Logger.debug("[ExperimentLogManager] 沒有日誌需要儲存");
+      Logger.debug("沒有日誌需要儲存");
       return;
     }
 
@@ -708,13 +750,13 @@ class ExperimentLogManager {
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          Logger.info(`[ExperimentLogManager] 日誌已儲存到 ${result.path}`);
+          Logger.info(`日誌已儲存到 ${result.path}`);
         } else {
-          Logger.warn(`[ExperimentLogManager] 儲存日誌失敗: ${result.error}`);
+          Logger.warn(`儲存日誌失敗: ${result.error}`);
         }
       } else {
         Logger.warn(
-          `[ExperimentLogManager] 無法連接到後端 API (${response.status})，日誌僅儲存於 IndexedDB`
+          `無法連接到後端 API (${response.status})，日誌僅儲存於 IndexedDB`
         );
       }
     } catch (error) {
@@ -854,7 +896,7 @@ class ExperimentLogManager {
   async listExperiments() {
     try {
       if (!this.db) {
-        Logger.warn("[ExperimentLogManager] IndexedDB 尚未初始化");
+        Logger.warn("IndexedDB 尚未初始化");
         return [];
       }
 
@@ -937,7 +979,7 @@ class ExperimentLogManager {
         };
       });
     } catch (error) {
-      Logger.error("[ExperimentLogManager] listExperiments 發生錯誤:", error);
+      Logger.error("listExperiments 發生錯誤:", error);
       return [];
     }
   }
@@ -982,7 +1024,7 @@ class ExperimentLogManager {
         };
       });
     } catch (error) {
-      Logger.error("[ExperimentLogManager] getAllLogs 發生錯誤:", error);
+      Logger.error("getAllLogs 發生錯誤:", error);
       return [...this.logs, ...this.pendingLogs];
     }
   }
@@ -1043,7 +1085,7 @@ class ExperimentLogManager {
   async deleteExperiment(experimentId) {
     try {
       if (!this.db) {
-        Logger.warn("[ExperimentLogManager] IndexedDB 尚未初始化");
+        Logger.warn("IndexedDB 尚未初始化");
         return false;
       }
 
@@ -1465,9 +1507,27 @@ class ExperimentLogManager {
     }
     return window.experimentLogManager.getExperimentId() || "";
   };
+
+  // 全域快捷：清理應用程式本機快取（IndexedDB + 常見 localStorage 鍵）
+  window.clearAppCache = async function () {
+    try {
+      await window.experimentLogManager.clearLocalCache();
+      alert("已刪除本機快取（IndexedDB 與常見 localStorage 鍵）");
+    } catch (err) {
+      console.error("清理快取失敗", err);
+      alert(
+        "清理快取失敗: " + (err && err.message ? err.message : String(err))
+      );
+    }
+  };
 })();
 
 // 如果作為 ES6 模塊導入，也提供匯出
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ExperimentLogManager;
 }
+
+
+
+
+

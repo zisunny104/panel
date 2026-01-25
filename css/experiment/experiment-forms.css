@@ -271,6 +271,29 @@
     border-radius: 4px;
     border: 2px solid #ddd;
     color: #666;
+    scrollbar-width: thin;
+    scrollbar-color: #bbb #f5f5f5;
+}
+
+.log-display::-webkit-scrollbar {
+    width: 8px;
+}
+
+.log-display::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.log-display::-webkit-scrollbar-thumb {
+    background: #bbb;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
+}
+
+.log-display::-webkit-scrollbar-thumb:hover {
+    background: #999;
+    background-clip: padding-box;
 }
 
 /* 實驗日誌列表 */
@@ -819,4 +842,16 @@ svg.icon-sm {
 
 .combination-history-status.error {
     color: #c62828;
+}
+
+/* 手勢卡片容器 */
+.gestures-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
 }

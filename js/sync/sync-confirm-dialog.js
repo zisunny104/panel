@@ -13,7 +13,7 @@ class SyncConfirmDialogManager {
    * @param {Function} onCancel - 取消時的Callback
    */
   static showJoinConfirmation(code, role, onConfirm, onCancel) {
-    Logger.debug("[Dialog] showJoinConfirmation 被調用", { code, role });
+    Logger.debug("showJoinConfirmation 被調用", { code, role });
 
     let selectedRole = role;
     let editedCode = code;
@@ -22,11 +22,11 @@ class SyncConfirmDialogManager {
     // 移除已存在的對話框（避免重複）
     const existing = document.querySelector(".sync-confirm-dialog");
     if (existing) {
-      Logger.debug("[Dialog] 移除已存在的對話框");
+      Logger.debug("移除已存在的對話框");
       existing.remove();
     }
 
-    Logger.debug("[Dialog] 建立新的確認對話框");
+    Logger.debug("建立新的確認對話框");
 
     // 建立對話框
     const confirmDialog = document.createElement("div");
@@ -76,14 +76,14 @@ class SyncConfirmDialogManager {
       </div>
     `;
 
-    Logger.debug("[Dialog] 將對話框新增到DOM");
+    Logger.debug("將對話框新增到DOM");
     document.body.appendChild(confirmDialog);
-    Logger.debug("[Dialog] 對話框已新增到DOM，準備綁定事件");
+    Logger.debug("對話框已新增到DOM，準備綁定事件");
 
     // 新增active類別以顯示對話框
     setTimeout(() => {
       confirmDialog.classList.add("active");
-      Logger.debug("[Dialog] 對話框active類別已新增，應該可見");
+      Logger.debug("對話框active類別已新增，應該可見");
     }, 10);
 
     // 綁定事件
@@ -106,7 +106,7 @@ class SyncConfirmDialogManager {
     // 分享代碼輸入變化 - 包含即時驗證狀態顯示
     let validationTimeout;
     codeInput.addEventListener("input", (e) => {
-      Logger.debug("[Dialog] 分享代碼輸入事件觸發，輸入值:", e.target.value);
+      Logger.debug("分享代碼輸入事件觸發，輸入值:", e.target.value);
       editedCode = e.target.value.toUpperCase();
       codeInput.value = editedCode;
 
@@ -133,7 +133,7 @@ class SyncConfirmDialogManager {
 
       // 延遲驗證（避免頻繁請求）
       validationTimeout = setTimeout(async () => {
-        Logger.debug("[Dialog] 開始驗證分享代碼:", editedCode);
+        Logger.debug("開始驗證分享代碼:", editedCode);
         try {
           // 使用 SyncClient 的方法驗證
           const syncClient = window.syncManager?.core?.syncClient;
@@ -142,7 +142,7 @@ class SyncConfirmDialogManager {
           }
 
           const result = await syncClient.getShareCodeInfo(editedCode);
-          Logger.debug("[Dialog] 收到驗證回應:", result);
+          Logger.debug("收到驗證回應:", result);
 
           // 確保元素仍存在且對話框未關閉
           const currentStatus = confirmDialog.querySelector(
@@ -152,7 +152,7 @@ class SyncConfirmDialogManager {
 
           // 有結果且未過期、未使用
           if (result && !result.expired && !result.used) {
-            Logger.debug("[Dialog] 分享代碼驗證成功");
+            Logger.debug("分享代碼驗證成功");
             currentStatus.classList.add("valid");
             currentStatus.classList.remove("invalid");
             currentStatus.querySelector(
@@ -162,7 +162,7 @@ class SyncConfirmDialogManager {
               ".sync-confirm-checksum-text"
             ).textContent = "代碼有效";
           } else {
-            Logger.debug("[Dialog] 分享代碼驗證失敗:", result);
+            Logger.debug("分享代碼驗證失敗:", result);
             currentStatus.classList.add("invalid");
             currentStatus.classList.remove("valid");
             currentStatus.querySelector(
@@ -173,7 +173,7 @@ class SyncConfirmDialogManager {
             ).textContent = "代碼無效或格式錯誤";
           }
         } catch (error) {
-          Logger.error("[Dialog] 驗證分享代碼時發生錯誤:", error);
+          Logger.error("驗證分享代碼時發生錯誤:", error);
           const currentStatus = confirmDialog.querySelector(
             ".sync-confirm-checksum-status"
           );
@@ -252,7 +252,7 @@ class SyncConfirmDialogManager {
 
         // 驗證通過，關閉對話框並執行Callback
         Logger.debug(
-          `[Dialog] 分享代碼驗證通過，準備執行加入Callback - 代碼: ${editedCode}, 角色: ${selectedRole}`
+          `分享代碼驗證通過，準備執行加入Callback - 代碼: ${editedCode}, 角色: ${selectedRole}`
         );
         confirmDialog.remove();
         if (onConfirm) onConfirm(editedCode, selectedRole);
@@ -276,11 +276,11 @@ class SyncConfirmDialogManager {
     };
     document.addEventListener("keydown", handleKeyPress);
 
-    Logger.debug("[Dialog] 所有事件綁定完成，對話框初始化完成");
+    Logger.debug("所有事件綁定完成，對話框初始化完成");
 
     // 如果有初始分享代碼，手動觸發驗證
     if (code && code.trim()) {
-      Logger.debug("[Dialog] 檢測到初始分享代碼，開始驗證:", code);
+      Logger.debug("檢測到初始分享代碼，開始驗證:", code);
       // 模擬input事件來觸發驗證
       const inputEvent = new Event("input", { bubbles: true });
       codeInput.dispatchEvent(inputEvent);
@@ -290,3 +290,8 @@ class SyncConfirmDialogManager {
 
 // 全域暴露供其他模組使用
 window.SyncConfirmDialogManager = SyncConfirmDialogManager;
+
+
+
+
+

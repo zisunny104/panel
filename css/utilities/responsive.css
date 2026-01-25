@@ -92,10 +92,10 @@
     .experiment-panel {
         width: calc(100vw - 2rem);
         max-width: 21.875rem;
-        right: 5.5rem;
+        right: 4rem;
     }
 
     .settings-panel {
-        right: 5.5rem;
+        right: 4rem;
     }
 }

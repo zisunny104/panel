@@ -75,12 +75,34 @@
 /* ================= 右下角圓形按鈕 ================= */
 .corner-buttons {
     position: fixed;
-    right: 2rem;
+    right: 1rem;
     bottom: 1rem;
     display: grid;
     grid-template-rows: repeat(3, 1fr);
     gap: 1.2rem;
     z-index: 20;
+}
+
+/* ================= 左側操作日誌 FAB 按鈕 ================= */
+.logger-fab-position {
+    --svg-checkmark: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='currentColor' d='M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z'%3E%3C/path%3E%3C/svg%3E");
+    --svg-cross: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='currentColor' d='M18 6L6 18M6 6l12 12'%3E%3C/path%3E%3C/svg%3E");
+    -webkit-user-select: none;
+    -webkit-text-size-adjust: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: sans-serif;
+    color: #fff;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    z-index: 30;
+    display: grid;
+    grid-template-rows: 1fr;
+    gap: 1.2rem;
+    align-items: center;
 }
 
 /* ================= 圓形按鈕基礎樣式 ================= */

@@ -190,40 +190,52 @@
         </div>
     </div>
 
+    <!-- ===== 核心基礎設施 ===== -->
     <!-- 全域核心 -->
     <script src="js/core/console-manager.js"></script>
     <script src="js/core/config.js"></script>
+
+    <!-- 網路基礎設施 -->
+    <script src="js/core/websocket-client.js"></script>
     <script src="js/core/time-sync-manager.js"></script>
 
-    <!-- WebSocket 客戶端 -->
-    <script src="js/core/websocket-client.js"></script>
-
+    <!-- ===== 同步系統 ===== -->
     <!-- 同步客戶端 -->
     <script src="js/sync/sync-client.js"></script>
 
-    <!-- 實驗中樞客戶端 -->
+    <!-- 實驗中樞系統 -->
     <script src="js/core/experiment-hub-client.js"></script>
 
-    <!-- 狀態管理 -->
-    <script src="js/core/experiment-state-manager.js"></script>
-
-    <!-- 日誌系統 -->
-    <script src="js/experiment/experiment-log-manager.js"></script>
-
+    <!-- ===== 工具與資料 ===== -->
     <!-- 基礎工具 -->
     <script type="module" src="js/core/random-utils.js"></script>
+
+    <!-- ===== 狀態管理 ===== -->
+    <!-- 實驗狀態管理 -->
+    <script src="js/core/experiment-state-manager.js"></script>
+
+    <!-- ===== 實驗功能模組 ===== -->
+    <!-- 日誌系統 -->
+    <script src="js/experiment/experiment-log-manager.js"></script>
 
     <!-- 實驗動作管理 -->
     <script src="js/experiment/experiment-action-manager.js"></script>
 
-    <!-- 實驗功能 -->
-    <script type="module" src="js/panel/combination-selector.js"></script>
+    <!-- 實驗UI控制 -->
+    <script type="module" src="js/experiment/experiment-ui-controls.js"></script>
     <script type="module" src="js/experiment/experiment-page-manager.js"></script>
+
+    <!-- 實驗同步管理 -->
     <script src="js/experiment/experiment-sync-manager.js"></script>
+
+    <!-- 實驗日誌UI -->
     <script type="module" src="js/experiment/experiment-log-ui.js"></script>
 
-    <!-- 同步系統 -->
+    <!-- ===== 同步與對話框 ===== -->
+    <!-- 同步確認對話框 -->
     <script src="js/sync/sync-confirm-dialog.js"></script>
+
+    <!-- 同步管理器 -->
     <script type="module" src="js/sync/sync-manager.js"></script>
 </body>
 

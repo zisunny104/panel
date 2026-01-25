@@ -1,6 +1,7 @@
 /**
- * 時間同步管理器 - 處理客戶端與伺服器的時間偏差校正
+ * TimeSyncManager - 時間同步管理器
  *
+ * 處理客戶端與伺服器的時間偏差校正
  * 確保多裝置間的時間戳一致性：
  * 1. 所有時間戳統一為毫秒級 Unix 時間戳
  * 2. 自動偵測客戶端與伺服器的時間偏差
@@ -317,3 +318,8 @@ if (typeof window !== "undefined") {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = TimeSyncManager;
 }
+
+
+
+
+

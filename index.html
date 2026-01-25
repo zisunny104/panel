@@ -358,41 +358,36 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- 操作日誌面板 -->
-        <div class="logger-output" id="loggerOutput" style="display:none;">
-            <div class="logger-panel-header">
-                <strong>操作日誌</strong>
-                <button id="copyLogButton" class="logger-panel-btn" title="複製日誌">
-                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="11" y="11" width="10" height="10" rx="1" ry="1"></rect>
-                        <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                </button>
-                <button id="minimizeLoggerPanel" class="logger-panel-btn" title="最小化">
-                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M7 13l5 5 5-5M12 18V6"></path>
-                    </svg>
-                </button>
-                <button id="closeLoggerPanel" class="logger-panel-btn" title="關閉">
-                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-            <hr class="panel-divider">
-            <div class="log-content" id="logContent"></div>
-            <button id="clearLogButton">清空日誌</button>
-            <button id="exportLogButton">匯出日誌 (JSON)</button>
-            <button id="showStatsButton">顯示統計</button>
+    <!-- 操作日誌面板 -->
+    <div class="logger-output" id="loggerOutput" style="display:none;">
+        <div class="logger-panel-header">
+            <strong>操作日誌</strong>
+            <button id="copyLogButton" class="logger-panel-btn" title="複製日誌">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="11" y="11" width="10" height="10" rx="1" ry="1"></rect>
+                    <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
+            <button id="closeLoggerPanel" class="logger-panel-btn" title="關閉">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
         </div>
+        <hr class="panel-divider">
+        <div class="log-content" id="logContent"></div>
+        <button id="clearLogButton">清空日誌</button>
+        <button id="exportLogButton">匯出日誌 (JSON)</button>
+    </div>
 
-        <!-- 左側控制按鈕 -->
-        <button class="circular-button circular-button.accent logger-fab-position" id="loggerFabButton" title="操作日誌">
+    <!-- 左側控制按鈕 -->
+    <div class="logger-fab-position">
+        <button class="circular-button circular-button.accent" id="loggerFabButton" title="操作日誌">
             <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -402,55 +397,76 @@
                 <polyline points="10,9 9,9 8,9"></polyline>
             </svg>
         </button>
+    </div>
 
-        <!-- BEEP 音效 -->
-        <audio id="beepSound" src="assets/audio/beep.mp3" preload="auto"></audio>
+    <!-- BEEP 音效 -->
+    <audio id="beepSound" src="assets/audio/beep.mp3" preload="auto"></audio>
 
-        <!-- 全域核心 -->
-        <script src="js/core/console-manager.js"></script>
-        <script src="js/core/config.js"></script>
+    <!-- ===== 核心基礎設施 ===== -->
+    <!-- 全域核心 -->
+    <script src="js/core/console-manager.js"></script>
+    <script src="js/core/config.js"></script>
 
-        <!-- WebSocket 客戶端（必須在 SyncClient 之前載入） -->
-        <script src="js/core/websocket-client.js"></script>
+    <!-- 網路基礎設施 -->
+    <script src="js/core/websocket-client.js"></script>
+    <script src="js/core/time-sync-manager.js"></script>
 
-        <!-- 同步客戶端 -->
-        <script src="js/sync/sync-client.js"></script>
+    <!-- ===== 同步系統 ===== -->
+    <!-- 同步客戶端 -->
+    <script src="js/sync/sync-client.js"></script>
 
-        <!-- 實驗中樞客戶端 -->
-        <script src="js/core/experiment-hub-client.js"></script>
-        <script type="module" src="js/sync/experiment-hub-manager.js"></script>
+    <!-- 實驗中樞系統 -->
+    <script src="js/core/experiment-hub-client.js"></script>
+    <script type="module" src="js/sync/experiment-hub-manager.js"></script>
 
-        <!-- 基礎工具 -->
-        <script type="module" src="js/core/random-utils.js"></script>
-        <script type="module" src="js/core/data-loader.js"></script>
+    <!-- ===== 工具與資料 ===== -->
+    <!-- 基礎工具 -->
+    <script type="module" src="js/core/random-utils.js"></script>
+    <script type="module" src="js/core/data-loader.js"></script>
 
-        <!-- 狀態管理 -->
-        <script src="js/core/experiment-state-manager.js"></script>
+    <!-- ===== 狀態管理 ===== -->
+    <!-- 實驗狀態管理 -->
+    <script src="js/core/experiment-state-manager.js"></script>
 
-        <!-- 面板 UI 控制 -->
-        <script src="js/panel/panel-manager.js"></script>
-        <script src="js/panel/panel-ui-controls.js"></script>
-        <script src="js/panel/panel-button-manager.js"></script>
+    <!-- ===== 面板 UI 控制 ===== -->
+    <!-- 面板管理 -->
+    <script src="js/panel/panel-manager.js"></script>
+    <script src="js/panel/panel-ui-controls.js"></script>
+    <script src="js/panel/panel-button-manager.js"></script>
 
-        <!-- 面板電源與媒體 -->
-        <script src="js/panel/panel-media-manager.js"></script>
-        <script src="js/panel/power-logger.js"></script>
-        <script src="js/panel/panel-power-control.js"></script>
+    <!-- ===== 面板功能模組 ===== -->
+    <!-- 媒體與電源控制 -->
+    <script src="js/panel/panel-media-manager.js"></script>
+    <script src="js/panel/panel-power-control.js"></script>
 
-        <!-- 面板功能 -->
-        <script src="js/panel/panel-action-manager.js"></script>
-        <script type="module" src="js/panel/combination-selector.js"></script>
-        <script src="js/panel/panel-experiment-log.js"></script>
-        <script type="module" src="js/panel/panel-experiment-manager.js"></script>
-        <script src="js/panel/panel-experiment-sync-receiver.js"></script>
+    <!-- 操作日誌 -->
+    <script src="js/panel/panel-logger.js"></script>
 
-        <!-- 同步系統 -->
-        <script src="js/sync/sync-confirm-dialog.js"></script>
-        <script src="js/experiment/experiment-sync-manager.js"></script>
-        <script type="module" src="js/sync/sync-manager.js"></script>
+    <!-- 動作管理 -->
+    <script src="js/panel/panel-action-manager.js"></script>
 
-        <!-- 應用啟動 -->
-        <script src="js/core/main.js"></script>
+    <!-- 組合選擇器 -->
+    <script type="module" src="js/core/combination-selector.js"></script>
+
+    <!-- 實驗日誌與管理 -->
+    <script src="js/panel/panel-experiment-log.js"></script>
+    <script src="js/panel/panel-experiment-sync.js"></script>
+    <script type="module" src="js/panel/panel-experiment-manager.js"></script>
+    <script src="js/panel/panel-experiment-sync-receiver.js"></script>
+
+    <!-- ===== 同步與對話框 ===== -->
+    <!-- 同步確認對話框 -->
+    <script src="js/sync/sync-confirm-dialog.js"></script>
+
+    <!-- 實驗同步管理 -->
+    <script src="js/experiment/experiment-sync-manager.js"></script>
+
+    <!-- 同步管理器 -->
+    <script type="module" src="js/sync/sync-manager.js"></script>
+
+    <!-- ===== 應用啟動 ===== -->
+    <!-- 主應用程式 -->
+    <script src="js/core/main.js"></script>
 
 </body>
 

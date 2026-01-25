@@ -19,7 +19,7 @@ class ExperimentLogUI {
     // 取得全域的 experimentLogManager 實例
     this.logManager = window.experimentLogManager;
     if (!this.logManager) {
-      Logger.warn("[ExperimentLogUI] experimentLogManager 未初始化");
+      Logger.warn("experimentLogManager 未初始化");
     }
   }
 
@@ -64,9 +64,9 @@ class ExperimentLogUI {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      Logger.info(`[ExperimentLogUI] 已下載日誌：${filename}`);
+      Logger.info(`已下載日誌：${filename}`);
     } catch (error) {
-      Logger.error("[ExperimentLogUI] 下載日誌失敗:", error);
+      Logger.error("下載日誌失敗:", error);
       alert("下載日誌失敗");
     }
   }
@@ -81,11 +81,11 @@ class ExperimentLogUI {
       const experiments = await this.loadExperimentLogsFromDirectory(logsDir);
 
       Logger.debug(
-        `[ExperimentLogUI] 從檔案系統載入 ${experiments.length} 個實驗日誌`,
+        `從檔案系統載入 ${experiments.length} 個實驗日誌`
       );
       this.displayExperimentLogs(experiments);
     } catch (error) {
-      Logger.error("[ExperimentLogUI] 載入日誌列表失敗:", error);
+      Logger.error("載入日誌列表失敗:", error);
       this.displayExperimentLogs([]);
     }
   }
@@ -102,7 +102,7 @@ class ExperimentLogUI {
       // 如果無法從 config 讀取，使用預設值
       return "runtime/experiment-data";
     } catch {
-      Logger.warn("[ExperimentLogUI] 無法從 config 讀取日誌目錄，使用預設值");
+      Logger.warn("無法從 config 讀取日誌目錄，使用預設值");
       return "runtime/experiment-data";
     }
   }
@@ -118,7 +118,7 @@ class ExperimentLogUI {
       // 讀取目錄內容（使用相對路徑）
       const files = await this.listFilesInDirectory(dirPath);
 
-      Logger.debug(`[ExperimentLogUI] 找到 ${files.length} 個檔案`);
+      Logger.debug(`找到 ${files.length} 個檔案`);
 
       for (const filename of files) {
         if (!filename.endsWith(".jsonl")) continue;
@@ -127,18 +127,18 @@ class ExperimentLogUI {
           // 透過 API 讀取檔案內容
           const apiUrl = this._getApiUrl();
           const response = await fetch(
-            `${apiUrl}/experiment-logs/read/${filename}`,
+            `${apiUrl}/experiment-logs/read/${filename}`
           );
 
           if (!response.ok) {
-            Logger.debug(`[ExperimentLogUI] 無法讀取檔案: ${filename}`);
+            Logger.debug(`無法讀取檔案: ${filename}`);
             continue;
           }
 
           const result = await response.json();
           if (!result.success || !result.content) {
             Logger.debug(
-              `[ExperimentLogUI] 檔案 ${filename} 讀取失敗: ${result.error}`,
+              `檔案 ${filename} 讀取失敗: ${result.error}`
             );
             continue;
           }
@@ -146,7 +146,7 @@ class ExperimentLogUI {
           const logs = this.parseJSONL(result.content);
 
           if (logs.length === 0) {
-            Logger.debug(`[ExperimentLogUI] 檔案 ${filename} 無有效日誌`);
+            Logger.debug(`檔案 ${filename} 無有效日誌`);
             continue;
           }
 
@@ -159,7 +159,7 @@ class ExperimentLogUI {
           // 從日誌中找受試者名稱和實驗組合（容錯處理）
           const expStartLog = logs.find(
             (log) =>
-              log.type === "exp_start" || log.type === "experiment_start",
+              log.type === "exp_start" || log.type === "experiment_start"
           );
           const subjectName = expStartLog?.subject_name || "n/a";
           const combinationName = expStartLog?.combination || "n/a";
@@ -175,16 +175,16 @@ class ExperimentLogUI {
             endTime: logs[logs.length - 1]?.ts || Date.now(),
             logs,
             // 用於實際操作的 ID
-            actualExperimentId: experimentId,
+            actualExperimentId: experimentId
           });
 
           Logger.debug(
-            `[ExperimentLogUI] 成功載入: ${filename} (${logs.length} 條記錄)`,
+            `成功載入: ${filename} (${logs.length} 條記錄)`
           );
         } catch (error) {
           Logger.debug(
-            `[ExperimentLogUI] 解析檔案 ${filename} 失敗:`,
-            error.message,
+            `解析檔案 ${filename} 失敗:`,
+            error.message
           );
           // 即使解析失敗，也嘗試顯示基本資訊
           const match = filename.match(/^(.+?)(?:_\d+)?\.jsonl$/);
@@ -203,7 +203,7 @@ class ExperimentLogUI {
             endTime: Date.now(),
             logs: [],
             actualExperimentId: experimentId,
-            error: error.message,
+            error: error.message
           });
         }
       }
@@ -211,7 +211,7 @@ class ExperimentLogUI {
       // 按開始時間排序（最新的在前）
       experiments.sort((a, b) => b.startTime - a.startTime);
     } catch (error) {
-      Logger.error("[ExperimentLogUI] 讀取目錄失敗:", error);
+      Logger.error("讀取目錄失敗:", error);
     }
 
     return experiments;
@@ -231,21 +231,21 @@ class ExperimentLogUI {
         const result = await response.json();
         if (result.success && result.files) {
           Logger.debug(
-            `[ExperimentLogUI] 從 API 讀取到 ${result.files.length} 個檔案`,
+            `從 API 讀取到 ${result.files.length} 個檔案`
           );
           return result.files.map((f) => f.filename);
         }
       }
     } catch (error) {
       Logger.debug(
-        "[ExperimentLogUI] API 不可用，無法動態讀取檔案列表",
-        error.message,
+        "API 不可用，無法動態讀取檔案列表",
+        error.message
       );
     }
 
     // 瀏覽器無法直接列出本機目錄，必須啟動伺服器
     Logger.warn(
-      "[ExperimentLogUI] 無法讀取實驗日誌檔案。請啟動伺服器：cd server && npm start",
+      "無法讀取實驗日誌檔案。請啟動伺服器：cd server && npm start"
     );
     return [];
   }
@@ -301,7 +301,7 @@ class ExperimentLogUI {
         try {
           return JSON.parse(line);
         } catch (e) {
-          Logger.warn("[ExperimentLogUI] 無法解析行:", line);
+          Logger.warn("無法解析行:", line);
           return null;
         }
       })
@@ -320,7 +320,7 @@ class ExperimentLogUI {
     if (!container) return;
 
     if (experiments.length === 0) {
-      container.innerHTML = '<div class="no-logs">目前沒有任何實驗日誌</div>';
+      container.innerHTML = "<div class=\"no-logs\">目前沒有任何實驗日誌</div>";
       return;
     }
 
@@ -350,7 +350,7 @@ class ExperimentLogUI {
               ${
                 exp.startTime
                   ? `<span class="log-date">${this.formatDate(
-                      exp.startTime,
+                      exp.startTime
                     )}</span>`
                   : ""
               }
@@ -386,7 +386,7 @@ class ExperimentLogUI {
           </button>
         </div>
       </div>
-    `,
+    `
       )
       .join("");
 
@@ -415,7 +415,7 @@ class ExperimentLogUI {
     return window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(dateString)
       : new Date(dateString).toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei"
         });
   }
 
@@ -438,7 +438,7 @@ class ExperimentLogUI {
   updateDeleteButton() {
     const deleteSelectedBtn = document.getElementById("deleteSelectedLogsBtn");
     const downloadSelectedBtn = document.getElementById(
-      "downloadSelectedLogsBtn",
+      "downloadSelectedLogsBtn"
     );
     const count = this.selectedLogs.size;
 
@@ -458,21 +458,21 @@ class ExperimentLogUI {
    */
   async viewLogDetails(logId) {
     try {
-      Logger.debug(`[ExperimentLogUI] 正在查看實驗日誌: ${logId}`);
+      Logger.debug(`正在查看實驗日誌: ${logId}`);
 
       // 從已載入的列表中找到對應的實驗
       const experiment = this.currentExperiments.find(
-        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId,
+        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId
       );
 
       if (!experiment || !experiment.logs || experiment.logs.length === 0) {
-        Logger.warn(`[ExperimentLogUI] 找不到實驗 ${logId} 的日誌資料`);
+        Logger.warn(`找不到實驗 ${logId} 的日誌資料`);
         alert(`找不到該實驗的日誌資料\n實驗ID: ${logId}`);
         return;
       }
 
       const entries = experiment.logs;
-      Logger.debug(`[ExperimentLogUI] 找到 ${entries.length} 條日誌記錄`);
+      Logger.debug(`找到 ${entries.length} 條日誌記錄`);
 
       // 計算統計資訊
       const stats = this.calculateLogStatistics(entries);
@@ -481,13 +481,13 @@ class ExperimentLogUI {
       const jsonlContent = entries.map((e) => JSON.stringify(e)).join("\n");
 
       Logger.debug(
-        `[ExperimentLogUI] 檢視日誌 ${logId}，共 ${entries.length} 條記錄`,
+        `檢視日誌 ${logId}，共 ${entries.length} 條記錄`
       );
 
       // 建立並顯示 modal
       this.showLogViewModal(logId, stats, jsonlContent);
     } catch (error) {
-      Logger.error("[ExperimentLogUI] 檢視日誌失敗:", error);
+      Logger.error("檢視日誌失敗:", error);
       alert("無法取得日誌詳細資訊: " + error.message);
     }
   }
@@ -514,6 +514,7 @@ class ExperimentLogUI {
       totalActionsRecorded: 0,
       gestureStats: {},
       overallAccuracy: 0,
+      overallConcordance: 0
     };
 
     if (entries.length === 0) return stats;
@@ -588,7 +589,7 @@ class ExperimentLogUI {
         } else {
           gesturesPlanned.set(
             gestureName,
-            gesturesPlanned.get(gestureName) + 1,
+            gesturesPlanned.get(gestureName) + 1
           );
         }
         stats.totalGesturesPlanned++;
@@ -618,7 +619,7 @@ class ExperimentLogUI {
             uncertain: 0,
             incorrect: 0,
             accuracy: 0,
-            concordance: 0,
+            concordance: 0
           };
         }
 
@@ -655,7 +656,7 @@ class ExperimentLogUI {
           uncertain: 0,
           incorrect: 0,
           accuracy: 0,
-          concordance: 0,
+          concordance: 0
         };
       }
     }
@@ -663,7 +664,7 @@ class ExperimentLogUI {
     // 計算總持續時間（秒）
     if (stats.startTime && stats.endTime) {
       stats.totalDuration = Math.round(
-        (stats.endTime - stats.startTime) / 1000,
+        (stats.endTime - stats.startTime) / 1000
       );
     }
 
@@ -673,23 +674,27 @@ class ExperimentLogUI {
     let totalGestureCount = 0;
 
     for (const [_gestureName, gestureStat] of Object.entries(
-      stats.gestureStats,
+      stats.gestureStats
     )) {
       const total = gestureStat.recorded || 1;
       gestureStat.accuracy = Math.round((gestureStat.correct / total) * 100);
       gestureStat.concordance = Math.round(
-        ((gestureStat.correct + gestureStat.uncertain) / total) * 100,
+        ((gestureStat.correct + gestureStat.uncertain) / total) * 100
       );
 
       totalCorrect += gestureStat.correct;
-      totalConcordance += gestureStat.correct + gestureStat.uncertain;
+      _totalConcordance += gestureStat.correct + gestureStat.uncertain;
       totalGestureCount += total;
     }
 
     // 計算整體正確率
     if (totalGestureCount > 0) {
       stats.overallAccuracy = Math.round(
-        (totalCorrect / totalGestureCount) * 100,
+        (totalCorrect / totalGestureCount) * 100
+      );
+      // 計算整體一致性（包含 uncertain）
+      stats.overallConcordance = Math.round(
+        (_totalConcordance / totalGestureCount) * 100
       );
     }
 
@@ -714,10 +719,10 @@ class ExperimentLogUI {
     const startTimeStr = stats.startTime
       ? window.timeSyncManager
         ? window.timeSyncManager.formatDateTime(
-            new Date(stats.startTime).getTime(),
+            new Date(stats.startTime).getTime()
           )
         : stats.startTime.toLocaleString("zh-TW", {
-            timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+            timeZone: window.CONFIG?.timezone || "Asia/Taipei"
           })
       : "未知";
 
@@ -735,7 +740,7 @@ class ExperimentLogUI {
           <span class="stat-accuracy">${gestureStat.accuracy}%</span>
           <span class="stat-concordance">${gestureStat.concordance}%</span>
         </div>
-      `,
+      `
         )
         .join("");
     }
@@ -761,19 +766,19 @@ class ExperimentLogUI {
                   <div class="metadata-item">
                     <span class="metadata-label">實驗ID：</span>
                     <span class="metadata-value">${this.escapeHtml(
-                      stats.experimentId || "N/A",
+                      stats.experimentId || "N/A"
                     )}</span>
                   </div>
                   <div class="metadata-item">
                     <span class="metadata-label">受試者名稱：</span>
                     <span class="metadata-value">${this.escapeHtml(
-                      stats.subjectName || "N/A",
+                      stats.subjectName || "N/A"
                     )}</span>
                   </div>
                   <div class="metadata-item">
                     <span class="metadata-label">實驗組合：</span>
                     <span class="metadata-value">${this.escapeHtml(
-                      stats.experimentCombination || "N/A",
+                      stats.experimentCombination || "N/A"
                     )}</span>
                   </div>
                   <div class="metadata-item">
@@ -808,6 +813,10 @@ class ExperimentLogUI {
                   <div class="stat-card">
                     <div class="stat-label">整體正確率</div>
                     <div class="stat-value">${stats.overallAccuracy}%</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">整體一致性</div>
+                    <div class="stat-value">${stats.overallConcordance || 0}%</div>
                   </div>
                 </div>
 
@@ -925,15 +934,15 @@ class ExperimentLogUI {
    */
   async downloadLogById(logId) {
     try {
-      Logger.debug(`[ExperimentLogUI] 正在下載實驗日誌: ${logId}`);
+      Logger.debug(`正在下載實驗日誌: ${logId}`);
 
       // 從已載入的列表中找到對應的實驗
       const experiment = this.currentExperiments.find(
-        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId,
+        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId
       );
 
       if (!experiment || !experiment.filename) {
-        Logger.warn(`[ExperimentLogUI] 找不到實驗 ${logId} 的檔案`);
+        Logger.warn(`找不到實驗 ${logId} 的檔案`);
         alert(`找不到該實驗的日誌檔案\n實驗ID: ${logId}`);
         return;
       }
@@ -941,7 +950,7 @@ class ExperimentLogUI {
       // 透過 API 讀取檔案內容
       const apiUrl = this._getApiUrl();
       const response = await fetch(
-        `${apiUrl}/experiment-logs/read/${experiment.filename}`,
+        `${apiUrl}/experiment-logs/read/${experiment.filename}`
       );
 
       if (!response.ok) {
@@ -966,9 +975,9 @@ class ExperimentLogUI {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      Logger.debug(`[ExperimentLogUI] 已下載日誌：${filename}`);
+      Logger.debug(`已下載日誌：${filename}`);
     } catch (error) {
-      Logger.error("[ExperimentLogUI] 下載日誌失敗:", error);
+      Logger.error("下載日誌失敗:", error);
       alert("下載日誌時發生錯誤: " + error.message);
     }
   }
@@ -983,15 +992,15 @@ class ExperimentLogUI {
     }
 
     try {
-      Logger.debug(`[ExperimentLogUI] 正在刪除實驗日誌: ${logId}`);
+      Logger.debug(`正在刪除實驗日誌: ${logId}`);
 
       // 從已載入的列表中找到對應的實驗
       const experiment = this.currentExperiments.find(
-        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId,
+        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId
       );
 
       if (!experiment || !experiment.filename) {
-        Logger.warn(`[ExperimentLogUI] 找不到實驗 ${logId} 的檔案`);
+        Logger.warn(`找不到實驗 ${logId} 的檔案`);
         alert(`找不到該實驗的日誌檔案\n實驗ID: ${logId}`);
         return;
       }
@@ -1001,8 +1010,8 @@ class ExperimentLogUI {
       const response = await fetch(
         `${apiUrl}/experiment-logs/delete/${experiment.filename}`,
         {
-          method: "DELETE",
-        },
+          method: "DELETE"
+        }
       );
 
       if (!response.ok) {
@@ -1015,12 +1024,12 @@ class ExperimentLogUI {
       }
 
       alert("日誌已成功刪除");
-      Logger.debug(`[ExperimentLogUI] 已刪除日誌：${experiment.filename}`);
+      Logger.debug(`已刪除日誌：${experiment.filename}`);
 
       // 重新載入列表
       this.loadExperimentLogs();
     } catch (error) {
-      Logger.error("[ExperimentLogUI] 刪除日誌失敗:", error);
+      Logger.error("刪除日誌失敗:", error);
       alert("刪除日誌時發生錯誤: " + error.message);
     }
   }
@@ -1046,17 +1055,17 @@ class ExperimentLogUI {
           // 從已載入的列表中找到對應的實驗
           const experiment = this.currentExperiments.find(
             (exp) =>
-              exp.actualExperimentId === logId || exp.experimentId === logId,
+              exp.actualExperimentId === logId || exp.experimentId === logId
           );
 
           if (!experiment || !experiment.filename) {
-            Logger.warn(`[ExperimentLogUI] 找不到實驗 ${logId} 的檔案，跳過`);
+            Logger.warn(`找不到實驗 ${logId} 的檔案，跳過`);
             continue;
           }
 
           // 透過 API 讀取檔案內容
           const response = await fetch(
-            `${apiUrl}/api/experiment-logs/read/${experiment.filename}`,
+            `${apiUrl}/api/experiment-logs/read/${experiment.filename}`
           );
 
           if (response.ok) {
@@ -1068,8 +1077,8 @@ class ExperimentLogUI {
           }
         } catch (error) {
           Logger.warn(
-            `[ExperimentLogUI] 下載日誌 ${logId} 失敗:`,
-            error.message,
+            `下載日誌 ${logId} 失敗:`,
+            error.message
           );
         }
       }
@@ -1094,11 +1103,11 @@ class ExperimentLogUI {
       window.URL.revokeObjectURL(url);
 
       Logger.debug(
-        `[ExperimentLogUI] 已批次下載 ${successCount}/${logIds.length} 個日誌`,
+        `已批次下載 ${successCount}/${logIds.length} 個日誌`
       );
       alert(`已成功下載 ${successCount} 個日誌檔案`);
     } catch (error) {
-      Logger.error("[ExperimentLogUI] 批次下載失敗:", error);
+      Logger.error("批次下載失敗:", error);
       alert("批次下載日誌時發生錯誤: " + error.message);
     }
   }
@@ -1114,7 +1123,7 @@ class ExperimentLogUI {
 
     if (
       !confirm(
-        `確定要刪除選取的 ${this.selectedLogs.size} 個日誌檔案嗎？此操作無法還原。`,
+        `確定要刪除選取的 ${this.selectedLogs.size} 個日誌檔案嗎？此操作無法還原。`
       )
     ) {
       return;
@@ -1131,11 +1140,11 @@ class ExperimentLogUI {
           // 從已載入的列表中找到對應的實驗
           const experiment = this.currentExperiments.find(
             (exp) =>
-              exp.actualExperimentId === logId || exp.experimentId === logId,
+              exp.actualExperimentId === logId || exp.experimentId === logId
           );
 
           if (!experiment || !experiment.filename) {
-            Logger.warn(`[ExperimentLogUI] 找不到實驗 ${logId} 的檔案，跳過`);
+            Logger.warn(`找不到實驗 ${logId} 的檔案，跳過`);
             continue;
           }
 
@@ -1143,8 +1152,8 @@ class ExperimentLogUI {
           const response = await fetch(
             `${apiUrl}/api/experiment-logs/delete/${experiment.filename}`,
             {
-              method: "DELETE",
-            },
+              method: "DELETE"
+            }
           );
 
           if (response.ok) {
@@ -1155,21 +1164,21 @@ class ExperimentLogUI {
           }
         } catch (error) {
           Logger.warn(
-            `[ExperimentLogUI] 刪除日誌 ${logId} 失敗:`,
-            error.message,
+            `刪除日誌 ${logId} 失敗:`,
+            error.message
           );
         }
       }
 
       alert(`已成功刪除 ${deletedCount} 個日誌檔案`);
       Logger.debug(
-        `[ExperimentLogUI] 已批次刪除 ${deletedCount}/${logIds.length} 個日誌`,
+        `已批次刪除 ${deletedCount}/${logIds.length} 個日誌`
       );
 
       this.selectedLogs.clear();
       this.loadExperimentLogs(); // 重新載入列表
     } catch (error) {
-      Logger.error("[ExperimentLogUI] 批次刪除失敗:", error);
+      Logger.error("批次刪除失敗:", error);
       alert("批次刪除日誌時發生錯誤: " + error.message);
     }
   }
@@ -1196,3 +1205,8 @@ window.addEventListener("DOMContentLoaded", () => {
   experimentLogUI.initialize();
   experimentLogUI.loadExperimentLogs();
 });
+
+
+
+
+

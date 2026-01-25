@@ -250,3 +250,8 @@ window.goToNextStep = goToNextStep;
 
 // ============ ES6 模組匯出 ============
 export { markGesture, goToNextStep };
+
+
+
+
+

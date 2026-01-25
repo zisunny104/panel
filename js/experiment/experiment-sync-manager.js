@@ -142,7 +142,7 @@ class ExperimentSyncManager {
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗開始失敗: ${error.message}，但本機實驗繼續進行`
+        `廣播實驗開始失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -166,7 +166,7 @@ class ExperimentSyncManager {
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗暫停失敗: ${error.message}，但本機實驗繼續進行`
+        `廣播實驗暫停失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -190,7 +190,7 @@ class ExperimentSyncManager {
       await this.syncState(syncData);
     } catch (error) {
       Logger.warn(
-        `[ExperimentSyncManager] 廣播實驗還原失敗: ${error.message}，但本機實驗繼續進行`
+        `廣播實驗還原失敗: ${error.message}，但本機實驗繼續進行`
       );
     }
   }
@@ -437,12 +437,12 @@ class ExperimentSyncManager {
   handleRemoteExperimentIdChange(syncData) {
     if (syncData.device_id === this.deviceId) {
       Logger.debug(
-        `[ExperimentSyncManager] 略過自己的實驗ID更新: ${syncData.device_id}`
+        `略過自己的實驗ID更新: ${syncData.device_id}`
       );
       return;
     }
 
-    Logger.debug("[ExperimentSyncManager] 收到遠端實驗ID更新:", syncData);
+    Logger.debug("收到遠端實驗ID更新:", syncData);
 
     // 直接調用對應管理器的處理函數，避免重複事件
     const data = {
@@ -459,7 +459,7 @@ class ExperimentSyncManager {
         "function"
     ) {
       Logger.debug(
-        "[ExperimentSyncManager] 路由到 panelExperiment.handleRemoteExperimentIdUpdate"
+        "路由到 panelExperiment.handleRemoteExperimentIdUpdate"
       );
       window.panelExperiment.handleRemoteExperimentIdUpdate(data);
     }
@@ -470,7 +470,7 @@ class ExperimentSyncManager {
       typeof window.app.handleRemoteExperimentIdUpdate === "function"
     ) {
       Logger.debug(
-        "[ExperimentSyncManager] 路由到 app.handleRemoteExperimentIdUpdate"
+        "路由到 app.handleRemoteExperimentIdUpdate"
       );
       window.app.handleRemoteExperimentIdUpdate(data);
     }
@@ -482,12 +482,12 @@ class ExperimentSyncManager {
   handleRemoteCombinationSelected(syncData) {
     if (syncData.device_id === this.deviceId) {
       Logger.debug(
-        `[ExperimentSyncManager] 略過自己的組合選擇: ${syncData.device_id}`
+        `略過自己的組合選擇: ${syncData.device_id}`
       );
       return;
     }
 
-    Logger.debug("[ExperimentSyncManager] 收到遠端組合選擇:", syncData);
+    Logger.debug("收到遠端組合選擇:", syncData);
 
     // 分派事件供各管理器處理
     window.dispatchEvent(
@@ -507,7 +507,7 @@ class ExperimentSyncManager {
         "function"
     ) {
       Logger.debug(
-        "[ExperimentSyncManager] 路由到 panelExperiment.handleRemoteCombinationSelected"
+        "路由到 panelExperiment.handleRemoteCombinationSelected"
       );
       window.panelExperiment.handleRemoteCombinationSelected({
         combination: syncData.combination,
@@ -523,7 +523,7 @@ class ExperimentSyncManager {
         "function"
     ) {
       Logger.debug(
-        "[ExperimentSyncManager] 路由到 combinationSelector.handleRemoteCombinationSelected"
+        "路由到 combinationSelector.handleRemoteCombinationSelected"
       );
       window.combinationSelector.handleRemoteCombinationSelected(
         syncData.combination
@@ -653,3 +653,8 @@ if (document.readyState === "loading") {
 } else {
   window.experimentSyncManager = new ExperimentSyncManager();
 }
+
+
+
+
+

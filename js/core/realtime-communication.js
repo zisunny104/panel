@@ -1,5 +1,6 @@
 /**
  * RealtimeCommunication - 即時通訊管理器
+ *
  * 處理Server-Sent Events、輪詢和心跳檢測
  */
 
@@ -308,3 +309,8 @@ class RealtimeCommunication {
 
 // 匯出
 export default RealtimeCommunication;
+
+
+
+
+

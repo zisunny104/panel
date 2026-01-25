@@ -1,4 +1,6 @@
-// main.js - 應用程式主初始化與協調模組
+/**
+ * MainApp - 應用程式主初始化與協調模組
+ */
 
 class MainApp {
   constructor() {
@@ -10,7 +12,7 @@ class MainApp {
   async initialize() {
     // 防止重複初始化
     if (this.initializationComplete) {
-      Logger.warn("MainApp 已經初始化，跳過重複動作");
+      Logger.warn("已完成初始化，跳過重複動作");
       return;
     }
 
@@ -22,17 +24,16 @@ class MainApp {
         );
       }
 
-      // 第一優先級：確保 SyncManager 完全初始化
-      // SyncManager 在 sync-manager.js 底部自動初始化，但需要等待初始化完成
-      Logger.debug("[MainApp] 等待 SyncManager 初始化完成...");
+      // 等待 SyncManager 初始化完成
+      Logger.debug("等待 SyncManager 初始化完成...");
 
       await new Promise((resolve) => {
         let resolved = false;
 
-        // 先檢查是否已經初始化（避免錯過事件觸發）
+        // 先檢查是否已經初始化
         if (window.syncManager?.initialized) {
           Logger.debug(
-            "[MainApp] SyncManager 已初始化（檢查標記）",
+            "SyncManager 已初始化",
             window.syncManager?.core?.syncClient?.sessionId
               ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
               : "本機模式"
@@ -41,12 +42,12 @@ class MainApp {
           return;
         }
 
-        // 監聽 CLIENT_INITIALIZED 事件（SyncManager 初始化完成後觸發）
+        // 監聽初始化完成事件
         const handleClientInit = (event) => {
           if (!resolved) {
             resolved = true;
             Logger.debug(
-              "[MainApp] SyncManager 已就緒（收到 CLIENT_INITIALIZED 事件）",
+              "SyncManager 已就緒",
               window.syncManager?.core?.syncClient?.sessionId
                 ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
                 : "本機模式"
@@ -59,11 +60,11 @@ class MainApp {
           once: true
         });
 
-        // 設置超時保護（最多等 10 秒）
+        // 設置超時保護
         setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            Logger.warn("[MainApp] 等待 SyncManager 超時（10秒），繼續初始化");
+            Logger.warn("等待 SyncManager 超時，繼續初始化");
             window.removeEventListener(
               "sync:client-initialized",
               handleClientInit
@@ -73,36 +74,25 @@ class MainApp {
         }, 10000);
       });
 
-      // 並行初始化時間同步和設定（相互獨立，可提前完成）
+      // 並行初始化時間同步和設定
       const timeSyncPromise = window.timeSyncManager
-        ? (async () => {
-            Logger.debug("開始時間同步初始化...");
-            await window.timeSyncManager.initialize();
-            Logger.info("時間同步已初始化");
-          })()
+        ? window.timeSyncManager.initialize()
         : Promise.resolve();
 
-      const configPromise = (async () => {
-        // ConfigManager 已在 config.js 中初始化，這裡只需要載入初始設定
-        await this.loadInitialSettings();
-      })();
+      const configPromise = this.loadInitialSettings();
 
       // 等待時間同步和設定完成
       await Promise.all([timeSyncPromise, configPromise]);
 
       // 初始化各個模組
-      this.createModules(); // 建立模組
-      await this.initializeModules(); // 初始化核心模組
-      this.setupModuleDependencies(); // 設定模組間依賴
-
-      // 注意：SyncManager 已在 sync-manager.js 底部自動初始化
-      // 不需要在此重複建立，直接使用全局的 window.syncManager
-      Logger.debug("SyncManager 已由 sync-manager.js 自動初始化");
+      this.createModules();
+      await this.initializeModules();
+      this.setupModuleDependencies();
 
       // 初始化 Experiment Hub Manager - 等待完成以避免後續模組等待超時
       if (!window.experimentHubManager) {
         try {
-          Logger.debug("[MainApp] 開始初始化 ExperimentHubManager...");
+          Logger.debug("開始初始化 ExperimentHubManager...");
           const { initializeExperimentHub } =
             await import("../sync/experiment-hub-manager.js");
 
@@ -125,7 +115,7 @@ class MainApp {
           Logger.warn("ExperimentHubManager 初始化失敗或超時:", error.message);
           // 建立備用實例，以保證系統繼續運作
           if (!window.experimentHubManager) {
-            Logger.debug("[MainApp] 建立備用 ExperimentHubManager 實例");
+            Logger.debug("建立備用 ExperimentHubManager 實例");
             const { ExperimentHubManager } =
               await import("../sync/experiment-hub-manager.js");
             window.experimentHubManager = new ExperimentHubManager();
@@ -177,12 +167,12 @@ class MainApp {
       buttonManager: window.buttonManager,
       mediaManager: window.mediaManager,
       logger: window.logger,
-      experiment: window.panelExperiment, // 修正：使用正確的實驗管理器
+      experiment: window.panelExperiment,
       powerControl: window.powerControl,
       syncManager: window.syncManager || {}
     };
 
-    // 建立動作管理器實例以支援action-based實驗
+    // 建立動作管理器實例
     this.createActionManager();
 
     // 將同步管理器設為全域可存取
@@ -210,7 +200,7 @@ class MainApp {
     }
     // 日誌系統、實驗管理器已在構造函數初始化
 
-    // 在背景預先載入媒體檔案（不會阻塞初始化）
+    // 在背景預先載入媒體檔案
     this.preloadMediaInBackground();
   }
 
@@ -233,28 +223,20 @@ class MainApp {
     }
   }
 
-  // 設定模組間依賴（可擴充）
+  // 設定模組間依賴
   setupModuleDependencies() {
-    // 監聽同步狀態更新事件 - 用於虛擬面板接收實驗狀態
+    // 監聽同步狀態更新事件
     window.addEventListener("sync_state_update", (event) => {
       const state = event.detail;
-      if (state && state.type === "experiment_started") {
+      if (state?.type === "experiment_started") {
         this.handleSyncExperimentStart(state);
-      }
-      //處理暫停同步訊號
-      else if (state && state.type === "experiment_paused") {
+      } else if (state?.type === "experiment_paused") {
         this.handleSyncExperimentPaused(state);
-      }
-      //處理繼續同步訊號
-      else if (state && state.type === "experiment_resumed") {
+      } else if (state?.type === "experiment_resumed") {
         this.handleSyncExperimentResumed(state);
-      }
-      //處理停止同步訊號
-      else if (state && state.type === "experiment_stopped") {
+      } else if (state?.type === "experiment_stopped") {
         this.handleSyncExperimentStopped(state);
-      }
-      //處理實驗ID更新訊號
-      else if (state && state.type === "experimentIdUpdate") {
+      } else if (state?.type === "experimentIdUpdate") {
         this.handleSyncExperimentIdUpdate(state);
       }
     });
@@ -262,9 +244,7 @@ class MainApp {
 
   // 處理同步的實驗開始狀態
   handleSyncExperimentStart(syncData) {
-    const source = syncData.source || "unknown";
-
-    // 更新面板的實驗資訊（如果有實驗 ID）
+    // 更新面板的實驗資訊
     const expIdInput = document.getElementById("experimentIdInput");
     const subjectInput = document.getElementById("subjectName");
 
@@ -275,7 +255,7 @@ class MainApp {
       subjectInput.value = syncData.subject_name;
     }
 
-    //優先檢查是否在 experiment.html（有 experimentPageManager）
+    // 檢查是否在 experiment.html
     if (this.modules.experimentPageManager) {
       const isRunning =
         this.modules.experimentPageManager.experimentRunning ||
@@ -283,25 +263,15 @@ class MainApp {
         false;
 
       if (!isRunning) {
-        // 直接調用實驗管理器的方法
-        if (
-          typeof this.modules.experimentPageManager.startExperiment ===
-          "function"
-        ) {
-          try {
-            this.modules.experimentPageManager.startExperiment();
-          } catch (error) {
-            Logger.error("[MainApp] 直接調用失敗:", error);
-          }
+        try {
+          this.modules.experimentPageManager.startExperiment();
+        } catch (error) {
+          Logger.error("直接調用失敗:", error);
         }
       }
     }
-    //檢查是否在 index.html（有 panelExperiment 的 PanelExperimentManager）
-    else if (
-      window.panelExperiment &&
-      typeof window.panelExperiment.startExperiment === "function"
-    ) {
-      // 檢查實驗是否已在執行
+    // 檢查是否在 index.html
+    else if (window.panelExperiment?.startExperiment) {
       const isRunning = window.panelExperiment.isExperimentRunning || false;
 
       if (!isRunning) {
@@ -309,13 +279,13 @@ class MainApp {
           window.panelExperiment.startExperiment();
         } catch (error) {
           Logger.error(
-            "[MainApp] panelExperiment.startExperiment() 失敗:",
+            "panelExperiment.startExperiment() 失敗:",
             error
           );
         }
       }
     } else {
-      Logger.warn("[MainApp]找不到有效的實驗管理器");
+      Logger.warn("找不到有效的實驗管理器");
     }
 
     // 記錄這個同步事件到日誌
@@ -334,128 +304,34 @@ class MainApp {
     }
   }
 
-  //處理同步的實驗暫停狀態
+  // 處理同步的實驗暫停狀態
   handleSyncExperimentPaused(syncData) {
-    const source = syncData.source || "unknown";
-
-    // 優先檢查是否在 experiment.html
-    if (this.modules.experimentPageManager) {
-      if (
-        typeof this.modules.experimentPageManager.pauseExperiment === "function"
-      ) {
-        try {
-          this.modules.experimentPageManager.togglePauseExperiment();
-        } catch (error) {
-          Logger.error("[MainApp] 暫停實驗失敗:", error);
-        }
-      }
-    }
-    // 檢查是否在 index.html
-    else if (
-      window.panelExperiment &&
-      typeof window.panelExperiment.pauseExperiment === "function"
-    ) {
-      try {
-        window.panelExperiment.togglePauseExperiment();
-      } catch (error) {
-        Logger.error(
-          "[MainApp] panelExperiment.togglePauseExperiment() 失敗:",
-          error
-        );
-      }
-    }
-
-    // 記錄到日誌
-    if (this.modules.logger) {
-      const deviceId = localStorage.getItem("sync_client_id") || "unknown";
-      this.modules.logger.logAction(
-        `[同步] 實驗暫停訊號來自: ${source}`,
-        null,
-        "handleSyncExperimentPaused",
-        false,
-        false,
-        false,
-        null,
-        { device_id: deviceId, source: source }
-      );
-    }
+    this.callExperimentMethod("togglePauseExperiment", "暫停實驗失敗");
   }
 
-  //處理同步的實驗還原狀態
+  // 處理同步的實驗還原狀態
   handleSyncExperimentResumed(syncData) {
-    const source = syncData.source || "unknown";
-
-    // 優先檢查是否在 experiment.html
-    if (this.modules.experimentPageManager) {
-      if (
-        typeof this.modules.experimentPageManager.resumeExperiment ===
-        "function"
-      ) {
-        try {
-          this.modules.experimentPageManager.togglePauseExperiment();
-        } catch (error) {
-          Logger.error("[MainApp] 還原實驗失敗:", error);
-        }
-      }
-    }
-    // 檢查是否在 index.html
-    else if (
-      window.panelExperiment &&
-      typeof window.panelExperiment.stopExperiment === "function"
-    ) {
-      try {
-        window.panelExperiment.togglePauseExperiment();
-      } catch (error) {
-        Logger.error(
-          "[MainApp] panelExperiment.togglePauseExperiment() 失敗:",
-          error
-        );
-      }
-    }
-
-    // 記錄到日誌
-    if (this.modules.logger) {
-      const deviceId = localStorage.getItem("sync_client_id") || "unknown";
-      this.modules.logger.logAction(
-        `[同步] 實驗還原訊號來自: ${source}`,
-        null,
-        "handleSyncExperimentResumed",
-        false,
-        false,
-        false,
-        null,
-        { device_id: deviceId, source: source }
-      );
-    }
+    this.callExperimentMethod("togglePauseExperiment", "還原實驗失敗");
   }
 
-  //處理同步的實驗停止狀態
+  // 處理同步的實驗停止狀態
   handleSyncExperimentStopped(syncData) {
-    const _source = syncData.source || "unknown";
+    this.callExperimentMethod("stopExperiment", "停止實驗失敗", false);
+  }
 
-    // 優先檢查是否在 experiment.html
-    if (this.modules.experimentPageManager) {
-      if (
-        typeof this.modules.experimentPageManager.stopExperiment === "function"
-      ) {
-        try {
-          //響應遠端停止訊號時不廣播（false = 不廣播）
-          this.modules.experimentPageManager.stopExperiment(false);
-        } catch (error) {
-          Logger.error("[MainApp] 停止實驗失敗:", error);
-        }
-      }
-    }
-    // 檢查是否在 index.html
-    else if (
-      window.panelExperiment &&
-      typeof window.panelExperiment.stopExperiment === "function"
-    ) {
+  // 通用實驗方法調用器
+  callExperimentMethod(methodName, errorMessage, ...args) {
+    if (this.modules.experimentPageManager?.[methodName]) {
       try {
-        //響應遠端停止訊號時不廣播（false = 不廣播）
-        window.panelExperiment.stopExperiment(false);
+        this.modules.experimentPageManager[methodName](...args);
       } catch (error) {
-        Loggererror("[MainApp] panelExperiment.stopExperiment() 失敗:", error);
+        Logger.error(`${errorMessage}:`, error);
+      }
+    } else if (window.panelExperiment?.[methodName]) {
+      try {
+        window.panelExperiment[methodName](...args);
+      } catch (error) {
+        Logger.error(`panelExperiment.${methodName}() 失敗:`, error);
       }
     }
   }
@@ -546,9 +422,8 @@ class MainApp {
     }
   }
 
-  // 建立動作管理器以支援 action-based 實驗
+  // 建立動作管理器
   createActionManager() {
-    // 使用共用的 ActionManager 類別
     if (!window.actionManager) {
       window.actionManager = new ActionManager();
       this.modules.actionManager = window.actionManager;
@@ -570,3 +445,8 @@ if (document.readyState === "loading") {
 
 // 匯出主應用程式實例
 window.mainApp = mainApp;
+
+
+
+
+

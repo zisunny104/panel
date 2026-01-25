@@ -68,7 +68,7 @@ export class SyncManagerQR {
   initialize() {
     // 防止重複初始化
     if (this.initialized) {
-      Logger.debug("[QR] 已初始化，跳過");
+      Logger.debug("已初始化，跳過");
       return;
     }
 
@@ -94,21 +94,21 @@ export class SyncManagerQR {
         target = window.SyncManager?.PAGE?.PANEL
       } = event.detail;
 
-      Logger.debug("[QR] 收到 QR Code 產生事件", { shareCode, role, target });
+      Logger.debug("收到 QR Code 產生事件", { shareCode, role, target });
 
       // 使用分享代碼
       const codeToUse = shareCode;
 
       if (!codeToUse) {
-        Logger.debug("[QR] QR Code 產生失敗：沒有有效的代碼", event.detail);
+        Logger.debug("QR Code 產生失敗：沒有有效的代碼", event.detail);
         return;
       }
 
       try {
         await this.generateQRCode(codeToUse, role, target);
-        Logger.debug("[QR] QR Code 產生完成");
+        Logger.debug("QR Code 產生完成");
       } catch (error) {
-        Logger.error("[QR] QR Code 產生過程中發生錯誤", error);
+        Logger.error("QR Code 產生過程中發生錯誤", error);
       }
     });
 
@@ -123,14 +123,14 @@ export class SyncManagerQR {
       typeof navigator.mediaDevices.addEventListener === "function"
     ) {
       navigator.mediaDevices.addEventListener("devicechange", async () => {
-        Logger.debug("[QR] 偵測到裝置變更 (devicechange)，正在刷新清單...");
+        Logger.debug("偵測到裝置變更 (devicechange)，正在刷新清單...");
         const video = document.getElementById("syncQrVideo");
         // 只有當掃描器已經打開時才刷新，避免背景執行報錯
         if (this.qrScanner && video) {
           try {
             await this.refreshDeviceList(video);
           } catch (err) {
-            Logger.warn("[QR] devicechange refresh failed:", err);
+            Logger.warn("devicechange refresh failed:", err);
           }
         }
       });
@@ -145,12 +145,12 @@ export class SyncManagerQR {
    * - ?shareCode=XXX&role=YYY (分享代碼)
    */
   checkUrlParameters() {
-    Logger.debug("[QR] 檢查URL參數開始");
+    Logger.debug("檢查URL參數開始");
     const urlParams = new URLSearchParams(window.location.search);
     const shareCode = urlParams.get("shareCode");
     const role = urlParams.get("role") || window.SyncManager?.ROLE?.VIEWER;
 
-    Logger.debug("[QR] 解析URL參數", { shareCode, role });
+    Logger.debug("解析URL參數", { shareCode, role });
 
     // 使用分享代碼
     const code = shareCode;
@@ -158,7 +158,7 @@ export class SyncManagerQR {
     if (code) {
       //檢查目前裝置是否已在工作階段中（產生者自己不應該加入）
       if (this.core?.syncClient?.sessionId) {
-        Logger.debug("[QR] 目前裝置已在工作階段中，忽略 URL 中的分享代碼");
+        Logger.debug("目前裝置已在工作階段中，忽略 URL 中的分享代碼");
         // 立即清理URL
         window.history.replaceState(
           {},
@@ -183,29 +183,29 @@ export class SyncManagerQR {
       // 延遲檢查以確保 SyncConfirmDialogManager 已載入
       if (window.SyncConfirmDialogManager) {
         Logger.debug(
-          "[QR] SyncConfirmDialogManager 已載入，直接顯示確認對話框"
+          "SyncConfirmDialogManager 已載入，直接顯示確認對話框"
         );
         // 已載入，直接顯示
         this.showJoinConfirmation(code, role);
       } else {
-        Logger.debug("[QR] SyncConfirmDialogManager 未載入，開始延遲重試");
+        Logger.debug("SyncConfirmDialogManager 未載入，開始延遲重試");
         // 未載入，延遲 500ms 後重試（最多重試 20 次 = 10秒）
         let retryCount = 0;
         const maxRetries = 20;
         const retryInterval = setInterval(() => {
           retryCount++;
           Logger.debug(
-            `[QR] 重試載入 SyncConfirmDialogManager (${retryCount}/${maxRetries})`
+            `重試載入 SyncConfirmDialogManager (${retryCount}/${maxRetries})`
           );
           if (window.SyncConfirmDialogManager) {
             Logger.debug(
-              "[QR] SyncConfirmDialogManager 載入成功，顯示確認對話框"
+              "SyncConfirmDialogManager 載入成功，顯示確認對話框"
             );
             clearInterval(retryInterval);
             this.showJoinConfirmation(code, role);
           } else if (retryCount >= maxRetries) {
             clearInterval(retryInterval);
-            Logger.error("[QR] SyncConfirmDialogManager 載入超時");
+            Logger.error("SyncConfirmDialogManager 載入超時");
             alert("系統初始化失敗，請重新整理頁面");
           }
         }, 500);
@@ -217,15 +217,15 @@ export class SyncManagerQR {
    * 顯示加入工作階段確認對話框（使用統一管理器）
    */
   showJoinConfirmation(code, role) {
-    Logger.debug("[QR] showJoinConfirmation 被調用", { code, role });
+    Logger.debug("showJoinConfirmation 被調用", { code, role });
 
     // 確保 SyncConfirmDialogManager 已載入
     if (!window.SyncConfirmDialogManager) {
-      Logger.error("[QR] SyncConfirmDialogManager 未載入");
+      Logger.error("SyncConfirmDialogManager 未載入");
       return;
     }
 
-    Logger.debug("[QR] SyncConfirmDialogManager 已載入，準備顯示對話框");
+    Logger.debug("SyncConfirmDialogManager 已載入，準備顯示對話框");
 
     // 使用統一的對話框管理器
     window.SyncConfirmDialogManager.showJoinConfirmation(
@@ -290,7 +290,7 @@ export class SyncManagerQR {
           );
 
           // 更新UI
-          Logger.debug("[QR] 同步工作階段加入流程完成，觸發UI更新事件");
+          Logger.debug("同步工作階段加入流程完成，觸發UI更新事件");
           window.dispatchEvent(new Event(SyncEvents.SESSION_JOINED));
         } catch (error) {
           Logger.error("加入工作階段失敗:", error);
@@ -330,10 +330,10 @@ export class SyncManagerQR {
     role = window.SyncManager?.ROLE?.VIEWER,
     target = window.SyncManager?.PAGE?.PANEL
   ) {
-    Logger.debug("[QR] 開始產生 QR Code ", { code, role, target });
+    Logger.debug("開始產生 QR Code ", { code, role, target });
 
     if (!code) {
-      Logger.error("[QR] QR Code 產生失敗：代碼為空");
+      Logger.error("QR Code 產生失敗：代碼為空");
       return;
     }
 
@@ -343,7 +343,7 @@ export class SyncManagerQR {
       container = document.getElementById("qrCodeDisplay");
     }
     if (!container) {
-      Logger.warn("[QR] 找不到 QR Code 容器 (shareQRCode 或 qrCodeDisplay)");
+      Logger.warn("找不到 QR Code 容器 (shareQRCode 或 qrCodeDisplay)");
       return;
     }
 
@@ -355,23 +355,23 @@ export class SyncManagerQR {
     // 取得分享代碼資訊
     let shareCodeInfo = null;
     try {
-      Logger.debug("[QR] 取得分享代碼資訊", { code });
+      Logger.debug("取得分享代碼資訊", { code });
       shareCodeInfo = await this.core.getShareCodeInfo(code);
-      Logger.debug("[QR] 分享代碼資訊取得成功", shareCodeInfo);
+      Logger.debug("分享代碼資訊取得成功", shareCodeInfo);
     } catch (error) {
-      Logger.error("[QR] 取得分享代碼資訊失敗（將繼續產生 QR Code）", error);
+      Logger.error("取得分享代碼資訊失敗（將繼續產生 QR Code）", error);
     }
 
     // 構建完整URL（根據 target）
     const qrUrl = this.core.generateQRContent(code, role, target);
-    Logger.debug("[QR] 產生的QR URL", { qrUrl, target });
+    Logger.debug("產生的QR URL", { qrUrl, target });
 
     // 檢查分享代碼是否已過期
     const isExpired = shareCodeInfo && shareCodeInfo.expired;
     const statusText = isExpired ? " (已過期)" : "";
 
     // 檢查 QRCodeStyling 庫是否已載入
-    Logger.debug("[QR] QRCodeStyling 可用性", {
+    Logger.debug("QRCodeStyling 可用性", {
       available: typeof QRCodeStyling !== "undefined",
       globalType: typeof window.QRCodeStyling
     });
@@ -473,7 +473,7 @@ export class SyncManagerQR {
       });
 
       qrCode.append(qrImageContainer);
-      Logger.debug("[QR] QR Code 已附加到容器");
+      Logger.debug("QR Code 已附加到容器");
 
       // 更新按鈕狀態
       const modeBtn = container.querySelector("#qrDefaultModeBtn");
@@ -492,9 +492,9 @@ export class SyncManagerQR {
       container.dataset.qrTarget = target;
       container.dataset.qrRole = role;
 
-      Logger.info("[QR] QR Code 產生成功", { code, role });
+      Logger.info("QR Code 產生成功", { code, role });
     } catch (error) {
-      Logger.error("[QR] QR Code 產生失敗:", error);
+      Logger.error("QR Code 產生失敗:", error);
     }
   }
 
@@ -516,7 +516,7 @@ export class SyncManagerQR {
               ? window.SyncManager?.ROLE?.VIEWER
               : window.SyncManager?.ROLE?.OPERATOR;
 
-          Logger.debug("[QR] 使用者切換預設模式，重新產生 QR", {
+          Logger.debug("使用者切換預設模式，重新產生 QR", {
             code,
             newRole
           });
@@ -525,7 +525,7 @@ export class SyncManagerQR {
             container.dataset.qrTarget || window.SyncManager?.PAGE?.PANEL;
           this.generateQRCode(code, newRole, currentTarget);
         } catch (err) {
-          Logger.error("[QR] 切換預設模式失敗:", err);
+          Logger.error("切換預設模式失敗:", err);
         }
       });
     }
@@ -544,14 +544,14 @@ export class SyncManagerQR {
               ? window.SyncManager?.PAGE?.PANEL
               : window.SyncManager?.PAGE?.EXPERIMENT;
 
-          Logger.debug("[QR] 使用者切換 QR 目標頁面", { code, newTarget });
+          Logger.debug("使用者切換 QR 目標頁面", { code, newTarget });
 
           // 重新產生 QR（使用相同 shareCode 與目前 role）
           const currentRole =
             container.dataset.qrRole || window.SyncManager?.ROLE?.VIEWER;
           this.generateQRCode(code, currentRole, newTarget);
         } catch (err) {
-          Logger.error("[QR] 切換 QR 目標頁面失敗:", err);
+          Logger.error("切換 QR 目標頁面失敗:", err);
         }
       });
     }
@@ -562,17 +562,17 @@ export class SyncManagerQR {
    * @param {number} remainingTime - 剩餘時間（秒），如果未提供則使用預設300秒
    */
   startQRCodeCountdown(remainingTime = null) {
-    Logger.debug("[QR] 開始 QR Code 倒數計時", { remainingTime });
+    Logger.debug("開始 QR Code 倒數計時", { remainingTime });
 
     const countdownElement = document.getElementById("qrCountdown");
     if (!countdownElement) {
-      Logger.warn("[QR] 找不到倒數計時元素 (qrCountdown)");
+      Logger.warn("找不到倒數計時元素 (qrCountdown)");
       return;
     }
 
     // 如果沒有提供剩餘時間，使用預設的300秒
     let initialTime = remainingTime !== null ? remainingTime : 300;
-    Logger.debug("[QR] 使用倒數時間", {
+    Logger.debug("使用倒數時間", {
       initialTime,
       provided: remainingTime !== null
     });
@@ -587,7 +587,7 @@ export class SyncManagerQR {
       currentTime--;
 
       if (currentTime <= 0) {
-        Logger.debug("[QR] QR Code 倒數結束，已過期");
+        Logger.debug("QR Code 倒數結束，已過期");
         clearInterval(this.countdownInterval);
         countdownElement.textContent = "有效期已過期";
         countdownElement.classList.add("sync-qr-expired");
@@ -644,7 +644,7 @@ export class SyncManagerQR {
       this.availableVideoDevices = sorted;
 
       Logger.debug(
-        "[QR] refreshDeviceList: 更新清單",
+        "refreshDeviceList: 更新清單",
         sorted.map((d) => ({ deviceId: d.deviceId, label: d.label }))
       );
 
@@ -688,7 +688,7 @@ export class SyncManagerQR {
         }
       }
     } catch (error) {
-      Logger.warn("[QR] refreshDeviceList failed:", error);
+      Logger.warn("refreshDeviceList failed:", error);
       if (statusEl) statusEl.textContent = "刷新相機清單失敗";
     }
   }
@@ -699,7 +699,7 @@ export class SyncManagerQR {
   async startQRScanner() {
     // 防止同時多次建立 scanner UI 或重複啟動
     if (this.qrScanner) {
-      Logger.warn("[QR] Scanner UI 已存在，忽略重複啟動請求");
+      Logger.warn("Scanner UI 已存在，忽略重複啟動請求");
       return;
     }
 
@@ -784,13 +784,13 @@ export class SyncManagerQR {
           copyBtn.innerHTML =
             "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
           copyBtn.classList.add("copied");
-          Logger.info("[QR] 已複製偵錯資訊到剪貼簿", debug);
+          Logger.info("已複製偵錯資訊到剪貼簿", debug);
           setTimeout(() => {
             copyBtn.innerHTML = originalHTML;
             copyBtn.classList.remove("copied");
           }, 1400);
         } catch (err) {
-          Logger.warn("[QR] 複製偵錯資訊失敗:", err);
+          Logger.warn("複製偵錯資訊失敗:", err);
           if (statusEl) statusEl.textContent = "無法複製偵錯資訊";
         }
       });
@@ -801,7 +801,7 @@ export class SyncManagerQR {
       refreshBtn.addEventListener("click", async (e) => {
         e.preventDefault();
         if (this.cameraLoading) {
-          Logger.debug("[QR] refreshCamerasBtn: camera is loading, ignoring");
+          Logger.debug("refreshCamerasBtn: camera is loading, ignoring");
           if (statusEl) statusEl.textContent = "攝影機正在啟動中，請稍後...";
           return;
         }
@@ -816,7 +816,7 @@ export class SyncManagerQR {
           this.availableVideoDevices = sorted;
           rebuildCameraOptions(filterInput?.value || "");
           Logger.debug(
-            "[QR] refreshCamerasBtn: enumerateDevices result (sorted)",
+            "refreshCamerasBtn: enumerateDevices result (sorted)",
             sorted.map((d) => ({ deviceId: d.deviceId, label: d.label }))
           );
 
@@ -830,7 +830,7 @@ export class SyncManagerQR {
 
           if (savedId && sorted.some((d) => d.deviceId === savedId)) {
             toStart = savedId;
-            Logger.debug("[QR] refreshCamerasBtn: hit savedId", savedId);
+            Logger.debug("refreshCamerasBtn: hit savedId", savedId);
           } else if (savedLabel) {
             const labelMatch = sorted.find((d) =>
               (d.label || "").toLowerCase().includes(savedLabel)
@@ -839,7 +839,7 @@ export class SyncManagerQR {
               toStart = labelMatch.deviceId;
               cameraSelect.value = toStart;
               Logger.debug(
-                "[QR] refreshCamerasBtn: matched saved label to device",
+                "refreshCamerasBtn: matched saved label to device",
                 { savedLabel, matched: toStart }
               );
             }
@@ -848,7 +848,7 @@ export class SyncManagerQR {
           if (!toStart && sorted.length > 0) {
             toStart = sorted[0].deviceId;
             Logger.debug(
-              "[QR] refreshCamerasBtn: default to first sorted device",
+              "refreshCamerasBtn: default to first sorted device",
               toStart
             );
           }
@@ -861,7 +861,7 @@ export class SyncManagerQR {
             if (statusEl) statusEl.textContent = "找不到可用的攝影機";
           }
         } catch (err) {
-          Logger.warn("[QR] refreshCamerasBtn error:", err);
+          Logger.warn("refreshCamerasBtn error:", err);
           if (statusEl) statusEl.textContent = "重新整理相機失敗";
         }
       });
@@ -910,14 +910,14 @@ export class SyncManagerQR {
 
       if (savedId && sorted.some((d) => d.deviceId === savedId)) {
         targetDeviceId = savedId;
-        Logger.debug("[QR] hit saved camera by id", { savedId });
+        Logger.debug("hit saved camera by id", { savedId });
       } else if (savedLabel) {
         const byLabel = sorted.find((d) =>
           (d.label || "").toLowerCase().includes(savedLabel)
         );
         if (byLabel) {
           targetDeviceId = byLabel.deviceId;
-          Logger.debug("[QR] hit saved camera by label", {
+          Logger.debug("hit saved camera by label", {
             savedLabel,
             matched: targetDeviceId
           });
@@ -926,7 +926,7 @@ export class SyncManagerQR {
 
       if (!targetDeviceId && sorted.length > 0) {
         targetDeviceId = sorted[0].deviceId;
-        Logger.debug("[QR] defaulting to first sorted device", targetDeviceId);
+        Logger.debug("defaulting to first sorted device", targetDeviceId);
       }
 
       // 設定選單並啟動目標相機
@@ -935,7 +935,7 @@ export class SyncManagerQR {
         if (statusEl) statusEl.textContent = "啟動選擇的相機...";
         await this.startCamera(video, targetDeviceId);
       } catch (e) {
-        Logger.warn("[QR] startCamera failed for initial selection:", e);
+        Logger.warn("startCamera failed for initial selection:", e);
       }
     } catch (error) {
       Logger.warn("無法列出相機裝置:", error);
@@ -963,7 +963,7 @@ export class SyncManagerQR {
           cameraSelect.selectedOptions && cameraSelect.selectedOptions[0];
         const selLabel = selOption ? selOption.textContent : "";
         if (selLabel) localStorage.setItem("preferredCameraLabel", selLabel);
-        Logger.debug("[QR] 使用者手動切換相機，已儲存偏好", {
+        Logger.debug("使用者手動切換相機，已儲存偏好", {
           preferred: val,
           label: selLabel
         });
@@ -1026,7 +1026,7 @@ export class SyncManagerQR {
           localStorage.setItem("preferredCameraLabel", matches[0].label);
         if (statusEl)
           statusEl.textContent = `選擇相機：${matches[0].label || matches[0].deviceId}`;
-        Logger.info("[QR] applyCameraFilter: selected device", {
+        Logger.info("applyCameraFilter: selected device", {
           deviceId: matches[0].deviceId,
           label: matches[0].label
         });
@@ -1079,7 +1079,7 @@ export class SyncManagerQR {
 
     // Prevent concurrent camera startup requests to avoid race conditions
     if (this.cameraLoading) {
-      Logger.warn("[QR] camera already loading, ignoring new request");
+      Logger.warn("camera already loading, ignoring new request");
       if (statusEl) statusEl.textContent = "攝影機正在啟動中，請稍後...";
       return;
     }
@@ -1223,7 +1223,7 @@ export class SyncManagerQR {
                   if (statusEl)
                     statusEl.textContent = `嘗試相機 ${i + 1}/${devicesList.length} (${deviceLabel}) - ${variant.desc}`;
 
-                  Logger.debug("[QR] startCamera attempting device variant", {
+                  Logger.debug("startCamera attempting device variant", {
                     deviceId: d.deviceId,
                     label: deviceLabel,
                     variant: variant.desc,
@@ -1301,7 +1301,7 @@ export class SyncManagerQR {
             if (statusEl)
               statusEl.textContent =
                 "所有相機嘗試失敗。請按右上資訊按鈕複製偵錯日誌以協助排查。";
-            Logger.debug("[QR] all device attempts failed", attemptRecords);
+            Logger.debug("all device attempts failed", attemptRecords);
             return;
           }
 
@@ -1337,12 +1337,12 @@ export class SyncManagerQR {
   async retryCamera(deviceId = "", video) {
     const statusEl = this.qrScanner?.querySelector(".sync-scanner-status");
     if (this.cameraLoading) {
-      Logger.debug("[QR] retryCamera: camera is already loading, ignoring");
+      Logger.debug("retryCamera: camera is already loading, ignoring");
       if (statusEl) statusEl.textContent = "攝影機正在啟動中，請稍後...";
       return;
     }
 
-    Logger.debug("[QR] retryCamera: user-initiated retry", { deviceId });
+    Logger.debug("retryCamera: user-initiated retry", { deviceId });
     if (statusEl) statusEl.textContent = "使用者要求重新嘗試啟動相機...";
 
     // 停掉目前 stream
@@ -1350,7 +1350,7 @@ export class SyncManagerQR {
       try {
         this.currentStream.getTracks().forEach((t) => t.stop());
       } catch (err) {
-        Logger.warn("[QR] retryCamera: 停止 stream 發生錯誤:", err);
+        Logger.warn("retryCamera: 停止 stream 發生錯誤:", err);
       }
       this.currentStream = null;
     }
@@ -1544,3 +1544,8 @@ export class SyncManagerQR {
     }
   }
 }
+
+
+
+
+

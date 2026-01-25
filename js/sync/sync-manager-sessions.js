@@ -70,7 +70,7 @@ export class SyncManagerSessions {
     window.addEventListener("sync_session_invalid", (event) => {
       const { reason, originalError } = event.detail;
 
-      Logger.info("[SyncManagerSessions] 工作階段失效，重新載入列表", {
+      Logger.info("工作階段失效，重新載入列表", {
         reason,
         originalError
       });
@@ -970,3 +970,8 @@ ${indentStr}}</span>`;
     this.selectedSessions.clear();
   }
 }
+
+
+
+
+

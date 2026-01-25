@@ -1,5 +1,5 @@
 /**
- * WebSocket 客戶端
+ * WebSocketClient - WebSocket 客戶端
  *
  * 功能:
  * - 管理 WebSocket 連接生命週期
@@ -707,3 +707,8 @@ if (typeof module !== "undefined" && module.exports) {
 } else {
   window.WebSocketClient = WebSocketClient;
 }
+
+
+
+
+

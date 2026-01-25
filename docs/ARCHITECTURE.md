@@ -156,10 +156,9 @@ panel/
 │   │   ├── panel-media-manager.js          # 媒體管理
 │   │   ├── panel-power-control.js          # 電源控制
 │   │   ├── panel-sync-operator.js          # 同步操作器
-│   │   ├── panel-toggle.js                 # 切換控制
 │   │   ├── panel-ui-controls.js            # 面板UI控制
 │   │   ├── combination-selector.js         # 組合選擇器
-│   │   ├── power-logger.js                 # 電源日誌
+│   │   ├── panel-logger.js                 # 面板操作日誌
 │   │   └── panel-experiment-log.js         # 面板實驗日誌
 │   │
 │   ├── sync/                         # 同步模組

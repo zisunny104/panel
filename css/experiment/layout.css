@@ -19,6 +19,29 @@
     overflow-y: auto;
     background: #f9f9f9;
     transition: flex 0.3s ease, margin-left 0.3s ease;
+    scrollbar-width: thin;
+    scrollbar-color: #bbb #f5f5f5;
+}
+
+.left-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.left-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.left-panel::-webkit-scrollbar-thumb {
+    background: #bbb;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
+}
+
+.left-panel::-webkit-scrollbar-thumb:hover {
+    background: #999;
+    background-clip: padding-box;
 }
 
 .left-panel.collapsed {

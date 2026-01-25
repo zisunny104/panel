@@ -14,7 +14,7 @@
 
 // 防止重複載入
 if (typeof window !== "undefined" && window.ExperimentHubClient) {
-  console.warn("[ExperimentHubClient] 已載入，跳過重複載入");
+  console.warn("已載入，跳過重複載入");
 } else {
   // 類別定義
   class ExperimentHubClient {
@@ -91,7 +91,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
       setTimeout(() => {
         clearInterval(checkInterval);
         if (!this.syncClientReady) {
-          Logger.warn("[ExperimentHubClient] SyncClient 就緒超時");
+          Logger.warn("SyncClient 就緒超時");
         }
       }, 30000);
     }
@@ -100,7 +100,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      * SyncClient 就緒回調
      */
     onSyncClientReady() {
-      Logger.info("[ExperimentHubClient] SyncClient 就緒");
+      Logger.info("SyncClient 就緒");
       this.syncClientReady = true;
 
       // 取得 SyncClient 的 WebSocket 客戶端
@@ -125,27 +125,27 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
 
       // 監聽實驗相關事件
       this.wsClient.on("experiment_started", (data) => {
-        Logger.debug("[ExperimentHubClient] 實驗開始", data);
+        Logger.debug("實驗開始", data);
         this.triggerExperimentStateChange({ state: "started", ...data });
       });
 
       this.wsClient.on("experiment_paused", (data) => {
-        Logger.debug("[ExperimentHubClient] 實驗暫停", data);
+        Logger.debug("實驗暫停", data);
         this.triggerExperimentStateChange({ state: "paused", ...data });
       });
 
       this.wsClient.on("experiment_resumed", (data) => {
-        Logger.debug("[ExperimentHubClient] 實驗恢復", data);
+        Logger.debug("實驗恢復", data);
         this.triggerExperimentStateChange({ state: "resumed", ...data });
       });
 
       this.wsClient.on("experiment_stopped", (data) => {
-        Logger.debug("[ExperimentHubClient] 實驗停止", data);
+        Logger.debug("實驗停止", data);
         this.triggerExperimentStateChange({ state: "stopped", ...data });
       });
 
       this.wsClient.on("experiment_id_update", (data) => {
-        Logger.debug("[ExperimentHubClient] 實驗 ID 更新", data);
+        Logger.debug("實驗 ID 更新", data);
         // 檢查是否是自己的更新（避免回音）
         if (data.clientId !== this.getClientId()) {
           this.triggerExperimentIdUpdate(data);
@@ -156,19 +156,19 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
       this.wsClient.on("authenticated", (data) => {
         this.connected = true;
         this.role = data.role;
-        Logger.debug("[ExperimentHubClient] WebSocket 已認證", data);
+        Logger.debug("WebSocket 已認證", data);
       });
 
       this.wsClient.on("disconnected", () => {
         this.connected = false;
-        Logger.info("[ExperimentHubClient] WebSocket 已斷線");
+        Logger.info("WebSocket 已斷線");
         this.triggerConnectionLost();
       });
 
       this.wsClient.on("reconnected", (data) => {
         this.connected = true;
         this.role = data.role;
-        Logger.info("[ExperimentHubClient] WebSocket 已重新連線", data);
+        Logger.info("WebSocket 已重新連線", data);
       });
     }
 
@@ -181,7 +181,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
     async registerExperimentId(experimentId, source = "client") {
       try {
         Logger.debug(
-          `[ExperimentHubClient] 註冊實驗 ID: ${experimentId} (來自: ${source})`
+          `註冊實驗 ID: ${experimentId} (來自: ${source})`
         );
 
         // 使用 SyncClient 的 syncState 方法來廣播實驗ID更新
@@ -196,22 +196,22 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
           };
 
           Logger.debug(
-            `[ExperimentHubClient] 透過 SyncClient 廣播實驗ID更新: ${experimentId}`
+            `透過 SyncClient 廣播實驗ID更新: ${experimentId}`
           );
 
           const syncResult = window.syncClient.syncState(updateData);
           if (!syncResult) {
             Logger.debug(
-              "[ExperimentHubClient] 本機模式或未連線，跳過同步廣播"
+              "本機模式或未連線，跳過同步廣播"
             );
           }
         } else {
-          Logger.debug("[ExperimentHubClient] SyncClient 不可用，無法廣播");
+          Logger.debug("SyncClient 不可用，無法廣播");
         }
 
         return true;
       } catch (error) {
-        Logger.error("[ExperimentHubClient] 註冊實驗 ID 失敗:", error);
+        Logger.error("註冊實驗 ID 失敗:", error);
         return false;
       }
     }
@@ -227,10 +227,10 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
           return window.experimentStateManager.getExperimentId();
         }
 
-        Logger.warn("[ExperimentHubClient] ExperimentStateManager 不存在");
+        Logger.warn("ExperimentStateManager 不存在");
         return null;
       } catch (error) {
-        Logger.error("[ExperimentHubClient] 取得實驗 ID 失敗:", error);
+        Logger.error("取得實驗 ID 失敗:", error);
         return null;
       }
     }
@@ -242,12 +242,12 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      */
     sendExperimentAction(action, data = {}) {
       if (!this.wsClient || !this.connected) {
-        Logger.warn("[ExperimentHubClient] 未連線，無法發送實驗操作");
+        Logger.warn("未連線，無法發送實驗操作");
         return false;
       }
 
       if (this.role !== window.SyncManager?.ROLE?.OPERATOR) {
-        Logger.warn("[ExperimentHubClient] 僅操作者可以發送實驗操作");
+        Logger.warn("僅操作者可以發送實驗操作");
         return false;
       }
 
@@ -360,7 +360,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      * 觸發實驗 ID 更新事件
      */
     triggerExperimentIdUpdate(data) {
-      Logger.debug("[ExperimentHubClient] 觸發實驗 ID 更新事件:", data);
+      Logger.debug("觸發實驗 ID 更新事件:", data);
       const event = new CustomEvent("experiment_hub_id_update", {
         detail: data
       });
@@ -396,3 +396,8 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ExperimentHubClient;
 }
+
+
+
+
+

@@ -1,7 +1,7 @@
 /* ================= 實驗面板 ================= */
 .experiment-panel {
     position: fixed;
-    right: 5.5rem;
+    right: 4rem;
     bottom: 4.5rem;
     width: 23.75rem;
     max-height: 85vh;
