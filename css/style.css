@@ -2,12 +2,12 @@
    Virtual Panel CSS - 模組化入口
    =============================== */
 
-/* 基礎樣式 */
+/* ===== 基礎樣式 ===== */
 @import url('./base/global.css');
 @import url('./base/scrollbar.css');
 @import url('./base/layout.css');
 
-/* 組件 */
+/* ===== 組件 ===== */
 @import url('./components/svg-panel.css');
 @import url('./components/media-area.css');
 @import url('./components/buttons.css');
@@ -18,29 +18,29 @@
 @import url('./components/control-panel.css');
 @import url('./components/toggle-switch.css');
 
-/* 面板 */
+/* ===== 面板 ===== */
 @import url('./panels/experiment-panel.css');
 @import url('./panels/log-panel.css');
 @import url('./panels/maintenance-panel.css');
 
-/* 狀態 */
+/* ===== 狀態 ===== */
 @import url('./states/power-states.css');
 @import url('./states/experiment-states.css');
 @import url('./states/interaction-states.css');
 
-/* 功能/工具 */
+/* ===== 功能/工具 ===== */
 @import url('./utilities/animations.css');
 @import url('./utilities/responsive.css');
 @import url('./utilities/version-info.css');
 
-/* 多螢幕同步 */
+/* ===== 多螢幕同步 ===== */
 @import url('./sync/indicator.css');
 @import url('./sync/qr.css');
 @import url('./sync/sessions.css');
 @import url('./sync/confirm.css');
 @import url('./sync/modal.css');
 
-/* 實驗頁面專用樣式 */
+/* ===== 實驗頁面專用樣式 ===== */
 @import url('./experiment/base.css');
 @import url('./experiment/layout.css');
 @import url('./experiment/buttons.css');

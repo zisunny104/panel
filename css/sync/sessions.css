@@ -239,14 +239,8 @@
     flex: 1;
 }
 
-.sync-card-label {
-    font-weight: bold;
-    color: #333;
-}
-
-.sync-card-value {
-    color: #666;
-}
+/* ===== 注意：.sync-card-label / .sync-card-value 的視覺樣式已統一由 "css/sync/indicator.css" 管理 ===== */
+/* 移除會造成與 indicator.css 覆蓋衝突的定義，若 session 卡片需要不同樣式，請改用更具範圍的選擇器 .sync-session-card .sync-card-label */
 
 .sync-card-hint {
     font-size: 14px;
@@ -352,7 +346,7 @@
     background: #c82333;
 }
 
-/* 空狀態樣式 */
+/* ===== 空狀態樣式 ===== */
 .sync-sessions-empty {
     text-align: center;
     color: #666;

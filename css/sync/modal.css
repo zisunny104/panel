@@ -135,12 +135,10 @@
     flex: 1;
     min-height: 0;
 
-    /* layout */
     display: flex;
     flex-direction: column;
     align-items: stretch;
 
-    /* overflow */
     overflow-y: auto;
 
     background: #ffffff;

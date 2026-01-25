@@ -44,7 +44,7 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-/* 掃描器頭部 */
+/* ===== 掃描器標題欄 ===== */
 .sync-scanner-header {
     display: flex;
     justify-content: space-between;
@@ -80,7 +80,7 @@
     transform: scale(1.1);
 }
 
-/* header action group (retry + close) */
+/* ===== 標題欄動作群組（重試 + 關閉） ===== */
 .sync-scanner-header-actions {
     display: flex;
     gap: 8px;
@@ -108,7 +108,7 @@
     transform: scale(1.05);
 }
 
-/* 視訊容器 */
+/* ===== 視訊容器 ===== */
 .sync-scanner-video-container {
     position: relative;
     flex: 1;

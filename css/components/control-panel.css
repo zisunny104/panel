@@ -140,7 +140,6 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: nowrap;
-    /* prevent wrapping */
     white-space: nowrap;
     overflow: hidden;
 }
@@ -171,7 +170,7 @@
 /* Control label and input sizing for consistent, non-wrapping rows */
 .settings-panel .control-label {
     min-width: 6rem;
-    /* reduced a bit */
+    /* 微幅縮小 */
     display: inline-block;
     text-align: left;
     font-size: 0.95rem;

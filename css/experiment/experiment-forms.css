@@ -81,7 +81,7 @@
     border-color: #bbb;
 }
 
-/* 實驗控制區域 */
+/* ===== 實驗控制區域 ===== */
 .experiment-control-group {
     margin-top: 15px;
     display: flex;
