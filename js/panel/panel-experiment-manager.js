@@ -108,7 +108,8 @@ class PanelExperimentManager {
 
   /** 同步狀態方法 */
   get syncState() {
-    return window.syncManager?.core?.syncState;
+    const core = window.syncManager?.core;
+    return core ? core.syncState.bind(core) : null;
   }
 
   /** 同步客戶端ID */
@@ -344,6 +345,11 @@ class PanelExperimentManager {
     this.flow.showCurrentStepMediaOrHome();
   }
 
+  /** 顯示目前步驟的媒體內容或首頁 */
+  showCurrentStepMediaOrHome() {
+    this.flow.showCurrentStepMediaOrHome();
+  }
+
   /** 處理實驗結束流程 */
   handleExperimentEnd() {
     if (
@@ -546,9 +552,6 @@ class PanelExperimentManager {
   initializeActionManager() {
     // 如果 SyncManager 還沒初始化，等待初始化完成
     if (!window.syncManager?.initialized) {
-      Logger.debug(
-        "SyncManager 未初始化，等待初始化事件再初始化 ActionManager",
-      );
       const handleInitialized = () => {
         Logger.debug("收到初始化事件，初始化 ActionManager");
         this.createActionManager();
@@ -560,12 +563,12 @@ class PanelExperimentManager {
       return;
     }
 
-    // SyncManager 已初始化，直接創建 ActionManager
+    // SyncManager 已初始化，直接建立 ActionManager
     this.createActionManager();
   }
 
   /**
-   * 創建動作管理器實例
+   * 建立動作管理器實例
    */
   createActionManager() {
     if (window.ActionManager) {

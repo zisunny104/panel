@@ -19,8 +19,7 @@ class PowerControl {
     this.powerKnob = document.getElementById("powerKnob");
     this.powerLightOn = document.getElementById("powerLightOn");
 
-    Logger.debug("構造函數 - powerLightOn 元素:", this.powerLightOn);
-
+    // 靜默初始化（移除詳細的 DOM 元素日誌）
     this.setupEventListeners();
     this.updatePowerUIWithoutSync(); // 初始化時不觸發同步事件
   }
@@ -45,6 +44,8 @@ class PowerControl {
     // 當電源狀態改變時，更新實驗模式按鈕樣式
     if (window.buttonManager) {
       window.buttonManager.updateExperimentButtonStyles();
+      // 確保按鈕禁用狀態也被更新
+      window.buttonManager.updateMediaForCurrentAction();
     }
 
     // 當電源狀態改變時，更新實驗模式媒體顯示
@@ -86,6 +87,15 @@ class PowerControl {
 
       this.updatePowerUI();
       this.enableAllButtons();
+
+      // 電源關閉時清除所有按鈕高亮
+      if (window.buttonManager) {
+        document.querySelectorAll(".button-overlay").forEach((btn) => {
+          btn.classList.remove("next-step-highlight");
+          btn.classList.remove("next-step-highlight-secondary");
+          btn.classList.remove("next-step-highlight-shift");
+        });
+      }
 
       if (window.logger) {
         const action = trigger === "knob" ? "旋轉開關關機" : "按鈕關機";
@@ -200,8 +210,13 @@ class PowerControl {
    * 停用所有按鈕
    */
   disableAllButtons() {
-    const buttonOverlays = document.querySelectorAll(".button-overlay");
-    buttonOverlays.forEach((btn) => btn.classList.add("disabled"));
+    // 如果正在等待開機，不要新增 disabled 類，讓 temporarily-disabled 樣式生效
+    const isWaitingForPowerOn =
+      window.panelExperiment?.waitingForPowerOn || false;
+    if (!isWaitingForPowerOn) {
+      const buttonOverlays = document.querySelectorAll(".button-overlay");
+      buttonOverlays.forEach((btn) => btn.classList.add("disabled"));
+    }
 
     // 開機動畫播放期間的按鈕狀態
     if (this.powerOnBtn) this.powerOnBtn.disabled = true;
@@ -633,6 +648,8 @@ class PowerControl {
     // 當電源狀態改變時，更新實驗模式按鈕樣式
     if (window.buttonManager) {
       window.buttonManager.updateExperimentButtonStyles();
+      // 確保按鈕禁用狀態也被更新
+      window.buttonManager.updateMediaForCurrentAction();
     }
 
     // 當電源狀態改變時，更新實驗模式媒體顯示

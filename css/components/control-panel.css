@@ -209,3 +209,24 @@
     padding: 0.125rem 0.25rem;
     text-align: center;
 }
+
+/* 滑桿與數字輸入框並排顯示 */
+.settings-panel .control-group .range-with-number {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.settings-panel .control-group .range-with-number input[type="range"] {
+    flex: 1;
+    min-width: 4rem;
+}
+
+.settings-panel .control-group .range-with-number .number-input {
+    flex: 0 0 3rem;
+    padding: 0.125rem 0.25rem;
+    text-align: center;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}

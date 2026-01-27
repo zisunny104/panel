@@ -42,6 +42,22 @@ class PanelExperimentUI {
         ? "⏸ 暫停中"
         : "";
     }
+
+    // 更新暫停/恢復按鈕的文字和狀態
+    const pauseButton = this.manager.getCachedElement("pauseExperimentBtn");
+    if (pauseButton) {
+      if (this.manager.timer.isPaused()) {
+        pauseButton.innerHTML = "▶ 繼續";
+        pauseButton.title = "恢復實驗";
+        pauseButton.classList.remove("experiment-pause-btn");
+        pauseButton.classList.add("experiment-resume-btn");
+      } else {
+        pauseButton.innerHTML = "⏸ 暫停";
+        pauseButton.title = "暫停實驗";
+        pauseButton.classList.remove("experiment-resume-btn");
+        pauseButton.classList.add("experiment-pause-btn");
+      }
+    }
   }
 
   /**
@@ -100,8 +116,14 @@ class PanelExperimentUI {
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
     const showHighlight = toggleTouchVisuals && toggleTouchVisuals.checked;
 
-    // 如果視覺提示被關閉，清除所有高亮
-    if (!showHighlight) {
+    // 確保視覺提示 class 的正確狀態
+    if (showHighlight) {
+      if (!document.body.classList.contains("visual-hints-enabled")) {
+        document.body.classList.add("visual-hints-enabled");
+      }
+    } else {
+      // 如果視覺提示被關閉，清除所有高亮
+      document.body.classList.remove("visual-hints-enabled");
       this.clearAllHighlights();
       return;
     }
@@ -115,17 +137,23 @@ class PanelExperimentUI {
         this.manager.currentStepIndex === 0 &&
         currentUnit?.steps?.[0]?.step_id?.includes("_1");
 
+      // 檢查是否在等待開機或關機
+      const isWaitingForPowerChange =
+        this.manager.waitingForPowerOn || this.manager.waitingForPowerOff;
+
       if (
         !isFirstStep &&
         window.powerControl &&
-        !window.powerControl.isPowerOn
+        !window.powerControl.isPowerOn &&
+        !isWaitingForPowerChange
       ) {
-        // 機器未開機且不是開機步驟，清除高亮
+        // 機器未開機且不是開機步驟且不在等待電源變化，清除高亮
         this.clearAllHighlights();
         return;
       }
 
       // 實驗進行中且視覺提示開啟，保持高亮（由其他方法控制具體哪些按鈕高亮）
+      // 如果在等待電源變化，電源按鈕高亮由 panel-experiment-power.js 管理
       return;
     }
 
@@ -209,6 +237,48 @@ class PanelExperimentUI {
   }
 
   /**
+   * 禁用/啟用參與者名稱和重新產生ID按鈕
+   */
+  lockParticipantAndIdControls(lock) {
+    const participantNameInput = this.manager.getCachedElement(
+      "participantNameInput",
+    );
+    const experimentIdInput = document.getElementById("experimentIdInput");
+    const regenerateIdButton = document.getElementById("regenerateIdButton");
+
+    Logger.debug(
+      `lockParticipantAndIdControls(${lock}) - participantNameInput found: ${!!participantNameInput}, experimentIdInput found: ${!!experimentIdInput}, regenerateIdButton found: ${!!regenerateIdButton}`,
+    );
+
+    if (participantNameInput) {
+      participantNameInput.disabled = lock;
+      if (lock) {
+        participantNameInput.classList.add("experiment-disabled");
+      } else {
+        participantNameInput.classList.remove("experiment-disabled");
+      }
+    }
+
+    if (experimentIdInput) {
+      experimentIdInput.disabled = lock;
+      if (lock) {
+        experimentIdInput.classList.add("experiment-disabled");
+      } else {
+        experimentIdInput.classList.remove("experiment-disabled");
+      }
+    }
+
+    if (regenerateIdButton) {
+      regenerateIdButton.disabled = lock;
+      if (lock) {
+        regenerateIdButton.classList.add("experiment-disabled");
+      } else {
+        regenerateIdButton.classList.remove("experiment-disabled");
+      }
+    }
+  }
+
+  /**
    * 設定事件監聽器
    */
   setupEventListeners() {
@@ -275,7 +345,7 @@ class PanelExperimentUI {
       this.manager.initializeFromSync(event.detail);
     });
 
-    Logger.debug("同步事件監聽器設定完成");
+    // 靜默完成同步事件設定
   }
 
   /**
@@ -295,6 +365,22 @@ class PanelExperimentUI {
     if (startButton) {
       startButton.addEventListener("click", () => {
         this.manager.startExperiment();
+      });
+    }
+
+    // 暫停/恢復實驗按鈕
+    const pauseButton = this.manager.getCachedElement("pauseExperimentBtn");
+    if (pauseButton) {
+      pauseButton.addEventListener("click", () => {
+        this.manager.togglePauseExperiment();
+      });
+    }
+
+    // 停止實驗按鈕
+    const stopButton = this.manager.getCachedElement("stopExperimentBtn");
+    if (stopButton) {
+      stopButton.addEventListener("click", () => {
+        this.manager.stopExperiment();
       });
     }
 
@@ -328,7 +414,7 @@ class PanelExperimentUI {
     // 媒體控制事件
     this.setupMediaControlEvents();
 
-    Logger.debug("實驗控制項設定完成");
+    // 靜默完成控制項設定（移除詳細日誌）
   }
 
   /**
@@ -468,7 +554,6 @@ class PanelExperimentUI {
       }
 
       // 第4步：都沒有ID，產生新ID
-      Logger.debug("第4步：產生新ID");
       this.manager.generateNewExperimentId();
     } catch (e) {
       Logger.warn("初始化實驗ID失敗，即將產生新ID:", e);
@@ -513,7 +598,7 @@ class PanelExperimentUI {
     // 設定預設組合（如果有的話）
     this.manager.units.selectDefaultCombination();
 
-    Logger.debug("實驗UI初始化完成");
+    // 靜默完成UI初始化
   }
 
   /**
@@ -524,6 +609,15 @@ class PanelExperimentUI {
 
     this.manager.currentExperimentId = newId;
     this.updateExperimentIdDisplay();
+
+    // 清除受試者名稱輸入框，為新實驗提供乾淨的開始
+    const participantNameInput = this.manager.getCachedElement(
+      "participantNameInput",
+    );
+    if (participantNameInput) {
+      participantNameInput.value = "";
+      this.manager.currentParticipantName = "";
+    }
 
     // 廣播新的實驗ID
     this.broadcastExperimentId();
@@ -584,7 +678,7 @@ class PanelExperimentUI {
       });
     }
 
-    Logger.debug(`廣播實驗ID: ${this.manager.currentExperimentId}`);
+    // 靜默廣播實驗ID（移除詳細日誌）
   }
 
   /**

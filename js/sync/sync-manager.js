@@ -425,6 +425,9 @@ class SyncManager {
         Logger.warn("工作階段還原失敗，進入本機模式", error);
         // 清除無效的工作階段資訊
         localStorage.removeItem("sync_session_id");
+        sessionStorage.removeItem("sync_sessionId");
+        sessionStorage.removeItem("sync_clientId");
+        sessionStorage.removeItem("sync_role");
         return false; // 本機模式
       }
     } catch (error) {

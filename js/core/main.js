@@ -108,7 +108,7 @@ class MainApp {
             timeoutPromise,
           ]);
 
-          Logger.info("ExperimentHubManager 已初始化（全域單一實例）", {
+          Logger.debug("ExperimentHubManager 已初始化（單例實例）", {
             syncMode: window.experimentHubManager.isInSyncMode(),
           });
         } catch (error) {

@@ -25,26 +25,34 @@ async function loadUnitsFromScenarios() {
                     action.isLastActionInStep =
                       actionIndex === step.actions.length - 1;
 
-                    actionsMap.set(action.actionId, action);
-                    actionToStepMap.set(action.actionId, {
-                      unit_id: unit.unit_id,
-                      step_id: step.step_id,
-                      step_name: step.step_name,
-                      isLastActionInStep: action.isLastActionInStep
-                    });
+                    // 確保使用正確的字段名稱 (action_id -> actionId)
+                    const actionId = action.action_id || action.actionId;
+                    if (actionId) {
+                      // 將 action_id 轉換為 actionId 以保持一致性
+                      action.actionId = actionId;
+                      actionsMap.set(actionId, action);
+                      actionToStepMap.set(actionId, {
+                        unit_id: unit.unit_id,
+                        step_id: step.step_id,
+                        step_name: step.step_name,
+                        isLastActionInStep: action.isLastActionInStep,
+                      });
+                    } else {
+                      console.warn("動作缺少 action_id 或 actionId:", action);
+                    }
                   });
                 }
                 return {
                   step_id: step.step_id,
                   step_name: step.step_name,
-                  actions: step.actions || []
+                  actions: step.actions || [],
                 };
               });
 
               unitsMap.set(unit.unit_id, {
                 unit_id: unit.unit_id,
                 unit_name: unit.unit_name,
-                steps: processedSteps
+                steps: processedSteps,
               });
             }
           });
@@ -56,7 +64,7 @@ async function loadUnitsFromScenarios() {
       units: Array.from(unitsMap.values()),
       unit_combinations: scenariosData.unit_combinations || [],
       actions: actionsMap,
-      actionToStep: actionToStepMap
+      actionToStep: actionToStepMap,
     };
   } catch (error) {
     Logger.error("載入 scenarios.json 失敗:", error);
@@ -78,7 +86,7 @@ function buildActionSequenceFromUnits(unitIds, actionsMap, unitsData) {
     .flatMap((unit) =>
       unit.steps
         .filter((step) => step.actions && Array.isArray(step.actions))
-        .flatMap((step) => step.actions)
+        .flatMap((step) => step.actions),
     );
 }
 

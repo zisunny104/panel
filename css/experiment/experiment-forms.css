@@ -164,6 +164,16 @@
     background: #5568d3;
 }
 
+/* 恢復按鈕樣式（與暫停按鈕相同，但可以根據需要自訂） */
+.experiment-control-buttons .experiment-resume-btn {
+    background: #4caf50;
+    color: white;
+}
+
+.experiment-control-buttons .experiment-resume-btn:hover {
+    background: #45a049;
+}
+
 .experiment-control-buttons .experiment-stop-btn {
     background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
     color: white;

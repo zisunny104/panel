@@ -98,7 +98,7 @@ class PanelLogger {
     const defaultInfo = {
       is_running: false,
       action_progress: null,
-      current_step: null
+      current_step: null,
     };
 
     const isRunning =
@@ -113,7 +113,7 @@ class PanelLogger {
     const experimentInfo = {
       is_running: true,
       action_progress: null,
-      current_step: null
+      current_step: null,
     };
 
     if (window.actionManager && window.actionManager.getProgress) {
@@ -151,7 +151,7 @@ class PanelLogger {
     isTouch = false,
     isCombo = false,
     comboDetails = null,
-    additionalData = {}
+    additionalData = {},
   ) {
     const now = new Date();
     const timestamp = now.toISOString();
@@ -164,13 +164,14 @@ class PanelLogger {
     const actionType = this.classifyAction(
       actionMessage,
       buttonId,
-      functionName
+      functionName,
     );
 
     // 取得裝置ID
-    const clientId = window.syncManager?.core?.syncClient?.clientId ||
-                    window.panelExperiment?.clientId ||
-                    "panel_device";
+    const clientId =
+      window.syncManager?.core?.syncClient?.clientId ||
+      window.panelExperiment?.clientId ||
+      "panel_device";
 
     const logEntry = {
       timestamp,
@@ -186,7 +187,7 @@ class PanelLogger {
       is_combo_operation: isCombo,
       combo_details: comboDetails,
       experiment_info: experimentInfo,
-      additional_data: additionalData
+      additional_data: additionalData,
     };
 
     this.logEntries.push(logEntry);
@@ -314,9 +315,9 @@ class PanelLogger {
     const now = new Date();
     const pad = (n) => n.toString().padStart(2, "0");
     const fileName = `log_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-      now.getDate()
+      now.getDate(),
     )}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(
-      now.getSeconds()
+      now.getSeconds(),
     )}.json`;
 
     const blob = new Blob([logData], { type: "application/json" });
@@ -355,7 +356,9 @@ class PanelLogger {
       navigator.clipboard
         .writeText(logText)
         .then(() => {
-          console.log("日誌已複製到剪貼簿（Clipboard API）");
+          if (typeof Logger !== "undefined") {
+            Logger.debug("日誌已複製到剪貼簿（Clipboard API）");
+          }
           this.logAction("日誌已複製到剪貼簿");
           this.showCopySuccess();
         })
@@ -364,7 +367,9 @@ class PanelLogger {
         });
     } else {
       // Clipboard API 不可用，顯示錯誤
-      this.handleCopyError("瀏覽器不支持自動複製功能，請手動選取並複製日誌內容");
+      this.handleCopyError(
+        "瀏覽器不支持自動複製功能，請手動選取並複製日誌內容",
+      );
     }
   }
 
@@ -438,9 +443,7 @@ class PanelLogger {
   toggleLogger() {
     const now = Date.now();
     if (now - (this._lastFabToggleAt || 0) < 150) {
-      Logger &&
-        Logger.debug &&
-        Logger.debug("切換被抑制（debounce）");
+      Logger && Logger.debug && Logger.debug("切換被抑制（debounce）");
       return;
     }
     this._lastFabToggleAt = now;
@@ -536,17 +539,16 @@ class PanelLogger {
    */
   handleExperimentMode() {
     if (this.isExperimentMode()) {
-      // 在實驗模式下，自動隱藏日誌面板以減少干擾
-      this.hideLoggerPanel();
-      console.log("實驗模式偵測到，已自動隱藏日誌面板");
+      // 在實驗模式下，隱藏所有面板以減少干擾
+      if (window.panelManager) {
+        window.panelManager.closePanel("settings");
+        window.panelManager.closePanel("experiment");
+        window.panelManager.closePanel("logger");
+      }
+      Logger.debug("實驗模式偵測到，已自動隱藏所有面板");
     }
   }
 }
 
 // 匯出單例
 window.logger = new PanelLogger();
-
-
-
-
-

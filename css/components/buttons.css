@@ -59,9 +59,9 @@
 }
 
 .button-overlay.shift-active {
-    border: 3px solid #00f;
-    box-shadow: 0 0 8px rgba(0, 0, 255, 0.7);
-    background-color: rgba(0, 0, 255, 0.3) !important;
+    border: 2px solid #0066ff;
+    box-shadow: 0 0 6px rgba(0, 102, 255, 0.4);
+    background-color: rgba(0, 102, 255, 0.15) !important;
     animation: pulse-blue 1.5s infinite;
 }
 

@@ -33,13 +33,13 @@ class TimeSyncManager {
    * 從伺服器取得參考時間，計算本機時間偏差
    */
   async initialize() {
-    Logger.debug("[TimeSyncManager] 初始化時間同步...");
+    Logger.debug("初始化時間同步...");
 
     try {
       await this.syncWithServer();
-      Logger.debug("[TimeSyncManager] 時間同步初始化完成");
+      Logger.debug("時間同步初始化完成");
     } catch (error) {
-      Logger.warn("[TimeSyncManager] 時間同步初始化失敗:", error);
+      Logger.warn("時間同步初始化失敗:", error);
       // 初始化失敗不影響系統運作，使用本機時間
       this.isSynced = false;
     }
@@ -58,6 +58,36 @@ class TimeSyncManager {
   }
 
   /**
+   * 根據時間偏差取得延遲等級顏色
+   * @param {number} offsetMs - 時間偏差（毫秒）
+   * @returns {string} 顏色標記
+   */
+  static getLatencyColor(offsetMs) {
+    const absOffset = Math.abs(offsetMs);
+
+    if (absOffset <= 50) {
+      return "green"; // 優秀：0-50ms
+    } else if (absOffset <= 100) {
+      return "yellow"; // 良好：51-100ms
+    } else if (absOffset <= 200) {
+      return "orange"; // 一般：101-200ms
+    } else {
+      return "red"; // 較差：201ms以上
+    }
+  }
+
+  /**
+   * 格式化時間偏差顯示
+   * @param {number} offsetMs - 時間偏差（毫秒）
+   * @returns {string} 格式化的時間偏差字串
+   */
+  static formatTimeOffset(offsetMs) {
+    const color = this.getLatencyColor(offsetMs);
+    const sign = offsetMs >= 0 ? "+" : "";
+    return `<${color}>${sign}${offsetMs} ms</${color}>`;
+  }
+
+  /**
    * 與伺服器同步時間
    * 使用本機時間，時間偏差固定為 0
    */
@@ -69,7 +99,9 @@ class TimeSyncManager {
       this.isSynced = true;
       this.lastSyncTime = Date.now();
 
-      Logger.debug("[TimeSyncManager] 使用本機時間，時間偏差 = 0ms");
+      Logger.debug(
+        `[TimeSyncManager] 使用本機時間，時間偏差 = ${TimeSyncManager.formatTimeOffset(this.timeOffset)}`,
+      );
     } catch (error) {
       Logger.warn("[TimeSyncManager] 時間初始化失敗:", error.message);
       this.isSynced = false;
@@ -111,7 +143,7 @@ class TimeSyncManager {
     this.syncSamples.push({
       offset: offset,
       delay: 0, // WebSocket 延遲忽略不計
-      timestamp: clientTime
+      timestamp: clientTime,
     });
 
     if (this.syncSamples.length > this.maxSamples) {
@@ -121,14 +153,14 @@ class TimeSyncManager {
     // 計算平均偏差
     this.timeOffset = Math.round(
       this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
-        this.syncSamples.length
+        this.syncSamples.length,
     );
 
     this.isSynced = true;
     this.lastSyncTime = Date.now();
 
     Logger.debug(
-      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`
+      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`,
     );
   }
   /**
@@ -155,7 +187,7 @@ class TimeSyncManager {
     return [
       String(hours).padStart(2, "0"),
       String(minutes).padStart(2, "0"),
-      String(seconds).padStart(2, "0")
+      String(seconds).padStart(2, "0"),
     ].join(":");
   }
 
@@ -188,7 +220,7 @@ class TimeSyncManager {
         minute: "2-digit",
         second: "2-digit",
         timeZone: this.timezone,
-        hour12: false
+        hour12: false,
       });
 
       let result = formatter.format(date).replace(/\//g, "-");

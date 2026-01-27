@@ -37,7 +37,11 @@
 				"approve": true,
 				"matchCommandLine": true
 			},
-			"Group-Object": true
+			"Group-Object": true,
+			"/^node -c js/panel/panel-experiment-ui\\.js$/": {
+				"approve": true,
+				"matchCommandLine": true
+			}
 		}
 	}
 }

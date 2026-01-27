@@ -13,6 +13,9 @@ class MediaManager {
     this.isHomePageLooping = false;
     this.homePageVideoElement = null;
 
+    // 音量控制
+    this.mediaVolume = 0.7; // 預設 70% 音量
+
     // 媒體快取相關
     this.mediaCache = new Map(); // 儲存已快取的媒體
     this.preloadPromises = new Map(); // 儲存預先載入 Promise
@@ -90,7 +93,7 @@ class MediaManager {
     } else {
       Logger.error(`不支援的媒體格式: ${src}`);
       this.mediaArea.innerHTML =
-        "<div class=\"media-error-message\">不支援的媒體格式</div>";
+        '<div class="media-error-message">不支援的媒體格式</div>';
       return null;
     }
 
@@ -119,14 +122,18 @@ class MediaManager {
         window.location.origin +
         window.location.pathname.substring(
           0,
-          window.location.pathname.lastIndexOf("/") + 1
+          window.location.pathname.lastIndexOf("/") + 1,
         );
 
       try {
         const finalSrc = new URL(src, baseUrl).href;
-        if (finalSrc === baseUrl || !finalSrc.includes(src.split("/").pop())) {
+        // 檢查轉換後的 URL 是否包含檔名的數字部分（中文會被 URL 編碼，所以不能直接檢查）
+        const fileName = src.split("/").pop();
+        const fileExtension = fileName.split(".").pop();
+        // 只檢查副檔名是否存在，副檔名通常不含中文，不會被編碼
+        if (finalSrc === baseUrl || !finalSrc.includes("." + fileExtension)) {
           Logger.warn(
-            `URL 轉換可能有誤: 原始=${src}, baseUrl=${baseUrl}, 結果=${finalSrc}`
+            `URL 轉換失敗: 原始=${src}, baseUrl=${baseUrl}, 結果=${finalSrc}`,
           );
           return baseUrl + src;
         }
@@ -171,6 +178,7 @@ class MediaManager {
     // 強制隱藏控制項
     video.controls = false;
     video.muted = options.muted !== false; // 預設靜音
+    video.volume = this.mediaVolume; // 設定媒體音量
     video.loop = options.loop || false;
     video.autoplay = options.autoplay !== false; // 預設自動播放
 
@@ -206,6 +214,16 @@ class MediaManager {
 
     video.addEventListener("ended", () => {
       if (options.onEnded) options.onEnded();
+    });
+
+    // 確保播放時音量正確設定
+    video.addEventListener("play", () => {
+      video.volume = this.mediaVolume;
+    });
+
+    // 確保媒體載入完成時音量正確設定
+    video.addEventListener("canplay", () => {
+      video.volume = this.mediaVolume;
     });
 
     // 嘗試播放
@@ -364,7 +382,7 @@ class MediaManager {
                         `;
           }
         }
-      }
+      },
     });
 
     if (video) {
@@ -388,7 +406,7 @@ class MediaManager {
       muted: true,
       autoplay: true,
       loop: false,
-      scrollIntoView: true
+      scrollIntoView: true,
     });
 
     return mediaElement;
@@ -490,18 +508,18 @@ class MediaManager {
     // 更新顯示狀態
     if (window.uiControls) {
       const toggleMediaAreaMarker = document.getElementById(
-        "toggleMediaAreaMarker"
+        "toggleMediaAreaMarker",
       );
       const toggleMediaContent = document.getElementById("toggleMediaContent");
 
       if (toggleMediaAreaMarker) {
         window.uiControls.updateMediaAreaMarkerVisibility(
-          toggleMediaAreaMarker.checked
+          toggleMediaAreaMarker.checked,
         );
       }
       if (toggleMediaContent) {
         window.uiControls.updateMediaContentVisibility(
-          toggleMediaContent.checked
+          toggleMediaContent.checked,
         );
       }
     }
@@ -529,7 +547,7 @@ class MediaManager {
     const timestamp = window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(Date.now())
       : new Date().toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei"
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
         });
 
     const errorInfo = {
@@ -539,7 +557,7 @@ class MediaManager {
       mediaType: mediaElement.tagName.toLowerCase(),
       onlineStatus: navigator.onLine ? "線上" : "已離線",
       errorCode: null,
-      errorMessage: "載入失敗"
+      errorMessage: "載入失敗",
     };
 
     // 取得具體錯誤代碼
@@ -556,7 +574,7 @@ class MediaManager {
     ) {
       errorInfo.possibleCauses = this.analyzePossibleCauses(
         originalSrc,
-        errorInfo
+        errorInfo,
       );
     }
 
@@ -573,7 +591,7 @@ class MediaManager {
       1: "載入被中止",
       2: "網路錯誤",
       3: "解碼錯誤",
-      4: "不支援的檔案格式"
+      4: "不支援的檔案格式",
     };
     return errors[errorCode] || "載入失敗";
   }
@@ -650,7 +668,7 @@ class MediaManager {
     // 記錄到日誌
     if (window.logger) {
       window.logger.logAction(
-        `${mediaType}載入失敗: ${errorInfo.errorMessage} (${errorInfo.originalSrc})`
+        `${mediaType}載入失敗: ${errorInfo.errorMessage} (${errorInfo.originalSrc})`,
       );
     }
   }
@@ -672,8 +690,6 @@ class MediaManager {
       // 只預先載入基本資源
       const essentialFiles = await this.collectEssentialMediaFiles();
 
-      Logger.debug(`開始預先載入 ${essentialFiles.length} 個基本媒體檔案...`);
-
       // 按優先級排序：先載入小的、常用的檔案
       const sortedFiles = this.sortMediaByPriority(essentialFiles);
 
@@ -691,7 +707,7 @@ class MediaManager {
 
       for (const batch of batches) {
         const results = await Promise.allSettled(
-          batch.map((file) => this.preloadMediaFile(file))
+          batch.map((file) => this.preloadMediaFile(file)),
         );
 
         results.forEach((result, index) => {
@@ -712,30 +728,28 @@ class MediaManager {
         }
       }
 
+      // 整合開始和完成的訊息為一個總結
       const endTime = performance.now();
-      Logger.debug(
-        `基本媒體預先載入完成: ${totalSuccessful} 成功, ${totalFailed} 失敗 (${(
-          endTime - startTime
-        ).toFixed(2)}ms)`
-      );
+      const loadTime = (endTime - startTime).toFixed(2);
 
-      if (successfulFiles.length > 0) {
-        Logger.debug("成功預先載入的檔案:", successfulFiles);
-      }
-
-      if (failedFiles.length > 0) {
-        Logger.warn("預先載入失敗的檔案:", failedFiles);
+      if (totalFailed === 0) {
+        // 全部成功：簡潔訊息
+        Logger.debug(
+          `基本媒體預先載入完成: <green>${totalSuccessful}</green> 個檔案 (<orange>${loadTime} ms</orange>)`,
+        );
+      } else {
+        // 有失敗：詳細訊息
+        Logger.debug(
+          `基本媒體預先載入完成: <green>${totalSuccessful}</green> 成功, <red>${totalFailed}</red> 失敗 (<orange>${loadTime} ms</orange>)`,
+        );
+        if (failedFiles.length > 0) {
+          Logger.warn("預先載入失敗的檔案:", failedFiles);
+        }
       }
 
       this.hasPreloadedEssential = true;
 
-      // 如果已經有組合，立即預先載入組合媒體
-      if (
-        window.experimentManager?.currentCombination ||
-        window.combinationSelector?.currentCombination
-      ) {
-        setTimeout(() => this.preloadCombinationMedia(), 100);
-      }
+      // 組合媒體預先載入由 combination_selected 事件處理，避免重複調用
     } catch (error) {
       Logger.error("基本媒體預先載入過程發生錯誤:", error);
     } finally {
@@ -801,11 +815,6 @@ class MediaManager {
 
     essentialFiles.forEach((file) => mediaFiles.add(file));
 
-    Logger.debug(
-      "collectEssentialMediaFiles: 收集到的基本媒體檔案 =",
-      Array.from(mediaFiles)
-    );
-
     return Array.from(mediaFiles);
   }
 
@@ -818,10 +827,9 @@ class MediaManager {
       return;
     }
 
-    // 確保基本資源已預先載入
+    // 確保基本資源已預先載入，如果還沒載入，靜默跳過組合預先載入
     if (!this.hasPreloadedEssential) {
-      Logger.debug("基本資源尚未預先載入，先預先載入基本資源");
-      await this.preloadAllMedia();
+      // 基本資源尚未載入，跳過組合預先載入（這是正常行為）
       return;
     }
 
@@ -849,12 +857,12 @@ class MediaManager {
       }
 
       Logger.debug(
-        `開始預先載入組合媒體檔案: ${combinationFiles.length} 個檔案...`
+        `開始預先載入組合媒體檔案: ${combinationFiles.length} 個檔案...`,
       );
 
       // 過濾掉已經預先載入的檔案
       const newFiles = combinationFiles.filter(
-        (file) => !this.mediaCache.has(file)
+        (file) => !this.mediaCache.has(file),
       );
 
       if (newFiles.length === 0) {
@@ -881,7 +889,7 @@ class MediaManager {
 
       for (const batch of batches) {
         const results = await Promise.allSettled(
-          batch.map((file) => this.preloadMediaFile(file))
+          batch.map((file) => this.preloadMediaFile(file)),
         );
 
         results.forEach((result, index) => {
@@ -906,7 +914,7 @@ class MediaManager {
       Logger.debug(
         `組合媒體預先載入完成: ${totalSuccessful} 成功, ${totalFailed} 失敗 (${(
           endTime - startTime
-        ).toFixed(2)}ms)`
+        ).toFixed(2)}ms)`,
       );
 
       if (successfulFiles.length > 0) {
@@ -934,7 +942,7 @@ class MediaManager {
       const unitIds = Array.isArray(currentCombination.units)
         ? currentCombination.units
         : currentCombination.units.fixed?.concat(
-            currentCombination.units.randomizable
+            currentCombination.units.randomizable,
           ) || [];
 
       Logger.debug("collectCombinationMediaFiles: 組合單元 =", unitIds);
@@ -988,7 +996,7 @@ class MediaManager {
 
     Logger.debug(
       "collectCombinationMediaFiles: 收集到的組合媒體檔案 =",
-      Array.from(mediaFiles)
+      Array.from(mediaFiles),
     );
 
     return Array.from(mediaFiles);
@@ -1082,8 +1090,8 @@ class MediaManager {
         cleanup();
         reject(
           new Error(
-            `Failed to preload ${src}: ${error.message || "Unknown error"}`
-          )
+            `Failed to preload ${src}: ${error.message || "Unknown error"}`,
+          ),
         );
       };
 
@@ -1096,6 +1104,33 @@ class MediaManager {
       // 設置來源
       element.src = src;
     });
+  }
+
+  /**
+   * 設定媒體音量
+   * @param {number} volume - 音量值 (0.0-1.0)
+   */
+  setMediaVolume(volume) {
+    this.mediaVolume = Math.max(0, Math.min(1, volume));
+
+    // 更新目前播放中的媒體音量
+    const currentMedia = this.mediaArea?.querySelector("video, audio");
+    if (currentMedia) {
+      currentMedia.volume = this.mediaVolume;
+    }
+
+    // 更新首頁影片音量
+    if (this.homePageVideoElement) {
+      this.homePageVideoElement.volume = this.mediaVolume;
+    }
+  }
+
+  /**
+   * 取得目前媒體音量
+   * @returns {number} 音量值 (0.0-1.0)
+   */
+  getMediaVolume() {
+    return this.mediaVolume;
   }
 
   /**

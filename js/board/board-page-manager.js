@@ -2662,7 +2662,7 @@ class BoardPageManager {
         return;
       }
 
-      // 實驗未進行中，直接應用組合
+      // 實驗未進行中，直接套用組合
       this.currentCombination = currentCombination;
       if (loadedUnits) {
         this.loadedUnits = loadedUnits;

@@ -79,7 +79,7 @@ class ConfigManager {
       localStorage.removeItem("userSettings");
       this.userSettings = { ...this.defaultSettings };
       await this.applySettings(this.userSettings);
-      // 一旦應用到 DOM，上面的 saveUserSettings() 監聽器會儲存新的值
+      // 一旦套用到 DOM，上面的 saveUserSettings() 監聽器會儲存新的值
       this.saveUserSettings();
       if (window.Logger) Logger.info("使用者設定已還原為預設值");
       // 通知 UI
@@ -186,6 +186,9 @@ class ConfigManager {
     // 音量設定
     if (settings.beepVolume !== undefined && beepVolume)
       beepVolume.value = settings.beepVolume;
+    // 媒體音量設定
+    if (settings.mediaVolume !== undefined && mediaVolume)
+      mediaVolume.value = settings.mediaVolume;
   }
 
   /**
@@ -204,6 +207,8 @@ class ConfigManager {
     );
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
+    const beepVolume = document.getElementById("beepVolume");
+    const mediaVolume = document.getElementById("mediaVolume");
 
     this.userSettings = {
       mainScale: scaleRange ? Number(scaleRange.value) : 1.29,
@@ -221,6 +226,7 @@ class ConfigManager {
       showMediaContent: toggleMediaContent ? toggleMediaContent.checked : true,
       playBeepSound: toggleBeepSound ? toggleBeepSound.checked : true,
       beepVolume: beepVolume ? beepVolume.value : "50",
+      mediaVolume: mediaVolume ? mediaVolume.value : "70",
     };
     localStorage.setItem("userSettings", JSON.stringify(this.userSettings));
   }
@@ -270,6 +276,9 @@ class ConfigManager {
     }
     if (beepVolume) {
       beepVolume.addEventListener("input", () => this.saveUserSettings());
+    }
+    if (mediaVolume) {
+      mediaVolume.addEventListener("input", () => this.saveUserSettings());
     }
   }
 

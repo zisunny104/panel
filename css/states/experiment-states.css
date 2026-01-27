@@ -52,20 +52,87 @@
 }
 
 /* ================= 下一步操作高亮 ================= */
-
-/* 主次操作（綠色）動畫 */
 .next-step-highlight {
-    /* 預設隱藏動畫，只有在視覺提示開啟時才顯示 */
     animation: none;
     filter: none;
 }
 
-/* 當視覺提示開啟時顯示動畫 */
 body.visual-hints-enabled .next-step-highlight {
     animation: pulse-green 1.5s ease-in-out infinite;
     filter: drop-shadow(0 0 8px rgba(40, 167, 69, 0.8));
 }
 
+.next-step-highlight-secondary {
+    filter: none;
+    box-shadow: none;
+}
+
+body.visual-hints-enabled .next-step-highlight-secondary {
+    filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.6));
+    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.5),
+        inset 0 0 0 1px rgba(255, 152, 0, 0.4);
+}
+
+.next-step-highlight-shift {
+    animation: none;
+    filter: none;
+}
+
+body.visual-hints-enabled .next-step-highlight-shift {
+    animation: pulse-green 1.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px rgba(40, 167, 69, 0.8));
+}
+
+/* 按鈕高亮樣式 */
+.button-overlay.next-step-highlight {
+    background-color: transparent;
+    border-color: initial;
+}
+
+body.visual-hints-enabled .button-overlay.next-step-highlight {
+    background-color: rgba(40, 167, 69, 0.3);
+    border-color: #28a745;
+}
+
+.button-overlay.next-step-highlight-secondary {
+    background-color: transparent;
+    border-color: initial;
+    filter: none;
+    box-shadow: none;
+}
+
+body.visual-hints-enabled .button-overlay.next-step-highlight-secondary {
+    background-color: rgba(255, 152, 0, 0.3);
+    border-color: #ff9800;
+    filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.6));
+    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.5),
+        inset 0 0 0 1px rgba(255, 152, 0, 0.4);
+}
+
+.button-overlay.next-step-highlight-shift {
+    background-color: transparent;
+    border-color: initial;
+}
+
+body.visual-hints-enabled .button-overlay.next-step-highlight-shift {
+    background-color: rgba(40, 167, 69, 0.3);
+    border-color: #28a745;
+}
+
+/* 電源開關區高亮 */
+#powerSwitchArea.next-step-highlight {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+body.visual-hints-enabled #powerSwitchArea.next-step-highlight {
+    background-color: rgba(40, 167, 69, 0.2);
+    border-radius: 8px;
+    border: 2px solid #28a745;
+}
+
+/* ================= 動畫定義 ================= */
 @keyframes pulse-green {
 
     0%,
@@ -80,115 +147,53 @@ body.visual-hints-enabled .next-step-highlight {
     }
 }
 
-/* 次要操作（橙色）- 不閃爍，固定展示 */
-.next-step-highlight-secondary {
-    /* 預設隱藏，只有在視覺提示開啟時才顯示 */
-    filter: none;
-    box-shadow: none;
-}
-
-/* 當視覺提示開啟時顯示次要操作高亮 */
-body.visual-hints-enabled .next-step-highlight-secondary {
-    filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.6));
-    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.5),
-        inset 0 0 0 1px rgba(255, 152, 0, 0.4);
-}
-
-/* Shift 按鍵（綠色，和主按鈕同色）動畫 */
-.next-step-highlight-shift {
-    /* 預設隱藏動畫，只有在視覺提示開啟時才顯示 */
-    animation: none;
-    filter: none;
-}
-
-/* 當視覺提示開啟時顯示 Shift 按鍵動畫 */
-body.visual-hints-enabled .next-step-highlight-shift {
-    animation: pulse-green 1.5s ease-in-out infinite;
-    filter: drop-shadow(0 0 8px rgba(40, 167, 69, 0.8));
-}
-
-@keyframes pulse-purple {
-
-    0%,
-    100% {
-        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7),
-            inset 0 0 0 0 rgba(40, 167, 69, 0.3);
-    }
-
-    50% {
-        box-shadow: 0 0 0 8px rgba(40, 167, 69, 0),
-            inset 0 0 0 2px rgba(40, 167, 69, 0.5);
-    }
-}
-
-/* 按鈕的主次操作高亮（綠色） */
-.button-overlay.next-step-highlight {
-    /* 預設無樣式，只有在視覺提示開啟時才套用 */
-    background-color: transparent !important;
-    border-color: initial !important;
-}
-
-/* 當視覺提示開啟時套用按鈕主次操作高亮 */
-body.visual-hints-enabled .button-overlay.next-step-highlight {
-    background-color: rgba(40, 167, 69, 0.3) !important;
-    border-color: #28a745 !important;
-}
-
-/* 按鈕的次要操作高亮（橙色） */
-.button-overlay.next-step-highlight-secondary {
-    /* 預設無樣式，只有在視覺提示開啟時才套用 */
-    background-color: transparent !important;
-    border-color: initial !important;
-    filter: none;
-    box-shadow: none;
-}
-
-/* 當視覺提示開啟時套用按鈕次要操作高亮 */
-body.visual-hints-enabled .button-overlay.next-step-highlight-secondary {
-    background-color: rgba(255, 152, 0, 0.3) !important;
-    border-color: #ff9800 !important;
-    filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.6));
-    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.5),
-        inset 0 0 0 1px rgba(255, 152, 0, 0.4);
-}
-
-/* 按鈕的 Shift 提示（綠色，和主按鈕同色） */
-.button-overlay.next-step-highlight-shift {
-    /* 預設無樣式，只有在視覺提示開啟時才套用 */
-    background-color: transparent !important;
-    border-color: initial !important;
-}
-
-/* 當視覺提示開啟時套用按鈕 Shift 提示 */
-body.visual-hints-enabled .button-overlay.next-step-highlight-shift {
-    background-color: rgba(40, 167, 69, 0.3) !important;
-    border-color: #28a745 !important;
-}
-
-/* 非按鈕元素的下一步高亮（如電源開關區） */
-#powerSwitchArea.next-step-highlight {
-    /* 預設無樣式，只有在視覺提示開啟時才套用 */
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-}
-
-/* 當視覺提示開啟時套用電源開關區高亮 */
-body.visual-hints-enabled #powerSwitchArea.next-step-highlight {
-    background-color: rgba(40, 167, 69, 0.2);
-    border-radius: 8px;
-    border: 2px solid #28a745;
-}
-
-/* 按鈕停用狀態（step 完成時的冷卻期間） */
+/* ================= 按鈕禁用狀態 ================= */
 .button-overlay.temporarily-disabled {
     cursor: not-allowed;
     pointer-events: none;
-    /* 灰色覆蓋效果，類似原本橘色按鈕的樣式 */
-    background-color: rgba(128, 128, 128, 0.5) !important;
-    border-color: rgba(100, 100, 100, 0.8) !important;
-    box-shadow: none !important;
-    /* 移除任何高亮效果 */
-    animation: none !important;
-    filter: none;
+    background-color: rgba(128, 128, 128, 0.5);
+    border-color: rgba(100, 100, 100, 0.8);
+    box-shadow: none;
+    opacity: 0.65;
+    animation: none;
+    filter: brightness(0.85);
+    transform: none;
+}
+
+.button-overlay.temporarily-disabled:hover,
+.button-overlay.temporarily-disabled:active,
+.button-overlay.temporarily-disabled.touch-active {
+    background-color: rgba(128, 128, 128, 0.5);
+    border-color: rgba(100, 100, 100, 0.8);
+    transform: none;
+}
+
+/* ================= 機器未開機時按鈕禁用狀態 ================= */
+.button-overlay.power-off-disabled {
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+/* ================= 實驗進行中控制禁用狀態 ================= */
+input:disabled,
+input.experiment-disabled {
+    background-color: rgba(200, 200, 200, 0.3);
+    color: rgba(100, 100, 100, 0.7);
+    cursor: not-allowed;
+    border-color: rgba(150, 150, 150, 0.5);
+}
+
+input:disabled::placeholder,
+input.experiment-disabled::placeholder {
+    color: rgba(100, 100, 100, 0.5);
+}
+
+button:disabled,
+button.experiment-disabled {
+    background-color: rgba(150, 150, 150, 0.4);
+    border-color: rgba(120, 120, 120, 0.6);
+    color: rgba(100, 100, 100, 0.7);
+    cursor: not-allowed;
+    opacity: 0.65;
+    pointer-events: none;
 }

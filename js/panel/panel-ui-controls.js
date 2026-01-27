@@ -5,10 +5,35 @@
  */
 class UIControlsManager {
   /**
+   * 預設設定值
+   */
+  static DEFAULTS = {
+    mainScale: 1.29,
+    topSpacerHeight: 5,
+    bottomSpacerHeight: 3,
+    powerSwitchScale: 0.9,
+    beepVolume: 50,
+    mediaVolume: 70,
+  };
+
+  /**
    * 建構子 - 初始化 UI 控制項管理器
    */
   constructor() {
-    // 主要 DOM 元素
+    // 初始化 DOM 元素引用
+    this.initializeDOMReferences();
+
+    // 設定事件監聽器
+    this.setupEventListeners();
+
+    // 初始化 UI 控制項狀態
+    this.initializeUIState();
+  }
+
+  /**
+   * 初始化 DOM 元素引用
+   */
+  initializeDOMReferences() {
     this.settingsPanel = document.getElementById("settingsPanel");
     this.scalable = document.getElementById("scalableArea");
     this.mediaArea = document.getElementById("mediaArea");
@@ -17,68 +42,32 @@ class UIControlsManager {
     this.powerSwitchArea = document.getElementById("powerSwitchArea");
     this.powerLightArea = document.getElementById("powerLightArea");
     this.panelBottomRow = document.getElementById("panelBottomRow");
+
+    // 設定初始顯示狀態
     if (this.powerSwitchArea) this.powerSwitchArea.style.display = "block";
     if (this.powerLightArea) this.powerLightArea.style.display = "block";
     if (this.settingsPanel) this.settingsPanel.classList.add("hidden");
 
-    // 初始化媒體區塊的視覺提示外框
-    if (this.mediaArea) {
-      this.mediaArea.classList.add("step-complete-indicator");
-      // 初始化時預設為關機狀態（墨綠色）
-      this.mediaArea.classList.add("power-off");
-      // 如果視覺提示關閉，隱藏提示外框
-      const showTouchVisuals =
-        localStorage.getItem("showTouchVisuals") !== "false";
-      if (!showTouchVisuals) {
-        this.mediaArea.classList.add("hidden-indicator");
-      }
-    }
-
-    // 監聽器要在建構時綁定，確保 UI 控制項能即時生效
-    this.setupEventListeners();
-
-    // 初始化同步 UI 控制項狀態
-    this.initializeUIControls();
-
-    // 當設定被重置為預設值時，更新 UI 控制項以反映新的預設值
-    document.addEventListener("user_settings_reset", () => {
-      const s = window.configManager?.userSettings || {};
-      // Apply numeric values through existing methods
-      if (s.powerSwitchScale !== undefined)
-        this.updatePowerScale(s.powerSwitchScale);
-      if (s.bottomSpacerHeight !== undefined)
-        this.updateBottomSpacer(s.bottomSpacerHeight);
-      if (s.mainScale !== undefined) this.updateScale(s.mainScale);
-      if (s.topSpacerHeight !== undefined)
-        this.updateTopSpacer(s.topSpacerHeight);
-
-      // Toggle-style settings - update via the manager methods (some methods exist in this file)
-      if (s.showButtonLabels !== undefined)
-        this.updateButtonLabelVisibility(s.showButtonLabels);
-      if (s.showButtonColors !== undefined)
-        this.updateButtonColorVisibility(s.showButtonColors);
-      if (s.showTouchVisuals !== undefined)
-        this.updateTouchVisuals(s.showTouchVisuals);
-      if (s.showMediaAreaMarker !== undefined)
-        this.updateMediaAreaMarkerVisibility(s.showMediaAreaMarker);
-      if (s.showMediaContent !== undefined)
-        this.updateMediaContentVisibility(s.showMediaContent);
-
-      // Beep sound stored in localStorage; let other code read it
-      if (s.playBeepSound !== undefined)
-        localStorage.setItem(
-          "playBeepSound",
-          s.playBeepSound ? "true" : "false",
-        );
-
-      if (window.logger) window.logger.logAction("已套用預設設定");
-    });
+    // 初始化媒體區塊視覺提示
+    this.initializeMediaAreaVisuals();
   }
 
   /**
-   * 更新主縮放比例
-   * @param {number} value - 縮放比例 (0.5-2.0)
+   * 初始化媒體區塊的視覺提示外框
    */
+  initializeMediaAreaVisuals() {
+    if (!this.mediaArea) return;
+
+    this.mediaArea.classList.add("step-complete-indicator", "power-off");
+
+    const showTouchVisuals =
+      localStorage.getItem("showTouchVisuals") !== "false";
+    if (!showTouchVisuals) {
+      this.mediaArea.classList.add("hidden-indicator");
+    } else {
+      document.body.classList.add("visual-hints-enabled");
+    }
+  }
   updateScale(value) {
     const scaleRange = document.getElementById("scaleRange");
     const scaleNumberInput = document.getElementById("scaleNumberInput");
@@ -268,6 +257,17 @@ class UIControlsManager {
   }
 
   /**
+   * 更新媒體音量
+   * @param {string|number} volume - 音量值 (0-100)
+   */
+  updateMediaVolume(volume) {
+    // 將音量設定儲存到 window.mediaManager 或全域變數
+    if (window.mediaManager) {
+      window.mediaManager.setMediaVolume(parseInt(volume) / 100);
+    }
+  }
+
+  /**
    * 顯示設定面板
    */
   showSettingsPanel() {
@@ -331,70 +331,6 @@ class UIControlsManager {
   /**
    * 初始化 UI 控制項狀態，同步 checkbox 和實際效果
    */
-  initializeUIControls() {
-    // 同步視覺提示狀態
-    const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
-    if (toggleTouchVisuals) {
-      const showTouchVisuals =
-        localStorage.getItem("showTouchVisuals") !== "false";
-      toggleTouchVisuals.checked = showTouchVisuals;
-      this.updateTouchVisuals(showTouchVisuals);
-    }
-
-    // 同步按鈕標籤顯示狀態
-    const toggleButtonLabels = document.getElementById("toggleButtonLabels");
-    if (toggleButtonLabels) {
-      const showButtonLabels =
-        localStorage.getItem("showButtonLabels") !== "false";
-      toggleButtonLabels.checked = showButtonLabels;
-      this.updateButtonLabelVisibility(showButtonLabels);
-    }
-
-    // 同步按鈕顏色顯示狀態
-    const toggleButtonColors = document.getElementById("toggleButtonColors");
-    if (toggleButtonColors) {
-      const showButtonColors =
-        localStorage.getItem("showButtonColors") !== "false";
-      toggleButtonColors.checked = showButtonColors;
-      this.updateButtonColorVisibility(showButtonColors);
-    }
-
-    // 同步媒體區域標記顯示狀態
-    const toggleMediaAreaMarker = document.getElementById(
-      "toggleMediaAreaMarker",
-    );
-    if (toggleMediaAreaMarker) {
-      const showMediaAreaMarker =
-        localStorage.getItem("showMediaAreaMarker") !== "false";
-      toggleMediaAreaMarker.checked = showMediaAreaMarker;
-      this.updateMediaAreaMarkerVisibility(showMediaAreaMarker);
-    }
-
-    // 同步媒體內容顯示狀態
-    const toggleMediaContent = document.getElementById("toggleMediaContent");
-    if (toggleMediaContent) {
-      const showMediaContent =
-        localStorage.getItem("showMediaContent") !== "false";
-      toggleMediaContent.checked = showMediaContent;
-      this.updateMediaContentVisibility(showMediaContent);
-    }
-
-    // 同步提示音效狀態
-    const toggleBeepSound = document.getElementById("toggleBeepSound");
-    if (toggleBeepSound) {
-      const playBeepSound = localStorage.getItem("playBeepSound") !== "false";
-      toggleBeepSound.checked = playBeepSound;
-    }
-
-    // 同步音量設定
-    const beepVolume = document.getElementById("beepVolume");
-    if (beepVolume) {
-      const volume = localStorage.getItem("beepVolume") || "50";
-      beepVolume.value = volume;
-      this.updateBeepVolume(volume);
-    }
-  }
-
   /**
    * 設定事件監聽器
    */
@@ -503,13 +439,53 @@ class UIControlsManager {
       });
     }
 
-    // 音量控制
+    // 音量控制 - 滑桿
     const beepVolume = document.getElementById("beepVolume");
+    const beepVolumeNumber = document.getElementById("beepVolumeNumber");
     if (beepVolume) {
       beepVolume.addEventListener("input", (e) => {
         const volume = e.target.value;
         localStorage.setItem("beepVolume", volume);
+        if (beepVolumeNumber) beepVolumeNumber.value = volume;
         this.updateBeepVolume(volume);
+      });
+    }
+
+    // 音量控制 - 數字輸入框
+    if (beepVolumeNumber) {
+      beepVolumeNumber.addEventListener("input", (e) => {
+        const volume = e.target.value;
+        // 確保值在有效範圍內
+        const clampedVolume = Math.max(0, Math.min(100, volume));
+        e.target.value = clampedVolume;
+        localStorage.setItem("beepVolume", clampedVolume);
+        if (beepVolume) beepVolume.value = clampedVolume;
+        this.updateBeepVolume(clampedVolume);
+      });
+    }
+
+    // 媒體音量控制 - 滑桿
+    const mediaVolume = document.getElementById("mediaVolume");
+    const mediaVolumeNumber = document.getElementById("mediaVolumeNumber");
+    if (mediaVolume) {
+      mediaVolume.addEventListener("input", (e) => {
+        const volume = e.target.value;
+        localStorage.setItem("mediaVolume", volume);
+        if (mediaVolumeNumber) mediaVolumeNumber.value = volume;
+        this.updateMediaVolume(volume);
+      });
+    }
+
+    // 媒體音量控制 - 數字輸入框
+    if (mediaVolumeNumber) {
+      mediaVolumeNumber.addEventListener("input", (e) => {
+        const volume = e.target.value;
+        // 確保值在有效範圍內
+        const clampedVolume = Math.max(0, Math.min(100, volume));
+        e.target.value = clampedVolume;
+        localStorage.setItem("mediaVolume", clampedVolume);
+        if (mediaVolume) mediaVolume.value = clampedVolume;
+        this.updateMediaVolume(clampedVolume);
       });
     }
 
@@ -569,33 +545,121 @@ class UIControlsManager {
     // 初始化全螢幕按鈕圖標
     this.updateFullscreenButtonIcon();
 
-    // 從 configManager 或 localStorage 載入設定
+    // 載入設定並套用
     const configSettings = window.configManager?.userSettings || {};
-    const savedMainScale =
-      configSettings.mainScale || localStorage.getItem("mainScale");
-    this.updateScale(savedMainScale || 1.29);
 
-    const savedTopSpacerHeight =
-      configSettings.topSpacerHeight || localStorage.getItem("topSpacerHeight");
+    // 套用數值設定
+    this.updateScale(
+      configSettings.mainScale ??
+        localStorage.getItem("mainScale") ??
+        UIControlsManager.DEFAULTS.mainScale,
+    );
     this.updateTopSpacer(
-      savedTopSpacerHeight !== null ? savedTopSpacerHeight : 5,
+      configSettings.topSpacerHeight ??
+        localStorage.getItem("topSpacerHeight") ??
+        UIControlsManager.DEFAULTS.topSpacerHeight,
     );
-
-    // 載入並套用底部間距
-    const savedBottomSpacerHeight =
-      configSettings.bottomSpacerHeight ||
-      localStorage.getItem("bottomSpacerHeight");
     this.updateBottomSpacer(
-      savedBottomSpacerHeight !== null ? savedBottomSpacerHeight : 3,
+      configSettings.bottomSpacerHeight ??
+        localStorage.getItem("bottomSpacerHeight") ??
+        UIControlsManager.DEFAULTS.bottomSpacerHeight,
+    );
+    this.updatePowerScale(
+      configSettings.powerSwitchScale ??
+        localStorage.getItem("powerSwitchScale") ??
+        UIControlsManager.DEFAULTS.powerSwitchScale,
     );
 
-    // 載入並套用電源按鈕縮放
-    const savedPowerScale =
-      configSettings.powerSwitchScale ||
-      localStorage.getItem("powerSwitchScale");
-    this.updatePowerScale(savedPowerScale !== null ? savedPowerScale : 0.9);
+    // 套用切換設定
+    this.updateButtonLabelVisibility(
+      localStorage.getItem("showButtonLabels") !== "false",
+    );
+    this.updateButtonColorVisibility(
+      localStorage.getItem("showButtonColors") !== "false",
+    );
+    this.updateTouchVisuals(
+      localStorage.getItem("showTouchVisuals") !== "false",
+    );
+    this.updateMediaAreaMarkerVisibility(
+      localStorage.getItem("showMediaAreaMarker") === "true",
+    );
+    this.updateMediaContentVisibility(
+      localStorage.getItem("showMediaContent") !== "false",
+    );
 
-    // 控制項初始狀態
+    // 套用音量設定
+    const beepVolume =
+      configSettings.beepVolume ??
+      localStorage.getItem("beepVolume") ??
+      UIControlsManager.DEFAULTS.beepVolume;
+    const mediaVolume =
+      configSettings.mediaVolume ??
+      localStorage.getItem("mediaVolume") ??
+      UIControlsManager.DEFAULTS.mediaVolume;
+
+    this.updateBeepVolume(beepVolume);
+    this.updateMediaVolume(mediaVolume);
+
+    // 更新 UI 元素值
+    this.syncUIElements(configSettings);
+
+    // 設定重置按鈕事件
+    this.setupResetButton();
+  }
+
+  /**
+   * 同步 UI 元素值
+   * @param {Object} configSettings - 設定物件
+   */
+  syncUIElements(configSettings) {
+    // 縮放控制
+    const scaleRange = document.getElementById("scaleRange");
+    const scaleNumberInput = document.getElementById("scaleNumberInput");
+    const scaleValue =
+      configSettings.mainScale ??
+      localStorage.getItem("mainScale") ??
+      UIControlsManager.DEFAULTS.mainScale;
+    if (scaleRange) scaleRange.value = scaleValue;
+    if (scaleNumberInput)
+      scaleNumberInput.value = parseFloat(scaleValue).toFixed(2);
+
+    // 間距控制
+    const topSpacerRange = document.getElementById("topSpacerRange");
+    const topSpacerNumberInput = document.getElementById(
+      "topSpacerNumberInput",
+    );
+    const topValue =
+      configSettings.topSpacerHeight ??
+      localStorage.getItem("topSpacerHeight") ??
+      UIControlsManager.DEFAULTS.topSpacerHeight;
+    if (topSpacerRange) topSpacerRange.value = topValue;
+    if (topSpacerNumberInput) topSpacerNumberInput.value = topValue;
+
+    const bottomSpacerRange = document.getElementById("bottomSpacerRange");
+    const bottomSpacerNumberInput = document.getElementById(
+      "bottomSpacerNumberInput",
+    );
+    const bottomValue =
+      configSettings.bottomSpacerHeight ??
+      localStorage.getItem("bottomSpacerHeight") ??
+      UIControlsManager.DEFAULTS.bottomSpacerHeight;
+    if (bottomSpacerRange) bottomSpacerRange.value = bottomValue;
+    if (bottomSpacerNumberInput) bottomSpacerNumberInput.value = bottomValue;
+
+    // 電源縮放控制
+    const powerScaleRange = document.getElementById("powerScaleRange");
+    const powerScaleNumberInput = document.getElementById(
+      "powerScaleNumberInput",
+    );
+    const powerValue =
+      configSettings.powerSwitchScale ??
+      localStorage.getItem("powerSwitchScale") ??
+      UIControlsManager.DEFAULTS.powerSwitchScale;
+    if (powerScaleRange) powerScaleRange.value = powerValue;
+    if (powerScaleNumberInput)
+      powerScaleNumberInput.value = parseFloat(powerValue).toFixed(2);
+
+    // 切換控制
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
@@ -605,59 +669,98 @@ class UIControlsManager {
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
 
-    // 還原預設按鈕
-    const resetSettingsBtn = document.getElementById("resetSettingsBtn");
-    if (resetSettingsBtn) {
-      resetSettingsBtn.addEventListener("click", async () => {
-        // 保守做法：呼叫 ConfigManager 的 reset 方法
-        if (
-          window.configManager &&
-          typeof window.configManager.resetUserSettingsToDefaults === "function"
-        ) {
-          await window.configManager.resetUserSettingsToDefaults();
-          // 更新本機 UIControls 的狀態
-          if (
-            window.uiControls &&
-            typeof window.uiControls.loadControlsFromDOM === "function"
-          ) {
-            window.uiControls.loadControlsFromDOM();
-          }
-          // 顯示短暫通知
-          if (window.logger) window.logger.logAction("已還原設定為預設值");
-        }
-      });
-    }
-
-    if (toggleButtonLabels) {
+    if (toggleButtonLabels)
       toggleButtonLabels.checked =
-        localStorage.getItem("showButtonLabels") === "true";
-      this.updateButtonLabelVisibility(toggleButtonLabels.checked);
-    }
-    if (toggleButtonColors) {
+        localStorage.getItem("showButtonLabels") !== "false";
+    if (toggleButtonColors)
       toggleButtonColors.checked =
-        localStorage.getItem("showButtonColors") === "true";
-      this.updateButtonColorVisibility(toggleButtonColors.checked);
-    }
-    if (toggleTouchVisuals) {
-      // default to true unless explicitly set to "false" in localStorage
+        localStorage.getItem("showButtonColors") !== "false";
+    if (toggleTouchVisuals)
       toggleTouchVisuals.checked =
         localStorage.getItem("showTouchVisuals") !== "false";
-      this.updateTouchVisuals(toggleTouchVisuals.checked);
-    }
-    if (toggleMediaAreaMarker) {
+    if (toggleMediaAreaMarker)
       toggleMediaAreaMarker.checked =
         localStorage.getItem("showMediaAreaMarker") === "true";
-      this.updateMediaAreaMarkerVisibility(toggleMediaAreaMarker.checked);
-    }
-    if (toggleMediaContent) {
+    if (toggleMediaContent)
       toggleMediaContent.checked =
         localStorage.getItem("showMediaContent") !== "false";
-      this.updateMediaContentVisibility(toggleMediaContent.checked);
-    }
-    if (toggleBeepSound) {
+    if (toggleBeepSound)
       toggleBeepSound.checked =
         localStorage.getItem("playBeepSound") !== "false";
-    }
+
+    // 音量控制
+    const beepVolume = document.getElementById("beepVolume");
+    const beepVolumeNumber = document.getElementById("beepVolumeNumber");
+    const beepVolValue =
+      configSettings.beepVolume ??
+      localStorage.getItem("beepVolume") ??
+      UIControlsManager.DEFAULTS.beepVolume;
+    if (beepVolume) beepVolume.value = beepVolValue;
+    if (beepVolumeNumber) beepVolumeNumber.value = beepVolValue;
+
+    const mediaVolume = document.getElementById("mediaVolume");
+    const mediaVolumeNumber = document.getElementById("mediaVolumeNumber");
+    const mediaVolValue =
+      configSettings.mediaVolume ??
+      localStorage.getItem("mediaVolume") ??
+      UIControlsManager.DEFAULTS.mediaVolume;
+    if (mediaVolume) mediaVolume.value = mediaVolValue;
+    if (mediaVolumeNumber) mediaVolumeNumber.value = mediaVolValue;
+  }
+
+  /**
+   * 設定重置按鈕事件
+   */
+  setupResetButton() {
+    const resetSettingsBtn = document.getElementById("resetSettingsBtn");
+    if (!resetSettingsBtn) return;
+
+    resetSettingsBtn.addEventListener("click", async () => {
+      if (window.configManager?.resetUserSettingsToDefaults) {
+        await window.configManager.resetUserSettingsToDefaults();
+        if (this.loadControlsFromDOM) {
+          this.loadControlsFromDOM();
+        }
+        if (window.logger) window.logger.logAction("已還原設定為預設值");
+      }
+    });
+  }
+
+  /**
+   * 設定設定重置事件監聽器
+   */
+  setupSettingsResetListener() {
+    document.addEventListener("user_settings_reset", () => {
+      const s = window.configManager?.userSettings || {};
+
+      if (s.mainScale !== undefined) this.updateScale(s.mainScale);
+      if (s.topSpacerHeight !== undefined)
+        this.updateTopSpacer(s.topSpacerHeight);
+      if (s.bottomSpacerHeight !== undefined)
+        this.updateBottomSpacer(s.bottomSpacerHeight);
+      if (s.powerSwitchScale !== undefined)
+        this.updatePowerScale(s.powerSwitchScale);
+
+      if (s.showButtonLabels !== undefined)
+        this.updateButtonLabelVisibility(s.showButtonLabels);
+      if (s.showButtonColors !== undefined)
+        this.updateButtonColorVisibility(s.showButtonColors);
+      if (s.showTouchVisuals !== undefined)
+        this.updateTouchVisuals(s.showTouchVisuals);
+      if (s.showMediaAreaMarker !== undefined)
+        this.updateMediaAreaMarkerVisibility(s.showMediaAreaMarker);
+      if (s.showMediaContent !== undefined)
+        this.updateMediaContentVisibility(s.showMediaContent);
+
+      if (s.playBeepSound !== undefined) {
+        localStorage.setItem(
+          "playBeepSound",
+          s.playBeepSound ? "true" : "false",
+        );
+      }
+
+      if (window.logger) window.logger.logAction("已套用預設設定");
+    });
   }
 }
 

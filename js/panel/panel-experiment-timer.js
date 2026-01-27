@@ -32,7 +32,7 @@ class PanelExperimentTimer {
         const milliseconds = deltaMs % 1000;
 
         const timeString = `${String(minutes).padStart(2, "0")}:${String(
-          seconds
+          seconds,
         ).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
 
         experimentTimer.textContent = timeString;
@@ -91,6 +91,12 @@ class PanelExperimentTimer {
     }
     this.experimentStartTime = null;
     this.experimentElapsed = 0;
+
+    // 重置 UI 顯示
+    const experimentTimer = document.getElementById("experimentTimer");
+    if (experimentTimer) {
+      experimentTimer.textContent = "00:00.000";
+    }
   }
 
   /**
@@ -105,6 +111,13 @@ class PanelExperimentTimer {
    */
   isRunning() {
     return this.experimentInterval !== null && !this.experimentPaused;
+  }
+
+  /**
+   * 檢查計時器是否已暫停
+   */
+  isPaused() {
+    return this.experimentPaused;
   }
 
   /**

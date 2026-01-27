@@ -84,16 +84,17 @@ class PanelExperimentPower {
    * 高亮電源開關
    */
   highlightPowerSwitch(highlight) {
-    const powerSwitch = document.querySelector(".power-button");
-    if (powerSwitch) {
+    // 使用正確的選擇器匹配電源按鈕
+    const powerButtons = document.querySelectorAll(".media-power-btn");
+    powerButtons.forEach((button) => {
       if (highlight) {
-        powerSwitch.classList.add("highlight");
-        Logger.debug("電源開關已高亮");
+        button.classList.add("next-step-highlight");
+        Logger.debug("電源按鈕已高亮");
       } else {
-        powerSwitch.classList.remove("highlight");
-        Logger.debug("電源開關高亮已取消");
+        button.classList.remove("next-step-highlight");
+        Logger.debug("電源按鈕高亮已取消");
       }
-    }
+    });
   }
 
   /**
@@ -231,27 +232,46 @@ class PanelExperimentPower {
    */
   highlightPowerSwitch(enable) {
     const powerSwitchArea = document.getElementById("powerSwitchArea");
-    Logger.debug(
-      `highlightPowerSwitch(${enable}): powerSwitchArea=${
-        powerSwitchArea ? "找到" : "未找到"
-      }`,
-    );
+    // 遵守用戶設定來啟用視覺提示
+    const showTouchVisuals =
+      localStorage.getItem("showTouchVisuals") !== "false";
+
+    // 只在視覺提示啟用時才輸出調試日誌
+    if (showTouchVisuals) {
+      Logger.debug(
+        `highlightPowerSwitch(${enable}): powerSwitchArea=${
+          powerSwitchArea ? "找到" : "未找到"
+        }`,
+      );
+    }
 
     if (powerSwitchArea) {
-      Logger.debug(
-        `   目前 display=${powerSwitchArea.style.display}, visibility=${powerSwitchArea.style.visibility}`,
-      );
+      if (showTouchVisuals) {
+        Logger.debug(
+          `   目前 display=${powerSwitchArea.style.display}, visibility=${powerSwitchArea.style.visibility}`,
+        );
+      }
 
       if (enable) {
-        //實驗進行中，無條件高亮電源按鈕
-        powerSwitchArea.classList.add("next-step-highlight");
-        Logger.debug("電源按鈕已高亮 (added class)");
-        Logger.debug(`   classList=${powerSwitchArea.classList.toString()}`);
+        // 遵守用戶設定來啟用視覺提示
+        if (
+          showTouchVisuals &&
+          !document.body.classList.contains("visual-hints-enabled")
+        ) {
+          document.body.classList.add("visual-hints-enabled");
+        }
+
+        // 實驗進行中，無條件高亮電源按鈕
+        if (!powerSwitchArea.classList.contains("next-step-highlight")) {
+          powerSwitchArea.classList.add("next-step-highlight");
+        }
       } else {
-        powerSwitchArea.classList.remove("next-step-highlight");
-        Logger.debug("電源按鈕高亮已移除");
+        // 檢查是否已移除，避免重複移除
+        if (powerSwitchArea.classList.contains("next-step-highlight")) {
+          powerSwitchArea.classList.remove("next-step-highlight");
+        }
       }
-    } else {
+    } else if (showTouchVisuals) {
       Logger.debug("無法找到 powerSwitchArea 元素！");
     }
   }
@@ -283,10 +303,11 @@ class PanelExperimentPower {
   /** 處理電源狀態變化 */
   onPowerStateChanged(isPowerOn) {
     if (this.manager.waitingForPowerOn && isPowerOn) {
-      // 等待開機完成
-      Logger.debug("電源打開，開始實驗");
+      // 等待開機完成 - 電源打開時立即移除電源按鈕高亮
+      Logger.debug("電源打開，開機動畫播放中，移除電源按鈕高亮");
       this.manager.waitingForPowerOn = false;
       this.manager.highlightPowerSwitch(false);
+
       if (window.logger) {
         window.logger.logAction("開機完成", null, null, false, false);
       }
@@ -299,41 +320,46 @@ class PanelExperimentPower {
         );
       }
 
-      //打開電源時，先高亮電源按鈕作為確認
-      Logger.debug("電源已打開，高亮電源按鈕");
-      this.manager.highlightPowerSwitch(true);
+      // 電源打開後，直接載入資料並顯示第一個動作的按鈕高亮
+      Logger.debug("電源已打開，準備載入單元資料和顯示按鈕高亮");
 
-      //延遲後清除電源按鈕高亮，載入資料並顯示第一個動作的按鈕高亮
-      setTimeout(() => {
-        this.manager.highlightPowerSwitch(false);
-
-        //此時才初始化動作序列和顯示第一個按鈕高亮
-        if (!window.actionManager?.isInitialized) {
-          Logger.debug("打開電源後，開始載入單元資料和初始化動作序列");
-          this.manager.loadUnitsAndStart();
-        } else {
-          // 已經初始化過，只更新按鈕高亮
-          if (window.buttonManager) {
-            Logger.debug("更新按鈕高亮");
-            window.buttonManager.updateMediaForCurrentAction();
+      //此時才初始化動作序列和顯示第一個按鈕高亮
+      if (!window.actionManager?.isInitialized) {
+        Logger.debug("打開電源後，開始載入單元資料和初始化動作序列");
+        // 等待 loadUnitsAndStart 完成後再執行 nextStep
+        this.manager.loadUnitsAndStart().then(() => {
+          // 根據設定面板的開關更新視覺提示
+          if (this.manager.ui) {
+            this.manager.ui.updateHighlightVisibility();
           }
+
+          // 開始執行第一個步驟
+          setTimeout(() => {
+            if (this.manager.flow?.nextStep) {
+              this.manager.flow.nextStep();
+            }
+          }, 100);
+        });
+      } else {
+        // 已經初始化過，只更新按鈕高亮
+        if (window.buttonManager) {
+          Logger.debug("更新按鈕高亮");
+          window.buttonManager.updateMediaForCurrentAction();
         }
 
-        // 開始執行第一個步驟
-        setTimeout(() => {
-          if (this.manager.flow?.nextStep) {
-            this.manager.flow.nextStep();
-          }
-        }, 100);
+        // 根據設定面板的開關更新視覺提示
+        if (this.manager.ui) {
+          this.manager.ui.updateHighlightVisibility();
+        }
+      }
 
-        //多螢幕同步：電源打開後廣播實驗狀態到其他裝置
-        Logger.debug("電源打開後，廣播實驗初始化到其他裝置");
+      //多螢幕同步：電源打開後廣播實驗狀態到其他裝置
+      Logger.debug("電源打開後，廣播實驗初始化到其他裝置");
 
-        //現在才廣播實驗初始化，此時按鈕高亮已準備好，experiment.html 也可以自動啟動
-        this.manager.broadcastExperimentInitialization();
+      //現在才廣播實驗初始化，此時按鈕高亮已準備好，experiment.html 也可以自動啟動
+      this.manager.broadcastExperimentInitialization();
 
-        this.manager.dispatchExperimentStateChanged();
-      }, 500);
+      this.manager.dispatchExperimentStateChanged();
 
       // 實驗開始後自動關閉實驗面板（延遲確保所有初始化完成）
       setTimeout(() => {
@@ -345,6 +371,18 @@ class PanelExperimentPower {
       this.manager.highlightPowerSwitch(false);
       if (window.logger) {
         window.logger.logAction("關機完成，實驗結束", null, null, false, false);
+      }
+      // 電源關閉時清除所有按鈕高亮
+      if (window.buttonManager) {
+        document.querySelectorAll(".button-overlay").forEach((btn) => {
+          btn.classList.remove("next-step-highlight");
+          btn.classList.remove("next-step-highlight-secondary");
+          btn.classList.remove("next-step-highlight-shift");
+        });
+      }
+      // 更新按鈕狀態（電源已關閉）
+      if (window.buttonManager) {
+        window.buttonManager.updateMediaForCurrentAction();
       }
       // 結束實驗
       this.manager.finishExperiment();
@@ -363,6 +401,18 @@ class PanelExperimentPower {
           false,
           false,
         );
+      }
+      // 電源關閉時清除所有按鈕高亮
+      if (window.buttonManager) {
+        document.querySelectorAll(".button-overlay").forEach((btn) => {
+          btn.classList.remove("next-step-highlight");
+          btn.classList.remove("next-step-highlight-secondary");
+          btn.classList.remove("next-step-highlight-shift");
+        });
+      }
+      // 更新按鈕狀態（電源已關閉）
+      if (window.buttonManager) {
+        window.buttonManager.updateMediaForCurrentAction();
       }
       this.manager.finishExperiment();
     } else if (

@@ -1,7 +1,7 @@
 /**
  * PanelExperimentUnits - 面板實驗單元管理器
  *
- * 負責單元載入、選擇、組合應用等單元相關功能
+ * 負責單元載入、選擇、組合套用等單元相關功能
  * 專門處理實驗單元的資料管理和操作邏輯
  */
 class PanelExperimentUnits {
@@ -553,7 +553,7 @@ class PanelExperimentUnits {
 
     Logger.debug(`處理組合選擇: ${combination.combination_name}`);
 
-    // 應用組合到單元選擇
+    // 套用組合到單元選擇
     this.applyUnitCombination(combination);
 
     // 更新組合選擇器UI
@@ -583,7 +583,7 @@ class PanelExperimentUnits {
     ) {
       Logger.debug("重新隨機排列單元組合");
 
-      // 重新應用相同的隨機組合（會觸發重新隨機）
+      // 重新套用相同的隨機組合（會觸發重新隨機）
       this.applyUnitCombination(this.manager.currentCombination);
 
       // 記錄日誌
@@ -638,15 +638,34 @@ class PanelExperimentUnits {
    */
   async loadUnitsAndStart() {
     try {
+      // 首先載入選擇的單元
+      this.loadSelectedUnits();
+      Logger.debug(
+        `已載入 ${this.manager.loadedUnits.length} 個單元: ${this.manager.loadedUnits.join(", ")}`,
+      );
+
       const data = await loadUnitsFromScenarios();
       window._allUnits = data.units;
       window._allUnitsActionsMap = data.actions;
       window._allUnitsActionToStepMap = data.actionToStep;
+      Logger.debug(
+        `scenarios 資料載入完成，共 ${Object.keys(data.units).length} 個單元`,
+      );
 
       // 初始化動作管理器
-      if (window.actionManager && this.manager.isExperimentRunning) {
+      Logger.debug(
+        `檢查 actionManager: ${!!window.actionManager}, isExperimentRunning: ${this.manager.isExperimentRunning}, waitingForPowerOn: ${this.manager.waitingForPowerOn}`,
+      );
+      // 只有在不等待開機時，才初始化動作序列並顯示按鈕高亮
+      if (
+        window.actionManager &&
+        this.manager.isExperimentRunning &&
+        !this.manager.waitingForPowerOn
+      ) {
+        Logger.debug("開始初始化 actionManager...");
         const initialized =
           await window.actionManager.initializeFromExperiment();
+        Logger.debug(`actionManager 初始化結果: ${initialized}`);
         if (initialized) {
           Logger.debug(
             "實驗資料載入後已初始化動作序列，共",
@@ -656,9 +675,26 @@ class PanelExperimentUnits {
 
           // 更新按鈕高亮和媒體
           if (window.buttonManager) {
+            Logger.debug("調用 updateMediaForCurrentAction");
             window.buttonManager.updateMediaForCurrentAction();
+          } else {
+            Logger.warn("buttonManager 不存在");
           }
+        } else {
+          Logger.warn("actionManager 初始化失敗");
         }
+      } else if (this.manager.waitingForPowerOn) {
+        Logger.debug(
+          "等待開機中，跳過 actionManager 初始化，但套用按鈕禁用狀態",
+        );
+        // 套用按鈕禁用視覺效果
+        if (window.buttonManager) {
+          window.buttonManager.updateMediaForCurrentAction();
+        }
+      } else {
+        Logger.warn(
+          `無法初始化 actionManager: actionManager=${!!window.actionManager}, isExperimentRunning=${this.manager.isExperimentRunning}`,
+        );
       }
 
       this.manager.showExperimentWaitingState();

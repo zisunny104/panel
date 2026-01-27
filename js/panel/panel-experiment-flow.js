@@ -11,6 +11,53 @@ class PanelExperimentFlow {
   }
 
   /**
+   * 檢查是否應該啟用視覺提示（遵守用戶設定）
+   * @returns {boolean} 用戶是否啟用了視覺提示
+   */
+  isVisualHintsEnabled() {
+    return localStorage.getItem("showTouchVisuals") !== "false";
+  }
+
+  /**
+   * 啟用視覺提示類別（如果用戶啟用了該選項）
+   */
+  enableVisualHintsIfUserEnabled() {
+    if (this.isVisualHintsEnabled()) {
+      document.body.classList.add("visual-hints-enabled");
+    }
+  }
+
+  /**
+   * 統一的實驗停止日誌導出函數
+   * @param {string} stopReason - 停止原因: 'local'(本機停止) | 'remote'(遠端停止) | 'completion'(實驗完成停止)
+   */
+  exportExperimentLog(stopReason = "completion") {
+    if (window.logger) {
+      // 只有當用戶啟用視覺提示時才輸出日誌
+      const shouldLog = this.isVisualHintsEnabled();
+
+      const stopReasonMap = {
+        local: "本機停止",
+        remote: "遠端停止",
+        completion: "實驗完成停止",
+      };
+
+      const reason = stopReasonMap[stopReason] || "未知停止";
+      window.logger.logAction("實驗結束");
+
+      // 延遲 500ms 後自動下載日誌，確保最後的日誌記錄已寫入
+      setTimeout(() => {
+        if (window.logger && typeof window.logger.exportLog === "function") {
+          if (shouldLog) {
+            Logger.debug(`自動下載實驗操作日誌（${reason}）`);
+          }
+          window.logger.exportLog();
+        }
+      }, 500);
+    }
+  }
+
+  /**
    * 更新實驗相關的UI組件
    */
   updateExperimentUI() {
@@ -56,7 +103,7 @@ class PanelExperimentFlow {
     const experimentId = this.manager.getCurrentExperimentId();
     let participantName =
       document.getElementById("participantNameInput")?.value?.trim() || "";
-    const combinationName =
+    const _combinationName =
       this.manager.currentCombination?.combination_name || "";
 
     // 如果受試者名稱為空，自動產生「受試者_實驗ID」
@@ -110,6 +157,10 @@ class PanelExperimentFlow {
     this.manager.isExperimentRunning = true;
     this.manager.ui.lockUnitList(true);
     this.manager.ui.lockExperimentId(true);
+    this.manager.ui.lockParticipantAndIdControls(true);
+
+    // 遵守用戶設定來啟用視覺提示（不要強制啟用）
+    this.enableVisualHintsIfUserEnabled();
 
     // 立即開始計時器，不管是否等待開機
     this.manager.timer.startTimer();
@@ -137,12 +188,22 @@ class PanelExperimentFlow {
     this.manager.broadcastExperimentInitialization();
 
     // 檢查開機設定
+    Logger.debug(
+      `[診斷] includeStartup=${this.manager.includeStartup}, powerControl=${window.powerControl ? "存在" : "未找到"}, isPowerOn=${window.powerControl?.isPowerOn ?? "無"}`,
+    );
+
     if (this.manager.includeStartup) {
       // 如果包含開機且機器目前是關閉的，等待使用者開機
       if (window.powerControl && !window.powerControl.isPowerOn) {
-        Logger.debug("等待開機：呼叫 highlightPowerSwitch(true)");
+        Logger.debug("實驗開始：電源未開啟，高亮電源按鈕");
         this.manager.waitingForPowerOn = true;
         this.manager.highlightPowerSwitch(true);
+
+        // 立即套用按鈕禁用視覺效果
+        if (window.buttonManager) {
+          window.buttonManager.updateMediaForCurrentAction();
+        }
+
         if (window.logger) {
           window.logger.logAction("等待使用者開機", null, null, false, false);
         }
@@ -167,10 +228,12 @@ class PanelExperimentFlow {
       }
     } else if (window.powerControl && !window.powerControl.isPowerOn) {
       // 不包含開機但機器是關閉的，自動開機
+      Logger.debug("實驗開始：不包含開機流程，自動開機");
       window.powerControl.setPowerState(true, "實驗自動開機");
     }
 
     //電源已打開或不需要檢查電源，載入單元資料並初始化動作序列
+    Logger.debug("實驗開始：電源已開啟，直接載入單元並高亮第一個按鈕");
     this.manager.loadUnitsAndStart();
 
     this.updateExperimentUI();
@@ -262,6 +325,9 @@ class PanelExperimentFlow {
     // 廣播暫停狀態
     this.manager.sync.broadcastExperimentPaused();
 
+    // 暫停時允許編輯受試者名稱
+    this.manager.ui.lockParticipantAndIdControls(false);
+
     // 更新UI
     this.manager.ui.updateExperimentUI();
 
@@ -296,6 +362,9 @@ class PanelExperimentFlow {
     // 廣播恢復狀態
     this.manager.sync.broadcastExperimentResumed();
 
+    // 恢復時重新禁用受試者名稱編輯
+    this.manager.ui.lockParticipantAndIdControls(true);
+
     // 更新UI
     this.manager.ui.updateExperimentUI();
 
@@ -327,10 +396,13 @@ class PanelExperimentFlow {
     // 停止計時器
     this.manager.timer.stopTimer();
 
-    // 記錄停止日誌
+    // 記錄停止日誌並使用統一的日誌導出函數
     if (window.logger) {
       window.logger.logAction("停止實驗", null, null, false, false);
     }
+
+    // 使用統一的日誌導出函數
+    this.exportExperimentLog("local");
 
     // 重置狀態
     this.manager.isExperimentRunning = false;
@@ -343,6 +415,7 @@ class PanelExperimentFlow {
     // 解鎖UI
     this.manager.ui.lockUnitList(false);
     this.manager.ui.lockExperimentId(false);
+    this.manager.ui.lockParticipantAndIdControls(false);
 
     // 顯示開始按鈕，隱藏控制按鈕
     const startExperimentButton = document.getElementById("startExperimentBtn");
@@ -402,27 +475,36 @@ class PanelExperimentFlow {
       return;
     }
 
-    const currentUnit = this.manager.loadedUnits[this.manager.currentUnitIndex];
+    // 確保 loadedUnits 已載入
+    if (!this.manager.loadedUnits || this.manager.loadedUnits.length === 0) {
+      Logger.warn("單元資料尚未載入，無法執行下一步");
+      return;
+    }
+
+    // loadedUnits 存的是 unit ID 字串，需要從 _allUnits 中查找實際的 unit 物件
+    const unitId = this.manager.loadedUnits[this.manager.currentUnitIndex];
+    const currentUnit = window._allUnits?.find((u) => u.unit_id === unitId);
+
     if (!currentUnit) {
-      Logger.warn("沒有當前單元，無法執行下一步");
+      Logger.warn(`沒有找到目前單元: ${unitId}`);
       return;
     }
 
-    const currentStep = currentUnit.steps[this.manager.currentStepIndex];
+    const currentStep = currentUnit.steps?.[this.manager.currentStepIndex];
     if (!currentStep) {
-      Logger.warn("沒有當前步驟，無法執行下一步");
+      Logger.warn("沒有目前步驟，無法執行下一步");
       return;
     }
 
-    // 執行當前步驟
+    // 執行目前步驟
     this.executeStep(currentStep);
 
     // 移動到下一步
     this.manager.currentStepIndex++;
 
-    // 檢查是否完成當前單元的所有步驟
+    // 檢查是否完成目前單元的所有步驟
     if (this.manager.currentStepIndex >= currentUnit.steps.length) {
-      // 當前單元完成，移動到下一個單元
+      // 目前單元完成，移動到下一個單元
       this.manager.currentUnitIndex++;
       this.manager.currentStepIndex = 0;
 
@@ -475,9 +557,12 @@ class PanelExperimentFlow {
    * 開始下一個單元
    */
   startNextUnit() {
-    const nextUnit = this.manager.loadedUnits[this.manager.currentUnitIndex];
+    // loadedUnits 存的是 unit ID 字串，需要從 _allUnits 中查找實際的 unit 物件
+    const nextUnitId = this.manager.loadedUnits[this.manager.currentUnitIndex];
+    const nextUnit = window._allUnits?.find((u) => u.unit_id === nextUnitId);
+
     if (!nextUnit) {
-      Logger.warn("沒有下一個單元");
+      Logger.warn(`沒有找到下一個單元: ${nextUnitId}`);
       return;
     }
 
@@ -565,6 +650,11 @@ class PanelExperimentFlow {
 
     // 取消電源開關高亮
     this.manager.highlightPowerSwitch(false);
+
+    // 解鎖UI
+    this.manager.ui.lockUnitList(false);
+    this.manager.ui.lockExperimentId(false);
+    this.manager.ui.lockParticipantAndIdControls(false);
 
     // 更新UI
     this.manager.ui.updateExperimentUI();
@@ -809,16 +899,15 @@ class PanelExperimentFlow {
 
   /** 完成實驗（處理最終清理和日誌匯出） */
   finishExperiment() {
-    if (window.logger) {
-      window.logger.logAction("實驗結束");
-    }
+    // 使用統一的日誌導出函數
+    this.exportExperimentLog("completion");
 
     // 清除預先載入的媒體
     if (window.mediaManager) {
       window.mediaManager.clearPreloadedMedia();
     }
 
-    //自動停止（不廣播到其他裝置）
+    // 自動停止（不廣播到其他裝置）
     this.manager.stopExperiment(false);
   }
 
@@ -888,7 +977,7 @@ class PanelExperimentFlow {
     } else if (window.mediaManager && isPowerOn) {
       // 沒有媒體檔案且機器已開機，播放首頁循環
       window.mediaManager.playMedia(
-        PanelExperimentManager.HOME_PAGE_VIDEO_PATH,
+        this.manager.constructor.HOME_PAGE_VIDEO_PATH,
         {
           controls: false,
           muted: true,

@@ -190,7 +190,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
             clientId: this.getClientId(),
             experimentId: experimentId,
             source: source,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
 
           Logger.debug(`透過 SyncClient 廣播實驗ID更新: ${experimentId}`);
@@ -264,7 +264,8 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      * 從 SyncClient 取得工作階段 ID
      */
     getSessionId() {
-      return window.syncManager?.core?.syncClient?.getSessionId() || null;
+      // 修復循環調用：直接從 syncManager 取得 sessionId
+      return window.syncManager?.core?.syncClient?.sessionId || null;
     }
 
     /**
@@ -323,7 +324,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      */
     triggerStateUpdate(state) {
       const event = new CustomEvent("experiment_hub_state_update", {
-        detail: state
+        detail: state,
       });
       window.dispatchEvent(event);
     }
@@ -334,7 +335,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
     triggerExperimentIdUpdate(data) {
       Logger.debug("觸發實驗 ID 更新事件:", data);
       const event = new CustomEvent("experiment_hub_id_update", {
-        detail: data
+        detail: data,
       });
       window.dispatchEvent(event);
     }
@@ -344,7 +345,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      */
     triggerExperimentStateChange(data) {
       const event = new CustomEvent("experiment_hub_state_change", {
-        detail: data
+        detail: data,
       });
       window.dispatchEvent(event);
     }

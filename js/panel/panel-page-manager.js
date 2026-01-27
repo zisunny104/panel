@@ -21,60 +21,26 @@ class PanelPageManager {
   async initialize() {
     const startTime = performance.now();
     try {
-      if (typeof Logger !== "undefined") {
-        Logger.info("PanelPageManager 開始初始化");
-      } else {
-        console.log("[PanelPageManager] 開始初始化");
-      }
+      Logger.debug("PanelPageManager 開始初始化");
 
       // 1. 載入核心腳本
       const coreStart = performance.now();
-      if (typeof Logger !== "undefined") {
-        Logger.debug("開始載入核心腳本");
-      }
       await this.loadCoreScripts();
-      if (typeof Logger !== "undefined") {
-        Logger.debug(
-          `核心腳本載入完成 (耗時: ${(performance.now() - coreStart).toFixed(0)}ms)`,
-        );
-      }
 
       // 2. 載入 UI 控制腳本
       const uiStart = performance.now();
-      if (typeof Logger !== "undefined") {
-        Logger.debug("開始載入 UI 腳本");
-      }
       await this.loadUIScripts();
-      if (typeof Logger !== "undefined") {
-        Logger.debug(
-          `UI 腳本載入完成 (耗時: ${(performance.now() - uiStart).toFixed(0)}ms)`,
-        );
-      }
 
       // 3. 載入實驗管理腳本
       const expStart = performance.now();
-      if (typeof Logger !== "undefined") {
-        Logger.debug("開始載入實驗管理腳本");
-      }
       await this.loadExperimentScripts();
-      if (typeof Logger !== "undefined") {
-        Logger.debug(
-          `實驗管理腳本載入完成 (耗時: ${(performance.now() - expStart).toFixed(0)}ms)`,
-        );
-      }
 
       // 4. 載入同步相關腳本
       const syncStart = performance.now();
-      if (typeof Logger !== "undefined") {
-        Logger.debug("開始載入同步腳本");
-      }
       await this.loadSyncScripts();
       if (typeof Logger !== "undefined") {
         Logger.debug(
-          `同步腳本載入完成 (耗時: ${(performance.now() - syncStart).toFixed(0)}ms)`,
-        );
-        Logger.info(
-          `所有腳本載入完成 (總耗時: ${(performance.now() - startTime).toFixed(0)}ms)`,
+          `所有腳本載入完成 (<orange>${(performance.now() - startTime).toFixed(0)} ms</orange>)`,
         );
       }
 
@@ -87,7 +53,7 @@ class PanelPageManager {
           error,
         );
       } else {
-        console.error(`初始化失敗:`, error);
+        console.error("初始化失敗:", error);
       }
     }
   }
@@ -103,14 +69,35 @@ class PanelPageManager {
       "js/core/data-loader.js",
       "js/core/time-sync-manager.js",
       "js/core/websocket-client.js",
+      "js/sync/sync-client.js",
+      "js/core/action-manager.js",
+      "js/core/combination-selector.js", // module
     ];
 
+    const startTime = performance.now();
+    let loadedCount = 0;
+    let cachedCount = 0;
+
     for (const script of coreScripts) {
-      if (typeof Logger !== "undefined") {
-        Logger.debug(`載入核心腳本: ${script}`);
+      const isModule =
+        script.includes("combination-selector.js") ||
+        script.includes("random-utils.js") ||
+        script.includes("data-loader.js");
+      const wasCached = await this.loadScript(script, isModule);
+      if (wasCached) {
+        cachedCount++;
+      } else {
+        loadedCount++;
       }
-      await this.loadScript(script);
     }
+
+    if (typeof Logger !== "undefined") {
+      const totalTime = performance.now() - startTime;
+      Logger.debug(
+        `核心腳本載入完成: <green>${loadedCount}</green> 個載入, <cyan>${cachedCount}</cyan> 個快取 (<orange>${totalTime.toFixed(0)} ms</orange>)`,
+      );
+    }
+
     this.coreScriptsLoaded = true;
   }
 
@@ -119,15 +106,31 @@ class PanelPageManager {
    */
   async loadUIScripts() {
     const uiScripts = [
+      "js/panel/panel-manager.js",
       "js/panel/panel-ui-controls.js",
       "js/panel/panel-button-manager.js",
+      "js/panel/panel-logger.js",
+      "js/panel/panel-power-control.js",
     ];
 
+    const startTime = performance.now();
+    let loadedCount = 0;
+    let cachedCount = 0;
+
     for (const script of uiScripts) {
-      if (typeof Logger !== "undefined") {
-        Logger.debug(`載入 UI 腳本: ${script}`);
+      const wasCached = await this.loadScript(script);
+      if (wasCached) {
+        cachedCount++;
+      } else {
+        loadedCount++;
       }
-      await this.loadScript(script);
+    }
+
+    if (typeof Logger !== "undefined") {
+      const totalTime = performance.now() - startTime;
+      Logger.debug(
+        `UI 腳本載入完成: <green>${loadedCount}</green> 個載入, <cyan>${cachedCount}</cyan> 個快取 (<orange>${totalTime.toFixed(0)} ms</orange>)`,
+      );
     }
   }
 
@@ -139,6 +142,7 @@ class PanelPageManager {
       "js/panel/panel-experiment-sync.js",
       "js/panel/panel-experiment-flow.js",
       "js/panel/panel-experiment-units.js",
+      "js/panel/panel-media-manager.js",
       "js/panel/panel-experiment-media.js",
       "js/panel/panel-experiment-power.js",
       "js/panel/panel-experiment-timer.js",
@@ -146,13 +150,27 @@ class PanelPageManager {
       "js/panel/panel-experiment-manager.js", // module
     ];
 
+    const startTime = performance.now();
+    let loadedCount = 0;
+    let cachedCount = 0;
+
     for (const script of experimentScripts) {
-      if (typeof Logger !== "undefined") {
-        Logger.debug(`載入實驗腳本: ${script}`);
-      }
       const isModule = script.includes("panel-experiment-manager.js");
-      await this.loadScript(script, isModule);
+      const wasCached = await this.loadScript(script, isModule);
+      if (wasCached) {
+        cachedCount++;
+      } else {
+        loadedCount++;
+      }
     }
+
+    if (typeof Logger !== "undefined") {
+      const totalTime = performance.now() - startTime;
+      Logger.debug(
+        `實驗腳本載入完成: <green>${loadedCount}</green> 個載入, <cyan>${cachedCount}</cyan> 個快取 (<orange>${totalTime.toFixed(0)} ms</orange>)`,
+      );
+    }
+
     this.experimentManagerLoaded = true;
   }
 
@@ -165,13 +183,26 @@ class PanelPageManager {
       "js/sync/sync-manager.js", // module
     ];
 
+    const startTime = performance.now();
+    let loadedCount = 0;
+    let cachedCount = 0;
+
     for (const script of syncScripts) {
-      if (typeof Logger !== "undefined") {
-        Logger.debug(`載入同步腳本: ${script}`);
-      }
       const isModule =
         script.includes(".mjs") || script.includes("sync-manager.js");
-      await this.loadScript(script, isModule);
+      const wasCached = await this.loadScript(script, isModule);
+      if (wasCached) {
+        cachedCount++;
+      } else {
+        loadedCount++;
+      }
+    }
+
+    if (typeof Logger !== "undefined") {
+      const totalTime = performance.now() - startTime;
+      Logger.debug(
+        `同步腳本載入完成: <green>${loadedCount}</green> 個載入, <cyan>${cachedCount}</cyan> 個快取 (<orange>${totalTime.toFixed(0)} ms</orange>)`,
+      );
     }
   }
 
@@ -183,10 +214,7 @@ class PanelPageManager {
       const loadStart = performance.now();
       // 檢查是否已經載入
       if (document.querySelector(`script[src="${src}"]`)) {
-        if (typeof Logger !== "undefined") {
-          Logger.debug(`腳本已快取: ${src}`);
-        }
-        resolve();
+        resolve(true); // 返回 true 表示已快取
         return;
       }
 
@@ -196,12 +224,7 @@ class PanelPageManager {
         script.type = "module";
       }
       script.onload = () => {
-        if (typeof Logger !== "undefined") {
-          Logger.debug(
-            `腳本載入成功: ${src} (耗時: ${(performance.now() - loadStart).toFixed(0)}ms)`,
-          );
-        }
-        resolve();
+        resolve(false); // 返回 false 表示新載入
       };
       script.onerror = () => {
         const error = `載入腳本失敗: ${src} (耗時: ${(performance.now() - loadStart).toFixed(0)}ms)`;
@@ -221,7 +244,7 @@ class PanelPageManager {
    */
   onInitializationComplete() {
     if (typeof Logger !== "undefined") {
-      Logger.info("所有腳本載入完成，開始載入應用啟動腳本");
+      Logger.debug("所有腳本載入完成，開始載入應用啟動腳本");
     }
 
     // 載入應用啟動腳本
@@ -229,19 +252,19 @@ class PanelPageManager {
     this.loadScript("js/core/main.js")
       .then(() => {
         if (typeof Logger !== "undefined") {
-          Logger.info(
-            `應用啟動完成 (耗時: ${(performance.now() - mainStart).toFixed(0)}ms)`,
+          Logger.debug(
+            `應用啟動完成 (<orange>${(performance.now() - mainStart).toFixed(0)} ms</orange>)`,
           );
         }
       })
       .catch((error) => {
         if (typeof Logger !== "undefined") {
           Logger.error(
-            `載入主應用程式失敗 (耗時: ${(performance.now() - mainStart).toFixed(0)}ms)`,
+            `載入主應用程式失敗 (<orange>${(performance.now() - mainStart).toFixed(0)} ms</orange>)`,
             error,
           );
         } else {
-          console.error(`載入主應用程式失敗:`, error);
+          console.error("載入主應用程式失敗:", error);
         }
       });
   }

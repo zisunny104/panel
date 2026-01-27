@@ -208,8 +208,18 @@
                 </label>開啟音效
             </div>
             <div class="control-group">
-                <label for="beepVolume">音量</label>
-                <input type="range" id="beepVolume" min="0" max="100" value="50">
+                <label for="beepVolume">按鍵音量</label>
+                <div class="range-with-number">
+                    <input type="range" id="beepVolume" min="0" max="100" value="50">
+                    <input type="number" id="beepVolumeNumber" min="0" max="100" value="50" class="number-input">
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="mediaVolume">媒體音量</label>
+                <div class="range-with-number">
+                    <input type="range" id="mediaVolume" min="0" max="100" value="70">
+                    <input type="number" id="mediaVolumeNumber" min="0" max="100" value="70" class="number-input">
+                </div>
             </div>
 
             <hr class="panel-divider">
@@ -407,33 +417,11 @@
     <audio id="beepSound" src="assets/audio/beep.mp3" preload="auto"></audio>
 
     <!-- ===== 核心基礎 ===== -->
-    <!-- 全域核心 -->
+    <!-- 全域核心：必須最先載入以提供 Logger 功能與錯誤捕捉 -->
     <script src="js/core/console-manager.js"></script>
-    <script src="js/core/config.js"></script>
-
-    <!-- 網路基礎 -->
-    <script src="js/core/websocket-client.js"></script>
-    <script src="js/core/time-sync-manager.js"></script>
-
-    <!-- ===== 同步系統 ===== -->
-    <!-- 同步客戶端 -->
-    <script src="js/sync/sync-client.js"></script>
-
-    <!-- 實驗中樞系統 -->
-    <script src="js/core/experiment-hub-client.js"></script>
-    <script type="module" src="js/sync/experiment-hub-manager.js"></script>
-
-    <!-- ===== 工具與資料 ===== -->
-    <!-- 基礎工具 -->
-    <script type="module" src="js/core/random-utils.js"></script>
-    <script type="module" src="js/core/data-loader.js"></script>
-
-    <!-- ===== 狀態管理 ===== -->
-    <!-- 實驗狀態管理 -->
-    <script src="js/core/experiment-state-manager.js"></script>
 
     <!-- ===== 面板頁面管理器 ===== -->
-    <!-- 負責載入和管理整個面板頁面的腳本 -->
+    <!-- 頁面入口：動態載入並協調所有其他模組（Data, Sync, UI, Experiment） -->
     <script src="js/panel/panel-page-manager.js"></script>
 
 </body>

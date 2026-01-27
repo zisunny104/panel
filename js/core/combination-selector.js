@@ -164,7 +164,7 @@ class CombinationSelector {
     if (savedCombination) {
       // 從 scriptData 中找到完整的組合資料
       const fullCombination = this.scriptData.unit_combinations?.find(
-        (c) => c.combination_id === savedCombination.combination_id
+        (c) => c.combination_id === savedCombination.combination_id,
       );
       if (fullCombination) {
         this.selectCombination(fullCombination, experimentId);
@@ -179,7 +179,7 @@ class CombinationSelector {
       window.CONFIG?.experiment?.defaultCombinationId;
     if (defaultCombinationId) {
       const defaultCombination = this.scriptData.unit_combinations?.find(
-        (c) => c.combination_id === defaultCombinationId
+        (c) => c.combination_id === defaultCombinationId,
       );
 
       if (defaultCombination) {
@@ -232,11 +232,11 @@ class CombinationSelector {
     // 取得該組合包含的單元 ID
     let combinationUnitIds = this.getCombinationUnitIds(
       combination,
-      experimentId
+      experimentId,
     );
 
     // 更新單元選擇狀態
-    const allCheckboxes = unitList.querySelectorAll("input[type=\"checkbox\"]");
+    const allCheckboxes = unitList.querySelectorAll('input[type="checkbox"]');
     allCheckboxes.forEach((checkbox) => {
       const li = checkbox.closest("li");
       const unitId = li.dataset.unitId;
@@ -270,13 +270,13 @@ class CombinationSelector {
   reorderUnitList(unitList, unitIds) {
     const allItems = Array.from(unitList.children);
     const startupCard = allItems.find((li) =>
-      li.classList.contains("startup-card")
+      li.classList.contains("startup-card"),
     );
     const shutdownCard = allItems.find((li) =>
-      li.classList.contains("shutdown-card")
+      li.classList.contains("shutdown-card"),
     );
     const normalItems = allItems.filter(
-      (li) => !li.classList.contains("power-option-card")
+      (li) => !li.classList.contains("power-option-card"),
     );
 
     const orderedItems = [];
@@ -330,9 +330,9 @@ class CombinationSelector {
           combination_name: combination.combination_name,
           units: combination.units,
           is_randomizable: combination.is_randomizable,
-          description: combination.description
+          description: combination.description,
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -345,8 +345,8 @@ class CombinationSelector {
       detail: {
         combinationId: combination.combination_id,
         combinationName: combination.combination_name,
-        combination: combination
-      }
+        combination: combination,
+      },
     });
     document.dispatchEvent(event);
     window.dispatchEvent(event);
@@ -395,8 +395,8 @@ class CombinationSelector {
           units: combination.units,
           is_randomizable: combination.is_randomizable,
           description: combination.description,
-          savedAt: Date.now()
-        })
+          savedAt: Date.now(),
+        }),
       );
     } catch (error) {
       Logger.warn("無法儲存到本機快取");
@@ -431,7 +431,7 @@ class CombinationSelector {
   }
 
   /**
-   * 取得當前選擇的組合
+   * 取得目前選擇的組合
    */
   getCurrentCombination() {
     return this.currentCombination;

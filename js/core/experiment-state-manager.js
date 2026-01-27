@@ -21,7 +21,7 @@ class ExperimentStateManager {
     // 事件監聽器
     this.listeners = new Map();
 
-    // 從 sessionStorage 還原狀態快照
+    // 從 localStorage 還原狀態快照
     this.restoreSnapshot();
 
     // 初始化同步
@@ -233,7 +233,7 @@ class ExperimentStateManager {
       this.emit("participantNameChanged", {
         participantName,
         oldName,
-        source
+        source,
       });
     }
   }
@@ -258,14 +258,14 @@ class ExperimentStateManager {
       const oldCombination = this.currentCombination;
       this.currentCombination = combination;
       Logger.info(
-        `目前組合已更新 (${source}): ${combination?.combination_name || "null"}`
+        `目前組合已更新 (${source}): ${combination?.combination_name || "null"}`,
       );
 
       // 分發事件
       this.emit("currentCombinationChanged", {
         combination,
         oldCombination,
-        source
+        source,
       });
     }
   }
@@ -291,7 +291,7 @@ class ExperimentStateManager {
           this.participantName || `受試者_${this.experimentId}`;
         window.experimentLogManager.initialize(
           this.experimentId,
-          defaultParticipantName
+          defaultParticipantName,
         );
         window.experimentLogManager.logExperimentStart();
       }
@@ -299,7 +299,7 @@ class ExperimentStateManager {
       this.emit("experimentStarted", {
         experimentId: this.experimentId,
         participantName: this.participantName,
-        combination: this.currentCombination
+        combination: this.currentCombination,
       });
     }
   }
@@ -321,7 +321,7 @@ class ExperimentStateManager {
 
       this.emit("experimentStopped", {
         experimentId: this.experimentId,
-        participantName: this.participantName
+        participantName: this.participantName,
       });
     }
   }
@@ -339,7 +339,7 @@ class ExperimentStateManager {
       }
 
       this.emit("experimentPaused", {
-        experimentId: this.experimentId
+        experimentId: this.experimentId,
       });
     }
   }
@@ -357,7 +357,7 @@ class ExperimentStateManager {
       }
 
       this.emit("experimentResumed", {
-        experimentId: this.experimentId
+        experimentId: this.experimentId,
       });
     }
   }
@@ -372,12 +372,12 @@ class ExperimentStateManager {
     // 只在同步模式下註冊到中樞
     if (window.experimentHubManager?.isInSyncMode?.()) {
       Logger.debug(
-        `[ExperimentStateManager] 同步模式，註冊實驗ID到中樞: ${newId}`
+        `[ExperimentStateManager] 同步模式，註冊實驗ID到中樞: ${newId}`,
       );
       window.experimentHubManager.registerExperimentId(newId, "state_manager");
     } else {
       Logger.debug(
-        `[ExperimentStateManager] 獨立模式，實驗ID僅存本機: ${newId}`
+        `[ExperimentStateManager] 獨立模式，實驗ID僅存本機: ${newId}`,
       );
     }
 
@@ -396,7 +396,7 @@ class ExperimentStateManager {
       isExperimentRunning: this.isExperimentRunning,
       experimentPaused: this.experimentPaused,
       experimentStartTime: this.experimentStartTime,
-      experimentElapsed: this.experimentElapsed
+      experimentElapsed: this.experimentElapsed,
     };
   }
 
@@ -446,8 +446,8 @@ class ExperimentStateManager {
     // 同時分發全域事件
     document.dispatchEvent(
       new CustomEvent(`state_${event}`, {
-        detail: data
-      })
+        detail: data,
+      }),
     );
 
     // 狀態變更後儲存快照
@@ -457,11 +457,11 @@ class ExperimentStateManager {
   // ============ 快照管理方法 ============
 
   /**
-   * 從 sessionStorage 還原狀態快照
+   * 從 localStorage 還原狀態快照
    */
   restoreSnapshot() {
     try {
-      const snapshot = sessionStorage.getItem("experiment_state_snapshot");
+      const snapshot = localStorage.getItem("experiment_state_snapshot");
       if (snapshot) {
         const state = JSON.parse(snapshot);
 
@@ -490,7 +490,7 @@ class ExperimentStateManager {
           this.experimentElapsed = state.experimentElapsed;
         }
 
-        Logger.info("已從快照還原狀態");
+        Logger.debug("已從快照還原狀態");
 
         // 更新 UI 元素
         this.updateUIFromSnapshot();
@@ -509,9 +509,9 @@ class ExperimentStateManager {
   _saveSnapshot() {
     try {
       const snapshot = this.getCurrentState();
-      sessionStorage.setItem(
+      localStorage.setItem(
         "experiment_state_snapshot",
-        JSON.stringify(snapshot)
+        JSON.stringify(snapshot),
       );
 
       Logger.debug("已儲存實驗狀態快照");

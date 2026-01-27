@@ -456,6 +456,13 @@ class PanelExperimentSync {
     }
   }
 
+  handleRemoteExperimentStopped(data) {
+    // 使用統一的日誌導出函數（來自 PanelExperimentFlow）
+    if (this.manager?.flow?.exportExperimentLog) {
+      this.manager.flow.exportExperimentLog("remote");
+    }
+  }
+
   /**
    * 套用遠端組合選擇
    */

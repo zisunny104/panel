@@ -41,7 +41,7 @@ class ExperimentLogManager {
 
     // 記錄初始化狀態
     Logger.debug(
-      `日誌管理器建立完成，分頁ID: ${this.tabId}, 本機 IndexedDB 存儲`,
+      `日誌管理器建立完成，分頁ID: ${this.tabId}, 本機 IndexedDB 儲存`,
     );
 
     // 標記初始化完成
@@ -1279,8 +1279,8 @@ class ExperimentLogManager {
       request.onerror = (event) => {
         Logger.error("IndexedDB 初始化失敗:", event.target.error);
         this.db = null;
-        // 降級方案：繼續使用記憶體存儲
-        Logger.warn("將使用記憶體存儲日誌，離線時可能遺失");
+        // 降級方案：繼續使用記憶體儲存
+        Logger.warn("將使用記憶體儲存日誌，離線時可能遺失");
       };
 
       request.onsuccess = (event) => {
@@ -1293,14 +1293,14 @@ class ExperimentLogManager {
       request.onupgradeneeded = (event) => {
         try {
           const db = event.target.result;
-          // 建立 pendingLogs 存儲對象
+          // 建立 pendingLogs 儲存對象
           if (!db.objectStoreNames.contains(this.pendingLogsStore)) {
             const store = db.createObjectStore(this.pendingLogsStore, {
               keyPath: "id",
               autoIncrement: true,
             });
             store.createIndex("timestamp", "timestamp", { unique: false });
-            Logger.info("建立 IndexedDB 存儲對象:", this.pendingLogsStore);
+            Logger.info("建立 IndexedDB 儲存對象:", this.pendingLogsStore);
           }
         } catch (error) {
           Logger.error("IndexedDB upgrade 失敗:", error);
@@ -1309,7 +1309,7 @@ class ExperimentLogManager {
     } catch (error) {
       Logger.error("IndexedDB 初始化異常:", error);
       this.db = null;
-      Logger.warn("將使用記憶體存儲日誌，離線時可能遺失");
+      Logger.warn("將使用記憶體儲存日誌，離線時可能遺失");
     }
   }
 
@@ -1347,7 +1347,7 @@ class ExperimentLogManager {
 
       request.onerror = (event) => {
         Logger.error("從 IndexedDB 還原日誌失敗:", event.target.error);
-        // 降級方案：繼續使用記憶體存儲
+        // 降級方案：繼續使用記憶體儲存
       };
     } catch (error) {
       Logger.error("IndexedDB 還原異常:", error);
@@ -1376,10 +1376,10 @@ class ExperimentLogManager {
 
       request.onerror = (event) => {
         Logger.error("儲存日誌到 IndexedDB 失敗:", event.target.error);
-        // 降級方案：繼續使用記憶體存儲
+        // 降級方案：繼續使用記憶體儲存
       };
     } catch (error) {
-      Logger.error("存儲日誌到 IndexedDB 異常:", error);
+      Logger.error("儲存日誌到 IndexedDB 異常:", error);
     }
   }
 

@@ -63,16 +63,21 @@ class ButtonManager {
     try {
       const response = await fetch("data/buttons.json");
       const data = await response.json();
-      this.buttonFunctionsMap = data;
+
+      // 將 buttons 陣列轉換為 Map 格式
+      if (data.buttons && Array.isArray(data.buttons)) {
+        this.buttonFunctionsMap = {};
+        data.buttons.forEach((button) => {
+          this.buttonFunctionsMap[button.button_id] = button;
+        });
+      } else {
+        this.buttonFunctionsMap = data;
+      }
 
       // 數據載入完成後設置事件監聽器
       this.setupEventListeners();
 
-      if (typeof Logger !== "undefined") {
-        Logger.info("按鈕功能配置載入完成，事件監聽器已設置");
-      } else {
-        console.log("[ButtonManager] 按鈕功能配置載入完成，事件監聽器已設置");
-      }
+      Logger.debug("按鈕功能配置載入完成，事件監聽器已設置");
     } catch (error) {
       console.error("載入按鈕功能配置失敗:", error);
     }
@@ -83,6 +88,22 @@ class ButtonManager {
    */
   clearButtonFunctions() {
     this.buttonFunctionsMap = {};
+  }
+
+  /**
+   * 清除所有按鈕的高亮效果
+   * 移除所有高亮相關的樣式類別
+   */
+  clearAllButtonHighlights() {
+    document.querySelectorAll(".button-overlay").forEach((btn) => {
+      btn.classList.remove("next-step-highlight");
+      btn.classList.remove("next-step-highlight-secondary");
+      btn.classList.remove("next-step-highlight-shift");
+    });
+
+    if (typeof Logger !== "undefined") {
+      Logger.debug("已清除所有按鈕高亮效果");
+    }
   }
 
   // ==========================================
@@ -116,12 +137,22 @@ class ButtonManager {
 
     if (buttonData?.button_functions) {
       if (buttonId === "B1") {
+        // Shift 按鈕特殊處理
         this.isShiftPressed = !this.isShiftPressed;
         button.classList.toggle("shift-active", this.isShiftPressed);
+
+        // 同步更新按鈕覆蓋層的狀態
+        const shiftOverlay = document.querySelector('[data-button="B1"]');
+        if (shiftOverlay) {
+          shiftOverlay.classList.toggle("shift-active", this.isShiftPressed);
+        }
+
         actionMessage = this.isShiftPressed
           ? '模擬按鈕 "B1" (Shift) 按下'
           : '模擬按鈕 "B1" (Shift) 放開';
         functionName = "shift";
+
+        Logger.debug(`Shift 狀態: ${this.isShiftPressed ? "按下" : "放開"}`);
       } else {
         // 其他按鈕處理
         const isShiftActive = this.isShiftPressed || this.isTouchShiftActive;
@@ -262,18 +293,24 @@ class ButtonManager {
    */
   checkAndExecuteExperimentAction(buttonId, functionName) {
     // 檢查實驗是否在執行中
-    if (!window.panelExperiment?.isExperimentRunning) return false;
+    if (!window.panelExperiment?.isExperimentRunning) {
+      Logger.debug(`實驗未執行，跳過按鈕動作: ${buttonId}`);
+      return false;
+    }
+
     // 確保動作管理員已初始化（當實驗開始時自動初始化）
     if (window.actionManager && !window.actionManager.isInitialized) {
+      Logger.debug("actionManager 尚未初始化，開始初始化...");
       // 使用 async 函式但不等待，讓實驗繼續執行
       window.actionManager
         .initializeFromExperiment()
         .then((initialized) => {
-          // Action sequence initialized
+          Logger.debug("actionManager 初始化完成");
         })
         .catch((error) => {
           Logger.error("動作序列初始化失敗:", error);
         });
+      return false;
     }
 
     // 處理動作序列邏輯
@@ -281,7 +318,12 @@ class ButtonManager {
       window.actionManager &&
       window.actionManager.currentActionSequence.length > 0
     ) {
+      Logger.debug(
+        `處理按鈕動作: ${buttonId} -> ${functionName}, 序列長度: ${window.actionManager.currentActionSequence.length}`,
+      );
       return this.handleActionBasedExperiment(buttonId, functionName);
+    } else {
+      Logger.warn("actionManager 不存在或動作序列為空");
     }
 
     return false;
@@ -338,13 +380,21 @@ class ButtonManager {
     );
 
     if (isValidButton) {
+      Logger.debug(
+        `按鈕驗證通過: ${buttonId}/${functionName}, 動作: ${currentAction.actionId}`,
+      );
+
       // 檢查 action 是否有下一步的互動定義
       if (
         currentAction.interactions &&
         currentAction.interactions[functionName]
       ) {
         const interaction = currentAction.interactions[functionName];
-        const nextActionId = interaction.next_actionId;
+        const nextActionId =
+          interaction.next_actionId || interaction.next_action_id;
+        Logger.debug(
+          `找到互動定義: ${functionName} -> ${nextActionId || "無下一個動作"}`,
+        );
 
         if (nextActionId) {
           // 儲存目前 action 用於檢查
@@ -583,6 +633,7 @@ class ButtonManager {
    */
   isButtonValidForAction(buttonId, functionName, action) {
     if (!action || !action.action_buttons) {
+      Logger.debug("動作無效或無 action_buttons");
       return false;
     }
 
@@ -595,6 +646,10 @@ class ButtonManager {
 
     const isValid =
       actionButtons.includes(functionName) || actionButtons.includes(buttonId);
+
+    Logger.debug(
+      `檢查按鈕有效性: ${buttonId}/${functionName}, 期望: [${actionButtons.join(", ")}], 結果: ${isValid}`,
+    );
     return isValid;
   }
 
@@ -602,6 +657,49 @@ class ButtonManager {
    * 更新目前 action 的媒體顯示
    */
   updateMediaForCurrentAction() {
+    // 遵守用戶設定來啟用視覺提示
+    const showTouchVisuals =
+      localStorage.getItem("showTouchVisuals") !== "false";
+    if (
+      showTouchVisuals &&
+      window.panelExperiment?.isExperimentRunning &&
+      !document.body.classList.contains("visual-hints-enabled")
+    ) {
+      document.body.classList.add("visual-hints-enabled");
+    }
+
+    // 檢查是否在等待電源開啟
+    const isWaitingForPowerOn =
+      window.panelExperiment?.waitingForPowerOn || false;
+
+    // 檢查機器是否已開機
+    const isPowerOn = this.isPowerOn();
+
+    // 清除所有按鈕的高亮效果
+    this.clearAllButtonHighlights();
+
+    // 管理按鈕禁用狀態
+    document.querySelectorAll(".button-overlay").forEach((btn) => {
+      // 在等待電源開啟時，新增禁用視覺反饋
+      if (isWaitingForPowerOn) {
+        btn.classList.add("temporarily-disabled");
+      } else {
+        btn.classList.remove("temporarily-disabled");
+      }
+
+      // 機器未開機時，禁用按鈕但不顯示視覺效果
+      if (!isPowerOn) {
+        btn.classList.add("power-off-disabled");
+      } else {
+        btn.classList.remove("power-off-disabled");
+      }
+    });
+
+    // 如果還在等待電源開啟，不需要載入動作信息
+    if (isWaitingForPowerOn || !window.actionManager) {
+      return;
+    }
+
     // 自動跳過沒有 action_buttons 的動作，但先顯示其媒體
     let currentAction = window.actionManager.getCurrentAction();
     while (currentAction && !currentAction.action_buttons) {
@@ -615,14 +713,11 @@ class ButtonManager {
       currentAction = window.actionManager.getCurrentAction();
     }
 
-    // 清除所有按鈕的高亮（包括主次、Shift）
-    document.querySelectorAll(".button-overlay").forEach((btn) => {
-      btn.classList.remove("next-step-highlight");
-      btn.classList.remove("next-step-highlight-secondary");
-      btn.classList.remove("next-step-highlight-shift");
-    });
-
     if (currentAction) {
+      Logger.debug(
+        `目前動作: ${currentAction.actionId}, 按鈕: ${currentAction.action_buttons}`,
+      );
+
       // 顯示媒體
       if (currentAction.media_file && window.mediaManager) {
         window.mediaManager.displayMedia(currentAction.media_file);
@@ -656,20 +751,34 @@ class ButtonManager {
           );
 
           if (hasMatchingFunction) {
+            // 找出匹配的功能名稱
+            const matchedFunction = buttonFunctions.find((func) =>
+              actionButtons.includes(func),
+            );
+            const functionIndex = buttonFunctions.indexOf(matchedFunction);
+
             // 檢查該功能是否在第二位置（需要 Shift）
-            buttonFunctions.forEach((func, index) => {
-              if (actionButtons.includes(func) && index === 1) {
-                requiresShiftFunctions.push(func);
-              }
+            if (functionIndex === 1) {
+              requiresShiftFunctions.push(matchedFunction);
+            }
+
+            matchedButtons.push({
+              btn,
+              buttonId,
+              buttonFunctions,
+              matchedFunction,
             });
-            matchedButtons.push({ btn, buttonId, buttonFunctions });
           }
         });
 
+        Logger.debug(
+          `找到 ${matchedButtons.length} 個匹配按鈕，需要 Shift: ${requiresShiftFunctions.length}`,
+        );
+
         // 按照 interactions 中的順序排序 matchedButtons
         matchedButtons.sort((a, b) => {
-          const aIndex = interactionsOrder.indexOf(a.buttonFunctions[0]);
-          const bIndex = interactionsOrder.indexOf(b.buttonFunctions[0]);
+          const aIndex = interactionsOrder.indexOf(a.matchedFunction);
+          const bIndex = interactionsOrder.indexOf(b.matchedFunction);
           return aIndex - bIndex;
         });
 
@@ -679,10 +788,16 @@ class ButtonManager {
             // 綠色（主按鈕）
             item.btn.classList.add("next-step-highlight");
             item.btn.classList.remove("next-step-highlight-secondary");
+            Logger.debug(
+              `主按鈕高亮: ${item.buttonId} (${item.matchedFunction})`,
+            );
           } else {
             // 橘色（次按鈕）
             item.btn.classList.remove("next-step-highlight");
             item.btn.classList.add("next-step-highlight-secondary");
+            Logger.debug(
+              `次按鈕高亮: ${item.buttonId} (${item.matchedFunction})`,
+            );
           }
           _highlightedCount++;
         });
@@ -695,16 +810,25 @@ class ButtonManager {
         if (requiresShiftFunctions.length > 0 && shiftButton) {
           // Shift 也用綠色高亮（和主按鈕同色）
           shiftButton.classList.add("next-step-highlight");
+          Logger.debug(
+            `Shift 按鈕高亮: 需要的功能 [${requiresShiftFunctions.join(", ")}]`,
+          );
         } else if (shiftButton) {
+          // 只在真正有高亮時才記錄移除日志
+          const hadHighlight =
+            shiftButton.classList.contains("next-step-highlight") ||
+            shiftButton.classList.contains("next-step-highlight-shift");
           shiftButton.classList.remove("next-step-highlight");
           shiftButton.classList.remove("next-step-highlight-shift");
+          if (hadHighlight) {
+            Logger.debug("Shift 按鈕高亮已移除");
+          }
         }
       }
     } else {
-      const powerSwitchArea = document.getElementById("powerSwitchArea");
-      if (powerSwitchArea) {
-        powerSwitchArea.classList.add("next-step-highlight");
-      }
+      // 沒有目前動作時，不進行任何高亮操作
+      // 電源按鈕高亮由 panel-experiment-flow.js 和 panel-experiment-power.js 獨立管理
+      Logger.debug("沒有目前動作，不進行按鈕高亮");
     }
   }
 
@@ -777,19 +901,25 @@ class ButtonManager {
    * 設定滑鼠事件
    */
   setupMouseEvents() {
-    if (typeof Logger !== "undefined") {
-      Logger.debug(
-        `設置 ${document.querySelectorAll(".button-overlay").length} 個按鈕的滑鼠事件監聽器`,
-      );
-    }
+    // 靜默設置按鈕事件監聽器（移除詳細日誌以減少初始化噪音）
     document.querySelectorAll(".button-overlay").forEach((button) => {
-      button.addEventListener("click", (event) => {
+      // 移除舊的事件監聽器，防止重複綁定
+      const oldHandler = button._clickHandler;
+      if (oldHandler) {
+        button.removeEventListener("click", oldHandler);
+      }
+
+      // 創建新的事件處理器並保存引用
+      const newHandler = (event) => {
         if (event.pointerType === "touch" || event.detail === 0) return;
         if (typeof Logger !== "undefined") {
           Logger.debug(`滑鼠點擊按鈕: ${button.dataset.label}`);
         }
         this.simulateButtonClick(button.dataset.label, false);
-      });
+      };
+
+      button._clickHandler = newHandler;
+      button.addEventListener("click", newHandler);
     });
   }
 
@@ -1135,9 +1265,20 @@ class ButtonManager {
       const beepAudio = document.getElementById("beepSound");
       if (beepAudio) {
         beepAudio.currentTime = 0;
-        beepAudio.play().catch((error) => {
-          console.warn("播放提示音失敗:", error);
-        });
+
+        // 嘗試播放，如果失敗則初始化音頻上下文
+        const playPromise = beepAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            // 如果是因為沒有用戶交互導致的錯誤，嘗試初始化音頻上下文
+            if (error.name === "NotAllowedError") {
+              console.warn("音頻播放被阻止，需要用戶交互後才能播放");
+              // 不顯示錯誤訊息給用戶，因為這是正常的瀏覽器行為
+            } else {
+              console.warn("播放提示音失敗:", error);
+            }
+          });
+        }
       }
     }
   }

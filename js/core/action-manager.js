@@ -141,13 +141,13 @@ class ActionManager {
       this.completedActions.delete(action.actionId);
     });
 
-    // 重新計算當前進度
+    // 重新計算目前進度
     this.updateCurrentIndex();
     Logger.info(`步驟取消: ${stepId}`);
   }
 
   /**
-   * 更新當前動作索引
+   * 更新目前動作索引
    */
   updateCurrentIndex() {
     for (let i = 0; i < this.currentActionSequence.length; i++) {
@@ -280,7 +280,30 @@ class ActionManager {
       window.buttonManager.updateMediaForCurrentAction();
     }
 
+    // 檢查是否所有動作都已完成
+    if (this.currentActionIndex >= this.currentActionSequence.length) {
+      Logger.debug("所有動作已完成，觸發實驗結束邏輯");
+      this.onAllActionsCompleted();
+    }
+
     return true;
+  }
+
+  /**
+   * 當所有動作完成時的回調
+   */
+  onAllActionsCompleted() {
+    // Panel 模式：觸發實驗流程控制器的實驗結束邏輯
+    if (this.options.pageType === "panel" && window.panelExperiment?.flow) {
+      Logger.debug("Panel 模式：觸發 handleExperimentEnd");
+      window.panelExperiment.flow.handleExperimentEnd();
+    }
+    // Experiment 模式：觸發相應的事件或回調
+    else if (this.options.pageType === "experiment") {
+      Logger.debug("Experiment 模式：所有動作已完成");
+      // 可以在這裡新增 experiment.html 的相應處理
+      document.dispatchEvent(new CustomEvent("allActionsCompleted"));
+    }
   }
 
   /**
@@ -422,3 +445,9 @@ class ActionManager {
 
 // 匯出給全域使用
 window.ActionManager = ActionManager;
+
+// 自動建立全域實例
+if (!window.actionManager) {
+  window.actionManager = new ActionManager();
+  Logger.debug("ActionManager 全域實例已自動建立");
+}

@@ -21,6 +21,11 @@ class PanelManager {
         button: null,
         closeButton: null,
       },
+      logger: {
+        element: null,
+        button: null,
+        closeButton: null,
+      },
     };
 
     this.initializePanels();
@@ -72,6 +77,11 @@ class PanelManager {
     this.panels.experiment.closeButton = document.getElementById(
       "closeExperimentPanel",
     );
+
+    this.panels.logger.element = document.getElementById("loggerOutput");
+    this.panels.logger.button = document.getElementById("loggerFabButton");
+    this.panels.logger.closeButton =
+      document.getElementById("closeLoggerPanel");
   }
 
   /**
@@ -107,6 +117,22 @@ class PanelManager {
         e.preventDefault();
         e.stopPropagation();
         this.closePanel("experiment");
+      });
+    }
+
+    if (this.panels.logger.button) {
+      this.panels.logger.button.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.togglePanel("logger");
+      });
+    }
+
+    if (this.panels.logger.closeButton) {
+      this.panels.logger.closeButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.closePanel("logger");
       });
     }
 
@@ -181,7 +207,9 @@ class PanelManager {
       panel.element.style.display = "block";
       // 對齊到設定切換按鈕，避免 UI 縮放時垂直位置偏移
       this.alignPanelToButton("settings");
-    } else if (panelName === window.SyncManager?.PAGE?.EXPERIMENT) {
+    } else if (panelName === "experiment") {
+      panel.element.style.display = "block";
+    } else if (panelName === "logger") {
       panel.element.style.display = "block";
     }
 
@@ -206,7 +234,20 @@ class PanelManager {
     if (panelName === "settings") {
       panel.element.classList.add("hidden");
       panel.element.style.display = "none";
-    } else if (panelName === window.SyncManager?.PAGE?.EXPERIMENT) {
+
+      // 關閉設定面板後，確保視覺提示狀態得到保留
+      const uiManager = window.uiControlsManager;
+      if (uiManager) {
+        const showTouchVisuals =
+          localStorage.getItem("showTouchVisuals") !== "false";
+        if (showTouchVisuals) {
+          // 確保視覺提示class被保留
+          document.body.classList.add("visual-hints-enabled");
+        }
+      }
+    } else if (panelName === "experiment") {
+      panel.element.style.display = "none";
+    } else if (panelName === "logger") {
       panel.element.style.display = "none";
     }
 

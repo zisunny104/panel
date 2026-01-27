@@ -9,12 +9,16 @@
     "settings": {
         "mainScale": 1.29,
         "topSpacerHeight": 5,
+        "bottomSpacerHeight": 3,
+        "powerSwitchScale": 0.9,
         "showButtonLabels": false,
         "showButtonColors": false,
         "showTouchVisuals": true,
         "showMediaAreaMarker": false,
         "showMediaContent": true,
-        "playBeepSound": true
+        "playBeepSound": true,
+        "beepVolume": 50,
+        "mediaVolume": 70
     },
     "multiScreenSync": {
         "description": "多裝置同步設定（超時時間由後端.env控制）",
