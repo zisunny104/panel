@@ -1,22 +1,18 @@
 /**
- * SyncClient - 同步客戶端 (WebSocket + REST API 混合架構)
+ * SyncClient - 同步客戶端
  *
- * 架構說明：
- * - REST API: 工作階段的建立、加入、查詢等操作
- * - WebSocket: 即時狀態同步、客戶端上下線通知
- * - sessionStorage: 用於同一分頁內的狀態恢復（重新整理後自動恢復連線）
- *
- * URL 自動偵測：
- * - 測試環境: localhost
- * - 生產環境: 自動使用目前網域
- * - Port 固定: 7645
+ * 功能：
+ * - WebSocket + REST API 混合架構處理同步功能
+ * - 工作階段管理：建立、加入、還原工作階段
+ * - 狀態同步：即時狀態更新和事件通知
+ * - 心跳檢測：伺服器連線狀態監控
+ * - 分享代碼：產生和管理工作階段分享代碼
  */
 
 // 防止重複載入
 if (typeof window !== "undefined" && window.SyncClient) {
   console.warn("已載入，跳過重複載入");
 } else {
-  // 類別定義
   class SyncClient {
     constructor(config = {}) {
       // API 端點配置
@@ -30,7 +26,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         autoReconnect: true
       };
 
-      // 狀態
+      // 連線和狀態管理
       this.sessionId = null;
       this.clientId = null;
       this.role = window.SyncManager?.ROLE?.LOCAL;
@@ -45,7 +41,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
       // 心跳檢測定時器（本機模式也需要，用於指示器）
       this.healthCheckTimer = null;
-      this.healthCheckInterval = 10000; // 10秒（輕量級即時檢查）
+      this.healthCheckInterval = 10000; // 10秒
       this.healthCheckMethod = "lightweight"; // "lightweight" 或 "websocket"
 
       // 如果有儲存的 sessionId，代表之前加入過工作階段，需要恢復
@@ -58,7 +54,7 @@ if (typeof window !== "undefined" && window.SyncClient) {
         this.startHeartbeatCheck();
       }
 
-      // 無論是否初始化同步，都監聽全域工作階段失效事件
+      // 監聽全域工作階段失效事件
       this.setupGlobalEventHandlers();
     }
 
@@ -74,13 +70,9 @@ if (typeof window !== "undefined" && window.SyncClient) {
           originalError
         });
 
-        // 標記工作階段已失效
         this.sessionInvalid = true;
-
-        // 清理工作階段相關的儲存資訊
         this.clearInvalidSessionData();
 
-        // 觸發工作階段失效事件
         window.dispatchEvent(
           new CustomEvent("sync_session_invalid", {
             detail: {
@@ -104,20 +96,17 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
       Logger.info("初始化同步功能...");
 
-      // 停止心跳檢測（切換到 WebSocket 狀態監聆）
+      // 停止心跳檢測（切換到 WebSocket 狀態監聽）
       this.stopHealthCheck();
 
-      // 建立 WebSocket 客戶端
       this.wsClient = new WebSocketClient(this.wsConfig);
-
-      // 設定 WebSocket 事件處理
       this.setupWebSocketHandlers();
 
       // 同步模式使用 WebSocket 狀態，不需要額外的 HTTP 心跳檢測
       this.healthCheckMethod = "websocket";
 
       this.initialized = true;
-      Logger.info("同步功能初始化完成，切換到 WebSocket 狀態監聴");
+      Logger.info("同步功能初始化完成，切換到 WebSocket 狀態監聽");
     }
 
     /**
@@ -128,7 +117,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
       const protocol = window.location.protocol;
       const host = window.location.host; // 包含 hostname 和 port
 
-      // 根據環境決定 API 路徑前綴
       const basePath = this.getApiBasePath();
 
       return `${protocol}//${host}${basePath}`;
@@ -138,17 +126,14 @@ if (typeof window !== "undefined" && window.SyncClient) {
      * 取得 API 路徑前綴（參考 QR Code 的動態路徑邏輯，完全避免硬編碼）
      */
     getApiBasePath() {
-      // 根據頁面路徑動態決定 API 前綴（完全動態，無硬編碼）
+      // 根據頁面路徑動態決定 API 前綴
       const pathname = window.location.pathname;
 
-      // 取得頁面所在的目錄路徑
       let basePath = pathname;
       if (!basePath.endsWith("/")) {
-        // 如果包含檔名，移除檔名部分
         basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
       }
 
-      // 確保以 / 結尾
       if (!basePath.endsWith("/")) {
         basePath += "/";
       }
@@ -162,7 +147,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
      * 設定 WebSocket 事件處理器
      */
     setupWebSocketHandlers() {
-      // 認證成功
       this.wsClient.on("authenticated", (data) => {
         Logger.debug("WebSocket 認證成功", data);
         this.connected = true;
@@ -171,7 +155,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
         this.role = data.role;
         this.saveState();
 
-        // 觸發連線成功事件
         window.dispatchEvent(
           new CustomEvent("sync_connected", {
             detail: data
@@ -179,7 +162,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
         );
       });
 
-      // 重新連接成功
       this.wsClient.on("reconnected", (data) => {
         Logger.debug("WebSocket 重新連接成功", data);
         this.connected = true;
@@ -191,7 +173,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
         );
       });
 
-      // 斷線
       this.wsClient.on("disconnected", (data) => {
         Logger.info("WebSocket 已斷線", data);
         this.connected = false;
@@ -203,13 +184,11 @@ if (typeof window !== "undefined" && window.SyncClient) {
         );
       });
 
-      // 狀態更新
       this.wsClient.on("state_update", (data) => {
         Logger.debug("收到狀態更新", data);
         this.triggerStateUpdate(data.state);
       });
 
-      // 客戶端加入
       this.wsClient.on("client_joined", (data) => {
         Logger.debug("新客戶端加入", data);
         window.dispatchEvent(
@@ -219,7 +198,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
         );
       });
 
-      // 客戶端退出
       this.wsClient.on("client_left", (data) => {
         Logger.debug("客戶端退出", data);
         window.dispatchEvent(
@@ -229,7 +207,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
         );
       });
 
-      // 客戶端重新連接
       this.wsClient.on("client_reconnected", (data) => {
         Logger.debug("客戶端重新連接", data);
         window.dispatchEvent(
@@ -239,23 +216,15 @@ if (typeof window !== "undefined" && window.SyncClient) {
         );
       });
 
-      // 伺服器錯誤
       this.wsClient.on("server_error", (data) => {
         Logger.error("伺服器錯誤", data);
 
-        // 檢查是否為工作階段不存在錯誤
         if (data && data.message && data.message.includes("工作階段不存在")) {
-          Logger.warn(
-            "偵測到工作階段不存在錯誤，自動清理工作階段資訊"
-          );
+          Logger.warn("偵測到工作階段不存在錯誤，自動清理工作階段資訊");
 
-          // 標記工作階段已失效
           this.sessionInvalid = true;
-
-          // 清理工作階段相關的儲存資訊
           this.clearInvalidSessionData();
 
-          // 觸發工作階段失效事件
           window.dispatchEvent(
             new CustomEvent("sync_session_invalid", {
               detail: {
@@ -273,57 +242,56 @@ if (typeof window !== "undefined" && window.SyncClient) {
         );
       });
 
-      // 實驗事件 - experiment_started
+      // 實驗開始事件
       this.wsClient.on("experiment_started", (data) => {
         Logger.debug("收到實驗開始事件", data);
         window.dispatchEvent(
-          new CustomEvent("remote_experiment_started", {
+          new CustomEvent("experiment_started", {
             detail: data
           })
         );
       });
 
-      // 實驗事件 - experiment_paused
+      // 實驗暫停事件
       this.wsClient.on("experiment_paused", (data) => {
         Logger.debug("收到實驗暫停事件", data);
         window.dispatchEvent(
-          new CustomEvent("remote_experiment_paused", {
+          new CustomEvent("experiment_paused", {
             detail: data
           })
         );
       });
 
-      // 實驗事件 - experiment_resumed
+      // 實驗恢復事件
       this.wsClient.on("experiment_resumed", (data) => {
         Logger.debug("收到實驗恢復事件", data);
         window.dispatchEvent(
-          new CustomEvent("remote_experiment_resumed", {
+          new CustomEvent("experiment_resumed", {
             detail: data
           })
         );
       });
 
-      // 實驗事件 - experiment_stopped
+      // 實驗停止事件
       this.wsClient.on("experiment_stopped", (data) => {
         Logger.debug("收到實驗停止事件", data);
         window.dispatchEvent(
-          new CustomEvent("remote_experiment_stopped", {
+          new CustomEvent("experiment_stopped", {
             detail: data
           })
         );
       });
 
-      // 實驗事件 - experiment_id_update
-      this.wsClient.on("experiment_id_update", (data) => {
-        Logger.debug("收到實驗ID更新事件", data);
+      // 實驗ID變化事件
+      this.wsClient.on("experiment_id_changed", (data) => {
+        Logger.debug("收到實驗ID變化事件", data);
         window.dispatchEvent(
-          new CustomEvent("experiment_id_updated", {
+          new CustomEvent("experiment_id_changed", {
             detail: data
           })
         );
       });
 
-      // 工作階段狀態更新
       this.wsClient.on("session_state", (data) => {
         Logger.debug("收到工作階段狀態", data);
         window.dispatchEvent(
@@ -344,7 +312,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
         // 首次建立工作階段，初始化同步功能
         this.initializeSync();
 
-        // 檢查伺服器狀態
         await this.checkServerHealth();
         if (!this.serverOnline) {
           throw new Error("伺服器離線，無法建立工作階段");
@@ -368,7 +335,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
         const data = await response.json();
 
-        // 儲存工作階段資訊
         this.sessionId = data.data.sessionId;
         this.clientId = data.data.clientId;
         this.role = data.data.role; // 伺服器回傳的角色（operator）
@@ -401,7 +367,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
           throw new Error("尚未加入工作階段");
         }
 
-        // 檢查伺服器狀態
         await this.checkServerHealth();
         if (!this.serverOnline) {
           throw new Error("伺服器離線，無法產生分享代碼");
@@ -461,7 +426,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
         // 首次加入工作階段，初始化同步功能
         this.initializeSync();
 
-        // 檢查伺服器狀態
         await this.checkServerHealth();
         if (!this.serverOnline) {
           throw new Error("伺服器離線，無法加入工作階段");
@@ -487,7 +451,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
         const data = await response.json();
 
-        // 儲存工作階段資訊
         this.sessionId = data.data.sessionId;
         this.clientId = data.data.clientId;
         this.role = data.data.role;
@@ -525,13 +488,11 @@ if (typeof window !== "undefined" && window.SyncClient) {
           return false;
         }
 
-        // 檢查是否有儲存的狀態
         if (!this.sessionId || !this.clientId) {
           Logger.debug("沒有可還原的工作階段");
           return false;
         }
 
-        // 檢查伺服器狀態
         await this.checkServerHealth();
         if (!this.serverOnline) {
           throw new Error("伺服器離線，無法還原工作階段");
@@ -672,7 +633,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
      * @returns {boolean}
      */
     syncState(state) {
-      // 檢查是否已初始化同步功能
       if (!this.initialized || !this.wsClient) {
         Logger.debug("本機模式，跳過狀態同步");
         return false;
@@ -786,7 +746,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
       Logger.debug("啟動心跳檢測 (10秒間隔)");
 
-      // 立即檢查一次
       this.checkServerHealth();
 
       // 定時檢查 (10秒)
@@ -797,13 +756,12 @@ if (typeof window !== "undefined" && window.SyncClient) {
 
     /**
      * 啟動心跳檢測定時器（舊版，保留相容）
+     * @deprecated 使用 startHeartbeatCheck() 替代
      */
     startHealthCheck() {
       // 同步模式不需要 HTTP 心跳檢測，直接回傳
       if (this.healthCheckMethod === "websocket") {
-        Logger.debug(
-          "同步模式，使用 WebSocket 狀態監視，不啟動 HTTP 心跳檢測"
-        );
+        Logger.debug("同步模式，使用 WebSocket 狀態監視，不啟動 HTTP 心跳檢測");
         return;
       }
 
@@ -948,13 +906,6 @@ if (typeof window !== "undefined" && window.SyncClient) {
     }
 
     /**
-     * 取得 WebSocket 狀態（用於除錯）
-     */
-    getWebSocketState() {
-      return this.wsClient.getState();
-    }
-
-    /**
      * 清理無效的工作階段資料
      * 當伺服器回報工作階段不存在時呼叫
      */
@@ -962,14 +913,9 @@ if (typeof window !== "undefined" && window.SyncClient) {
       try {
         Logger.info("清理無效的工作階段資料");
 
-        // 清除 localStorage 中的工作階段資訊
-        localStorage.removeItem("sync_session_id");
-        localStorage.removeItem("sync_session_backup");
-        localStorage.removeItem("sync_client_id");
-
-        // 清除 sessionStorage 中的工作階段資訊
-        sessionStorage.removeItem("sync_session_id");
-        sessionStorage.removeItem("sync_client_id");
+        // 清除 sessionStorage 中的工作階段資訊（與 saveState 方法保持一致）
+        sessionStorage.removeItem("sync_sessionId");
+        sessionStorage.removeItem("sync_clientId");
         sessionStorage.removeItem("sync_role");
 
         // 重置內部狀態
@@ -1000,8 +946,3 @@ if (typeof window !== "undefined" && window.SyncClient) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = SyncClient;
 }
-
-
-
-
-

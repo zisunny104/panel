@@ -7,7 +7,7 @@
 class ExperimentStateManager {
   constructor() {
     this.experimentId = null;
-    this.subjectName = null;
+    this.participantName = null;
     this.currentCombination = null;
     this.loadedUnits = [];
     this.isExperimentRunning = false;
@@ -22,29 +22,27 @@ class ExperimentStateManager {
     this.listeners = new Map();
 
     // 從 sessionStorage 還原狀態快照
-    this._restoreSnapshot();
+    this.restoreSnapshot();
 
     // 初始化同步
-    this._setupSync();
+    this.setupSync();
   }
 
   /**
    * 設定同步處理器
-   * @private
    */
-  _setupSync() {
+  setupSync() {
     // 監聽輸入框變化
-    this._setupInputSync();
+    this.setupInputSync();
 
     // 監聽中樞狀態更新
-    this._setupHubSync();
+    this.setupHubSync();
   }
 
   /**
    * 設定輸入框同步
-   * @private
    */
-  _setupInputSync() {
+  setupInputSync() {
     // 實驗ID輸入框
     const experimentIdInput = document.getElementById("experimentIdInput");
     if (experimentIdInput) {
@@ -69,34 +67,33 @@ class ExperimentStateManager {
     }
 
     // 受試者名稱輸入框
-    const subjectNameInput = document.getElementById("subjectName");
-    if (subjectNameInput) {
-      subjectNameInput.addEventListener("input", (e) => {
+    const participantNameInput = document.getElementById("participantName");
+    if (participantNameInput) {
+      participantNameInput.addEventListener("input", (e) => {
         const newName = e.target.value.trim();
-        if (newName !== this.subjectName) {
-          this.setSubjectName(newName, "input");
+        if (newName !== this.participantName) {
+          this.setParticipantName(newName, "input");
         }
       });
 
-      subjectNameInput.addEventListener("change", (e) => {
+      participantNameInput.addEventListener("change", (e) => {
         const newName = e.target.value.trim();
-        if (newName !== this.subjectName) {
-          this.setSubjectName(newName, "input");
+        if (newName !== this.participantName) {
+          this.setParticipantName(newName, "input");
         }
       });
 
       // 初始化時從輸入框讀取
-      if (subjectNameInput.value.trim() && !this.subjectName) {
-        this.subjectName = subjectNameInput.value.trim();
+      if (participantNameInput.value.trim() && !this.participantName) {
+        this.participantName = participantNameInput.value.trim();
       }
     }
   }
 
   /**
    * 設定中樞同步
-   * @private
    */
-  _setupHubSync() {
+  setupHubSync() {
     // 監聽中樞狀態更新事件
     document.addEventListener("hub_state_updated", (event) => {
       const { state } = event.detail;
@@ -104,15 +101,15 @@ class ExperimentStateManager {
     });
 
     // 監聽中樞實驗ID更新
-    document.addEventListener("experiment_id_updated", (event) => {
+    document.addEventListener("experiment_id_changed", (event) => {
       const { experimentId } = event.detail;
       this.setExperimentId(experimentId, "hub");
     });
 
     // 監聽中樞受試者名稱更新
-    document.addEventListener("subject_name_updated", (event) => {
-      const { subjectName } = event.detail;
-      this.setSubjectName(subjectName, "hub");
+    document.addEventListener("participant_name_updated", (event) => {
+      const { participantName } = event.detail;
+      this.setParticipantName(participantName, "hub");
     });
   }
 
@@ -124,25 +121,27 @@ class ExperimentStateManager {
     if (state.experimentId !== undefined) {
       this.setExperimentId(state.experimentId, "hub_state");
     }
-    if (state.subjectName !== undefined) {
-      this.setSubjectName(state.subjectName, "hub_state");
+    if (state.participantName !== undefined) {
+      this.setParticipantName(state.participantName, "hub_state");
     }
     if (state.currentCombination !== undefined) {
       this.setCurrentCombination(state.currentCombination, "hub_state");
     }
     if (state.loadedUnits !== undefined) {
       this.loadedUnits = [...state.loadedUnits];
-      this._emit("loadedUnitsChanged", this.loadedUnits);
+      this.emit("loadedUnitsChanged", this.loadedUnits);
     }
     if (state.isExperimentRunning !== undefined) {
       this.isExperimentRunning = state.isExperimentRunning;
-      this._emit("experimentRunningChanged", this.isExperimentRunning);
+      this.emit("experimentRunningChanged", this.isExperimentRunning);
     }
     if (state.experimentPaused !== undefined) {
       this.experimentPaused = state.experimentPaused;
-      this._emit("experimentPausedChanged", this.experimentPaused);
+      this.emit("experimentPausedChanged", this.experimentPaused);
     }
   }
+
+  // ============ 狀態設定方法 ============
 
   /**
    * 設定實驗ID
@@ -170,9 +169,11 @@ class ExperimentStateManager {
       }
 
       // 分發事件
-      this._emit("experimentIdChanged", { experimentId, oldId, source });
+      this.emit("experimentIdChanged", { experimentId, oldId, source });
     }
   }
+
+  // ============ 狀態取得方法 ============
 
   /**
    * 取得實驗ID
@@ -210,23 +211,30 @@ class ExperimentStateManager {
 
   /**
    * 設定受試者名稱
-   * @param {string} subjectName - 新的受試者名稱
+   * @param {string} participantName - 新的受試者名稱
    * @param {string} source - 更新來源
    */
-  setSubjectName(subjectName, source = "unknown") {
-    if (this.subjectName !== subjectName) {
-      const oldName = this.subjectName;
-      this.subjectName = subjectName;
-      Logger.info(`受試者名稱已更新 (${source}): ${subjectName}`);
+  setParticipantName(participantName, source = "unknown") {
+    if (this.participantName !== participantName) {
+      const oldName = this.participantName;
+      this.participantName = participantName;
+      Logger.info(`受試者名稱已更新 (${source}): ${participantName}`);
 
       // 同步更新輸入框
-      const subjectNameInput = document.getElementById("subjectName");
-      if (subjectNameInput && subjectNameInput.value.trim() !== subjectName) {
-        subjectNameInput.value = subjectName;
+      const participantNameInput = document.getElementById("participantName");
+      if (
+        participantNameInput &&
+        participantNameInput.value.trim() !== participantName
+      ) {
+        participantNameInput.value = participantName;
       }
 
       // 分發事件
-      this._emit("subjectNameChanged", { subjectName, oldName, source });
+      this.emit("participantNameChanged", {
+        participantName,
+        oldName,
+        source
+      });
     }
   }
 
@@ -234,8 +242,8 @@ class ExperimentStateManager {
    * 取得受試者名稱
    * @returns {string|null} 目前的受試者名稱
    */
-  getSubjectName() {
-    return this.subjectName;
+  getParticipantName() {
+    return this.participantName;
   }
 
   /**
@@ -254,13 +262,15 @@ class ExperimentStateManager {
       );
 
       // 分發事件
-      this._emit("currentCombinationChanged", {
+      this.emit("currentCombinationChanged", {
         combination,
         oldCombination,
         source
       });
     }
   }
+
+  // ============ 實驗控制方法 ============
 
   /**
    * 開始實驗
@@ -277,18 +287,18 @@ class ExperimentStateManager {
 
       // 初始化日誌管理器
       if (window.experimentLogManager) {
-        const defaultSubjectName =
-          this.subjectName || `受試者_${this.experimentId}`;
+        const defaultParticipantName =
+          this.participantName || `受試者_${this.experimentId}`;
         window.experimentLogManager.initialize(
           this.experimentId,
-          defaultSubjectName
+          defaultParticipantName
         );
         window.experimentLogManager.logExperimentStart();
       }
 
-      this._emit("experimentStarted", {
+      this.emit("experimentStarted", {
         experimentId: this.experimentId,
-        subjectName: this.subjectName,
+        participantName: this.participantName,
         combination: this.currentCombination
       });
     }
@@ -309,9 +319,9 @@ class ExperimentStateManager {
         window.experimentLogManager.flushAll();
       }
 
-      this._emit("experimentStopped", {
+      this.emit("experimentStopped", {
         experimentId: this.experimentId,
-        subjectName: this.subjectName
+        participantName: this.participantName
       });
     }
   }
@@ -328,7 +338,7 @@ class ExperimentStateManager {
         window.experimentLogManager.logExperimentPause();
       }
 
-      this._emit("experimentPaused", {
+      this.emit("experimentPaused", {
         experimentId: this.experimentId
       });
     }
@@ -346,7 +356,7 @@ class ExperimentStateManager {
         window.experimentLogManager.logExperimentResume();
       }
 
-      this._emit("experimentResumed", {
+      this.emit("experimentResumed", {
         experimentId: this.experimentId
       });
     }
@@ -380,7 +390,7 @@ class ExperimentStateManager {
   getCurrentState() {
     return {
       experimentId: this.experimentId,
-      subjectName: this.subjectName,
+      participantName: this.participantName,
       currentCombination: this.currentCombination,
       loadedUnits: this.loadedUnits,
       isExperimentRunning: this.isExperimentRunning,
@@ -389,6 +399,8 @@ class ExperimentStateManager {
       experimentElapsed: this.experimentElapsed
     };
   }
+
+  // ============ 事件管理方法 ============
 
   /**
    * 監聽狀態變化
@@ -419,9 +431,8 @@ class ExperimentStateManager {
 
   /**
    * 分發事件
-   * @private
    */
-  _emit(event, data) {
+  emit(event, data) {
     if (this.listeners.has(event)) {
       this.listeners.get(event).forEach((callback) => {
         try {
@@ -443,73 +454,46 @@ class ExperimentStateManager {
     this._saveSnapshot();
   }
 
+  // ============ 快照管理方法 ============
+
   /**
    * 從 sessionStorage 還原狀態快照
-   * @private
    */
-  _restoreSnapshot() {
+  restoreSnapshot() {
     try {
       const snapshot = sessionStorage.getItem("experiment_state_snapshot");
       if (snapshot) {
         const state = JSON.parse(snapshot);
 
-        // 詳細記錄還原的內容
-        const restoredFields = [];
         if (state.experimentId !== undefined) {
           this.experimentId = state.experimentId;
-          restoredFields.push(`experimentId: ${state.experimentId}`);
         }
-        if (state.subjectName !== undefined) {
-          this.subjectName = state.subjectName;
-          restoredFields.push(`subjectName: ${state.subjectName}`);
+        if (state.participantName !== undefined) {
+          this.participantName = state.participantName;
         }
         if (state.currentCombination !== undefined) {
           this.currentCombination = state.currentCombination;
-          restoredFields.push(
-            `currentCombination: ${state.currentCombination}`
-          );
         }
         if (state.loadedUnits !== undefined) {
           this.loadedUnits = [...state.loadedUnits];
-          restoredFields.push(`loadedUnits: [${state.loadedUnits.join(", ")}]`);
         }
         if (state.isExperimentRunning !== undefined) {
           this.isExperimentRunning = state.isExperimentRunning;
-          restoredFields.push(
-            `isExperimentRunning: ${state.isExperimentRunning}`
-          );
         }
         if (state.experimentPaused !== undefined) {
           this.experimentPaused = state.experimentPaused;
-          restoredFields.push(`experimentPaused: ${state.experimentPaused}`);
         }
         if (state.experimentStartTime !== undefined) {
           this.experimentStartTime = state.experimentStartTime;
-          restoredFields.push(
-            `experimentStartTime: ${
-              state.experimentStartTime
-                ? window.timeSyncManager.formatDateTime(
-                    state.experimentStartTime
-                  )
-                : "未開始"
-            }`
-          );
         }
         if (state.experimentElapsed !== undefined) {
           this.experimentElapsed = state.experimentElapsed;
-          restoredFields.push(
-            `experimentElapsed: ${state.experimentElapsed}ms`
-          );
         }
 
-        if (restoredFields.length > 0) {
-          Logger.info(`從快照還原狀態: ${restoredFields.join(", ")}`);
-        } else {
-          Logger.debug("從快照還原狀態 (無需還原字段)");
-        }
+        Logger.info("已從快照還原狀態");
 
         // 更新 UI 元素
-        this._updateUIFromSnapshot();
+        this.updateUIFromSnapshot();
       } else {
         Logger.debug("沒有快照可還原");
       }
@@ -530,26 +514,7 @@ class ExperimentStateManager {
         JSON.stringify(snapshot)
       );
 
-      // 詳細記錄儲存的內容
-      const savedFields = [];
-      if (snapshot.experimentId)
-        savedFields.push(`experimentId: ${snapshot.experimentId}`);
-      if (snapshot.subjectName)
-        savedFields.push(`subjectName: ${snapshot.subjectName}`);
-      if (snapshot.currentCombination)
-        savedFields.push(`currentCombination: ${snapshot.currentCombination}`);
-      if (snapshot.loadedUnits?.length)
-        savedFields.push(`loadedUnits: [${snapshot.loadedUnits.join(", ")}]`);
-      if (snapshot.isExperimentRunning !== undefined)
-        savedFields.push(
-          `isExperimentRunning: ${snapshot.isExperimentRunning}`
-        );
-      if (snapshot.experimentPaused !== undefined)
-        savedFields.push(`experimentPaused: ${snapshot.experimentPaused}`);
-      if (snapshot.experimentElapsed !== undefined)
-        savedFields.push(`experimentElapsed: ${snapshot.experimentElapsed}ms`);
-
-      Logger.debug(`已儲存實驗狀態快照: ${savedFields.join(", ")}`);
+      Logger.debug("已儲存實驗狀態快照");
     } catch (error) {
       Logger.error("儲存狀態快照失敗:", error);
     }
@@ -557,9 +522,8 @@ class ExperimentStateManager {
 
   /**
    * 從快照更新 UI 元素
-   * @private
    */
-  _updateUIFromSnapshot() {
+  updateUIFromSnapshot() {
     // 更新實驗ID輸入框
     const experimentIdInput = document.getElementById("experimentIdInput");
     if (experimentIdInput && this.experimentId) {
@@ -567,9 +531,9 @@ class ExperimentStateManager {
     }
 
     // 更新受試者名稱輸入框
-    const subjectNameInput = document.getElementById("subjectName");
-    if (subjectNameInput && this.subjectName) {
-      subjectNameInput.value = this.subjectName;
+    const participantNameInput = document.getElementById("participantName");
+    if (participantNameInput && this.participantName) {
+      participantNameInput.value = this.participantName;
     }
   }
 }
@@ -583,8 +547,3 @@ class ExperimentStateManager {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ExperimentStateManager;
 }
-
-
-
-
-

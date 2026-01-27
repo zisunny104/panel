@@ -442,20 +442,20 @@
 }
 
 /* 受試者名稱欄位樣式 */
-.experiment-subject-row {
+.experiment-participant-row {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 0.5rem;
 }
 
-.experiment-subject-row label {
+.experiment-participant-row label {
     color: #ccc;
     white-space: nowrap;
     font-size: 0.9rem;
 }
 
-.experiment-subject-input {
+.experiment-participant-input {
     flex: 1;
     padding: 8px 12px;
     border: 1px solid #555;
@@ -467,11 +467,11 @@
     transition: border-color 0.2s;
 }
 
-.experiment-subject-input:focus {
+.experiment-participant-input:focus {
     border-color: #ff8c00;
 }
 
-.experiment-subject-input::placeholder {
+.experiment-participant-input::placeholder {
     color: #888;
 }
 

@@ -1,10 +1,10 @@
-// panel-logger.js - 操作日誌記錄功能模塊
-
 /**
- * LogPanel 類別 - 負責操作日誌記錄、顯示和管理
+ * PanelLogger - 操作日誌記錄功能模塊
+ *
+ * 負責操作日誌記錄、顯示和管理
  * 提供日誌記錄、面板控制、匯出等功能
  */
-class LogPanel {
+class PanelLogger {
   // ==================== 建構子與初始化 ====================
 
   /**
@@ -24,7 +24,7 @@ class LogPanel {
         Logger.debug &&
         Logger.debug("FAB 被點擊", { target: evt.target });
       try {
-        this._toggleLogger();
+        this.toggleLogger();
       } catch (err) {
         console.error("FAB 點擊處理錯誤：", err);
       }
@@ -42,12 +42,12 @@ class LogPanel {
   initializeDOMElements() {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", () => {
-        this._setupDOMElements();
+        this.setupDOMElements();
         this.setupEventListeners();
         this.initializeLoggerState();
       });
     } else {
-      this._setupDOMElements();
+      this.setupDOMElements();
       this.setupEventListeners();
       this.initializeLoggerState();
     }
@@ -56,7 +56,7 @@ class LogPanel {
   /**
    * 設置 DOM 元素引用
    */
-  _setupDOMElements() {
+  setupDOMElements() {
     this.loggerOutput = document.getElementById("loggerOutput");
     this.logContent = document.getElementById("logContent");
     this.loggerFabButton = document.getElementById("loggerFabButton");
@@ -66,19 +66,7 @@ class LogPanel {
    * 偵測是否在實驗模式
    */
   isExperimentMode() {
-    const startExperimentButton = document.getElementById("startExperimentBtn");
-    if (
-      startExperimentButton &&
-      startExperimentButton.style.display === "none"
-    ) {
-      return true;
-    }
-
-    if (window.experiment && window.experiment.isExperimentRunning) {
-      return true;
-    }
-
-    return false;
+    return window.experiment?.isExperimentRunning || false;
   }
 
   /**
@@ -179,9 +167,15 @@ class LogPanel {
       functionName
     );
 
+    // 取得裝置ID
+    const clientId = window.syncManager?.core?.syncClient?.clientId ||
+                    window.panelExperiment?.clientId ||
+                    "panel_device";
+
     const logEntry = {
       timestamp,
       formatted_time: formattedTime,
+      client_id: clientId,
       action: actionMessage,
       action_type: actionType.type,
       is_experiment_relevant: actionType.isExperimentRelevant,
@@ -366,18 +360,21 @@ class LogPanel {
           this.showCopySuccess();
         })
         .catch((err) => {
-          Logger.error("Clipboard API 複製失敗:", err);
-          console.error("複製失敗，請手動選取並複製日誌內容");
-          this.showCopyError();
+          this.handleCopyError("Clipboard API 複製失敗");
         });
     } else {
       // Clipboard API 不可用，顯示錯誤
-      Logger.error("瀏覽器不支持複製功能");
-      console.error(
-        "您的瀏覽器不支持自動複製功能，請手動選取並複製日誌內容"
-      );
-      this.showCopyError();
+      this.handleCopyError("瀏覽器不支持自動複製功能，請手動選取並複製日誌內容");
     }
+  }
+
+  /**
+   * 處理複製錯誤
+   */
+  handleCopyError(errorMessage) {
+    Logger.error("複製功能錯誤:", errorMessage);
+    console.error(errorMessage);
+    this.showCopyError();
   }
 
   /**
@@ -438,7 +435,7 @@ class LogPanel {
   /**
    * 切換日誌面板，加入短暫去抖動以避免多重輸入事件造成重複切換
    */
-  _toggleLogger() {
+  toggleLogger() {
     const now = Date.now();
     if (now - (this._lastFabToggleAt || 0) < 150) {
       Logger &&
@@ -547,7 +544,7 @@ class LogPanel {
 }
 
 // 匯出單例
-window.logger = new LogPanel();
+window.logger = new PanelLogger();
 
 
 

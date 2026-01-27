@@ -4,5 +4,40 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"chat.tools.terminal.autoApprove": {
+			"Set-Location": true,
+			"npx eslint": true,
+			"/^Set-Location -LiteralPath \"d:\\\\OneDrive - 亞洲大學\\[Asia University\\]\\\\1141\\\\_新生活運動\\\\_碩論\\\\_機台MR教學\\\\panel\"; node -c js/panel/panel-action-manager\\.js$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"/^Set-Location -LiteralPath \"d:\\\\OneDrive - 亞洲大學\\[Asia University\\]\\\\1141\\\\_新生活運動\\\\_碩論\\\\_機台MR教學\\\\panel\"; node -c js/panel/panel-experiment-manager\\.js$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"/^Set-Location -LiteralPath \"d:\\\\OneDrive - 亞洲大學\\[Asia University\\]\\\\1141\\\\_新生活運動\\\\_碩論\\\\_機台MR教學\\\\panel\"; node -c js/core/action-manager-registry\\.js$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"ForEach-Object": true,
+			"/^node -c \"d:\\\\OneDrive - 亞洲大學\\[Asia University\\]\\\\1141\\\\_新生活運動\\\\_碩論\\\\_機台MR教學\\\\panel\\\\js\\\\core\\\\experiment-hub-client\\.js\"$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"/^node -c \"d:\\\\OneDrive - 亞洲大學\\[Asia University\\]\\\\1141\\\\_新生活運動\\\\_碩論\\\\_機台MR教學\\\\panel\\\\js\\\\core\\\\sync-events-constants\\.js\"$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"/^node -c \"d:\\\\OneDrive - 亞洲大學\\[Asia University\\]\\\\1141\\\\_新生活運動\\\\_碩論\\\\_機台MR教學\\\\panel\\\\js\\\\experiment\\\\experiment-page-manager\\.js\"$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"/^node -c \"js\\\\experiment\\\\experiment-page-manager\\.js\" ; node -c \"js\\\\experiment\\\\experiment-utils\\.js\" ; node -c \"js\\\\experiment\\\\experiment-ui-manager\\.js\"$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"Group-Object": true
+		}
+	}
 }

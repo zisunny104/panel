@@ -43,7 +43,7 @@ class ExperimentActionManager {
       const actionSequence = buildActionSequenceFromUnits(
         unitIds,
         allActionsMap,
-        window._allUnits
+        window._allUnits,
       );
 
       if (actionSequence && actionSequence.length > 0) {
@@ -69,7 +69,7 @@ class ExperimentActionManager {
     // 移除舊的監聽器以防重複
     window.removeEventListener(
       "remoteButtonPressed",
-      this.handleRemoteButtonBound
+      this.handleRemoteButtonBound,
     );
 
     // 綁定 this 上下文
@@ -78,7 +78,7 @@ class ExperimentActionManager {
       // 驗證實驗ID是否相同
       if (window.experiment?.currentExperimentId !== experimentId) {
         Logger.warn(
-          `實驗ID不相符，忽略遠端按鈕: 期望=${window.experiment?.currentExperimentId}, 收到=${experimentId}`
+          `實驗ID不相符，忽略遠端按鈕: 期望=${window.experiment?.currentExperimentId}, 收到=${experimentId}`,
         );
         return;
       }
@@ -90,7 +90,7 @@ class ExperimentActionManager {
     // 設定事件監聽器
     window.addEventListener(
       "remoteButtonPressed",
-      this.handleRemoteButtonBound
+      this.handleRemoteButtonBound,
     );
   }
 
@@ -122,24 +122,12 @@ class ExperimentActionManager {
       Logger.info(
         "動作已完成:",
         currentAction.action_id,
-        `(${this.currentActionIndex}/${this.currentActionSequence.length})`
+        `(${this.currentActionIndex}/${this.currentActionSequence.length})`,
       );
 
       // 記錄動作完成時間（如果需要）
       if (this.actionTimings) {
         this.actionTimings.set(currentAction.action_id, Date.now());
-      }
-
-      //記錄到 JSONL 實驗日誌
-      if (window.panelExperimentLog) {
-        window.panelExperimentLog.logActionComplete(
-          currentAction.action_id,
-          currentAction.action_name || currentAction.description || "",
-          currentAction.button_id || "",
-          currentAction.action_buttons || "",
-          this.currentActionIndex,
-          this.currentActionSequence.length
-        );
       }
 
       // 廣播動作完成事件給多螢幕同步系統
@@ -150,8 +138,8 @@ class ExperimentActionManager {
           action_sequence_progress: {
             current: this.currentActionIndex,
             total: this.currentActionSequence.length,
-            completed: Array.from(this.completedActions)
-          }
+            completed: Array.from(this.completedActions),
+          },
         });
       }
 
@@ -161,7 +149,7 @@ class ExperimentActionManager {
         window.panelExperiment.broadcastButtonAction({
           action_id: currentAction.action_id,
           button_id: currentAction.button_id || "",
-          action_name: currentAction.action_name || ""
+          action_name: currentAction.action_name || "",
         });
       }
 
@@ -189,7 +177,7 @@ class ExperimentActionManager {
       current: this.currentActionIndex,
       total: this.currentActionSequence.length,
       completed: Array.from(this.completedActions),
-      isComplete: this.currentActionIndex >= this.currentActionSequence.length
+      isComplete: this.currentActionIndex >= this.currentActionSequence.length,
     };
   }
 

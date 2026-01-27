@@ -40,7 +40,7 @@ class PanelExperimentPower {
           null,
           null,
           false,
-          false
+          false,
         );
       }
 
@@ -74,7 +74,7 @@ class PanelExperimentPower {
           null,
           null,
           false,
-          false
+          false,
         );
       }
     }
@@ -132,7 +132,7 @@ class PanelExperimentPower {
         false,
         false,
         null,
-        { reason }
+        { reason },
       );
     }
   }
@@ -159,11 +159,11 @@ class PanelExperimentPower {
   broadcastPowerStateChange(isPowerOn) {
     if (window.syncManager?.core?.isConnected?.()) {
       const powerStateData = {
-        type: "power_state_changed",
+        type: window.SyncDataTypes.POWER_STATE_CHANGED,
         source: "panel",
-        device_id: this.manager.clientId,
+        clientId: this.manager.clientId,
         is_power_on: isPowerOn,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       window.syncManager.core.syncState(powerStateData).catch((error) => {
@@ -190,7 +190,7 @@ class PanelExperimentPower {
         "remote_power_change",
         null,
         false,
-        false
+        false,
       );
     }
   }
@@ -211,7 +211,7 @@ class PanelExperimentPower {
       includeShutdown: this.manager.includeShutdown,
       waitingForPowerOn: this.manager.waitingForPowerOn,
       waitingForPowerOff: this.manager.waitingForPowerOff,
-      isPowerOn: this.checkPowerState()
+      isPowerOn: this.checkPowerState(),
     };
   }
 
@@ -234,12 +234,12 @@ class PanelExperimentPower {
     Logger.debug(
       `highlightPowerSwitch(${enable}): powerSwitchArea=${
         powerSwitchArea ? "找到" : "未找到"
-      }`
+      }`,
     );
 
     if (powerSwitchArea) {
       Logger.debug(
-        `   目前 display=${powerSwitchArea.style.display}, visibility=${powerSwitchArea.style.visibility}`
+        `   目前 display=${powerSwitchArea.style.display}, visibility=${powerSwitchArea.style.visibility}`,
       );
 
       if (enable) {
@@ -276,8 +276,127 @@ class PanelExperimentPower {
     }
 
     Logger.debug(
-      `電源選項已更新: 開機=${includeStartup}, 關機=${includeShutdown}`
+      `電源選項已更新: 開機=${includeStartup}, 關機=${includeShutdown}`,
     );
+  }
+
+  /** 處理電源狀態變化 */
+  onPowerStateChanged(isPowerOn) {
+    if (this.manager.waitingForPowerOn && isPowerOn) {
+      // 等待開機完成
+      Logger.debug("電源打開，開始實驗");
+      this.manager.waitingForPowerOn = false;
+      this.manager.highlightPowerSwitch(false);
+      if (window.logger) {
+        window.logger.logAction("開機完成", null, null, false, false);
+      }
+      // 設定按鈕顏色為執行中
+      if (window.mainApp?.setExperimentPanelButtonColor) {
+        window.mainApp.setExperimentPanelButtonColor("running");
+      } else {
+        Logger.error(
+          "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義",
+        );
+      }
+
+      //打開電源時，先高亮電源按鈕作為確認
+      Logger.debug("電源已打開，高亮電源按鈕");
+      this.manager.highlightPowerSwitch(true);
+
+      //延遲後清除電源按鈕高亮，載入資料並顯示第一個動作的按鈕高亮
+      setTimeout(() => {
+        this.manager.highlightPowerSwitch(false);
+
+        //此時才初始化動作序列和顯示第一個按鈕高亮
+        if (!window.actionManager?.isInitialized) {
+          Logger.debug("打開電源後，開始載入單元資料和初始化動作序列");
+          this.manager.loadUnitsAndStart();
+        } else {
+          // 已經初始化過，只更新按鈕高亮
+          if (window.buttonManager) {
+            Logger.debug("更新按鈕高亮");
+            window.buttonManager.updateMediaForCurrentAction();
+          }
+        }
+
+        // 開始執行第一個步驟
+        setTimeout(() => {
+          if (this.manager.flow?.nextStep) {
+            this.manager.flow.nextStep();
+          }
+        }, 100);
+
+        //多螢幕同步：電源打開後廣播實驗狀態到其他裝置
+        Logger.debug("電源打開後，廣播實驗初始化到其他裝置");
+
+        //現在才廣播實驗初始化，此時按鈕高亮已準備好，experiment.html 也可以自動啟動
+        this.manager.broadcastExperimentInitialization();
+
+        this.manager.dispatchExperimentStateChanged();
+      }, 500);
+
+      // 實驗開始後自動關閉實驗面板（延遲確保所有初始化完成）
+      setTimeout(() => {
+        this.manager.closeExperimentPanel();
+      }, 1000);
+    } else if (this.manager.waitingForPowerOff && !isPowerOn) {
+      // 等待關機完成
+      this.manager.waitingForPowerOff = false;
+      this.manager.highlightPowerSwitch(false);
+      if (window.logger) {
+        window.logger.logAction("關機完成，實驗結束", null, null, false, false);
+      }
+      // 結束實驗
+      this.manager.finishExperiment();
+    } else if (
+      this.manager.isExperimentRunning &&
+      !isPowerOn &&
+      !this.manager.waitingForPowerOff
+    ) {
+      //實驗進行中，電源關閉 → 立即結束實驗
+      Logger.debug("實驗進行中偵測到電源關閉，立即結束實驗");
+      if (window.logger) {
+        window.logger.logAction(
+          "異常關機，實驗被迫結束",
+          null,
+          null,
+          false,
+          false,
+        );
+      }
+      this.manager.finishExperiment();
+    } else if (
+      this.manager.isExperimentRunning &&
+      isPowerOn &&
+      !this.manager.waitingForPowerOn &&
+      !this.manager.waitingForPowerOff
+    ) {
+      // 實驗進行中，電源重新開啟，還原目前步驟的媒體播放
+      this.manager.showCurrentStepMedia();
+      // 確保按鈕高亮效果被更新
+      if (window.buttonManager) {
+        window.buttonManager.updateExperimentButtonStyles();
+      }
+    }
+  }
+
+  /** 處理實驗結束流程 */
+  handleExperimentEnd() {
+    if (
+      this.manager.includeShutdown &&
+      window.powerControl &&
+      window.powerControl.isPowerOn
+    ) {
+      // 需要關機且機器目前是開啟的，等待使用者關機
+      this.manager.waitingForPowerOff = true;
+      this.manager.highlightPowerSwitch(true);
+      if (window.logger) {
+        window.logger.logAction("等待關機", null, null, false, false);
+      }
+    } else {
+      // 不需要關機或機器已經關閉，直接結束實驗
+      this.manager.finishExperiment();
+    }
   }
 }
 

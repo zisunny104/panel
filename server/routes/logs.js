@@ -52,7 +52,7 @@ router.post("/batch", (req, res) => {
  * {
  *   "experimentId": "EXP20260109ABCD",
  *   "metadata": {
- *     "subjectName": "測試者",
+ *     "participantName": "測試者",
  *     "duration": 120000
  *   }
  * }

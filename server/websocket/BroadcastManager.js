@@ -228,7 +228,7 @@ export class BroadcastManager {
    */
   broadcastExperimentIdUpdate(sessionId, experimentId, metadata = {}) {
     const message = {
-      type: "experiment_id_update",
+      type: "experiment_id_changed",
       data: {
         experimentId,
         ...metadata,

@@ -1,9 +1,14 @@
-// media-manager.js - 媒體播放與管理模塊
-
+/**
+ * MediaManager - 媒體管理器
+ *
+ * 負責媒體播放、預載入和快取管理
+ * 支援影片、圖片和音頻檔案的播放
+ */
 class MediaManager {
+  /**
+   * 建構子 - 初始化媒體管理器
+   */
   constructor() {
-    this.mediaFiles = [];
-    this.currentMediaIndex = 0;
     this.mediaArea = document.getElementById("mediaArea");
     this.isHomePageLooping = false;
     this.homePageVideoElement = null;
@@ -24,7 +29,6 @@ class MediaManager {
   setupEventListeners() {
     // 監聽組合選擇事件
     document.addEventListener("combination_selected", (event) => {
-      // 使用事件中的組合資料，或者延遲一下再檢查
       const combination = event.detail?.combination;
       if (combination) {
         setTimeout(() => this.preloadCombinationMedia(combination), 500);
@@ -44,7 +48,12 @@ class MediaManager {
     });
   }
 
-  // 統一的媒體播放方法
+  /**
+   * 播放媒體檔案
+   * @param {string} src - 媒體檔案路徑
+   * @param {Object} options - 播放選項
+   * @returns {HTMLElement|null} 建立的媒體元素
+   */
   playMedia(src, options = {}) {
     if (!this.mediaArea) {
       Logger.warn("playMedia: mediaArea 不存在");
@@ -95,24 +104,17 @@ class MediaManager {
     return mediaElement;
   }
 
-  // 設定影片元素
-  setupVideoElement(video, src, options = {}) {
-    // 檢查來源路徑是否有效
-    if (!src || src.trim() === "") {
-      Logger.warn("setupVideoElement: 收到空的影片路徑");
-      return;
-    }
-
-    // 確保路徑正確，如果是相對路徑則轉換為絕對路徑
-    let finalSrc = src;
-
+  /**
+   * 處理媒體來源路徑，轉換相對路徑為絕對路徑
+   * @param {string} src - 原始來源路徑
+   * @returns {string} 處理後的來源路徑
+   */
+  processMediaSrc(src) {
     if (
       !src.startsWith("http") &&
       !src.startsWith("blob:") &&
       !src.startsWith("data:")
     ) {
-      // 對於相對路徑，確保正確編碼，避免雙重編碼
-      // PHP 伺服器會自動處理 URL 編碼，所以這裡只需傳遞原始路徑
       const baseUrl =
         window.location.origin +
         window.location.pathname.substring(
@@ -121,22 +123,36 @@ class MediaManager {
         );
 
       try {
-        // 使用 URL API 正確編碼相對路徑
-        finalSrc = new URL(src, baseUrl).href;
-        // 除錯：確認路徑轉換正確
+        const finalSrc = new URL(src, baseUrl).href;
         if (finalSrc === baseUrl || !finalSrc.includes(src.split("/").pop())) {
           Logger.warn(
             `URL 轉換可能有誤: 原始=${src}, baseUrl=${baseUrl}, 結果=${finalSrc}`
           );
-          // 回退到直接拼接
-          finalSrc = baseUrl + src;
+          return baseUrl + src;
         }
+        return finalSrc;
       } catch (e) {
-        // 如果 URL 無效，直接使用原始路徑
         Logger.warn(`URL 編碼失敗，使用原始路徑: ${src}`, e);
-        finalSrc = src;
+        return src;
       }
     }
+    return src;
+  }
+
+  /**
+   * 設定影片元素
+   * @param {HTMLVideoElement} video - 影片元素
+   * @param {string} src - 影片來源
+   * @param {Object} options - 設定選項
+   */
+  setupVideoElement(video, src, options = {}) {
+    if (!src || src.trim() === "") {
+      Logger.warn("setupVideoElement: 收到空的影片路徑");
+      return;
+    }
+
+    // 確保路徑正確
+    const finalSrc = this.processMediaSrc(src);
 
     video.src = finalSrc;
 
@@ -158,7 +174,7 @@ class MediaManager {
     video.loop = options.loop || false;
     video.autoplay = options.autoplay !== false; // 預設自動播放
 
-    // 事件監聯
+    // 事件監聽
     video.addEventListener("loadstart", () => {
       video.style.background = "transparent";
     });
@@ -206,34 +222,15 @@ class MediaManager {
     if (options.onStart) options.onStart(video);
   }
 
-  // 設定圖片元素
+  /**
+   * 設定圖片元素
+   * @param {HTMLImageElement} img - 圖片元素
+   * @param {string} src - 圖片來源
+   * @param {Object} options - 設定選項
+   */
   setupImageElement(img, src, options = {}) {
-    // 確保路徑正確，如果是相對路徑則轉換為絕對路徑
-    let finalSrc = src;
-
-    if (
-      !src.startsWith("http") &&
-      !src.startsWith("blob:") &&
-      !src.startsWith("data:")
-    ) {
-      // 對於相對路徑，確保正確編碼，避免雙重編碼
-      // PHP 伺服器會自動處理 URL 編碼，所以這裡只需傳遞原始路徑
-      const baseUrl =
-        window.location.origin +
-        window.location.pathname.substring(
-          0,
-          window.location.pathname.lastIndexOf("/") + 1
-        );
-
-      try {
-        // 使用 URL API 正確編碼相對路徑
-        finalSrc = new URL(src, baseUrl).href;
-      } catch (e) {
-        // 如果 URL 無效，直接使用原始路徑
-        Logger.warn(`URL 編碼失敗，使用原始路徑: ${src}`, e);
-        finalSrc = src;
-      }
-    }
+    // 確保路徑正確
+    const finalSrc = this.processMediaSrc(src);
 
     img.src = finalSrc;
 
@@ -257,7 +254,11 @@ class MediaManager {
     });
   }
 
-  // 在媒體區域播放指定媒體
+  /**
+   * 在媒體區域播放指定媒體
+   * @param {string} src - 媒體來源路徑
+   * @param {Object} options - 播放選項
+   */
   playMediaInArea(src, options = {}) {
     if (!this.mediaArea) return;
 
@@ -296,7 +297,9 @@ class MediaManager {
     this.mediaArea.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  // 停止首頁影片循環
+  /**
+   * 停止首頁影片循環
+   */
   stopHomePageLoop() {
     if (this.isHomePageLooping && this.homePageVideoElement) {
       this.homePageVideoElement.pause();
@@ -315,8 +318,10 @@ class MediaManager {
     }
   }
 
-  // 播放首頁影片循環
-  // @param {boolean} forcePlay - 是否強制播放（即使在實驗模式下）
+  /**
+   * 播放首頁影片循環
+   * @param {boolean} forcePlay - 是否強制播放
+   */
   playHomePageLoop(forcePlay = false) {
     // 檢查是否在實驗模式，如果是且沒有強制播放就不播放首頁影片
     if (
@@ -368,7 +373,11 @@ class MediaManager {
     }
   }
 
-  // 顯示步驟媒體（實驗模式用）
+  /**
+   * 顯示步驟媒體
+   * @param {string} mediaFile - 媒體檔案路徑
+   * @returns {HTMLElement|null} 建立的媒體元素
+   */
   showStepMedia(mediaFile) {
     if (!mediaFile) {
       return;
@@ -385,7 +394,11 @@ class MediaManager {
     return mediaElement;
   }
 
-  // 預先載入媒體檔案（減少黑畫面等待時間）
+  /**
+   * 預先載入媒體檔案（減少黑畫面等待時間）
+   * @param {string} mediaFile - 媒體檔案路徑
+   * @returns {HTMLElement|null} 預載入的元素
+   */
   preloadMedia(mediaFile) {
     if (!mediaFile) {
       return null;
@@ -427,7 +440,10 @@ class MediaManager {
     return preloadElement;
   }
 
-  // 批次預先載入多個媒體檔案
+  /**
+   * 批次預先載入多個媒體檔案
+   * @param {string[]} mediaFiles - 媒體檔案路徑陣列
+   */
   preloadMediaBatch(mediaFiles) {
     if (!Array.isArray(mediaFiles)) {
       return;
@@ -442,7 +458,9 @@ class MediaManager {
     Logger.debug(`批次預先載入 ${mediaFiles.length} 個媒體檔案`);
   }
 
-  // 清除預先載入的媒體
+  /**
+   * 清除預先載入的媒體
+   */
   clearPreloadedMedia() {
     const preloadElements = document.querySelectorAll("[data-preload='true']");
     preloadElements.forEach((element) => {
@@ -452,17 +470,21 @@ class MediaManager {
     Logger.debug("已清除預先載入的媒體");
   }
 
-  // 顯示媒體（實驗模式用的別名方法）
+  /**
+   * 顯示媒體（實驗模式用的別名方法）
+   * @param {string} mediaFile - 媒體檔案路徑
+   * @returns {HTMLElement|null} 建立的媒體元素
+   */
   displayMedia(mediaFile) {
     return this.showStepMedia(mediaFile);
   }
 
-  // 清空媒體區域
+  /**
+   * 清空媒體區域
+   */
   clearMediaArea() {
     if (this.mediaArea) {
       this.mediaArea.innerHTML = "";
-      this.mediaFiles = [];
-      this.currentMediaIndex = 0;
     }
 
     // 更新顯示狀態
@@ -485,7 +507,9 @@ class MediaManager {
     }
   }
 
-  // 重設媒體管理器
+  /**
+   * 重設媒體管理器
+   */
   reset() {
     this.stopHomePageLoop();
     this.clearMediaArea();
@@ -494,7 +518,13 @@ class MediaManager {
     }
   }
 
-  // 取得錯誤資訊
+  /**
+   * 取得錯誤資訊
+   * @param {HTMLElement} mediaElement - 媒體元素
+   * @param {Event} errorEvent - 錯誤事件
+   * @param {string} originalSrc - 原始來源路徑
+   * @returns {Object} 錯誤資訊物件
+   */
   getDetailedErrorInfo(mediaElement, errorEvent, originalSrc) {
     const timestamp = window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(Date.now())
@@ -533,7 +563,11 @@ class MediaManager {
     return errorInfo;
   }
 
-  // 取得簡化的媒體錯誤文字
+  /**
+   * 取得簡化的媒體錯誤文字
+   * @param {number} errorCode - 錯誤代碼
+   * @returns {string} 錯誤描述文字
+   */
   getMediaErrorText(errorCode) {
     const errors = {
       1: "載入被中止",
@@ -544,7 +578,12 @@ class MediaManager {
     return errors[errorCode] || "載入失敗";
   }
 
-  // 分析可能的錯誤原因
+  /**
+   * 分析可能的錯誤原因
+   * @param {string} src - 來源路徑
+   * @param {Object} errorInfo - 錯誤資訊
+   * @returns {string[]} 可能的錯誤原因陣列
+   */
   analyzePossibleCauses(src, errorInfo) {
     // 檢查錯誤代碼特定原因
     if (errorInfo.errorCode === 2) {
@@ -580,7 +619,11 @@ class MediaManager {
     return ["檔案載入失敗"];
   }
 
-  // 顯示簡化的錯誤資訊
+  /**
+   * 顯示簡化的錯誤資訊
+   * @param {Object} errorInfo - 錯誤資訊物件
+   * @param {string} mediaType - 媒體類型
+   */
   displayDetailedError(errorInfo, mediaType) {
     const errorHtml = `
             <div class="media-detailed-error">
@@ -703,6 +746,8 @@ class MediaManager {
   /**
    * 按優先級排序媒體檔案
    * 優先載入：小檔案、常用檔案、UI資源
+   * @param {string[]} mediaFiles - 媒體檔案陣列
+   * @returns {string[]} 排序後的媒體檔案陣列
    */
   sortMediaByPriority(mediaFiles) {
     const priorityMap = new Map();
@@ -950,59 +995,6 @@ class MediaManager {
   }
 
   /**
-   * 收集所有可能的媒體檔案（後備方案）
-   */
-  async collectAllPossibleMediaFiles(mediaFiles) {
-    try {
-      // 從 scenarios.json 中收集圖片檔案
-      const response = await fetch("./data/scenarios.json");
-      const scenariosData = await response.json();
-
-      if (scenariosData.sections) {
-        scenariosData.sections.forEach((section) => {
-          if (section.units) {
-            section.units.forEach((unit) => {
-              if (unit.steps) {
-                unit.steps.forEach((step) => {
-                  if (step.actions) {
-                    step.actions.forEach((action) => {
-                      if (action.media_file) {
-                        mediaFiles.add(action.media_file);
-                      }
-                    });
-                  }
-                });
-              }
-            });
-          }
-        });
-      }
-    } catch (error) {
-      Logger.warn("收集 scenarios.json 中的媒體檔案失敗:", error);
-    }
-
-    try {
-      // 從 units.json 中收集圖片檔案
-      const response = await fetch("./data/units.json");
-      const unitsData = await response.json();
-
-      if (unitsData.units) {
-        unitsData.units.forEach((unit) => {
-          if (unit.steps) {
-            unit.steps.forEach((step) => {
-              if (step.media_file) {
-                mediaFiles.add(step.media_file);
-              }
-            });
-          }
-        });
-      }
-    } catch (error) {
-      Logger.warn("收集 units.json 中的媒體檔案失敗:", error);
-    }
-  }
-
-  /**
    * 預先載入單個媒體檔案
    */
   async preloadMediaFile(src) {
@@ -1107,32 +1099,9 @@ class MediaManager {
   }
 
   /**
-   * 檢查媒體是否已快取
+   * 語言變更處理
+   * @param {string} newLanguage - 新的語言代碼
    */
-  isMediaCached(src) {
-    return this.mediaCache.has(src);
-  }
-
-  /**
-   * 取得快取的媒體
-   */
-  getCachedMedia(src) {
-    return this.mediaCache.get(src);
-  }
-
-  /**
-   * 取得快取統計
-   */
-  getCacheStats() {
-    return {
-      cachedCount: this.mediaCache.size,
-      preloadingCount: this.preloadPromises.size,
-      isPreloading: this.isPreloading,
-      cachedFiles: Array.from(this.mediaCache.keys())
-    };
-  }
-
-  // 語言變更處理
   onLanguageChange(newLanguage) {
     // 記錄語言變更
     if (window.logger) {
@@ -1146,8 +1115,3 @@ class MediaManager {
 
 // 匯出單例
 window.mediaManager = new MediaManager();
-
-
-
-
-

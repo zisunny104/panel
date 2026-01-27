@@ -1,11 +1,5 @@
 /**
- * DataLoader - 從 scenarios.json 載入資料
- *
- * 從 scenarios.json 載入實驗資料
- */
-
-/**
- * 從 scenarios.json 載入實驗資料
+ * DataLoader - 從 scenarios.json 載入實驗資料
  * @returns {Promise<{units: Array, unit_combinations: Array, actions: Map, actionToStep: Map}>}
  */
 async function loadUnitsFromScenarios() {
@@ -14,8 +8,8 @@ async function loadUnitsFromScenarios() {
     const scenariosData = await response.json();
 
     const unitsMap = new Map();
-    const actionsMap = new Map(); // action_id -> action 物件
-    const actionToStepMap = new Map(); // action_id -> { unit_id, step_id, step_name }
+    const actionsMap = new Map(); // actionId -> action 物件
+    const actionToStepMap = new Map(); // actionId -> { unit_id, step_id, step_name }
 
     // 從 sections 中提取所有單元和actions
     if (scenariosData.sections && Array.isArray(scenariosData.sections)) {
@@ -31,8 +25,8 @@ async function loadUnitsFromScenarios() {
                     action.isLastActionInStep =
                       actionIndex === step.actions.length - 1;
 
-                    actionsMap.set(action.action_id, action);
-                    actionToStepMap.set(action.action_id, {
+                    actionsMap.set(action.actionId, action);
+                    actionToStepMap.set(action.actionId, {
                       unit_id: unit.unit_id,
                       step_id: step.step_id,
                       step_name: step.step_name,
@@ -93,8 +87,3 @@ export { loadUnitsFromScenarios, buildActionSequenceFromUnits };
 // 為了向後相容性，也將函數新增到全域範圍
 window.loadUnitsFromScenarios = loadUnitsFromScenarios;
 window.buildActionSequenceFromUnits = buildActionSequenceFromUnits;
-
-
-
-
-

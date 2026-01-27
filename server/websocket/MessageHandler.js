@@ -30,7 +30,6 @@ export class MessageHandler {
       auth: this.handleAuth.bind(this),
       heartbeat: this.handleHeartbeat.bind(this),
       state_update: this.handleStateUpdate.bind(this),
-      experiment_action: this.handleExperimentAction.bind(this),
       get_session_state: this.handleGetSessionState.bind(this),
       ping: this.handlePing.bind(this),
     };
@@ -364,16 +363,22 @@ export class MessageHandler {
    */
   _getStateUpdateInfo(state) {
     switch (state.type) {
-      case "subjectNameUpdate":
-        return ` | 受試者: <green>${state.subjectName || "N/A"}</green>`;
+      case "participantNameUpdate":
+        return ` | 受試者: <green>${state.participantName || "N/A"}</green>`;
       case "experimentIdUpdate":
         return ` | 實驗ID: <green>${state.experimentId || "N/A"}</green>`;
       case "combination_selected":
         return ` | 組合: <green>${state.combination || "N/A"}</green>`;
       case "experimentStateUpdate":
         return ` | 狀態: <green>${state.experimentState || "N/A"}</green>`;
-      case "button_action":
-        return ` | 按鈕: <green>${state.buttonId || "N/A"}</green>`;
+      case "button_pressed":
+        return ` | 按鈕: <green>${state.button || "N/A"}</green>`;
+      case "action_completed":
+        return ` | 動作: <green>${state.actionId || "N/A"}</green>`;
+      case "step_completed":
+        return ` | 步驟: <green>${state.step_id || "N/A"}</green>`;
+      case "step_cancelled":
+        return ` | 取消步驟: <green>${state.step_id || "N/A"}</green>`;
       default:
         return "";
     }

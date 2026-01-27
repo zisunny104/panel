@@ -24,8 +24,8 @@ class ConfigManager {
       const response = await fetch("./data/config.json", {
         headers: {
           Accept: "application/json",
-          "Cache-Control": "no-cache"
-        }
+          "Cache-Control": "no-cache",
+        },
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -35,7 +35,7 @@ class ConfigManager {
       window.CONFIG = config; // 暴露到全域作用域供其他模塊使用
       this.defaultSettings = config.settings || {};
 
-      // 嘗試載入本機存儲的設定
+      // 嘗試載入本機儲存的設定
       const saved = localStorage.getItem("userSettings");
       if (saved) {
         try {
@@ -61,7 +61,7 @@ class ConfigManager {
       this.configData = {
         version: "1.1.dev",
         author: "開發版本",
-        description: "虛擬操作面板"
+        description: "虛擬操作面板",
       };
       // 仍然嘗試載入版本資訊
       if (window.Logger) {
@@ -83,7 +83,7 @@ class ConfigManager {
       this.saveUserSettings();
       if (window.Logger) Logger.info("使用者設定已還原為預設值");
       // 通知 UI
-      document.dispatchEvent(new CustomEvent("userSettingsReset", {}));
+      document.dispatchEvent(new CustomEvent("user_settings_reset", {}));
     } catch (e) {
       Logger.error("重設設定失敗:", e);
     }
@@ -97,7 +97,7 @@ class ConfigManager {
     // 等待 DOM 完全載入
     if (document.readyState !== "complete") {
       await new Promise((resolve) =>
-        window.addEventListener("load", resolve, { once: true })
+        window.addEventListener("load", resolve, { once: true }),
       );
     }
 
@@ -106,24 +106,25 @@ class ConfigManager {
     const scaleNumberInput = document.getElementById("scaleNumberInput");
     const topSpacerRange = document.getElementById("topSpacerRange");
     const topSpacerNumberInput = document.getElementById(
-      "topSpacerNumberInput"
+      "topSpacerNumberInput",
     );
     const bottomSpacerRange = document.getElementById("bottomSpacerRange");
     const bottomSpacerNumberInput = document.getElementById(
-      "bottomSpacerNumberInput"
+      "bottomSpacerNumberInput",
     );
     const powerScaleRange = document.getElementById("powerScaleRange");
     const powerScaleNumberInput = document.getElementById(
-      "powerScaleNumberInput"
+      "powerScaleNumberInput",
     );
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
     const toggleMediaAreaMarker = document.getElementById(
-      "toggleMediaAreaMarker"
+      "toggleMediaAreaMarker",
     );
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
+    const beepVolume = document.getElementById("beepVolume");
 
     // 主縮放設定
     if (settings.mainScale !== undefined && scaleRange) {
@@ -182,6 +183,9 @@ class ConfigManager {
     // 蜂鳴聲播放
     if (settings.playBeepSound !== undefined && toggleBeepSound)
       toggleBeepSound.checked = settings.playBeepSound;
+    // 音量設定
+    if (settings.beepVolume !== undefined && beepVolume)
+      beepVolume.value = settings.beepVolume;
   }
 
   /**
@@ -196,7 +200,7 @@ class ConfigManager {
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
     const toggleMediaAreaMarker = document.getElementById(
-      "toggleMediaAreaMarker"
+      "toggleMediaAreaMarker",
     );
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
@@ -215,7 +219,8 @@ class ConfigManager {
         ? toggleMediaAreaMarker.checked
         : true,
       showMediaContent: toggleMediaContent ? toggleMediaContent.checked : true,
-      playBeepSound: toggleBeepSound ? toggleBeepSound.checked : true
+      playBeepSound: toggleBeepSound ? toggleBeepSound.checked : true,
+      beepVolume: beepVolume ? beepVolume.value : "50",
     };
     localStorage.setItem("userSettings", JSON.stringify(this.userSettings));
   }
@@ -228,16 +233,17 @@ class ConfigManager {
     const scaleNumberInput = document.getElementById("scaleNumberInput");
     const topSpacerRange = document.getElementById("topSpacerRange");
     const topSpacerNumberInput = document.getElementById(
-      "topSpacerNumberInput"
+      "topSpacerNumberInput",
     );
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
     const toggleMediaAreaMarker = document.getElementById(
-      "toggleMediaAreaMarker"
+      "toggleMediaAreaMarker",
     );
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
+    const beepVolume = document.getElementById("beepVolume");
 
     // 監聽所有設定相關元素的 input 事件
     [
@@ -253,7 +259,7 @@ class ConfigManager {
       toggleButtonColors,
       toggleTouchVisuals,
       toggleMediaAreaMarker,
-      toggleMediaContent
+      toggleMediaContent,
     ].forEach((el) => {
       if (el) el.addEventListener("input", () => this.saveUserSettings());
     });
@@ -262,6 +268,9 @@ class ConfigManager {
     if (toggleBeepSound) {
       toggleBeepSound.addEventListener("input", () => this.saveUserSettings());
     }
+    if (beepVolume) {
+      beepVolume.addEventListener("input", () => this.saveUserSettings());
+    }
   }
 
   /**
@@ -269,19 +278,9 @@ class ConfigManager {
    */
   loadVersionInfo() {
     const versionElement = document.getElementById("appVersion");
-    if (window.Logger) {
-      Logger.debug("載入版本資訊:", {
-        element: !!versionElement,
-        version: this.configData.version,
-        configData: this.configData
-      });
-    }
 
     if (versionElement && this.configData.version) {
       versionElement.textContent = this.configData.version;
-      if (window.Logger) {
-        Logger.debug("版本號已更新到 UI:", this.configData.version);
-      }
     }
     // 版本元素在某些頁面（如 experiment.html）上可能不存在，這是正常的
   }
@@ -314,10 +313,7 @@ class ConfigManager {
         return gitHash.substring(0, 7);
       }
     } catch (error) {
-      // git 不可用時記錄但不中斷
-      if (window.Logger) {
-        Logger.debug("無法取得 git commit hash，使用時間戳:", error.message);
-      }
+      // git 不可用時不中斷，靜默回退到時間戳
     }
 
     // 回退到時間戳轉換（原邏輯）
@@ -345,11 +341,6 @@ class ConfigManager {
       const newVersion = this.generateNewVersion(currentVersion);
       const updateTime = new Date().toISOString();
 
-      if (window.Logger) {
-        Logger.debug(`版本更新: ${currentVersion} → ${newVersion}`);
-        Logger.debug(`更新時間: ${updateTime}`);
-      }
-
       // 在生產環境中，這裡需要向後端發送請求來更新 config.json
       // 這裡我們先更新本機資料
       this.configData.version = newVersion;
@@ -361,7 +352,7 @@ class ConfigManager {
       return {
         oldVersion: currentVersion,
         newVersion: newVersion,
-        updateTime: updateTime
+        updateTime: updateTime,
       };
     } catch (error) {
       Logger.error("版本更新失敗:", error);
@@ -378,7 +369,7 @@ class ConfigManager {
       author: this.configData.author,
       created_at: this.configData.created_at,
       updated_at: this.configData.updated_at,
-      description: this.configData.description
+      description: this.configData.description,
     };
   }
 }
@@ -408,26 +399,3 @@ window.getAppVersionInfo = function () {
     return null;
   }
 };
-
-// 測試版本功能
-window.testVersionSystem = function () {
-  if (window.Logger) {
-    Logger.debug("測試版本系統...");
-    const versionElement = document.getElementById("appVersion");
-    Logger.debug("版本元素:", versionElement);
-    Logger.debug(
-      "目前顯示:",
-      versionElement ? versionElement.textContent : "元素不存在"
-    );
-    Logger.debug("ConfigManager:", window.configManager);
-    Logger.debug("版本資訊:", window.getAppVersionInfo());
-  }
-  if (window.configManager) {
-    window.configManager.loadVersionInfo();
-  }
-};
-
-
-
-
-

@@ -112,7 +112,7 @@
 | `panel-experiment-manager.js（無媒體狀態）` | 📺    | UI 視覺回饋 | 無媒體內容提示圖示，用於提示目前無可顯示內容 |
 | `panel-power-control.js（緊急停止）`        | 🚨    | 安全警示    | 緊急停止警告符號，具有明確安全意義           |
 | `sync-confirm-dialog.js（驗證流程）`        | 🔍    | 狀態提示    | 分享代碼驗證狀態，搭配「驗證中」文字顯示     |
-| `experiment.html（播放器控制）`             | ▶ ⏸ ⏹ | 播放控制    | 實驗播放、暫停、停止控制按鈕                 |
+| `board.html（播放器控制）`                  | ▶ ⏸ ⏹ | 播放控制    | 實驗播放、暫停、停止控制按鈕                 |
 | `experiment-page-manager.js（播放狀態）`    | ▶ ⏸   | 狀態提示    | 播放器播放 / 暫停狀態視覺回饋                |
 | `panel-experiment-manager.js（暫停狀態）`   | ⏸     | 狀態指示    | 面板中顯示暫停中的狀態指示                   |
 

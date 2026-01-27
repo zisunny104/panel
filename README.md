@@ -27,10 +27,10 @@
 ```
 panel/
 ├── index.html              # 主頁面(機台面板)
-├── experiment.html         # 實驗頁面(實驗管理)
+├── board.html              # 實驗頁面(實驗管理)
 ├── js/                     # JavaScript 模組
 │   ├── core/              # 核心功能
-│   ├── experiment/        # 實驗相關
+│   ├── board/             # 實驗相關
 │   ├── panel/             # 面板控制
 │   ├── power/             # 電源控制
 │   ├── sync/              # 同步系統

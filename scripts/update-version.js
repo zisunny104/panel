@@ -17,7 +17,7 @@ const CONFIG_PATH = path.join(__dirname, "..", "data", "config.json");
 function getGitCommitHash(length = 7) {
   try {
     return execSync(`git rev-parse --short=${length} HEAD`, {
-      encoding: "utf8",
+      encoding: "utf8"
     }).trim();
   } catch (error) {
     console.error("無法取得 git commit hash:", error.message);
@@ -84,7 +84,7 @@ function updateGitCommitHash() {
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-        second: "2-digit",
+        second: "2-digit"
       })
       .replace(/\//g, "-") + ".000Z";
 
@@ -126,7 +126,7 @@ function updateVersion() {
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-        second: "2-digit",
+        second: "2-digit"
       })
       .replace(/\//g, "-") + ".000Z";
 

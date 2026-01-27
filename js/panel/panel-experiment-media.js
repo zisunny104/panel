@@ -22,10 +22,10 @@ class PanelExperimentMedia {
 
     Logger.debug(`顯示媒體: ${mediaPath}`);
 
-    // 停止當前媒體（如果有）
+    // 停止目前媒體（如果有）
     this.stopCurrentMedia();
 
-    // 更新當前媒體路徑
+    // 更新目前媒體路徑
     this.currentMediaPath = mediaPath;
 
     // 取得媒體容器
@@ -71,7 +71,7 @@ class PanelExperimentMedia {
     const video = document.createElement("video");
     video.src = mediaPath;
     video.controls = true;
-    video.autoplay = false; // 不自動播放，讓用戶控制
+    video.autoplay = false; // 不自動播放，讓使用者控制
     video.style.width = "100%";
     video.style.height = "auto";
     video.style.maxHeight = "400px";
@@ -86,7 +86,7 @@ class PanelExperimentMedia {
       this.displayText(`影片載入失敗: ${mediaPath}`, container);
     });
 
-    // 儲存當前媒體元素引用
+    // 儲存目前媒體元素引用
     this.currentMediaElement = video;
 
     container.appendChild(video);
@@ -110,7 +110,7 @@ class PanelExperimentMedia {
       this.displayText(`圖片載入失敗: ${mediaPath}`, container);
     });
 
-    // 儲存當前媒體元素引用
+    // 儲存目前媒體元素引用
     this.currentMediaElement = img;
 
     container.appendChild(img);
@@ -138,7 +138,7 @@ class PanelExperimentMedia {
       this.displayText(`音訊載入失敗: ${mediaPath}`, container);
     });
 
-    // 儲存當前媒體元素引用
+    // 儲存目前媒體元素引用
     this.currentMediaElement = audio;
 
     container.appendChild(audio);
@@ -181,7 +181,7 @@ class PanelExperimentMedia {
 
     // 如果是實驗運行中且未暫停，自動進入下一步
     if (this.manager.isExperimentRunning && !this.manager.timer.isPaused()) {
-      // 延遲一下再進入下一步，給用戶一點時間
+      // 延遲一下再進入下一步，給使用者一點時間
       setTimeout(() => {
         this.manager.flow.nextStep();
       }, 1000);
@@ -189,7 +189,7 @@ class PanelExperimentMedia {
   }
 
   /**
-   * 停止當前媒體
+   * 停止目前媒體
    */
   stopCurrentMedia() {
     if (this.currentMediaElement) {
@@ -266,7 +266,7 @@ class PanelExperimentMedia {
   }
 
   /**
-   * 取得當前媒體路徑
+   * 取得目前媒體路徑
    */
   getCurrentMediaPath() {
     return this.currentMediaPath;

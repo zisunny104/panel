@@ -48,16 +48,16 @@ class PanelExperimentUI {
    * 更新按鈕狀態：根據角色禁用/啟用按鈕
    */
   updateButtonStates() {
-    // 如果 SyncManager 還沒初始化，等待 CLIENT_INITIALIZED 事件
+    // 如果 SyncManager 還沒初始化，等待初始化完成
     if (!window.syncManager?.initialized) {
-      Logger.debug("SyncManager 未初始化，等待 CLIENT_INITIALIZED 事件");
+      Logger.debug("SyncManager 未初始化，等待初始化事件");
       const handleInitialized = () => {
-        Logger.debug("收到 CLIENT_INITIALIZED 事件，更新按鈕狀態");
+        Logger.debug("收到初始化事件，更新按鈕狀態");
         this.updateButtonStates();
         document.removeEventListener("CLIENT_INITIALIZED", handleInitialized);
       };
       document.addEventListener("CLIENT_INITIALIZED", handleInitialized, {
-        once: true
+        once: true,
       });
       return;
     }
@@ -69,12 +69,12 @@ class PanelExperimentUI {
       "startExperimentBtn",
       "pauseExperimentBtn",
       "stopExperimentBtn",
-      "regenerateIdButton"
+      "regenerateIdButton",
     ];
 
     Logger.debug("updateButtonStates", {
       isViewer,
-      role: window.syncManager?.core?.syncClient?.role
+      role: window.syncManager?.core?.syncClient?.role,
     });
 
     buttonsToDisable.forEach((buttonId) => {
@@ -102,24 +102,18 @@ class PanelExperimentUI {
 
     // 如果視覺提示被關閉，清除所有高亮
     if (!showHighlight) {
-      const powerSwitchArea = document.getElementById("powerSwitchArea");
-      if (powerSwitchArea) {
-        powerSwitchArea.classList.remove("next-step-highlight");
-      }
-      document.querySelectorAll(".button-overlay").forEach((btn) => {
-        btn.classList.remove("next-step-highlight");
-      });
+      this.clearAllHighlights();
       return;
     }
 
     // 視覺提示開啟時，才檢查實驗狀態並顯示高亮
-    // 實驗進行中時，需要檢查：
-    // 1. 如果是第一步（開機步驟），顯示高亮
-    // 2. 如果不是第一步但機器未開機，清除高亮
     if (this.manager.isExperimentRunning) {
+      const currentUnitId =
+        this.manager.loadedUnits[this.manager.currentUnitIndex];
+      const currentUnit = window._allUnits?.[currentUnitId];
       const isFirstStep =
         this.manager.currentStepIndex === 0 &&
-        this.manager.currentScenario?.steps?.[0]?.step_id?.includes("_1");
+        currentUnit?.steps?.[0]?.step_id?.includes("_1");
 
       if (
         !isFirstStep &&
@@ -127,13 +121,7 @@ class PanelExperimentUI {
         !window.powerControl.isPowerOn
       ) {
         // 機器未開機且不是開機步驟，清除高亮
-        const powerSwitchArea = document.getElementById("powerSwitchArea");
-        if (powerSwitchArea) {
-          powerSwitchArea.classList.remove("next-step-highlight");
-        }
-        document.querySelectorAll(".button-overlay").forEach((btn) => {
-          btn.classList.remove("next-step-highlight");
-        });
+        this.clearAllHighlights();
         return;
       }
 
@@ -142,6 +130,13 @@ class PanelExperimentUI {
     }
 
     // 實驗未進行時，清除所有高亮
+    this.clearAllHighlights();
+  }
+
+  /**
+   * 清除所有高亮
+   */
+  clearAllHighlights() {
     const powerSwitchArea = document.getElementById("powerSwitchArea");
     if (powerSwitchArea) {
       powerSwitchArea.classList.remove("next-step-highlight");
@@ -158,10 +153,10 @@ class PanelExperimentUI {
     const unitList = document.querySelector(".experiment-units-list");
     if (!unitList) return;
     Array.from(unitList.children).forEach((li) => {
-      const checkbox = li.querySelector("input[type=\"checkbox\"]");
+      const checkbox = li.querySelector('input[type="checkbox"]');
       if (checkbox) checkbox.disabled = lock;
-      const upBtn = li.querySelector(".unit-sort-btn[title=\"上移\"]");
-      const downBtn = li.querySelector(".unit-sort-btn[title=\"下移\"]");
+      const upBtn = li.querySelector('.unit-sort-btn[title="上移"]');
+      const downBtn = li.querySelector('.unit-sort-btn[title="下移"]');
       if (upBtn) upBtn.disabled = lock;
       if (downBtn) downBtn.disabled = lock;
       const dragHandle = li.querySelector(".unit-drag-handle");
@@ -173,15 +168,13 @@ class PanelExperimentUI {
    * 鎖定/解鎖實驗ID輸入框
    */
   lockExperimentId(lock) {
-    const _experimentIdInput = document.getElementById("experimentIdInput");
-    const _regenerateIdButton = document.getElementById("regenerateIdButton");
     const experimentIdInputGroup = document.querySelector(
-      ".experiment-id-input-group"
+      ".experiment-id-input-group",
     );
 
     Logger.debug(
       `lockExperimentId(${lock}) - InputGroup found:`,
-      !!experimentIdInputGroup
+      !!experimentIdInputGroup,
     );
 
     if (lock) {
@@ -234,20 +227,18 @@ class PanelExperimentUI {
       deviceModeChanged: (data) => this.manager.handleDeviceModeChanged(data),
       experimentIdUpdate: (data) =>
         this.manager.sync.handleRemoteExperimentIdUpdate(data),
-      subjectNameUpdate: (data) =>
-        this.manager.sync.handleRemoteSubjectNameUpdate(data),
+      participantNameUpdate: (data) =>
+        this.manager.sync.handleRemoteParticipantNameUpdate(data),
       experimentStart: (data) =>
-        this.manager.sync.handleRemoteExperimentStart(data),
+        this.manager.sync.handleRemoteExperimentInit(data),
       experimentStop: (data) =>
-        this.manager.sync.handleRemoteExperimentStop(data),
+        this.manager.sync.handleRemoteExperimentStopped(data),
       experimentPause: (data) =>
-        this.manager.sync.handleRemoteExperimentPause(data),
+        this.manager.sync.handleRemoteExperimentPaused(data),
       experimentResume: (data) =>
-        this.manager.sync.handleRemoteExperimentResume(data),
-      powerOn: (data) => this.manager.sync.handleRemotePowerOn(data),
-      powerOff: (data) => this.manager.sync.handleRemotePowerOff(data),
+        this.manager.sync.handleRemoteExperimentResumed(data),
       unitSelectionUpdate: (data) =>
-        this.manager.sync.handleRemoteUnitSelectionUpdate(data),
+        this.manager.sync.handleRemoteCombinationSelected(data),
       combinationUpdate: (data) =>
         this.manager.sync.handleRemoteCombinationUpdate(data),
       stepNavigation: (data) =>
@@ -256,7 +247,7 @@ class PanelExperimentUI {
       uiStateUpdate: (data) =>
         this.manager.sync.handleRemoteUIStateUpdate(data),
       experimentReset: (data) =>
-        this.manager.sync.handleRemoteExperimentReset(data)
+        this.manager.sync.handleRemoteExperimentReset(data),
     };
 
     // 註冊同步事件
@@ -267,19 +258,15 @@ class PanelExperimentUI {
     // 廣播事件監聽器
     window.addEventListener("experiment_id_broadcasted", (e) => {
       if (e.detail?.experimentId) {
-        this.manager.handleRemoteExperimentIdUpdate({
-          experimentId: e.detail.experimentId,
-          source: e.detail.source || "broadcast"
-        });
+        this.manager.currentExperimentId = e.detail.experimentId;
+        this.updateExperimentIdDisplay();
       }
     });
 
-    window.addEventListener("subject_name_broadcasted", (e) => {
-      if (e.detail?.subjectName) {
-        this.manager.handleRemoteSubjectNameUpdate({
-          subjectName: e.detail.subjectName,
-          source: e.detail.source || "broadcast"
-        });
+    window.addEventListener("participant_name_broadcasted", (e) => {
+      if (e.detail?.participantName) {
+        this.manager.currentParticipantName = e.detail.participantName;
+        this.updateParticipantNameDisplay();
       }
     });
 
@@ -329,7 +316,7 @@ class PanelExperimentUI {
 
     // 電源狀態變化監聽
     window.addEventListener("power_state_changed", (event) => {
-      this.manager.onPowerStateChanged(event.detail.isPowerOn);
+      this.manager.power.onPowerStateChanged(event.detail.isPowerOn);
     });
 
     // 單元選擇相關事件
@@ -360,7 +347,7 @@ class PanelExperimentUI {
     const unitList = this.manager.getCachedElement("experiment-units-list");
     if (unitList) {
       unitList.addEventListener("change", (e) => {
-        if (e.target.matches("input[name=\"unitCheckbox\"]")) {
+        if (e.target.matches('input[name="unitCheckbox"]')) {
           this.manager.ui.updateUnitSelectionUI();
           this.manager.updateSelectAllState();
         }
@@ -378,7 +365,7 @@ class PanelExperimentUI {
       if (combinationItem) {
         const combinationId = combinationItem.dataset.combinationId;
         const combination = window.combinationsData?.find(
-          (c) => c.combination_id === combinationId
+          (c) => c.combination_id === combinationId,
         );
         if (combination) {
           this.manager.units.handleCombinationSelection(combination);
@@ -449,7 +436,7 @@ class PanelExperimentUI {
             this.manager.currentExperimentId = experimentId;
             if (window.experimentStateManager) {
               window.experimentStateManager.syncExperimentIdWithInput(
-                experimentId
+                experimentId,
               );
             }
             return;
@@ -521,27 +508,19 @@ class PanelExperimentUI {
     this.manager.units.renderUnitList();
 
     // 載入並渲染預設組合
-    this.manager.renderDefaultSequences();
-
-    // 初始化UI狀態
-    this.manager.ui.initializeUI();
+    this.manager.units.renderDefaultSequences();
 
     // 設定預設組合（如果有的話）
-    this.manager.applyDefaultCombination();
+    this.manager.units.selectDefaultCombination();
 
     Logger.debug("實驗UI初始化完成");
   }
 
   /**
-   * 生成新的實驗ID
+   * 產生新的實驗ID
    */
   generateNewExperimentId() {
-    const timestamp = new Date()
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[:-]/g, "");
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const newId = `EXP${timestamp}${random}`;
+    const newId = RandomUtils.generateNewExperimentId();
 
     this.manager.currentExperimentId = newId;
     this.updateExperimentIdDisplay();
@@ -549,7 +528,7 @@ class PanelExperimentUI {
     // 廣播新的實驗ID
     this.broadcastExperimentId();
 
-    Logger.info(`生成新實驗ID: ${newId}`);
+    Logger.info(`產生新實驗ID: ${newId}`);
     return newId;
   }
 
@@ -560,7 +539,7 @@ class PanelExperimentUI {
     const experimentIdInput =
       this.manager.getCachedElement("experimentIdInput");
     const experimentIdDisplay = this.manager.getCachedElement(
-      "experimentIdDisplay"
+      "experimentIdDisplay",
     );
 
     if (experimentIdInput && this.manager.currentExperimentId) {
@@ -573,7 +552,7 @@ class PanelExperimentUI {
   }
 
   /**
-   * 取得當前實驗ID
+   * 取得目前實驗ID
    */
   getCurrentExperimentId() {
     return this.manager.currentExperimentId;
@@ -591,17 +570,17 @@ class PanelExperimentUI {
         detail: {
           experimentId: this.manager.currentExperimentId,
           source: this.manager.clientId,
-          timestamp: new Date().toISOString()
-        }
-      })
+          timestamp: new Date().toISOString(),
+        },
+      }),
     );
 
     // 如果在同步模式下，發送同步事件
     if (window.syncManager?.isActive) {
-      window.syncManager.broadcast("experiment_id_update", {
+      window.syncManager.broadcast("experiment_id_changed", {
         experimentId: this.manager.currentExperimentId,
         source: this.manager.clientId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -617,10 +596,10 @@ class PanelExperimentUI {
     const oldId = this.manager.currentExperimentId;
     this.manager.currentExperimentId = data.experimentId;
 
-    // 如果實驗正在運行，排程更新
+    // 如果實驗正在進行，排程更新
     if (this.manager.isExperimentRunning) {
       this.manager.pendingExperimentIdUpdate = data.experimentId;
-      Logger.info(`實驗運行中，排程ID更新: ${data.experimentId}`);
+      Logger.info(`實驗進行中，排程ID更新: ${data.experimentId}`);
     } else {
       this.updateExperimentIdDisplay();
       Logger.info(`遠端實驗ID更新: ${oldId} -> ${data.experimentId}`);
@@ -630,10 +609,10 @@ class PanelExperimentUI {
     if (window.logger) {
       window.logger.logAction(
         `ID變更(${oldId} -> ${data.experimentId})`,
-        "experiment_id_update",
+        "experiment_id_changed",
         data.experimentId,
         false,
-        false
+        false,
       );
     }
   }
@@ -641,29 +620,29 @@ class PanelExperimentUI {
   /**
    * 處理遠端受試者名稱更新
    */
-  handleRemoteSubjectNameUpdate(data) {
-    if (!data?.subjectName) return;
+  handleRemoteParticipantNameUpdate(data) {
+    if (!data?.participantName) return;
 
-    const oldName = this.manager.currentSubjectName || "";
-    this.manager.currentSubjectName = data.subjectName;
+    const oldName = this.manager.currentParticipantName || "";
+    this.manager.currentParticipantName = data.participantName;
 
-    // 如果實驗正在運行，排程更新
+    // 如果實驗正在進行，排程更新
     if (this.manager.isExperimentRunning) {
-      this.manager.pendingSubjectNameUpdate = data.subjectName;
-      Logger.info(`實驗運行中，排程受試者名稱更新: ${data.subjectName}`);
+      this.manager.pendingParticipantNameUpdate = data.participantName;
+      Logger.info(`實驗進行中，排程受試者名稱更新: ${data.participantName}`);
     } else {
-      this.updateSubjectNameDisplay();
-      Logger.info(`遠端受試者名稱更新: ${oldName} -> ${data.subjectName}`);
+      this.updateParticipantNameDisplay();
+      Logger.info(`遠端受試者名稱更新: ${oldName} -> ${data.participantName}`);
     }
 
     // 記錄日誌
     if (window.logger) {
       window.logger.logAction(
-        `受試者變更(${oldName} -> ${data.subjectName})`,
-        "subject_name_update",
-        data.subjectName,
+        `受試者變更(${oldName} -> ${data.participantName})`,
+        "participant_name_update",
+        data.participantName,
         false,
-        false
+        false,
       );
     }
   }
@@ -671,40 +650,44 @@ class PanelExperimentUI {
   /**
    * 更新受試者名稱顯示
    */
-  updateSubjectNameDisplay() {
-    const subjectNameInput = this.manager.getCachedElement("subjectNameInput");
-    const subjectNameDisplay =
-      this.manager.getCachedElement("subjectNameDisplay");
+  updateParticipantNameDisplay() {
+    const participantNameInput = this.manager.getCachedElement(
+      "participantNameInput",
+    );
+    const participantNameDisplay = this.manager.getCachedElement(
+      "participantNameDisplay",
+    );
 
-    if (subjectNameInput && this.manager.currentSubjectName) {
-      subjectNameInput.value = this.manager.currentSubjectName;
+    if (participantNameInput && this.manager.currentParticipantName) {
+      participantNameInput.value = this.manager.currentParticipantName;
     }
 
-    if (subjectNameDisplay && this.manager.currentSubjectName) {
-      subjectNameDisplay.textContent = this.manager.currentSubjectName;
+    if (participantNameDisplay && this.manager.currentParticipantName) {
+      participantNameDisplay.textContent = this.manager.currentParticipantName;
     }
   }
 
   /**
-   * 應用待定的ID更新
+   * 套用待定的ID更新
    */
   applyPendingIdUpdates() {
     if (this.manager.pendingExperimentIdUpdate) {
       this.manager.currentExperimentId = this.manager.pendingExperimentIdUpdate;
       this.updateExperimentIdDisplay();
       Logger.info(
-        `應用待定實驗ID更新: ${this.manager.pendingExperimentIdUpdate}`
+        `套用待定實驗ID更新: ${this.manager.pendingExperimentIdUpdate}`,
       );
       this.manager.pendingExperimentIdUpdate = null;
     }
 
-    if (this.manager.pendingSubjectNameUpdate) {
-      this.manager.currentSubjectName = this.manager.pendingSubjectNameUpdate;
-      this.updateSubjectNameDisplay();
+    if (this.manager.pendingParticipantNameUpdate) {
+      this.manager.currentParticipantName =
+        this.manager.pendingParticipantNameUpdate;
+      this.updateParticipantNameDisplay();
       Logger.info(
-        `應用待定受試者名稱更新: ${this.manager.pendingSubjectNameUpdate}`
+        `套用待定受試者名稱更新: ${this.manager.pendingParticipantNameUpdate}`,
       );
-      this.manager.pendingSubjectNameUpdate = null;
+      this.manager.pendingParticipantNameUpdate = null;
     }
   }
 
@@ -718,10 +701,10 @@ class PanelExperimentUI {
       Logger.info(`從同步狀態恢復實驗ID: ${syncState.experimentId}`);
     }
 
-    if (syncState?.subjectName) {
-      this.manager.currentSubjectName = syncState.subjectName;
-      this.updateSubjectNameDisplay();
-      Logger.info(`從同步狀態恢復受試者名稱: ${syncState.subjectName}`);
+    if (syncState?.participantName) {
+      this.manager.currentParticipantName = syncState.participantName;
+      this.updateParticipantNameDisplay();
+      Logger.info(`從同步狀態恢復受試者名稱: ${syncState.participantName}`);
     }
   }
 }

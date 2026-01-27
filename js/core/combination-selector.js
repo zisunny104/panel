@@ -25,7 +25,7 @@ class CombinationSelector {
     });
 
     // 監聽實驗ID更新
-    window.addEventListener("experiment_id_updated", (e) => {
+    window.addEventListener("experiment_id_changed", (e) => {
       // 當實驗ID更新時，如果已有組合，需要重新套用以更新隨機順序
       if (this.currentCombination) {
         this.selectCombination(this.currentCombination, e.detail?.experimentId);
@@ -169,10 +169,7 @@ class CombinationSelector {
       if (fullCombination) {
         this.selectCombination(fullCombination, experimentId);
       } else {
-        Logger.warn(
-          "本機快取的組合找不到:",
-          savedCombination.combination_id
-        );
+        Logger.warn("本機快取的組合找不到:", savedCombination.combination_id);
       }
       return;
     }
@@ -189,10 +186,7 @@ class CombinationSelector {
         this.selectCombination(defaultCombination, experimentId);
         return;
       } else {
-        Logger.warn(
-          "設定的預設組合找不到:",
-          defaultCombinationId
-        );
+        Logger.warn("設定的預設組合找不到:", defaultCombinationId);
       }
     }
 
@@ -204,20 +198,6 @@ class CombinationSelector {
     }
 
     Logger.error("沒有任何可用的組合");
-  }
-
-  /**
-   * 發送同步事件
-   */
-  sendSyncEvent(eventType, data) {
-    if (
-      window.SyncManager &&
-      typeof window.SyncManager.sendEvent === "function"
-    ) {
-      window.SyncManager.sendEvent(eventType, data);
-    } else {
-      Logger.warn("SyncManager 不可用，無法發送同步事件");
-    }
   }
 
   /**
@@ -341,8 +321,8 @@ class CombinationSelector {
       typeof window.SyncManager.syncState === "function"
     ) {
       window.SyncManager.syncState({
-        type: "combination_selected",
-        device_id:
+        type: window.SyncDataTypes.COMBINATION_SELECTED,
+        clientId:
           window.syncManager?.core?.syncClient?.clientId ||
           "combination_selector",
         combination: {
@@ -460,8 +440,3 @@ class CombinationSelector {
 
 // 建立全域實例
 window.CombinationSelector = new CombinationSelector();
-
-
-
-
-

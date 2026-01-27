@@ -20,7 +20,7 @@ class MainApp {
       // 等待 DOM 完全載入
       if (document.readyState !== "complete") {
         await new Promise((resolve) =>
-          window.addEventListener("load", resolve, { once: true })
+          window.addEventListener("load", resolve, { once: true }),
         );
       }
 
@@ -36,7 +36,7 @@ class MainApp {
             "SyncManager 已初始化",
             window.syncManager?.core?.syncClient?.sessionId
               ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
-              : "本機模式"
+              : "本機模式",
           );
           resolve();
           return;
@@ -50,14 +50,14 @@ class MainApp {
               "SyncManager 已就緒",
               window.syncManager?.core?.syncClient?.sessionId
                 ? `同步模式 (sessionId: ${window.syncManager.core.syncClient.sessionId})`
-                : "本機模式"
+                : "本機模式",
             );
             resolve();
           }
         };
 
         window.addEventListener("sync:client-initialized", handleClientInit, {
-          once: true
+          once: true,
         });
 
         // 設置超時保護
@@ -67,7 +67,7 @@ class MainApp {
             Logger.warn("等待 SyncManager 超時，繼續初始化");
             window.removeEventListener(
               "sync:client-initialized",
-              handleClientInit
+              handleClientInit,
             );
             resolve();
           }
@@ -100,16 +100,16 @@ class MainApp {
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => {
               reject(new Error("ExperimentHubManager 初始化超時 (5秒)"));
-            }, 5000)
+            }, 5000),
           );
 
           window.experimentHubManager = await Promise.race([
             initializeExperimentHub(),
-            timeoutPromise
+            timeoutPromise,
           ]);
 
           Logger.info("ExperimentHubManager 已初始化（全域單一實例）", {
-            syncMode: window.experimentHubManager.isInSyncMode()
+            syncMode: window.experimentHubManager.isInSyncMode(),
           });
         } catch (error) {
           Logger.warn("ExperimentHubManager 初始化失敗或超時:", error.message);
@@ -128,9 +128,11 @@ class MainApp {
       this.initializationComplete = true;
       this.setupExperimentPanelButtonColor();
     } catch (error) {
-      this.handleError(error, "初始化");
+      Logger.error("初始化失敗:", error);
     }
   }
+
+  // ============ 按鈕顏色控制 ============
 
   // 根據實驗狀態切換 experimentPanelButton 底色
   setupExperimentPanelButtonColor() {
@@ -159,6 +161,8 @@ class MainApp {
     }
   }
 
+  // ============ 模組管理 ============
+
   // 建立模組
   createModules() {
     this.modules = {
@@ -169,11 +173,9 @@ class MainApp {
       logger: window.logger,
       experiment: window.panelExperiment,
       powerControl: window.powerControl,
-      syncManager: window.syncManager || {}
+      syncManager: window.syncManager || {},
+      actionManager: window.actionManager,
     };
-
-    // 建立動作管理器實例
-    this.createActionManager();
 
     // 將同步管理器設為全域可存取
     window.syncManager = this.modules.syncManager;
@@ -192,7 +194,20 @@ class MainApp {
     }
     // 按鈕管理器
     if (this.modules.buttonManager) {
-      await this.modules.buttonManager.loadButtonFunctions();
+      // 檢查是否已經載入按鈕功能（在構造函數中已載入）
+      if (
+        !this.modules.buttonManager.buttonFunctionsMap ||
+        Object.keys(this.modules.buttonManager.buttonFunctionsMap).length === 0
+      ) {
+        await this.modules.buttonManager.loadButtonFunctions();
+      } else {
+        Logger.debug("按鈕功能已載入，跳過重複載入");
+      }
+    }
+    // 動作管理器
+    if (this.modules.actionManager) {
+      // ActionManager 會自動初始化，這裡確保它已準備就緒
+      Logger.debug("ActionManager 已初始化");
     }
     // 電源控制
     if (this.modules.powerControl) {
@@ -223,6 +238,8 @@ class MainApp {
     }
   }
 
+  // ============ 同步事件處理 ============
+
   // 設定模組間依賴
   setupModuleDependencies() {
     // 監聽同步狀態更新事件
@@ -246,25 +263,25 @@ class MainApp {
   handleSyncExperimentStart(syncData) {
     // 更新面板的實驗資訊
     const expIdInput = document.getElementById("experimentIdInput");
-    const subjectInput = document.getElementById("subjectName");
+    const participantInput = document.getElementById("participantNameInput");
 
     if (expIdInput && syncData.experiment_id) {
       expIdInput.value = syncData.experiment_id;
     }
-    if (subjectInput && syncData.subject_name) {
-      subjectInput.value = syncData.subject_name;
+    if (participantInput && syncData.participant_name) {
+      participantInput.value = syncData.participant_name;
     }
 
-    // 檢查是否在 experiment.html
-    if (this.modules.experimentPageManager) {
+    // 檢查是否在 board.html
+    if (this.modules.boardPageManager) {
       const isRunning =
-        this.modules.experimentPageManager.experimentRunning ||
-        this.modules.experimentPageManager.state?.running ||
+        this.modules.boardPageManager.experimentRunning ||
+        this.modules.boardPageManager.state?.running ||
         false;
 
       if (!isRunning) {
         try {
-          this.modules.experimentPageManager.startExperiment();
+          this.modules.boardPageManager.startExperiment();
         } catch (error) {
           Logger.error("直接調用失敗:", error);
         }
@@ -278,10 +295,7 @@ class MainApp {
         try {
           window.panelExperiment.startExperiment();
         } catch (error) {
-          Logger.error(
-            "panelExperiment.startExperiment() 失敗:",
-            error
-          );
+          Logger.error("panelExperiment.startExperiment() 失敗:", error);
         }
       }
     } else {
@@ -290,16 +304,22 @@ class MainApp {
 
     // 記錄這個同步事件到日誌
     if (this.modules.logger) {
-      const deviceId = localStorage.getItem("sync_client_id") || "unknown";
+      const clientId = localStorage.getItem("sync_client_id") || "unknown";
+      const sourceClientId = syncData.clientId || "unknown";
+      const sourceType = syncData.source || "unknown";
       this.modules.logger.logAction(
-        `[同步] 實驗開始訊號來自: ${source}`,
+        `[同步] 實驗開始訊號來自 ${sourceType} (${sourceClientId})`,
         null,
         "handleSyncExperimentStart",
         false,
         false,
         false,
         null,
-        { device_id: deviceId, source: source }
+        {
+          client_id: clientId,
+          source_client_id: sourceClientId,
+          source_type: sourceType,
+        },
       );
     }
   }
@@ -321,9 +341,9 @@ class MainApp {
 
   // 通用實驗方法調用器
   callExperimentMethod(methodName, errorMessage, ...args) {
-    if (this.modules.experimentPageManager?.[methodName]) {
+    if (this.modules.boardPageManager?.[methodName]) {
       try {
-        this.modules.experimentPageManager[methodName](...args);
+        this.modules.boardPageManager[methodName](...args);
       } catch (error) {
         Logger.error(`${errorMessage}:`, error);
       }
@@ -347,12 +367,14 @@ class MainApp {
 
       // 分派事件通知其他模組（如果需要）
       document.dispatchEvent(
-        new CustomEvent("experimentIdChanged", {
-          detail: { experimentId, timestamp }
-        })
+        new CustomEvent("experiment_id_changed", {
+          detail: { experimentId, timestamp },
+        }),
       );
     }
   }
+
+  // ============ 設定載入 ============
 
   // 載入初始設定
   async loadInitialSettings() {
@@ -374,63 +396,6 @@ class MainApp {
     if (refCard) refCard.style.display = "none";
     if (settingsPanel) settingsPanel.classList.add("hidden");
   }
-
-  // 取得模組實例
-  getModule(name) {
-    return this.modules[name];
-  }
-
-  // 檢查初始化狀態
-  isInitialized() {
-    return this.initializationComplete;
-  }
-
-  // 重新載入設定
-  async reloadConfig() {
-    if (this.modules.config) {
-      await this.modules.config.loadConfigSettings();
-    }
-  }
-
-  // 重設應用程式狀態
-  reset() {
-    if (this.modules.logger) this.modules.logger.clearLog();
-    if (this.modules.mediaManager) this.modules.mediaManager.reset();
-    if (this.modules.buttonManager) {
-      this.modules.buttonManager.clearButtonFunctions();
-      this.modules.buttonManager.loadButtonFunctions();
-    }
-    if (this.modules.powerControl) {
-      this.modules.powerControl.isPowerOn = false;
-      this.modules.powerControl.isPowerVideoPlaying = false;
-      this.modules.powerControl.updatePowerUIWithoutSync(); // 重置時不觸發同步事件
-    }
-    if (
-      this.modules.experiment &&
-      this.modules.experiment.isExperimentRunning
-    ) {
-      //重置時不廣播（false = 不廣播）
-      this.modules.experiment.stopExperiment(false);
-    }
-  }
-
-  // 錯誤處理
-  handleError(error, context = "") {
-    Logger.error(`錯誤 ${context}:`, error);
-    if (this.modules.logger) {
-      this.modules.logger.logAction(`錯誤 ${context}: ${error.message}`);
-    }
-  }
-
-  // 建立動作管理器
-  createActionManager() {
-    if (!window.actionManager) {
-      window.actionManager = new ActionManager();
-      this.modules.actionManager = window.actionManager;
-    } else {
-      this.modules.actionManager = window.actionManager;
-    }
-  }
 }
 
 // 建立並初始化主應用程式
@@ -445,8 +410,3 @@ if (document.readyState === "loading") {
 
 // 匯出主應用程式實例
 window.mainApp = mainApp;
-
-
-
-
-

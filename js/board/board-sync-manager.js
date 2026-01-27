@@ -11,7 +11,7 @@ class ExperimentSyncManager {
       running: false,
       paused: false,
       startTime: null,
-      actions: []
+      actions: [],
     };
     this.initialize();
   }
@@ -20,12 +20,12 @@ class ExperimentSyncManager {
    * 產生唯一的裝置 ID
    */
   generateDeviceId() {
-    let deviceId = localStorage.getItem("exp_device_id");
+    let deviceId = localStorage.getItem("exp_client_id");
     if (!deviceId) {
       const timestamp = Date.now().toString(36);
       const random = Math.random().toString(36).substring(2, 8);
       deviceId = `EXP-${timestamp}-${random}`.toUpperCase();
-      localStorage.setItem("exp_device_id", deviceId);
+      localStorage.setItem("exp_client_id", deviceId);
     }
     return deviceId;
   }
@@ -102,10 +102,10 @@ class ExperimentSyncManager {
     });
 
     // 實驗狀態與資訊更新
-    // 注意：subjectNameUpdate 和 experimentIdUpdate 已由 experiment-page-manager 直接廣播
+    // 注意：subjectNameUpdate 和 experimentIdUpdate 已由 board-page-manager 直接廣播
     // 此監聽器僅保留用於按鈕動作廣播
     document.addEventListener("experimentStateChange", (event) => {
-      // 注意：受試者名稱和實驗ID更新已由 experiment-page-manager 使用 syncManager.core.syncState() 直接廣播
+      // 注意：受試者名稱和實驗ID更新已由 board-page-manager 使用 syncManager.core.syncState() 直接廣播
       // 此處不再轉發，避免重複廣播
       // 處理按鈕動作廣播
       if (event.detail?.type === "button_action") {
@@ -136,14 +136,12 @@ class ExperimentSyncManager {
         gesture_count:
           details?.gestureCount || details?.gestureSequence?.length || 0,
         timestamp: new Date().toISOString(),
-        state: { running: true, paused: false }
+        state: { running: true, paused: false },
       };
 
       await this.syncState(syncData);
     } catch (error) {
-      Logger.warn(
-        `廣播實驗開始失敗: ${error.message}，但本機實驗繼續進行`
-      );
+      Logger.warn(`廣播實驗開始失敗: ${error.message}，但本機實驗繼續進行`);
     }
   }
 
@@ -160,14 +158,12 @@ class ExperimentSyncManager {
         event: "experiment_paused",
         device_id: this.deviceId,
         timestamp: new Date().toISOString(),
-        state: { running: true, paused: true }
+        state: { running: true, paused: true },
       };
 
       await this.syncState(syncData);
     } catch (error) {
-      Logger.warn(
-        `廣播實驗暫停失敗: ${error.message}，但本機實驗繼續進行`
-      );
+      Logger.warn(`廣播實驗暫停失敗: ${error.message}，但本機實驗繼續進行`);
     }
   }
 
@@ -184,14 +180,12 @@ class ExperimentSyncManager {
         event: "experiment_resumed",
         device_id: this.deviceId,
         timestamp: new Date().toISOString(),
-        state: { running: true, paused: false }
+        state: { running: true, paused: false },
       };
 
       await this.syncState(syncData);
     } catch (error) {
-      Logger.warn(
-        `廣播實驗還原失敗: ${error.message}，但本機實驗繼續進行`
-      );
+      Logger.warn(`廣播實驗還原失敗: ${error.message}，但本機實驗繼續進行`);
     }
   }
 
@@ -207,7 +201,7 @@ class ExperimentSyncManager {
       event: "experiment_stopped",
       device_id: this.deviceId,
       timestamp: new Date().toISOString(),
-      state: { running: false, paused: false }
+      state: { running: false, paused: false },
     };
 
     await this.syncState(syncData);
@@ -225,7 +219,7 @@ class ExperimentSyncManager {
       unit_id: actionData?.unit_id,
       button_pressed: actionData?.button_pressed,
       timestamp: new Date().toISOString(),
-      details: actionData
+      details: actionData,
     };
 
     await this.syncState(syncData);
@@ -246,7 +240,7 @@ class ExperimentSyncManager {
       button_id: buttonData?.buttonData?.button,
       function: buttonData?.buttonData?.function,
       button_function: buttonData?.buttonData?.function,
-      timestamp: buttonData?.timestamp || new Date().toISOString()
+      timestamp: buttonData?.timestamp || new Date().toISOString(),
     };
 
     await this.syncState(syncData);
@@ -319,7 +313,7 @@ class ExperimentSyncManager {
         gestureCount: gestures.length,
         gesture_count: gestures.length,
         device_id: this.deviceId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -343,9 +337,9 @@ class ExperimentSyncManager {
           gestures: syncData.gesture_sequence || syncData.gestures,
           unit_count: syncData.unit_count,
           gesture_count: syncData.gesture_count,
-          timestamp: syncData.timestamp
-        }
-      })
+          timestamp: syncData.timestamp,
+        },
+      }),
     );
   }
 
@@ -364,7 +358,7 @@ class ExperimentSyncManager {
       experiment_started: "remote_experiment_started",
       experiment_paused: "remote_experiment_paused",
       experiment_resumed: "remote_experiment_resumed",
-      experiment_stopped: "remote_experiment_stopped"
+      experiment_stopped: "remote_experiment_stopped",
     };
 
     const eventName = eventMap[syncData.event];
@@ -388,9 +382,9 @@ class ExperimentSyncManager {
             gestureCount: syncData.gesture_count,
             gesture_count: syncData.gesture_count,
             state: syncData.state,
-            timestamp: syncData.timestamp
-          }
-        })
+            timestamp: syncData.timestamp,
+          },
+        }),
       );
     }
   }
@@ -408,7 +402,7 @@ class ExperimentSyncManager {
       experimentId: syncData.experiment_id,
       experiment_id: syncData.experiment_id,
       remote_device_id: syncData.device_id,
-      timestamp: syncData.timestamp
+      timestamp: syncData.timestamp,
     };
 
     // 調用面板管理器的處理函數
@@ -436,9 +430,7 @@ class ExperimentSyncManager {
    */
   handleRemoteExperimentIdChange(syncData) {
     if (syncData.device_id === this.deviceId) {
-      Logger.debug(
-        `略過自己的實驗ID更新: ${syncData.device_id}`
-      );
+      Logger.debug(`略過自己的實驗ID更新: ${syncData.device_id}`);
       return;
     }
 
@@ -449,7 +441,7 @@ class ExperimentSyncManager {
       experimentId: syncData.experiment_id,
       experiment_id: syncData.experiment_id,
       remote_device_id: syncData.device_id,
-      timestamp: syncData.timestamp
+      timestamp: syncData.timestamp,
     };
 
     // 調用面板管理器的處理函數
@@ -458,9 +450,7 @@ class ExperimentSyncManager {
       typeof window.panelExperiment.handleRemoteExperimentIdUpdate ===
         "function"
     ) {
-      Logger.debug(
-        "路由到 panelExperiment.handleRemoteExperimentIdUpdate"
-      );
+      Logger.debug("路由到 panelExperiment.handleRemoteExperimentIdUpdate");
       window.panelExperiment.handleRemoteExperimentIdUpdate(data);
     }
 
@@ -469,9 +459,7 @@ class ExperimentSyncManager {
       window.app &&
       typeof window.app.handleRemoteExperimentIdUpdate === "function"
     ) {
-      Logger.debug(
-        "路由到 app.handleRemoteExperimentIdUpdate"
-      );
+      Logger.debug("路由到 app.handleRemoteExperimentIdUpdate");
       window.app.handleRemoteExperimentIdUpdate(data);
     }
   }
@@ -481,9 +469,7 @@ class ExperimentSyncManager {
    */
   handleRemoteCombinationSelected(syncData) {
     if (syncData.device_id === this.deviceId) {
-      Logger.debug(
-        `略過自己的組合選擇: ${syncData.device_id}`
-      );
+      Logger.debug(`略過自己的組合選擇: ${syncData.device_id}`);
       return;
     }
 
@@ -495,9 +481,9 @@ class ExperimentSyncManager {
         detail: {
           combination: syncData.combination,
           device_id: syncData.device_id,
-          timestamp: syncData.timestamp
-        }
-      })
+          timestamp: syncData.timestamp,
+        },
+      }),
     );
 
     // 調用面板管理器的處理函數
@@ -506,13 +492,11 @@ class ExperimentSyncManager {
       typeof window.panelExperiment.handleRemoteCombinationSelected ===
         "function"
     ) {
-      Logger.debug(
-        "路由到 panelExperiment.handleRemoteCombinationSelected"
-      );
+      Logger.debug("路由到 panelExperiment.handleRemoteCombinationSelected");
       window.panelExperiment.handleRemoteCombinationSelected({
         combination: syncData.combination,
         device_id: syncData.device_id,
-        timestamp: syncData.timestamp
+        timestamp: syncData.timestamp,
       });
     }
 
@@ -523,10 +507,10 @@ class ExperimentSyncManager {
         "function"
     ) {
       Logger.debug(
-        "路由到 combinationSelector.handleRemoteCombinationSelected"
+        "路由到 combinationSelector.handleRemoteCombinationSelected",
       );
       window.combinationSelector.handleRemoteCombinationSelected(
-        syncData.combination
+        syncData.combination,
       );
     }
   }
@@ -547,9 +531,9 @@ class ExperimentSyncManager {
           button_id: syncData.button,
           function: syncData.function,
           button_function: syncData.function,
-          timestamp: syncData.timestamp
-        }
-      })
+          timestamp: syncData.timestamp,
+        },
+      }),
     );
   }
 
@@ -568,9 +552,9 @@ class ExperimentSyncManager {
           unit_id: syncData.unit_id,
           button_pressed: syncData.button_pressed,
           timestamp: syncData.timestamp,
-          details: syncData.details
-        }
-      })
+          details: syncData.details,
+        },
+      }),
     );
   }
 
@@ -581,7 +565,7 @@ class ExperimentSyncManager {
     if (syncData.device_id === this.deviceId) return;
 
     const buttons = document.querySelectorAll(
-      `.action-button[data-action-id="${syncData.action_id}"][data-gesture-index="${syncData.gesture_index}"]`
+      `.action-button[data-action-id="${syncData.action_id}"][data-gesture-index="${syncData.gesture_index}"]`,
     );
 
     buttons.forEach((button) => {
@@ -590,7 +574,7 @@ class ExperimentSyncManager {
           button,
           syncData.action_id,
           syncData.gesture_index,
-          true
+          true,
         );
       }
     });
@@ -603,7 +587,7 @@ class ExperimentSyncManager {
     if (syncData.device_id === this.deviceId) return;
 
     const buttons = document.querySelectorAll(
-      `.action-button[data-action-id="${syncData.action_id}"][data-gesture-index="${syncData.gesture_index}"]`
+      `.action-button[data-action-id="${syncData.action_id}"][data-gesture-index="${syncData.gesture_index}"]`,
     );
 
     buttons.forEach((button) => {
@@ -627,9 +611,9 @@ class ExperimentSyncManager {
           step_index: syncData.step_index,
           gesture_name: syncData.gesture_name,
           timer_value: syncData.timer_value,
-          timestamp: syncData.timestamp
-        }
-      })
+          timestamp: syncData.timestamp,
+        },
+      }),
     );
   }
 
@@ -640,7 +624,7 @@ class ExperimentSyncManager {
     return {
       connected: this.isConnected,
       deviceId: this.deviceId,
-      experimentState: this.experimentState
+      experimentState: this.experimentState,
     };
   }
 }
@@ -653,8 +637,3 @@ if (document.readyState === "loading") {
 } else {
   window.experimentSyncManager = new ExperimentSyncManager();
 }
-
-
-
-
-

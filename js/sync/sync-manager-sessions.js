@@ -246,6 +246,7 @@ export class SyncManagerSessions {
 
   /**
    * 格式化同步狀態資料為易讀格式
+   * 將 JSON 物件轉換為帶語法高亮的 HTML 顯示格式
    */
   formatSyncState(state) {
     // 如果 state 是字串，先解析為物件
@@ -262,6 +263,7 @@ export class SyncManagerSessions {
       return "<span class=\"sync-state-empty\">無資料</span>";
     }
 
+    // 遞歸格式化函數：將值轉換為帶顏色的 HTML 標籤
     const formatValue = (value, indent = 0) => {
       const indentStr = "  ".repeat(indent);
 
@@ -335,6 +337,11 @@ ${indentStr}}</span>`;
 
     return `<div class="sync-state-formatted">${formatValue(state)}</div>`;
   }
+
+  /**
+   * 渲染工作階段詳細資訊
+   * 生成包含分享代碼、裝置列表和同步狀態的工作階段詳情 HTML
+   */
   renderSessionDetails(session) {
     // 處理分享代碼資訊（支援多個分享代碼）
     const shareCodeInfo = (() => {
@@ -495,7 +502,8 @@ ${indentStr}}</span>`;
   }
 
   /**
-   * 綁定事件
+   * 綁定所有事件監聽器
+   * 包括按鈕點擊、勾選框變化、卡片展開/收合等用戶交互事件
    */
   bindEvents() {
     // 關閉按鈕
@@ -507,111 +515,101 @@ ${indentStr}}</span>`;
 
     // 重新整理按鈕
     const refreshBtn = this.sessionsPanel.querySelector("#refreshSessionsBtn");
-    refreshBtn.addEventListener("click", () => {
+    refreshBtn.addEventListener("click", async () => {
       refreshBtn.disabled = true;
       refreshBtn.textContent = "載入中...";
 
-      // 將重操作移到下一個事件循環
-      setTimeout(async () => {
-        await this.loadSessionsData();
-        const sessionsList = this.sessionsPanel.querySelector("#sessionsList");
-        sessionsList.innerHTML = this.renderSessionsList();
+      await this.loadSessionsData();
+      const sessionsList = this.sessionsPanel.querySelector("#sessionsList");
+      sessionsList.innerHTML = this.renderSessionsList();
 
-        refreshBtn.disabled = false;
-        refreshBtn.textContent = "重新整理";
-      }, 0);
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = "重新整理";
     });
 
     // 刪除所有工作階段按鈕
     const clearAllBtn = this.sessionsPanel.querySelector(
       "#clearAllSessionsBtn"
     );
-    clearAllBtn.addEventListener("click", () => {
-      // 將所有操作（包括確認對話框）移到下一個事件循環
-      setTimeout(async () => {
-        if (!confirm("確定要刪除所有工作階段嗎？此操作無法還原。")) {
-          return;
-        }
+    clearAllBtn.addEventListener("click", async () => {
+      if (!confirm("確定要刪除所有工作階段嗎？此操作無法還原。")) {
+        return;
+      }
 
-        clearAllBtn.disabled = true;
-        clearAllBtn.textContent = "刪除中...";
+      clearAllBtn.disabled = true;
+      clearAllBtn.textContent = "刪除中...";
 
-        try {
-          const response = await fetch(
-            `${this.getApiUrl()}/sync/sessions/clear`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-          const data = await response.json();
-
-          if (data.success) {
-            // 清空本機資料
-            this.sessionsData = [];
-            this.expandedCards.clear();
-
-            // 高效更新：直接顯示空狀態而不是重新渲染
-            const sessionsList =
-              this.sessionsPanel.querySelector("#sessionsList");
-            sessionsList.innerHTML = `
-              <div class="sync-sessions-empty">
-                目前沒有工作階段
-              </div>
-            `;
-          } else {
-            alert("刪除失敗: " + data.message);
+      try {
+        const response = await fetch(
+          `${this.getApiUrl()}/sync/sessions/clear`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
           }
-        } catch (error) {
-          Logger.error("刪除所有工作階段錯誤:", error);
-          alert("刪除失敗: " + error.message);
-        }
+        );
+        const data = await response.json();
 
-        clearAllBtn.disabled = false;
-        clearAllBtn.textContent = "刪除所有工作階段";
-      }, 0);
+        if (data.success) {
+          // 清空本機資料
+          this.sessionsData = [];
+          this.expandedCards.clear();
+
+          // 高效更新：直接顯示空狀態而不是重新渲染
+          const sessionsList =
+            this.sessionsPanel.querySelector("#sessionsList");
+          sessionsList.innerHTML = `
+            <div class="sync-sessions-empty">
+              目前沒有工作階段
+            </div>
+          `;
+        } else {
+          alert("刪除失敗: " + data.message);
+        }
+      } catch (error) {
+        Logger.error("刪除所有工作階段錯誤:", error);
+        alert("刪除失敗: " + error.message);
+      }
+
+      clearAllBtn.disabled = false;
+      clearAllBtn.textContent = "刪除所有工作階段";
     });
 
     // 結束所有活動中工作階段按鈕
     const stopAllActiveBtn = this.sessionsPanel.querySelector(
       "#stopAllActiveSessionsBtn"
     );
-    stopAllActiveBtn.addEventListener("click", () => {
-      setTimeout(async () => {
-        const activeSessions = this.sessionsData.filter((session) => {
-          const isActive = Date.now() / 1000 - session.lastActivity < 600;
-          return isActive;
-        });
+    stopAllActiveBtn.addEventListener("click", async () => {
+      const activeSessions = this.sessionsData.filter((session) => {
+        const isActive = Date.now() / 1000 - session.lastActivity < 600;
+        return isActive;
+      });
 
-        if (activeSessions.length === 0) {
-          alert("目前沒有活動中的工作階段");
-          return;
-        }
+      if (activeSessions.length === 0) {
+        alert("目前沒有活動中的工作階段");
+        return;
+      }
 
-        if (
-          !confirm(
-            `確定要結束所有 ${activeSessions.length} 個活動中工作階段嗎？`
-          )
-        ) {
-          return;
-        }
+      if (
+        !confirm(`確定要結束所有 ${activeSessions.length} 個活動中工作階段嗎？`)
+      ) {
+        return;
+      }
 
-        stopAllActiveBtn.disabled = true;
-        stopAllActiveBtn.textContent = "處理中...";
+      stopAllActiveBtn.disabled = true;
+      stopAllActiveBtn.textContent = "處理中...";
 
-        try {
-          // 這裡可以實現結束活動中工作階段的邏輯
-          // 目前先顯示成功訊息
-          alert(`已結束 ${activeSessions.length} 個活動中工作階段`);
-          await this.refreshSessionsList();
-        } catch (error) {
-          Logger.error("結束活動中工作階段錯誤:", error);
-          alert("操作失敗: " + error.message);
-        }
+      try {
+        // 這裡可以實現結束活動中工作階段的邏輯
+        // 目前先顯示成功訊息
+        alert(`已結束 ${activeSessions.length} 個活動中工作階段`);
+        await this.refreshSessionsList();
+      } catch (error) {
+        Logger.error("結束活動中工作階段錯誤:", error);
+        alert("操作失敗: " + error.message);
+      }
 
-        stopAllActiveBtn.disabled = false;
-        stopAllActiveBtn.textContent = "結束所有活動中工作階段";
-      }, 0);
+      stopAllActiveBtn.disabled = false;
+      stopAllActiveBtn.textContent = "結束所有活動中工作階段";
     });
 
     // 全選按鈕
@@ -721,63 +719,59 @@ ${indentStr}}</span>`;
     const deleteSelectedBtn = this.sessionsPanel.querySelector(
       "#deleteSelectedSessionsBtn"
     );
-    deleteSelectedBtn.addEventListener("click", () => {
-      setTimeout(async () => {
-        if (this.selectedSessions.size === 0) {
-          alert("請先選取要刪除的工作階段");
-          return;
+    deleteSelectedBtn.addEventListener("click", async () => {
+      if (this.selectedSessions.size === 0) {
+        alert("請先選取要刪除的工作階段");
+        return;
+      }
+
+      if (
+        !confirm(
+          `確定要刪除選取的 ${this.selectedSessions.size} 個工作階段嗎？此操作無法還原。`
+        )
+      ) {
+        return;
+      }
+
+      deleteSelectedBtn.disabled = true;
+      deleteSelectedBtn.textContent = "刪除中...";
+
+      try {
+        const deletePromises = Array.from(this.selectedSessions).map(
+          (sessionId) =>
+            fetch(`${this.getApiUrl()}/sync/session/${sessionId}`, {
+              method: "DELETE"
+            }).then((response) => response.json())
+        );
+
+        const results = await Promise.all(deletePromises);
+        const successCount = results.filter((result) => result.success).length;
+        const failCount = results.length - successCount;
+
+        // 從本機資料中移除已刪除的工作階段
+        this.sessionsData = this.sessionsData.filter(
+          (session) => !this.selectedSessions.has(session.id)
+        );
+
+        // 清空選取狀態
+        this.selectedSessions.clear();
+
+        // 重新渲染列表
+        await this.refreshSessionsList();
+
+        if (failCount === 0) {
+          alert(`成功刪除 ${successCount} 個工作階段`);
+        } else {
+          alert(`刪除完成：成功 ${successCount} 個，失敗 ${failCount} 個`);
         }
+      } catch (error) {
+        Logger.error("批次刪除工作階段錯誤:", error);
+        alert("批次刪除失敗: " + error.message);
+      }
 
-        if (
-          !confirm(
-            `確定要刪除選取的 ${this.selectedSessions.size} 個工作階段嗎？此操作無法還原。`
-          )
-        ) {
-          return;
-        }
-
-        deleteSelectedBtn.disabled = true;
-        deleteSelectedBtn.textContent = "刪除中...";
-
-        try {
-          const deletePromises = Array.from(this.selectedSessions).map(
-            (sessionId) =>
-              fetch(`${this.getApiUrl()}/sync/session/${sessionId}`, {
-                method: "DELETE"
-              }).then((response) => response.json())
-          );
-
-          const results = await Promise.all(deletePromises);
-          const successCount = results.filter(
-            (result) => result.success
-          ).length;
-          const failCount = results.length - successCount;
-
-          // 從本機資料中移除已刪除的工作階段
-          this.sessionsData = this.sessionsData.filter(
-            (session) => !this.selectedSessions.has(session.id)
-          );
-
-          // 清空選取狀態
-          this.selectedSessions.clear();
-
-          // 重新渲染列表
-          await this.refreshSessionsList();
-
-          if (failCount === 0) {
-            alert(`成功刪除 ${successCount} 個工作階段`);
-          } else {
-            alert(`刪除完成：成功 ${successCount} 個，失敗 ${failCount} 個`);
-          }
-        } catch (error) {
-          Logger.error("批次刪除工作階段錯誤:", error);
-          alert("批次刪除失敗: " + error.message);
-        }
-
-        deleteSelectedBtn.disabled = false;
-        deleteSelectedBtn.textContent = "刪除選取工作階段";
-        this.updateBatchOperationButtons();
-      }, 0);
+      deleteSelectedBtn.disabled = false;
+      deleteSelectedBtn.textContent = "刪除選取工作階段";
+      this.updateBatchOperationButtons();
     });
 
     // 統一的事件處理器：處理卡片展開/收合、同步狀態展開/收合、以及各種按鈕點擊
@@ -799,8 +793,7 @@ ${indentStr}}</span>`;
       if (event.target.classList.contains("sync-delete-session-btn")) {
         const sessionId = event.target.dataset.sessionId;
 
-        // 將所有操作（包括確認對話框）移到下一個事件循環
-        setTimeout(async () => {
+        (async () => {
           if (!confirm(`確定要刪除工作階段 ${sessionId} 嗎？`)) {
             return;
           }
@@ -854,7 +847,7 @@ ${indentStr}}</span>`;
             event.target.disabled = false;
             event.target.textContent = "刪除";
           }
-        }, 0);
+        })();
         return;
       }
 
@@ -970,8 +963,3 @@ ${indentStr}}</span>`;
     this.selectedSessions.clear();
   }
 }
-
-
-
-
-

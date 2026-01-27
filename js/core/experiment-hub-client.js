@@ -144,7 +144,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
         this.triggerExperimentStateChange({ state: "stopped", ...data });
       });
 
-      this.wsClient.on("experiment_id_update", (data) => {
+      this.wsClient.on("experiment_id_changed", (data) => {
         Logger.debug("實驗 ID 更新", data);
         // 檢查是否是自己的更新（避免回音）
         if (data.clientId !== this.getClientId()) {
@@ -161,7 +161,7 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
 
       this.wsClient.on("disconnected", () => {
         this.connected = false;
-        Logger.info("WebSocket 已斷線");
+        Logger.warn("WebSocket 已斷線");
         this.triggerConnectionLost();
       });
 
@@ -180,30 +180,24 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
      */
     async registerExperimentId(experimentId, source = "client") {
       try {
-        Logger.debug(
-          `註冊實驗 ID: ${experimentId} (來自: ${source})`
-        );
+        Logger.debug(`註冊實驗 ID: ${experimentId} (來自: ${source})`);
 
         // 使用 SyncClient 的 syncState 方法來廣播實驗ID更新
         // 這樣伺服器會通過 sync_state_update 事件處理，而不是直接的 WebSocket 訊息
         if (window.syncClient && window.syncClient.syncState) {
           const updateData = {
-            type: "experimentIdUpdate",
-            device_id: this.getClientId(),
+            type: window.SyncDataTypes.EXPERIMENT_ID_UPDATE,
+            clientId: this.getClientId(),
             experimentId: experimentId,
             source: source,
             timestamp: new Date().toISOString()
           };
 
-          Logger.debug(
-            `透過 SyncClient 廣播實驗ID更新: ${experimentId}`
-          );
+          Logger.debug(`透過 SyncClient 廣播實驗ID更新: ${experimentId}`);
 
           const syncResult = window.syncClient.syncState(updateData);
           if (!syncResult) {
-            Logger.debug(
-              "本機模式或未連線，跳過同步廣播"
-            );
+            Logger.debug("本機模式或未連線，跳過同步廣播");
           }
         } else {
           Logger.debug("SyncClient 不可用，無法廣播");
@@ -238,28 +232,6 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
     /**
      * 發送實驗操作（透過 WebSocket）
      * @param {string} action - 操作類型 ('start', 'pause', 'resume', 'stop')
-     * @param {Object} data - 額外資料
-     */
-    sendExperimentAction(action, data = {}) {
-      if (!this.wsClient || !this.connected) {
-        Logger.warn("未連線，無法發送實驗操作");
-        return false;
-      }
-
-      if (this.role !== window.SyncManager?.ROLE?.OPERATOR) {
-        Logger.warn("僅操作者可以發送實驗操作");
-        return false;
-      }
-
-      this.wsClient.sendExperimentAction(action, {
-        ...data,
-        sessionId: this.getSessionId(),
-        clientId: this.getClientId()
-      });
-
-      return true;
-    }
-
     /**
      * 檢查快速更新限制
      * @param {string} updateType - 更新類型
@@ -396,8 +368,3 @@ if (typeof window !== "undefined" && window.ExperimentHubClient) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ExperimentHubClient;
 }
-
-
-
-
-

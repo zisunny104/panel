@@ -207,6 +207,10 @@
                     </div>
                 </label>開啟音效
             </div>
+            <div class="control-group">
+                <label for="beepVolume">音量</label>
+                <input type="range" id="beepVolume" min="0" max="100" value="50">
+            </div>
 
             <hr class="panel-divider">
 
@@ -333,8 +337,8 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="subjectNameInput">受試者名稱:</label>
-                        <input type="text" id="subjectNameInput" class="form-input" placeholder="受試者名稱">
+                        <label for="participantNameInput">受試者名稱:</label>
+                        <input type="text" id="participantNameInput" class="form-input" placeholder="受試者名稱">
                     </div>
 
                     <div class="form-group experiment-control-group">
@@ -402,12 +406,12 @@
     <!-- BEEP 音效 -->
     <audio id="beepSound" src="assets/audio/beep.mp3" preload="auto"></audio>
 
-    <!-- ===== 核心基礎設施 ===== -->
+    <!-- ===== 核心基礎 ===== -->
     <!-- 全域核心 -->
     <script src="js/core/console-manager.js"></script>
     <script src="js/core/config.js"></script>
 
-    <!-- 網路基礎設施 -->
+    <!-- 網路基礎 -->
     <script src="js/core/websocket-client.js"></script>
     <script src="js/core/time-sync-manager.js"></script>
 
@@ -428,45 +432,9 @@
     <!-- 實驗狀態管理 -->
     <script src="js/core/experiment-state-manager.js"></script>
 
-    <!-- ===== 面板 UI 控制 ===== -->
-    <!-- 面板管理 -->
-    <script src="js/panel/panel-manager.js"></script>
-    <script src="js/panel/panel-ui-controls.js"></script>
-    <script src="js/panel/panel-button-manager.js"></script>
-
-    <!-- ===== 面板功能模組 ===== -->
-    <!-- 媒體與電源控制 -->
-    <script src="js/panel/panel-media-manager.js"></script>
-    <script src="js/panel/panel-power-control.js"></script>
-
-    <!-- 操作日誌 -->
-    <script src="js/panel/panel-logger.js"></script>
-
-    <!-- 動作管理 -->
-    <script src="js/panel/panel-action-manager.js"></script>
-
-    <!-- 組合選擇器 -->
-    <script type="module" src="js/core/combination-selector.js"></script>
-
-    <!-- 實驗日誌與管理 -->
-    <script src="js/panel/panel-experiment-log.js"></script>
-    <script src="js/panel/panel-experiment-sync.js"></script>
-    <script type="module" src="js/panel/panel-experiment-manager.js"></script>
-    <script src="js/panel/panel-experiment-sync-receiver.js"></script>
-
-    <!-- ===== 同步與對話框 ===== -->
-    <!-- 同步確認對話框 -->
-    <script src="js/sync/sync-confirm-dialog.js"></script>
-
-    <!-- 實驗同步管理 -->
-    <script src="js/experiment/experiment-sync-manager.js"></script>
-
-    <!-- 同步管理器 -->
-    <script type="module" src="js/sync/sync-manager.js"></script>
-
-    <!-- ===== 應用啟動 ===== -->
-    <!-- 主應用程式 -->
-    <script src="js/core/main.js"></script>
+    <!-- ===== 面板頁面管理器 ===== -->
+    <!-- 負責載入和管理整個面板頁面的腳本 -->
+    <script src="js/panel/panel-page-manager.js"></script>
 
 </body>
 

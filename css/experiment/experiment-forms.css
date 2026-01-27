@@ -46,19 +46,19 @@
 }
 
 /* 受試者名稱輸入區域 */
-.subject-name-group {
+.participant-name-group {
     display: flex;
     gap: 8px;
     align-items: center;
 }
 
-.subject-name-group .form-input {
+.participant-name-group .form-input {
     flex: 1;
     height: 40px;
     box-sizing: border-box;
 }
 
-.subject-name-group .btn-secondary {
+.participant-name-group .btn-secondary {
     flex-shrink: 0;
     width: 40px;
     height: 40px;
@@ -76,7 +76,7 @@
     justify-content: center;
 }
 
-.subject-name-group .btn-secondary:hover {
+.participant-name-group .btn-secondary:hover {
     background: #e9ecef;
     border-color: #bbb;
 }

@@ -47,8 +47,8 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="subjectName">受試者名稱:</label>
-                    <input type="text" id="subjectName" class="form-input" placeholder="受試者名稱" />
+                    <label for="participantName">受試者名稱:</label>
+                    <input type="text" id="participantName" class="form-input" placeholder="受試者名稱" />
                 </div>
 
                 <!-- 實驗控制按鈕 -->
@@ -209,27 +209,18 @@
     <!-- ===== 工具與資料 ===== -->
     <!-- 基礎工具 -->
     <script type="module" src="js/core/random-utils.js"></script>
+    <script type="module" src="js/core/data-loader.js"></script>
 
     <!-- ===== 狀態管理 ===== -->
     <!-- 實驗狀態管理 -->
     <script src="js/core/experiment-state-manager.js"></script>
 
     <!-- ===== 實驗功能模組 ===== -->
-    <!-- 日誌系統 -->
-    <script src="js/experiment/experiment-log-manager.js"></script>
-
     <!-- 實驗動作管理 -->
-    <script src="js/experiment/experiment-action-manager.js"></script>
+    <script src="js/core/action-manager.js"></script>
 
-    <!-- 實驗UI控制 -->
-    <script type="module" src="js/experiment/experiment-ui-controls.js"></script>
-    <script type="module" src="js/experiment/experiment-page-manager.js"></script>
-
-    <!-- 實驗同步管理 -->
-    <script src="js/experiment/experiment-sync-manager.js"></script>
-
-    <!-- 實驗日誌UI -->
-    <script type="module" src="js/experiment/experiment-log-ui.js"></script>
+    <!-- 實驗頁面管理器（會自動載入所需依賴） -->
+    <script type="module" src="js/board/board-page-manager.js"></script>
 
     <!-- ===== 同步與對話框 ===== -->
     <!-- 同步確認對話框 -->

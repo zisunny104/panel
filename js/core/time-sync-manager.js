@@ -86,13 +86,6 @@ class TimeSyncManager {
   }
 
   /**
-   * 取得目前本機時間（毫秒級）
-   */
-  getLocalTime() {
-    return Date.now();
-  }
-
-  /**
    * 取得目前時間偏差（毫秒）
    */
   getTimeOffset() {
@@ -105,54 +98,6 @@ class TimeSyncManager {
   isSynchronized() {
     return this.isSynced;
   }
-
-  /**
-   * 取得同步統計資訊（用於診斷）
-   */
-  getSyncStats() {
-    return {
-      isSynced: this.isSynced,
-      timeOffset: this.timeOffset,
-      lastSyncTime: this.lastSyncTime,
-      samplesCount: this.syncSamples.length,
-      samples: this.syncSamples
-    };
-  }
-
-  /**
-   * 透過 WebSocket 進行一次性校時
-   * @param {number} serverTime - 伺服器時間戳（毫秒）
-   */
-  syncWithWebSocket(serverTime) {
-    const clientTime = Date.now();
-    const offset = clientTime - serverTime;
-
-    // 記錄樣本
-    this.syncSamples.push({
-      offset: offset,
-      delay: 0, // WebSocket 延遲忽略不計
-      timestamp: clientTime
-    });
-
-    if (this.syncSamples.length > this.maxSamples) {
-      this.syncSamples.shift();
-    }
-
-    // 計算平均偏差
-    this.timeOffset = Math.round(
-      this.syncSamples.reduce((sum, s) => sum + s.offset, 0) /
-        this.syncSamples.length
-    );
-
-    this.isSynced = true;
-    this.lastSyncTime = Date.now();
-
-    Logger.debug(
-      `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`
-    );
-  }
-
-  // 由於 file 中先前含有兩組重複的簡易時間格式化實作，現已移除，並保留下方的 Intl-based 實作以統一時區、格式與行為。
 
   /**
    * 透過 WebSocket 進行一次性校時
@@ -318,8 +263,3 @@ if (typeof window !== "undefined") {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = TimeSyncManager;
 }
-
-
-
-
-

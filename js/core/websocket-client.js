@@ -192,7 +192,7 @@ class WebSocketClient {
         case "experiment_paused":
         case "experiment_resumed":
         case "experiment_stopped":
-        case "experiment_id_update":
+        case "experiment_id_changed":
           this.emit(`experiment_${type.split("_")[1]}`, data);
           break;
 
@@ -299,7 +299,7 @@ class WebSocketClient {
     this.clearLocalSyncData();
 
     // 派發 window 事件，讓 SyncManager 進行後續處理
-    const clearEvent = new CustomEvent("sync_data_cleared", {
+    const clearEvent = new CustomEvent("data_cleared", {
       detail: {
         reason,
         message,
@@ -516,32 +516,6 @@ class WebSocketClient {
   }
 
   /**
-   * 取得工作階段狀態
-   */
-  getSessionState() {
-    this.send({
-      type: "get_session_state",
-      data: {
-        sessionId: this.sessionId
-      }
-    });
-  }
-
-  /**
-   * 發送實驗操作
-   */
-  sendExperimentAction(action, data = {}) {
-    this.send({
-      type: "experiment_action",
-      data: {
-        sessionId: this.sessionId,
-        action,
-        ...data
-      }
-    });
-  }
-
-  /**
    * 註冊事件處理器
    */
   on(event, handler) {
@@ -707,8 +681,3 @@ if (typeof module !== "undefined" && module.exports) {
 } else {
   window.WebSocketClient = WebSocketClient;
 }
-
-
-
-
-

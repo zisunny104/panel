@@ -120,21 +120,6 @@ class Logger {
   }
 
   /**
-   * 強制輸出日誌（繞過等級控制，緊急情況使用）
-   */
-  static forceLog(...args) {
-    // 直接使用 console.log，繞過等級控制
-    console.log("[FORCE]", ...args);
-  }
-
-  /**
-   * 強制輸出錯誤（緊急錯誤）
-   */
-  static forceError(...args) {
-    console.error("[FORCE ERROR]", ...args);
-  }
-
-  /**
    * 取得目前設定狀態
    */
   static getStatus() {
@@ -151,8 +136,3 @@ class Logger {
 window.Logger = Logger;
 
 window.ConsoleManager = Logger;
-
-
-
-
-

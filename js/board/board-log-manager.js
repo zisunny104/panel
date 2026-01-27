@@ -41,7 +41,7 @@ class ExperimentLogManager {
 
     // 記錄初始化狀態
     Logger.debug(
-      `日誌管理器建立完成，分頁ID: ${this.tabId}, 本機 IndexedDB 存儲`
+      `日誌管理器建立完成，分頁ID: ${this.tabId}, 本機 IndexedDB 存儲`,
     );
 
     // 標記初始化完成
@@ -137,7 +137,7 @@ class ExperimentLogManager {
             "sync_client_id",
             "sync_preferred_role",
             "preferredCameraId",
-            "preferredCameraLabel"
+            "preferredCameraLabel",
           ];
           keys.forEach((k) => localStorage.removeItem(k));
 
@@ -187,8 +187,8 @@ class ExperimentLogManager {
       // 分發事件供其他組件使用
       document.dispatchEvent(
         new CustomEvent("experiment_id_changed", {
-          detail: { experimentId, source }
-        })
+          detail: { experimentId, source },
+        }),
       );
     }
   }
@@ -207,13 +207,13 @@ class ExperimentLogManager {
       this.pendingLogs = [];
       this.experimentStartTime = null;
       Logger.info(
-        `日誌管理器已初始化: 實驗ID=${experimentId}, 受試者=${this.participantName}`
+        `日誌管理器已初始化: 實驗ID=${experimentId}, 受試者=${this.participantName}`,
       );
 
       // 初始化完成後，嘗試發送任何待發送的日誌
       if (this.pendingLogs.length > 0) {
         Logger.info(
-          `初始化完成，發現 ${this.pendingLogs.length} 條待發送日誌，準備發送`
+          `初始化完成，發現 ${this.pendingLogs.length} 條待發送日誌，準備發送`,
         );
         // 延遲一小段時間，確保其他組件也初始化完成
         setTimeout(() => {
@@ -255,16 +255,13 @@ class ExperimentLogManager {
    */
   _autoStartExperimentIfNeeded() {
     // 檢查實驗是否已在執行
-    if (
-      window.experimentPageManager &&
-      !window.experimentPageManager.experimentRunning
-    ) {
+    if (window.boardPageManager && !window.boardPageManager.experimentRunning) {
       // 檢查是否滿足啟動條件
       const experimentIdInput = document.getElementById("experimentIdInput");
       if (experimentIdInput && experimentIdInput.value.trim()) {
         Logger.info("偵測到實驗操作，自動啟動實驗");
         try {
-          window.experimentPageManager.startExperiment();
+          window.boardPageManager.startExperiment();
         } catch (error) {
           Logger.warn("自動啟動實驗失敗:", error);
         }
@@ -303,7 +300,7 @@ class ExperimentLogManager {
       ts: this.experimentStartTime,
       type: "exp_start",
       exp_id: experimentId,
-      participant: this.participantName || `受試者_${experimentId}`
+      participant: this.participantName || `受試者_${experimentId}`,
     };
 
     // 新增裝置ID（如果有）
@@ -343,7 +340,7 @@ class ExperimentLogManager {
       ts: Date.now(),
       type: "exp_end",
       exp_id: experimentId,
-      participant: this.participantName || `受試者_${experimentId}`
+      participant: this.participantName || `受試者_${experimentId}`,
     };
 
     // 新增裝置ID（如果有）
@@ -373,7 +370,7 @@ class ExperimentLogManager {
     const logEntry = {
       ts: Date.now(),
       type: "exp_pause",
-      exp_id: experimentId
+      exp_id: experimentId,
     };
 
     if (deviceId) {
@@ -402,7 +399,7 @@ class ExperimentLogManager {
     const logEntry = {
       ts: Date.now(),
       type: "exp_resume",
-      exp_id: experimentId
+      exp_id: experimentId,
     };
 
     if (deviceId) {
@@ -447,7 +444,7 @@ class ExperimentLogManager {
       ts: Date.now(),
       type: "gesture_step_start",
       exp_id: experimentId,
-      g_idx: gestureIndex
+      g_idx: gestureIndex,
     };
 
     if (gestureName) {
@@ -494,7 +491,7 @@ class ExperimentLogManager {
       ts: Date.now(),
       type: "gesture_step_end",
       exp_id: experimentId,
-      g_idx: gestureIndex
+      g_idx: gestureIndex,
     };
 
     if (gestureName) {
@@ -533,7 +530,7 @@ class ExperimentLogManager {
       type: "gesture_attempt",
       exp_id: experimentId,
       g_idx: gestureIndex,
-      g_type: gestureType
+      g_type: gestureType,
     };
     if (stepId) {
       logEntry.s_id = stepId;
@@ -562,7 +559,7 @@ class ExperimentLogManager {
       ts: Date.now(),
       type: "action",
       exp_id: experimentId,
-      a_id: actionId
+      a_id: actionId,
     };
     if (gestureIndex !== null) {
       logEntry.g_idx = gestureIndex;
@@ -597,7 +594,7 @@ class ExperimentLogManager {
       const removedLog = this.pendingLogs.shift();
       Logger.warn(
         `待發送日誌數量超過限制 (${this.maxPendingLogs})，移除最舊日誌:`,
-        removedLog
+        removedLog,
       );
     }
 
@@ -647,7 +644,7 @@ class ExperimentLogManager {
     try {
       const transaction = this.db.transaction(
         [this.pendingLogsStore],
-        "readwrite"
+        "readwrite",
       );
       const store = transaction.objectStore(this.pendingLogsStore);
 
@@ -658,7 +655,7 @@ class ExperimentLogManager {
           const logToSave = {
             ...log,
             // id 由 autoIncrement 自動產生
-            savedAt: Date.now() // 記錄儲存時間
+            savedAt: Date.now(), // 記錄儲存時間
           };
 
           const request = store.add(logToSave);
@@ -675,7 +672,7 @@ class ExperimentLogManager {
       await Promise.all(addPromises);
 
       Logger.debug(
-        `[ExperimentLogManager] 成功儲存 ${this.pendingLogs.length} 條日誌到 IndexedDB`
+        `[ExperimentLogManager] 成功儲存 ${this.pendingLogs.length} 條日誌到 IndexedDB`,
       );
 
       // 廣播同步事件
@@ -692,7 +689,7 @@ class ExperimentLogManager {
    */
   async flushAll() {
     Logger.debug(
-      `[ExperimentLogManager] 完成實驗，確保 ${this.pendingLogs.length} 條待處理日誌寫入 IndexedDB`
+      `[ExperimentLogManager] 完成實驗，確保 ${this.pendingLogs.length} 條待處理日誌寫入 IndexedDB`,
     );
 
     try {
@@ -739,12 +736,12 @@ class ExperimentLogManager {
       const response = await fetch(`${apiUrl}/experiment-logs/save`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           filename: filename,
-          content: jsonlContent
-        })
+          content: jsonlContent,
+        }),
       });
 
       if (response.ok) {
@@ -756,13 +753,13 @@ class ExperimentLogManager {
         }
       } else {
         Logger.warn(
-          `無法連接到後端 API (${response.status})，日誌僅儲存於 IndexedDB`
+          `無法連接到後端 API (${response.status})，日誌僅儲存於 IndexedDB`,
         );
       }
     } catch (error) {
       Logger.warn(
         "[ExperimentLogManager] 儲存到 runtime 資料夾失敗（僅儲存於 IndexedDB）:",
-        error.message
+        error.message,
       );
     }
   }
@@ -820,7 +817,7 @@ class ExperimentLogManager {
     // 只顯示最近 20 條
     const recentLogs = this.logs.slice(-20);
     let html =
-      "<div style=\"font-size: 12px; max-height: 300px; overflow-y: auto; padding: 10px; background: #f5f5f5; border-radius: 4px;\">";
+      '<div style="font-size: 12px; max-height: 300px; overflow-y: auto; padding: 10px; background: #f5f5f5; border-radius: 4px;">';
 
     recentLogs.forEach((log) => {
       const time = new Date(log.ts).toLocaleTimeString("zh-TW");
@@ -870,7 +867,7 @@ class ExperimentLogManager {
       gesture_step_start: "步驟開始",
       gesture_step_end: "步驟結束",
       gesture_attempt: "手勢",
-      action: "動作"
+      action: "動作",
     };
     return labels[type] || type;
   }
@@ -902,7 +899,7 @@ class ExperimentLogManager {
 
       const transaction = this.db.transaction(
         [this.pendingLogsStore],
-        "readonly"
+        "readonly",
       );
       const store = transaction.objectStore(this.pendingLogsStore);
       const request = store.getAll();
@@ -925,7 +922,7 @@ class ExperimentLogManager {
                 logs: [],
                 startTime: null,
                 endTime: null,
-                logCount: 0
+                logCount: 0,
               });
             }
 
@@ -955,7 +952,7 @@ class ExperimentLogManager {
           experiments.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
 
           Logger.debug(
-            `[ExperimentLogManager] 從 IndexedDB 載入 ${experiments.length} 個實驗`
+            `[ExperimentLogManager] 從 IndexedDB 載入 ${experiments.length} 個實驗`,
           );
 
           // 調試信息：列出所有實驗ID
@@ -963,7 +960,7 @@ class ExperimentLogManager {
             Logger.debug(
               `[ExperimentLogManager] 實驗ID列表: ${experiments
                 .map((e) => `${e.experimentId}(${e.logCount}條)`)
-                .join(", ")}`
+                .join(", ")}`,
             );
           }
 
@@ -973,7 +970,7 @@ class ExperimentLogManager {
         request.onerror = (event) => {
           Logger.error(
             "[ExperimentLogManager] 列出實驗失敗:",
-            event.target.error
+            event.target.error,
           );
           reject(event.target.error);
         };
@@ -992,14 +989,14 @@ class ExperimentLogManager {
     try {
       if (!this.db) {
         Logger.warn(
-          "[ExperimentLogManager] IndexedDB 尚未初始化，僅回傳記憶體中的日誌"
+          "[ExperimentLogManager] IndexedDB 尚未初始化，僅回傳記憶體中的日誌",
         );
         return [...this.logs, ...this.pendingLogs];
       }
 
       const transaction = this.db.transaction(
         [this.pendingLogsStore],
-        "readonly"
+        "readonly",
       );
       const store = transaction.objectStore(this.pendingLogsStore);
       const request = store.getAll();
@@ -1017,7 +1014,7 @@ class ExperimentLogManager {
         request.onerror = (event) => {
           Logger.error(
             "[ExperimentLogManager] 讀取所有日誌失敗:",
-            event.target.error
+            event.target.error,
           );
           // 發生錯誤時至少回傳記憶體中的日誌
           resolve([...this.logs, ...this.pendingLogs]);
@@ -1039,22 +1036,22 @@ class ExperimentLogManager {
       const allLogs = await this.getAllLogs();
       const filtered = allLogs.filter(
         (log) =>
-          log.exp_id === experimentId || log.experimentId === experimentId
+          log.exp_id === experimentId || log.experimentId === experimentId,
       );
 
       Logger.debug(
-        `[ExperimentLogManager] 取得實驗 ${experimentId} 的日誌: 找到 ${filtered.length} 條（總共 ${allLogs.length} 條）`
+        `[ExperimentLogManager] 取得實驗 ${experimentId} 的日誌: 找到 ${filtered.length} 條（總共 ${allLogs.length} 條）`,
       );
 
       // 如果沒找到，輸出調試信息
       if (filtered.length === 0 && allLogs.length > 0) {
         const uniqueExpIds = [
-          ...new Set(allLogs.map((log) => log.exp_id || log.experimentId))
+          ...new Set(allLogs.map((log) => log.exp_id || log.experimentId)),
         ];
         Logger.warn(
           `[ExperimentLogManager] 未找到匹配的實驗ID。查找: "${experimentId}", 資料庫中的ID: ${uniqueExpIds.join(
-            ", "
-          )}`
+            ", ",
+          )}`,
         );
       }
 
@@ -1062,7 +1059,7 @@ class ExperimentLogManager {
     } catch (error) {
       Logger.error(
         `[ExperimentLogManager] 取得實驗 ${experimentId} 的日誌失敗:`,
-        error
+        error,
       );
       return [];
     }
@@ -1091,7 +1088,7 @@ class ExperimentLogManager {
 
       const transaction = this.db.transaction(
         [this.pendingLogsStore],
-        "readwrite"
+        "readwrite",
       );
       const store = transaction.objectStore(this.pendingLogsStore);
 
@@ -1105,12 +1102,12 @@ class ExperimentLogManager {
           // 過濾出要刪除的日誌
           const logsToDelete = allLogs.filter(
             (log) =>
-              log.exp_id === experimentId || log.experimentId === experimentId
+              log.exp_id === experimentId || log.experimentId === experimentId,
           );
 
           if (logsToDelete.length === 0) {
             Logger.warn(
-              `[ExperimentLogManager] 沒有找到實驗 ${experimentId} 的日誌`
+              `[ExperimentLogManager] 沒有找到實驗 ${experimentId} 的日誌`,
             );
             resolve(true);
             return;
@@ -1125,7 +1122,7 @@ class ExperimentLogManager {
               deletedCount++;
               if (deletedCount === logsToDelete.length) {
                 Logger.info(
-                  `[ExperimentLogManager] 已刪除實驗 ${experimentId} 的 ${deletedCount} 條日誌`
+                  `[ExperimentLogManager] 已刪除實驗 ${experimentId} 的 ${deletedCount} 條日誌`,
                 );
                 // 廣播刪除事件
                 this._broadcastMessage("experimentDeleted", { experimentId });
@@ -1136,7 +1133,7 @@ class ExperimentLogManager {
             deleteRequest.onerror = (e) => {
               Logger.error(
                 "[ExperimentLogManager] 刪除日誌失敗:",
-                e.target.error
+                e.target.error,
               );
               reject(e.target.error);
             };
@@ -1146,7 +1143,7 @@ class ExperimentLogManager {
         getAllRequest.onerror = (event) => {
           Logger.error(
             "[ExperimentLogManager] 讀取日誌失敗:",
-            event.target.error
+            event.target.error,
           );
           reject(event.target.error);
         };
@@ -1154,7 +1151,7 @@ class ExperimentLogManager {
     } catch (error) {
       Logger.error(
         `[ExperimentLogManager] 刪除實驗 ${experimentId} 失敗:`,
-        error
+        error,
       );
       return false;
     }
@@ -1176,7 +1173,7 @@ class ExperimentLogManager {
       participant: this.participantName || `受試者_${experimentId}`,
       button: button,
       function: buttonFunction,
-      remote_device_id: remoteDeviceId
+      remote_device_id: remoteDeviceId,
     };
 
     this._addLog(logEntry);
@@ -1193,7 +1190,7 @@ class ExperimentLogManager {
       duplicateTimestamps: [],
       timeGaps: [],
       futureTimestamps: [],
-      totalLogs: logs.length
+      totalLogs: logs.length,
     };
 
     if (logs.length < 2) return issues;
@@ -1215,7 +1212,7 @@ class ExperimentLogManager {
         issues.duplicateTimestamps.push({
           timestamp,
           count: timestampCounts.get(timestamp),
-          types: [log.type]
+          types: [log.type],
         });
         issues.hasIssues = true;
       }
@@ -1226,7 +1223,7 @@ class ExperimentLogManager {
           index: i,
           timestamp,
           type: log.type,
-          offset: timestamp - now
+          offset: timestamp - now,
         });
         issues.hasIssues = true;
       }
@@ -1244,7 +1241,7 @@ class ExperimentLogManager {
             from: prevTimestamp,
             to: timestamp,
             gap: gap,
-            type: log.type
+            type: log.type,
           });
           issues.hasIssues = true;
         }
@@ -1300,7 +1297,7 @@ class ExperimentLogManager {
           if (!db.objectStoreNames.contains(this.pendingLogsStore)) {
             const store = db.createObjectStore(this.pendingLogsStore, {
               keyPath: "id",
-              autoIncrement: true
+              autoIncrement: true,
             });
             store.createIndex("timestamp", "timestamp", { unique: false });
             Logger.info("建立 IndexedDB 存儲對象:", this.pendingLogsStore);
@@ -1329,7 +1326,7 @@ class ExperimentLogManager {
 
       const transaction = this.db.transaction(
         [this.pendingLogsStore],
-        "readonly"
+        "readonly",
       );
       const store = transaction.objectStore(this.pendingLogsStore);
       const request = store.getAll();
@@ -1368,7 +1365,7 @@ class ExperimentLogManager {
 
       const transaction = this.db.transaction(
         [this.pendingLogsStore],
-        "readwrite"
+        "readwrite",
       );
       const store = transaction.objectStore(this.pendingLogsStore);
       const request = store.add(logEntry);
@@ -1397,7 +1394,7 @@ class ExperimentLogManager {
 
       const transaction = this.db.transaction(
         [this.pendingLogsStore],
-        "readwrite"
+        "readwrite",
       );
       const store = transaction.objectStore(this.pendingLogsStore);
 
@@ -1425,7 +1422,7 @@ class ExperimentLogManager {
 
     const transaction = this.db.transaction(
       [this.pendingLogsStore],
-      "readwrite"
+      "readwrite",
     );
     const store = transaction.objectStore(this.pendingLogsStore);
     const request = store.clear();
@@ -1489,7 +1486,7 @@ class ExperimentLogManager {
         type,
         data,
         senderTabId: this.tabId,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
   }
@@ -1516,7 +1513,7 @@ class ExperimentLogManager {
     } catch (err) {
       console.error("清理快取失敗", err);
       alert(
-        "清理快取失敗: " + (err && err.message ? err.message : String(err))
+        "清理快取失敗: " + (err && err.message ? err.message : String(err)),
       );
     }
   };
@@ -1526,8 +1523,3 @@ class ExperimentLogManager {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ExperimentLogManager;
 }
-
-
-
-
-

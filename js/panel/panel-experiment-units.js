@@ -15,7 +15,7 @@ class PanelExperimentUnits {
   getSelectedUnits() {
     const selectedUnits = [];
     const unitCheckboxes = document.querySelectorAll(
-      "input[name=\"unitCheckbox\"]:checked"
+      'input[name="unitCheckbox"]:checked',
     );
 
     unitCheckboxes.forEach((checkbox) => {
@@ -60,7 +60,7 @@ class PanelExperimentUnits {
         "unit_start",
         firstUnit.unit_id,
         false,
-        false
+        false,
       );
     }
 
@@ -83,7 +83,7 @@ class PanelExperimentUnits {
    */
   toggleSelectAllUnits(checked) {
     const unitCheckboxes = document.querySelectorAll(
-      "input[name=\"unitCheckbox\"]"
+      'input[name="unitCheckbox"]',
     );
 
     unitCheckboxes.forEach((checkbox) => {
@@ -97,46 +97,12 @@ class PanelExperimentUnits {
   }
 
   /**
-   * 應用單元組合
-   */
-  applyUnitCombination(combination) {
-    if (!combination) {
-      Logger.warn("無效的組合");
-      return;
-    }
-
-    Logger.debug(`應用單元組合: ${combination.combination_name}`);
-
-    // 更新當前組合
-    this.manager.currentCombination = combination;
-
-    // 取得組合中的單元ID列表
-    const unitIds = combination.units || [];
-
-    // 更新UI中的單元選擇
-    this.updateUnitSelectionForCombination(unitIds);
-
-    // 記錄日誌
-    if (window.logger) {
-      window.logger.logAction(
-        `套用組合: ${combination.combination_name}`,
-        "combination_applied",
-        combination.combination_id,
-        false,
-        false
-      );
-    }
-
-    Logger.debug("單元組合應用完成");
-  }
-
-  /**
    * 根據組合更新單元選擇
    */
   updateUnitSelectionForCombination(unitIds) {
     // 取消所有單元的選擇
     const allCheckboxes = document.querySelectorAll(
-      "input[name=\"unitCheckbox\"]"
+      'input[name="unitCheckbox"]',
     );
     allCheckboxes.forEach((checkbox) => {
       checkbox.checked = false;
@@ -145,7 +111,7 @@ class PanelExperimentUnits {
     // 選擇組合中的單元
     unitIds.forEach((unitId) => {
       const checkbox = document.querySelector(
-        `input[name="unitCheckbox"][value="${unitId}"]`
+        `input[name="unitCheckbox"][value="${unitId}"]`,
       );
       if (checkbox) {
         checkbox.checked = true;
@@ -327,7 +293,7 @@ class PanelExperimentUnits {
 
     // 取得所有普通單元項目（排除電源卡片）
     const normalItems = Array.from(list.children).filter(
-      (item) => !item.classList.contains("power-option-card")
+      (item) => !item.classList.contains("power-option-card"),
     );
 
     const idx = normalItems.indexOf(li);
@@ -357,7 +323,7 @@ class PanelExperimentUnits {
 
     // 只對普通單元項目啟用拖曳，排除電源卡片
     const handles = unitList.querySelectorAll(
-      "li:not(.power-option-card) .unit-drag-handle"
+      "li:not(.power-option-card) .unit-drag-handle",
     );
     handles.forEach((handle) => {
       handle.addEventListener("mousedown", (e) => {
@@ -410,7 +376,7 @@ class PanelExperimentUnits {
 
       // 只在普通單元項目之間進行排序，排除電源卡片
       const items = Array.from(unitList.children).filter(
-        (item) => !item.classList.contains("power-option-card")
+        (item) => !item.classList.contains("power-option-card"),
       );
       let insertBefore = null;
 
@@ -479,7 +445,7 @@ class PanelExperimentUnits {
     // 只對普通單元項目進行全選操作，排除電源卡片
     const normalItems = unitList.querySelectorAll("li:not(.power-option-card)");
     normalItems.forEach((li) => {
-      const checkbox = li.querySelector("input[type=\"checkbox\"]");
+      const checkbox = li.querySelector('input[type="checkbox"]');
       if (checkbox) {
         checkbox.checked = checked;
       }
@@ -497,7 +463,7 @@ class PanelExperimentUnits {
     // 只考慮普通單元項目的勾選狀態，排除電源卡片
     const normalItems = unitList.querySelectorAll("li:not(.power-option-card)");
     const checkboxes = Array.from(normalItems)
-      .map((li) => li.querySelector("input[type=\"checkbox\"]"))
+      .map((li) => li.querySelector('input[type="checkbox"]'))
       .filter((cb) => cb);
     const checkedBoxes = checkboxes.filter((cb) => cb.checked);
 
@@ -523,7 +489,7 @@ class PanelExperimentUnits {
 
     // 只考慮普通單元項目的位置
     const normalItems = Array.from(list.children).filter(
-      (item) => !item.classList.contains("power-option-card")
+      (item) => !item.classList.contains("power-option-card"),
     );
 
     const index = normalItems.indexOf(li);
@@ -560,10 +526,10 @@ class PanelExperimentUnits {
    */
   updateSelectAllCheckboxState() {
     const unitCheckboxes = document.querySelectorAll(
-      "input[name=\"unitCheckbox\"]"
+      'input[name="unitCheckbox"]',
     );
     const checkedBoxes = document.querySelectorAll(
-      "input[name=\"unitCheckbox\"]:checked"
+      'input[name="unitCheckbox"]:checked',
     );
     const selectAllCheckbox = document.getElementById("selectAllUnits");
 
@@ -601,7 +567,7 @@ class PanelExperimentUnits {
       combination_name: combination.combination_name,
       combination_id: combination.combination_id,
       unit_count: combination.units?.length || 0,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     Logger.debug("組合選擇處理完成");
@@ -633,7 +599,7 @@ class PanelExperimentUnits {
    */
   hasSelectedUnits() {
     const selectedCheckboxes = document.querySelectorAll(
-      "input[name=\"unitCheckbox\"]:checked"
+      'input[name="unitCheckbox"]:checked',
     );
     return selectedCheckboxes.length > 0;
   }
@@ -643,7 +609,7 @@ class PanelExperimentUnits {
    */
   getSelectedUnitCount() {
     const selectedCheckboxes = document.querySelectorAll(
-      "input[name=\"unitCheckbox\"]:checked"
+      'input[name="unitCheckbox"]:checked',
     );
     return selectedCheckboxes.length;
   }
@@ -659,7 +625,7 @@ class PanelExperimentUnits {
       Array.from(unitList.children).forEach((li) => {
         if (li.classList.contains("power-option-card")) return;
 
-        const checkbox = li.querySelector("input[type=\"checkbox\"]");
+        const checkbox = li.querySelector('input[type="checkbox"]');
         if (checkbox && checkbox.checked) {
           this.manager.loadedUnits.push(li.dataset.unitId);
         }
@@ -674,47 +640,30 @@ class PanelExperimentUnits {
     try {
       const data = await loadUnitsFromScenarios();
       window._allUnits = data.units;
-      // 設定動作相關的全域變數
       window._allUnitsActionsMap = data.actions;
       window._allUnitsActionToStepMap = data.actionToStep;
 
-      // 在資料載入完成後，初始化動作管理器
+      // 初始化動作管理器
       if (window.actionManager && this.manager.isExperimentRunning) {
-        try {
-          const initialized =
-            await window.actionManager.initializeFromExperiment();
-          if (initialized) {
-            Logger.debug(
-              "實驗資料載入後已初始化動作序列，共",
-              window.actionManager.currentActionSequence.length,
-              "個動作"
-            );
+        const initialized =
+          await window.actionManager.initializeFromExperiment();
+        if (initialized) {
+          Logger.debug(
+            "實驗資料載入後已初始化動作序列，共",
+            window.actionManager.currentActionSequence.length,
+            "個動作",
+          );
 
-            //記錄第一個單元到 JSONL 實驗日誌
-            if (
-              window.panelExperimentLog &&
-              this.manager.loadedUnits.length > 0
-            ) {
-              window.panelExperimentLog.logUnitChange(
-                this.manager.loadedUnits[0],
-                0,
-                this.manager.loadedUnits.length
-              );
-            }
-
-            //初始化完成後立即更新按鈕高亮和媒體
-            // 顯示第一個教學動作的按鈕提示
-            if (window.buttonManager) {
-              window.buttonManager.updateMediaForCurrentAction();
-            }
+          // 更新按鈕高亮和媒體
+          if (window.buttonManager) {
+            window.buttonManager.updateMediaForCurrentAction();
           }
-        } catch (error) {
-          Logger.error("資料載入後動作序列初始化失敗:", error);
         }
       }
 
-      this.showExperimentWaitingState();
+      this.manager.showExperimentWaitingState();
     } catch (error) {
+      Logger.error("載入 scenarios.json 失敗:", error);
       if (window.logger) {
         window.logger.logAction(`載入 scenarios.json 失敗: ${error.message}`);
       }
@@ -722,18 +671,252 @@ class PanelExperimentUnits {
   }
 
   /**
-   * 顯示實驗等待狀態
+   * 選擇並套用預設組合
+   * 優先級：快取 > 設定中的預設 > 第一個
    */
-  showExperimentWaitingState() {
-    if (!window._allUnits || this.manager.loadedUnits.length === 0) return;
-    const unitId = this.manager.loadedUnits[this.manager.currentUnitIndex];
-    const unit = window._allUnits.find((u) => u.unit_id === unitId);
-    if (!unit) return;
-    const step = unit.steps[this.manager.currentStepIndex];
-    if (!step) return;
+  selectDefaultCombination() {
+    try {
+      // 非同步載入組合資料
+      loadUnitsFromScenarios()
+        .then((data) => {
+          if (!data || !Array.isArray(data.unit_combinations)) return;
 
-    // 顯示目前步驟的媒體內容和按鈕高亮
-    this.manager.media.showCurrentStepMediaOrHome();
+          let selectedCombination = null;
+
+          // 優先檢查本機快取
+          const cachedCombinationId = localStorage.getItem(
+            "last_selected_combination_id",
+          );
+          if (cachedCombinationId) {
+            selectedCombination = data.unit_combinations.find(
+              (c) => c.combination_id === cachedCombinationId,
+            );
+          }
+
+          // 如果沒有快取，使用設定中的預設組合
+          if (!selectedCombination) {
+            const defaultCombinationId =
+              window.CONFIG?.experiment?.defaultCombinationId;
+            if (defaultCombinationId) {
+              selectedCombination = data.unit_combinations.find(
+                (c) => c.combination_id === defaultCombinationId,
+              );
+            }
+          }
+
+          // 如果都沒有，使用第一個組合
+          if (!selectedCombination && data.unit_combinations.length > 0) {
+            selectedCombination = data.unit_combinations[0];
+          }
+
+          // 套用選定的組合
+          if (selectedCombination) {
+            Logger.debug(
+              `套用預設組合: ${selectedCombination.combination_name}`,
+            );
+            this.applyUnitCombination(selectedCombination);
+          }
+        })
+        .catch((error) => {
+          Logger.warn("套用預設組合失敗:", error);
+        });
+    } catch (error) {
+      Logger.warn("選擇預設組合時發生錯誤:", error);
+    }
+  }
+
+  /** 從 scenarios.json 渲染預設實驗序列 */
+  async renderDefaultSequences() {
+    try {
+      const data = await loadUnitsFromScenarios();
+      // 找出所有組合列表容器（index.html 和 experiment.html 共用）
+      const lists = document.querySelectorAll(".experiment-default-list");
+      if (lists.length === 0) return;
+
+      if (data && Array.isArray(data.unit_combinations)) {
+        const defaultCombinationId =
+          window.CONFIG?.experiment?.defaultCombinationId;
+
+        // 為每個列表容器渲染組合
+        lists.forEach((list) => {
+          list.innerHTML = "";
+
+          data.unit_combinations.forEach((combination) => {
+            const li = document.createElement("li");
+            li.className = "combination-item";
+            li.dataset.combinationId = combination.combination_id;
+            li.innerHTML = `
+              <div class="combo-name">${combination.combination_name}</div>
+              <div class="combo-desc">${combination.description || ""}</div>
+            `;
+            li.addEventListener("click", () =>
+              this.applyUnitCombination(combination),
+            );
+
+            // 如果是預設組合，自動選擇並點擊
+            if (
+              defaultCombinationId &&
+              combination.combination_id === defaultCombinationId
+            ) {
+              li.classList.add("active");
+              // 延遲套用，確保 DOM 已完全更新
+              setTimeout(() => {
+                this.applyUnitCombination(combination);
+              }, 0);
+            }
+
+            list.appendChild(li);
+          });
+        });
+      }
+    } catch (error) {
+      Logger.error("載入 scenarios.json 組合失敗:", error);
+      if (window.logger) {
+        window.logger.logAction(`載入單元組合失敗: ${error.message}`);
+      }
+    }
+  }
+
+  /** 套用預設單元組合 */
+  applyDefaultSequence(sequenceId, unitIds) {
+    const unitList = document.querySelector(".experiment-units-list");
+    if (!unitList) return;
+
+    // 清除目前組合追蹤（因為這不是來自新的unit_combinations）
+    this.manager.currentCombination = null;
+
+    const allBtns = document.querySelectorAll(".default-combo-btn");
+    let clickedBtn = null;
+    allBtns.forEach((btn) => {
+      if (btn.dataset.sequenceId === sequenceId) clickedBtn = btn;
+      btn.classList.remove("active");
+    });
+    if (clickedBtn) {
+      clickedBtn.classList.add("active");
+      clickedBtn.style.transform = "scale(0.95)";
+      setTimeout(() => {
+        clickedBtn.style.transform = "";
+      }, 150);
+    }
+
+    if (unitIds && Array.isArray(unitIds)) {
+      // 清空所有勾選
+      Array.from(unitList.children).forEach((li) => {
+        const checkbox = li.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = false;
+      });
+
+      // 取得所有項目
+      const allItems = Array.from(unitList.children);
+      const startupCard = allItems.find((item) =>
+        item.classList.contains("startup-card"),
+      );
+      const shutdownCard = allItems.find((item) =>
+        item.classList.contains("shutdown-card"),
+      );
+      const normalItems = allItems.filter(
+        (item) => !item.classList.contains("power-option-card"),
+      );
+
+      // 建立新的排序
+      const orderedItems = [];
+
+      // 1. 先放開機卡片（如果存在）並勾選
+      if (startupCard) {
+        const checkbox = startupCard.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = true;
+        orderedItems.push(startupCard);
+      }
+
+      // 2. 按照指定順序放入選中的普通單元
+      unitIds.forEach((unitId) => {
+        const item = normalItems.find((li) => li.dataset.unitId === unitId);
+        if (item) {
+          const checkbox = item.querySelector('input[type="checkbox"]');
+          if (checkbox) checkbox.checked = true;
+          orderedItems.push(item);
+        }
+      });
+
+      // 3. 放入未選中的普通單元
+      normalItems.forEach((item) => {
+        if (!unitIds.includes(item.dataset.unitId)) {
+          orderedItems.push(item);
+        }
+      });
+
+      // 4. 最後放關機卡片（如果存在）並勾選
+      if (shutdownCard) {
+        const checkbox = shutdownCard.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = true;
+        orderedItems.push(shutdownCard);
+      }
+
+      // 重新排列列表
+      unitList.innerHTML = "";
+      orderedItems.forEach((item) => unitList.appendChild(item));
+
+      // 更新開機關機選項的狀態
+      this.manager.includeStartup = true;
+      this.manager.includeShutdown = true;
+
+      this.enableUnitDragSort(unitList);
+      this.updateSelectAllState();
+      this.updateAllUnitButtonStates();
+      if (window.logger) {
+        window.logger.logAction(
+          `已套用預設組合：${sequenceId}，單元順序：開機 → ${unitIds.join(
+            " → ",
+          )} → 關機`,
+        );
+      }
+    }
+  }
+
+  /** 套用新的單元組合 */
+  applyUnitCombination(combination) {
+    // 儲存目前選中的組合
+    this.manager.currentCombination = combination;
+
+    // 使用中央 CombinationSelector 進行選擇
+    if (window.CombinationSelector) {
+      // 取得目前實驗ID以便可隨機組合使用
+      const experimentId = this.manager.getCurrentExperimentId();
+      window.CombinationSelector.selectCombination(combination, experimentId);
+    }
+
+    // 更新面板特定的狀態
+    this.manager.includeStartup = true;
+    this.manager.includeShutdown = true;
+
+    // 記錄日誌
+    if (window.logger) {
+      const experimentId = this.manager.getCurrentExperimentId();
+      if (combination.is_randomizable) {
+        window.logger.logAction(
+          `套用組合：${combination.combination_name} (ID:${experimentId})`,
+        );
+      } else {
+        window.logger.logAction(`套用組合：${combination.combination_name}`);
+      }
+    }
+  }
+
+  /** 自動重新套用指定隨機組合（如果目前選中的是隨機組合） */
+  autoReapplyRandomCombination() {
+    if (
+      this.manager.currentCombination &&
+      this.manager.currentCombination.is_randomizable
+    ) {
+      // 延遲執行，讓輸入框的值先更新完成
+      setTimeout(() => {
+        this.applyUnitCombination(this.manager.currentCombination);
+        if (window.logger) {
+          const experimentId = this.manager.getCurrentExperimentId();
+          window.logger.logAction(`ID變更(${experimentId})，重新隨機排列`);
+        }
+      }, 50);
+    }
   }
 }
 

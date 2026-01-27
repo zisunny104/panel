@@ -14,6 +14,33 @@ class PanelExperimentTimer {
   }
 
   /**
+   * 更新計時器顯示
+   */
+  updateTimerDisplay() {
+    const experimentTimer = document.getElementById("experimentTimer");
+    if (!experimentTimer) return;
+
+    this.experimentInterval = setInterval(() => {
+      if (!this.experimentPaused) {
+        const now = Date.now();
+        const deltaMs = now - this.experimentStartTime;
+        this.experimentElapsed = Math.floor(deltaMs / 1000);
+
+        const totalSeconds = Math.floor(deltaMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const milliseconds = deltaMs % 1000;
+
+        const timeString = `${String(minutes).padStart(2, "0")}:${String(
+          seconds
+        ).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
+
+        experimentTimer.textContent = timeString;
+      }
+    }, 50);
+  }
+
+  /**
    * 開始計時器（顯示 mm:ss.mmm，內部 this.experimentElapsed 保持為秒）
    */
   startTimer() {
@@ -25,24 +52,7 @@ class PanelExperimentTimer {
       this.experimentPaused = false;
       experimentTimer.textContent = "00:00.000";
 
-      this.experimentInterval = setInterval(() => {
-        if (!this.experimentPaused) {
-          const now = Date.now();
-          const deltaMs = now - this.experimentStartTime; // ms
-          this.experimentElapsed = Math.floor(deltaMs / 1000); // keep seconds for other logic
-
-          const totalSeconds = Math.floor(deltaMs / 1000);
-          const minutes = Math.floor(totalSeconds / 60);
-          const seconds = totalSeconds % 60;
-          const milliseconds = deltaMs % 1000;
-
-          const timeString = `${String(minutes).padStart(2, "0")}:${String(
-            seconds
-          ).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
-
-          experimentTimer.textContent = timeString;
-        }
-      }, 50);
+      this.updateTimerDisplay();
     }
   }
 
@@ -52,28 +62,10 @@ class PanelExperimentTimer {
   resumeTimer() {
     const experimentTimer = document.getElementById("experimentTimer");
     if (experimentTimer) {
-      // 調整開始時間，保持已經過的時間
       this.experimentStartTime = Date.now() - this.experimentElapsed * 1000;
       this.experimentPaused = false;
 
-      this.experimentInterval = setInterval(() => {
-        if (!this.experimentPaused) {
-          const now = Date.now();
-          const deltaMs = now - this.experimentStartTime;
-          this.experimentElapsed = Math.floor(deltaMs / 1000);
-
-          const totalSeconds = Math.floor(deltaMs / 1000);
-          const minutes = Math.floor(totalSeconds / 60);
-          const seconds = totalSeconds % 60;
-          const milliseconds = deltaMs % 1000;
-
-          const timeString = `${String(minutes).padStart(2, "0")}:${String(
-            seconds
-          ).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
-
-          experimentTimer.textContent = timeString;
-        }
-      }, 50);
+      this.updateTimerDisplay();
     }
   }
 

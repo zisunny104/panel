@@ -52,23 +52,11 @@ function shuffleArray(array, randomFunc) {
 function getCombinationUnitIds(combination, experimentId = null) {
   let unitIds = [];
 
-  // console.log("[RandomUtils] 處理組合:", {
-  //   combination_id: combination.combination_id,
-  //   is_randomizable: combination.is_randomizable,
-  //   experimentId: experimentId,
-  // });
-
   if (Array.isArray(combination.units)) {
     // 簡單陣列格式
     unitIds = combination.units;
-    // console.log("[RandomUtils] 簡單陣列格式，單元:", unitIds);
   } else if (combination.units && typeof combination.units === "object") {
     // 複雜格式（隨機化）
-    // console.log("[RandomUtils] 複雜格式:", {
-    //   randomizable: combination.units.randomizable,
-    //   fixed: combination.units.fixed,
-    // });
-
     if (combination.is_randomizable && combination.units.randomizable) {
       const seed = experimentId || "default";
       const seededRandom = createSeededRandom(seed);
@@ -77,17 +65,13 @@ function getCombinationUnitIds(combination, experimentId = null) {
         seededRandom
       );
       unitIds = randomized;
-      // console.log("[RandomUtils] 隨機化後:", unitIds);
     } else if (combination.units.randomizable) {
       // 非隨機化，直接使用 randomizable 的順序
       unitIds = [...combination.units.randomizable];
-      // console.log("[RandomUtils] 非隨機，直接使用:", unitIds);
     }
 
     // 處理 fixed 單元
     if (combination.units.fixed) {
-      // console.log("[RandomUtils] 處理 fixed 單元前:", unitIds);
-
       // 分類處理以確保順序正確
       const fixedFirst = [];
       const fixedLast = [];
@@ -103,19 +87,11 @@ function getCombinationUnitIds(combination, experimentId = null) {
         }
       });
 
-      // console.log("[RandomUtils] Fixed 分類:", {
-      //   first: fixedFirst,
-      //   other: fixedOther,
-      //   last: fixedLast,
-      // });
-
       // 組合: first + 原本的 + other + last
       unitIds = [...fixedFirst, ...unitIds, ...fixedOther, ...fixedLast];
-      // console.log("[RandomUtils] 處理 fixed 單元後:", unitIds);
     }
   }
 
-  // console.log("[RandomUtils] 最終單元列表:", unitIds);
   return unitIds;
 }
 
@@ -142,8 +118,3 @@ export const RandomUtils = {
 
 // 保持向後相容的全域物件
 window.RandomUtils = RandomUtils;
-
-
-
-
-

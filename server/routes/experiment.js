@@ -19,7 +19,7 @@ const router = express.Router();
  *   "createCode": "113151006",
  *   "sessionId": "ABC123" (可選),
  *   "clientId": "CLIENT_xxx",
- *   "data": { "subjectName": "測試", ... } (可選)
+ *   "data": { "participantName": "測試", ... } (可選)
  * }
  *
  * Response:
@@ -54,7 +54,7 @@ router.post("/id", (req, res) => {
     createCode,
     sessionId,
     clientId,
-    data
+    data,
   );
 
   if (result.success) {
@@ -168,7 +168,7 @@ router.delete("/id", (req, res) => {
  * Request Body:
  * {
  *   "experimentId": "EXP20260109ABCD",
- *   "data": { "subjectName": "新名稱", ... }
+ *   "data": { "participantName": "新名稱", ... }
  * }
  *
  * Response:
