@@ -48,6 +48,10 @@ class ButtonManager {
     this.lastActionTime = 0;
     this.actionCooldown = 200; // 200ms 冷卻時間
 
+    // 實驗動作管理
+    this.experimentActions = new Map(); // 儲存實驗動作數據
+    this.actionListeners = new Map(); // 事件監聽器儲存
+
     // 初始化 - 只載入按鈕功能，事件監聽器在數據載入後設置
     this.loadButtonFunctions();
   }
@@ -79,7 +83,7 @@ class ButtonManager {
 
       Logger.debug("按鈕功能配置載入完成，事件監聽器已設置");
     } catch (error) {
-      console.error("載入按鈕功能配置失敗:", error);
+      Logger.error("載入按鈕功能配置失敗:", error);
     }
   }
 
@@ -217,14 +221,15 @@ class ButtonManager {
 
         // 記錄動作進度
         if (
-          window.actionManager &&
-          window.actionManager.currentActionSequence?.length > 0
+          window.experimentActionHandler &&
+          window.experimentActionHandler.currentActionSequence?.length > 0
         ) {
-          const currentActionIndex = window.actionManager.currentActionIndex;
+          const currentActionIndex =
+            window.experimentActionHandler.currentActionIndex;
           const totalActions =
-            window.actionManager.currentActionSequence.length;
+            window.experimentActionHandler.currentActionSequence.length;
           const prevAction =
-            window.actionManager.currentActionSequence[
+            window.experimentActionHandler.currentActionSequence[
               Math.max(0, currentActionIndex - 1)
             ];
           const logMessage = `按鈕 "${buttonId}" → 功能 "${functionName}" | 動作: ${
@@ -292,6 +297,13 @@ class ButtonManager {
    * 檢查並執行實驗模式下的對應動作
    */
   checkAndExecuteExperimentAction(buttonId, functionName) {
+    // 檢查是否為新的實驗動作按鈕（事件驅動）
+    if (this.isExperimentActionButton(buttonId)) {
+      Logger.debug(`檢測到新實驗動作按鈕: ${buttonId}`);
+      this.emitButtonActionClick(buttonId);
+      return true;
+    }
+
     // 檢查實驗是否在執行中
     if (!window.panelExperiment?.isExperimentRunning) {
       Logger.debug(`實驗未執行，跳過按鈕動作: ${buttonId}`);
@@ -299,32 +311,22 @@ class ButtonManager {
     }
 
     // 確保動作管理員已初始化（當實驗開始時自動初始化）
-    if (window.actionManager && !window.actionManager.isInitialized) {
-      Logger.debug("actionManager 尚未初始化，開始初始化...");
-      // 使用 async 函式但不等待，讓實驗繼續執行
-      window.actionManager
-        .initializeFromExperiment()
-        .then((initialized) => {
-          Logger.debug("actionManager 初始化完成");
-        })
-        .catch((error) => {
-          Logger.error("動作序列初始化失敗:", error);
-        });
+    if (!window.experimentActionHandler) {
+      Logger.warn("experimentActionHandler 不存在，無法處理動作");
+      return false;
+    }
+
+    // 如果動作序列為空，記錄警告但繼續處理
+    if (window.experimentActionHandler.currentActionSequence.length === 0) {
+      Logger.warn("動作序列為空，無法處理動作");
       return false;
     }
 
     // 處理動作序列邏輯
-    if (
-      window.actionManager &&
-      window.actionManager.currentActionSequence.length > 0
-    ) {
-      Logger.debug(
-        `處理按鈕動作: ${buttonId} -> ${functionName}, 序列長度: ${window.actionManager.currentActionSequence.length}`,
-      );
-      return this.handleActionBasedExperiment(buttonId, functionName);
-    } else {
-      Logger.warn("actionManager 不存在或動作序列為空");
-    }
+    Logger.debug(
+      `處理按鈕動作: ${buttonId} -> ${functionName}, 序列長度: ${window.experimentActionHandler.currentActionSequence.length}`,
+    );
+    return this.handleActionBasedExperiment(buttonId, functionName);
 
     return false;
   }
@@ -343,11 +345,11 @@ class ButtonManager {
     }
     this.lastActionTime = now;
 
-    if (!window.actionManager) {
+    if (!window.experimentActionHandler) {
       return false;
     }
 
-    let currentAction = window.actionManager.getCurrentAction();
+    let currentAction = window.experimentActionHandler.getCurrentAction();
     if (!currentAction) {
       return false;
     }
@@ -357,8 +359,8 @@ class ButtonManager {
       // 儲存目前 action，檢查是否為 step 最後一個
       const skippedAction = currentAction;
 
-      window.actionManager.completeCurrentAction();
-      currentAction = window.actionManager.getCurrentAction();
+      window.experimentActionHandler.completeCurrentAction();
+      currentAction = window.experimentActionHandler.getCurrentAction();
 
       // 如果被跳過的 action 是 step 的最後一個，觸發冷卻效果
       if (skippedAction.isLastActionInStep) {
@@ -401,36 +403,39 @@ class ButtonManager {
           const completedAction = currentAction;
 
           // 完成目前 action
-          window.actionManager.completeCurrentAction();
+          window.experimentActionHandler.completeCurrentAction();
 
           // 查找下一個 action
           const nextActionIndex =
-            window.actionManager.currentActionSequence.findIndex(
+            window.experimentActionHandler.currentActionSequence.findIndex(
               (action) => action.actionId === nextActionId,
             );
 
           // 取得下一個 action 物件
           const nextAction =
             nextActionIndex !== -1
-              ? window.actionManager.currentActionSequence[nextActionIndex]
+              ? window.experimentActionHandler.currentActionSequence[
+                  nextActionIndex
+                ]
               : null;
 
           if (nextActionIndex !== -1) {
-            window.actionManager.currentActionIndex = nextActionIndex;
+            window.experimentActionHandler.currentActionIndex = nextActionIndex;
           }
 
           // 冷卻邏輯分兩種情況：
           // 情況1：如果 step 只有 1 個 action -> 完成時冷卻
           // 情況2：如果 step 有多個 action -> 進入最後一個 action 時冷卻
 
-          const stepInfo = window.actionManager.actionToStepMap?.get(
+          const stepInfo = window.experimentActionHandler.actionToStepMap?.get(
             completedAction.actionId,
           );
           const stepActions = stepInfo
-            ? window.actionManager.currentActionSequence.filter(
+            ? window.experimentActionHandler.currentActionSequence.filter(
                 (a) =>
-                  window.actionManager.actionToStepMap?.get(a.actionId)
-                    ?.step_id === stepInfo.step_id,
+                  window.experimentActionHandler.actionToStepMap?.get(
+                    a.actionId,
+                  )?.step_id === stepInfo.step_id,
               )
             : [];
 
@@ -443,8 +448,8 @@ class ButtonManager {
               window.panelExperiment?.currentUnitIndex
             ];
           const allStepsInUnit = new Set();
-          if (currentUnitId && window.actionManager.actionToStepMap) {
-            for (const [_actionId, stepData] of window.actionManager
+          if (currentUnitId && window.experimentActionHandler.actionToStepMap) {
+            for (const [_actionId, stepData] of window.experimentActionHandler
               .actionToStepMap) {
               if (stepData.unit_id === currentUnitId) {
                 allStepsInUnit.add(stepData.step_id);
@@ -495,22 +500,22 @@ class ButtonManager {
       } else {
         // 沒有定義互動，直接完成並移到下一個
         const completedAction = currentAction;
-        window.actionManager.completeCurrentAction();
+        window.experimentActionHandler.completeCurrentAction();
 
         // 冷卻邏輯：
         // 情況1：step 只有 1 個 action -> 只有在首尾 step 時才冷卻
         // 情況2：step 有多個 action -> 進入最後一個 action 時冷卻
-        const stepInfo = window.actionManager.actionToStepMap?.get(
+        const stepInfo = window.experimentActionHandler.actionToStepMap?.get(
           completedAction.actionId,
         );
         const stepActions = stepInfo
-          ? window.actionManager.currentActionSequence.filter(
+          ? window.experimentActionHandler.currentActionSequence.filter(
               (a) =>
-                window.actionManager.actionToStepMap?.get(a.actionId)
+                window.experimentActionHandler.actionToStepMap?.get(a.actionId)
                   ?.step_id === stepInfo.step_id,
             )
           : [];
-        const nextAction = window.actionManager.getCurrentAction();
+        const nextAction = window.experimentActionHandler.getCurrentAction();
 
         let shouldCooldown = false;
         let cooldownReason = "";
@@ -521,8 +526,8 @@ class ButtonManager {
             window.panelExperiment?.currentUnitIndex
           ];
         const allStepsInUnit = new Set();
-        if (currentUnitId && window.actionManager.actionToStepMap) {
-          for (const [_actionId, stepData] of window.actionManager
+        if (currentUnitId && window.experimentActionHandler.actionToStepMap) {
+          for (const [_actionId, stepData] of window.experimentActionHandler
             .actionToStepMap) {
             if (stepData.unit_id === currentUnitId) {
               allStepsInUnit.add(stepData.step_id);
@@ -585,7 +590,7 @@ class ButtonManager {
     this.updateMediaForCurrentAction();
 
     // 檢查是否還有下一個動作（實驗是否已完成）
-    const nextAction = window.actionManager?.getCurrentAction();
+    const nextAction = window.experimentActionHandler?.getCurrentAction();
     if (!nextAction) {
       // 實驗已完成，不執行冷卻效果
       return;
@@ -696,12 +701,12 @@ class ButtonManager {
     });
 
     // 如果還在等待電源開啟，不需要載入動作信息
-    if (isWaitingForPowerOn || !window.actionManager) {
+    if (isWaitingForPowerOn || !window.experimentActionHandler) {
       return;
     }
 
     // 自動跳過沒有 action_buttons 的動作，但先顯示其媒體
-    let currentAction = window.actionManager.getCurrentAction();
+    let currentAction = window.experimentActionHandler.getCurrentAction();
     while (currentAction && !currentAction.action_buttons) {
       if (currentAction.media_file && window.mediaManager) {
         window.mediaManager.displayMedia(currentAction.media_file);
@@ -709,8 +714,8 @@ class ButtonManager {
         // 如果沒有設定媒體，強制播放首頁循環影片
         window.mediaManager.playHomePageLoop(true);
       }
-      window.actionManager.completeCurrentAction();
-      currentAction = window.actionManager.getCurrentAction();
+      window.experimentActionHandler.completeCurrentAction();
+      currentAction = window.experimentActionHandler.getCurrentAction();
     }
 
     if (currentAction) {
@@ -857,7 +862,10 @@ class ButtonManager {
   isPowerOn() {
     if (window.powerControl) return window.powerControl.isPowerOn;
     const powerLightOn = document.querySelector(".power-light-on-img");
-    if (powerLightOn) return powerLightOn.style.display !== "none";
+    if (powerLightOn) {
+      // respect class-based hiding only (clean conversion)
+      return !powerLightOn.classList.contains("is-hidden");
+    }
     return true;
   }
 
@@ -895,6 +903,11 @@ class ButtonManager {
     document.addEventListener("deviceModeChanged", (e) => {
       this.handleDeviceModeChanged(e.detail);
     });
+
+    // 監聽實驗動作載入事件
+    window.addEventListener("experiment:actions-loaded", (e) => {
+      this.handleExperimentActionsLoaded(e.detail);
+    });
   }
 
   /**
@@ -909,7 +922,7 @@ class ButtonManager {
         button.removeEventListener("click", oldHandler);
       }
 
-      // 創建新的事件處理器並保存引用
+      // 建立新的事件處理器並保存引用
       const newHandler = (event) => {
         if (event.pointerType === "touch" || event.detail === 0) return;
         if (typeof Logger !== "undefined") {
@@ -1272,14 +1285,173 @@ class ButtonManager {
           playPromise.catch((error) => {
             // 如果是因為沒有用戶交互導致的錯誤，嘗試初始化音頻上下文
             if (error.name === "NotAllowedError") {
-              console.warn("音頻播放被阻止，需要用戶交互後才能播放");
+              Logger.warn("音頻播放被阻止，需要用戶交互後才能播放");
               // 不顯示錯誤訊息給用戶，因為這是正常的瀏覽器行為
             } else {
-              console.warn("播放提示音失敗:", error);
+              Logger.warn("播放提示音失敗:", error);
             }
           });
         }
       }
+    }
+  }
+
+  // ==========================================
+  // 實驗動作處理
+  // ==========================================
+
+  /**
+   * 處理實驗動作載入事件
+   * @param {Object} data - 動作數據
+   */
+  handleExperimentActionsLoaded(data) {
+    const { actions } = data;
+
+    if (!actions || !Array.isArray(actions)) {
+      Logger.warn("無效的實驗動作數據");
+      return;
+    }
+
+    // 清空舊的動作數據
+    this.experimentActions.clear();
+
+    // 儲存新的動作數據
+    actions.forEach((actionData) => {
+      this.experimentActions.set(actionData.buttonId, actionData);
+    });
+
+    Logger.debug(`已載入 ${actions.length} 個實驗動作`);
+  }
+
+  /**
+   * 檢查按鈕是否為實驗動作按鈕
+   * @param {string} buttonId - 按鈕ID
+   * @returns {boolean} 是否為實驗動作按鈕
+   */
+  isExperimentActionButton(buttonId) {
+    return this.experimentActions.has(buttonId);
+  }
+
+  /**
+   * 取得按鈕的實驗動作數據
+   * @param {string} buttonId - 按鈕ID
+   * @returns {Object|null} 動作數據
+   */
+  getExperimentActionData(buttonId) {
+    return this.experimentActions.get(buttonId) || null;
+  }
+
+  /**
+   * 發射按鈕動作點擊事件
+   * @param {string} buttonId - 按鈕ID
+   */
+  emitButtonActionClick(buttonId) {
+    const actionData = this.getExperimentActionData(buttonId);
+    if (!actionData) {
+      Logger.warn(`按鈕 ${buttonId} 不是實驗動作按鈕`);
+      return;
+    }
+
+    // 發射事件給 Page Manager
+    const event = new CustomEvent("button:action-clicked", {
+      detail: {
+        buttonId: buttonId,
+        actionId: actionData.actionId,
+        action: actionData.action,
+      },
+      bubbles: true,
+    });
+    window.dispatchEvent(event);
+
+    Logger.debug(`已發射按鈕動作點擊事件: ${buttonId}`);
+  }
+
+  /**
+   * 顯示動作回饋
+   * @param {string} buttonId - 按鈕ID
+   * @param {string} type - 回饋類型 ('correct' | 'incorrect')
+   */
+  showActionFeedback(buttonId, type) {
+    const buttonElement = document.querySelector(`[data-label="${buttonId}"]`);
+    if (!buttonElement) {
+      Logger.warn(`找不到按鈕元素: ${buttonId}`);
+      return;
+    }
+
+    // 添加回饋CSS類別
+    const feedbackClass =
+      type === "correct" ? "action-correct" : "action-incorrect";
+    buttonElement.classList.add(feedbackClass);
+
+    // 1秒後移除回饋類別
+    setTimeout(() => {
+      buttonElement.classList.remove(feedbackClass);
+    }, 1000);
+
+    Logger.debug(`顯示動作回饋: ${buttonId} (${type})`);
+  }
+
+  /**
+   * 監聽按鈕動作驗證結果事件
+   * @param {Function} callback - 回調函數
+   */
+  onActionValidationResult(callback) {
+    const listener = (event) => {
+      callback(event.detail);
+    };
+
+    window.addEventListener("experiment:action-validation", listener);
+    this.actionListeners.set("action-validation", listener);
+  }
+
+  /**
+   * 移除事件監聽器
+   */
+  removeActionListeners() {
+    this.actionListeners.forEach((listener, eventName) => {
+      window.removeEventListener(eventName, listener);
+    });
+    this.actionListeners.clear();
+  }
+
+  /**
+   * Minimal event-emitter API to support PageManager expectations
+   * on(eventName, handler) - register
+   * off(eventName, handler) - unregister
+   * emit(eventName, data) - invoke handlers and also dispatch DOM event
+   */
+  on(eventName, handler) {
+    if (!this._events) this._events = new Map();
+    const list = this._events.get(eventName) || [];
+    list.push(handler);
+    this._events.set(eventName, list);
+  }
+
+  off(eventName, handler) {
+    if (!this._events) return;
+    const list = this._events.get(eventName) || [];
+    this._events.set(
+      eventName,
+      list.filter((h) => h !== handler),
+    );
+  }
+
+  emit(eventName, data) {
+    if (this._events && this._events.get(eventName)) {
+      this._events.get(eventName).forEach((h) => {
+        try {
+          h(data);
+        } catch (e) {
+          Logger?.error("buttonManager event handler error", e);
+        }
+      });
+    }
+
+    // Also dispatch a global DOM event for other modules that rely on it
+    try {
+      window.dispatchEvent(new CustomEvent(eventName, { detail: data }));
+    } catch (e) {
+      // ignore
     }
   }
 }

@@ -1,6 +1,6 @@
 {
     "name": "panel",
-    "version": "2.1.3f26ebe",
+    "version": "2.2.bc0460d",
     "description": "機台操作面板與實驗設定",
     "main": "index.html",
     "scripts": {

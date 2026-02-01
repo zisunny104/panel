@@ -1,0 +1,181 @@
+/* ================= 操作日誌面板 ================= */
+.logger-output {
+    position: fixed;
+    bottom: 1rem;
+    left: 4rem;
+    width: 300px;
+    height: 400px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 0.625rem;
+    border-radius: 0.625rem;
+    font-size: 0.8rem;
+    z-index: 10;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+    display: none;
+    flex-direction: column;
+    touch-action: auto;
+    user-select: none;
+    gap: 0;
+}
+
+.logger-panel-header {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    font-weight: bold;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.logger-panel-header strong {
+    flex: 1;
+    text-align: left;
+}
+
+.logger-panel-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.25rem;
+    background: #333;
+    color: #fff;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    margin-left: 0.375rem;
+    padding: 0.125rem;
+}
+
+.logger-panel-btn svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.logger-fab-position {
+    /* 左側浮動按鈕容器：與右側 .corner-buttons 規格一致 */
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    z-index: 30;
+
+    display: grid;
+    grid-template-rows: 1fr;
+    /* 單個按鈕 */
+    gap: 1.2rem;
+    align-items: center;
+}
+
+/* 確保 FAB 按鈕可見的樣式 */
+.logger-fab-visible {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 1000 !important;
+}
+
+/* 重新附加到body的日誌面板樣式 */
+.logger-reparented {
+    position: fixed !important;
+    right: 20px !important;
+    bottom: 20px !important;
+    z-index: 1000 !important;
+}
+
+/* 複製按鈕狀態樣式 */
+.copy-success {
+    background: #4CAF50 !important;
+}
+
+.copy-success svg {
+    display: none;
+}
+
+.copy-success::before {
+    content: "";
+    display: block;
+    width: 1.5rem;
+    height: 1.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20,6 9,17 4,12'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+}
+
+.copy-error {
+    background: #f44336 !important;
+}
+
+.copy-error svg {
+    display: none;
+}
+
+.copy-error::before {
+    content: "";
+    display: block;
+    width: 1.5rem;
+    height: 1.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'%3E%3C/line%3E%3Cline x1='6' y1='6' x2='18' y2='18'%3E%3C/line%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+}
+
+/* 排除 .logger-panel-btn 按钮，仅适用于日誌內容区的按钮 */
+.logger-output>button,
+.logger-output .log-content~button {
+    background-color: #555;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+    touch-action: manipulation;
+}
+
+.logger-output>button:hover,
+.logger-output .log-content~button:hover {
+    background-color: #777;
+}
+
+.logger-output>button:active,
+.logger-output .log-content~button:active {
+    background-color: #333;
+}
+
+/* 確保面板按鈕維持正方形樣式 */
+.logger-panel-btn {
+    background: #333 !important;
+    padding: 2px !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 4px !important;
+}
+
+.logger-panel-btn:hover {
+    background: #555 !important;
+}
+
+.logger-panel-btn:active {
+    background: #222 !important;
+}
+
+.logger-output .log-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 5px;
+    padding-right: 5px;
+    touch-action: pan-y;
+}
+
+.logger-output a {
+    color: #ffcc00;
+}

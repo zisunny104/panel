@@ -80,9 +80,7 @@ class ExperimentLogUI {
       const logsDir = await this.getLogsDirectory();
       const experiments = await this.loadExperimentLogsFromDirectory(logsDir);
 
-      Logger.debug(
-        `從檔案系統載入 ${experiments.length} 個實驗日誌`
-      );
+      Logger.debug(`從檔案系統載入 ${experiments.length} 個實驗日誌`);
       this.displayExperimentLogs(experiments);
     } catch (error) {
       Logger.error("載入日誌列表失敗:", error);
@@ -137,9 +135,7 @@ class ExperimentLogUI {
 
           const result = await response.json();
           if (!result.success || !result.content) {
-            Logger.debug(
-              `檔案 ${filename} 讀取失敗: ${result.error}`
-            );
+            Logger.debug(`檔案 ${filename} 讀取失敗: ${result.error}`);
             continue;
           }
 
@@ -178,14 +174,9 @@ class ExperimentLogUI {
             actualExperimentId: experimentId
           });
 
-          Logger.debug(
-            `成功載入: ${filename} (${logs.length} 條記錄)`
-          );
+          Logger.debug(`成功載入: ${filename} (${logs.length} 條記錄)`);
         } catch (error) {
-          Logger.debug(
-            `解析檔案 ${filename} 失敗:`,
-            error.message
-          );
+          Logger.debug(`解析檔案 ${filename} 失敗:`, error.message);
           // 即使解析失敗，也嘗試顯示基本資訊
           const match = filename.match(/^(.+?)(?:_\d+)?\.jsonl$/);
           const experimentId = match
@@ -230,23 +221,16 @@ class ExperimentLogUI {
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.files) {
-          Logger.debug(
-            `從 API 讀取到 ${result.files.length} 個檔案`
-          );
+          Logger.debug(`從 API 讀取到 ${result.files.length} 個檔案`);
           return result.files.map((f) => f.filename);
         }
       }
     } catch (error) {
-      Logger.debug(
-        "API 不可用，無法動態讀取檔案列表",
-        error.message
-      );
+      Logger.debug("API 不可用，無法動態讀取檔案列表", error.message);
     }
 
     // 瀏覽器無法直接列出本機目錄，必須啟動伺服器
-    Logger.warn(
-      "無法讀取實驗日誌檔案。請啟動伺服器：cd server && npm start"
-    );
+    Logger.warn("無法讀取實驗日誌檔案。請啟動伺服器：cd server && npm start");
     return [];
   }
 
@@ -480,9 +464,7 @@ class ExperimentLogUI {
       // 產生 JSONL 內容
       const jsonlContent = entries.map((e) => JSON.stringify(e)).join("\n");
 
-      Logger.debug(
-        `檢視日誌 ${logId}，共 ${entries.length} 條記錄`
-      );
+      Logger.debug(`檢視日誌 ${logId}，共 ${entries.length} 條記錄`);
 
       // 建立並顯示 modal
       this.showLogViewModal(logId, stats, jsonlContent);
@@ -1076,10 +1058,7 @@ class ExperimentLogUI {
             }
           }
         } catch (error) {
-          Logger.warn(
-            `下載日誌 ${logId} 失敗:`,
-            error.message
-          );
+          Logger.warn(`下載日誌 ${logId} 失敗:`, error.message);
         }
       }
 
@@ -1102,9 +1081,7 @@ class ExperimentLogUI {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      Logger.debug(
-        `已批次下載 ${successCount}/${logIds.length} 個日誌`
-      );
+      Logger.debug(`已批次下載 ${successCount}/${logIds.length} 個日誌`);
       alert(`已成功下載 ${successCount} 個日誌檔案`);
     } catch (error) {
       Logger.error("批次下載失敗:", error);
@@ -1163,17 +1140,12 @@ class ExperimentLogUI {
             }
           }
         } catch (error) {
-          Logger.warn(
-            `刪除日誌 ${logId} 失敗:`,
-            error.message
-          );
+          Logger.warn(`刪除日誌 ${logId} 失敗:`, error.message);
         }
       }
 
       alert(`已成功刪除 ${deletedCount} 個日誌檔案`);
-      Logger.debug(
-        `已批次刪除 ${deletedCount}/${logIds.length} 個日誌`
-      );
+      Logger.debug(`已批次刪除 ${deletedCount}/${logIds.length} 個日誌`);
 
       this.selectedLogs.clear();
       this.loadExperimentLogs(); // 重新載入列表
@@ -1200,13 +1172,30 @@ window.downloadSelectedLogs = () => experimentLogUI.downloadSelectedLogs();
 window.deleteSelectedLogs = () => experimentLogUI.deleteSelectedLogs();
 window.updateDeleteButton = () => experimentLogUI.updateDeleteButton();
 
-// 頁面載入時初始化並載入日誌列表
-window.addEventListener("DOMContentLoaded", () => {
-  experimentLogUI.initialize();
-  experimentLogUI.loadExperimentLogs();
-});
+// 頁面載入時安全初始化並載入日誌列表（支援晚載入）
+function _initExperimentLogUI() {
+  try {
+    if (window.experimentLogUI && !window.experimentLogUI._initialized) {
+      // 初始化（使用可選鏈以避免意外錯誤）
+      typeof window.experimentLogUI.initialize === "function" &&
+        window.experimentLogUI.initialize();
 
+      if (typeof window.experimentLogUI.loadExperimentLogs === "function") {
+        window.experimentLogUI.loadExperimentLogs();
+      }
 
+      window.experimentLogUI._initialized = true;
+    }
+  } catch (e) {
+    // 若 Logger 可用則記錄，否則靜默失敗
+    if (typeof Logger !== "undefined" && Logger.warn) {
+      Logger.warn("initExperimentLogUI failed", e);
+    }
+  }
+}
 
-
-
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", _initExperimentLogUI);
+} else {
+  _initExperimentLogUI();
+}

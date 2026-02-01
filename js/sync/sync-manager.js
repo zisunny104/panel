@@ -10,20 +10,12 @@ import { SyncManagerSessions } from "./sync-manager-sessions.js";
 import { SyncEvents } from "../core/sync-events-constants.js";
 
 class SyncManager {
-  // ========== 靜態常數 ==========
-  /**
-   * 角色鍵名常數
-   */
   static ROLE = {
     VIEWER: "viewer",
     OPERATOR: "operator",
     LOCAL: "local",
   };
 
-  /**
-   * 狀態鍵名常數
-   * 集中定義所有系統狀態鍵名，避免在代碼中硬編碼
-   */
   static STATUS = {
     IDLE: "idle",
     OFFLINE: "offline",
@@ -31,77 +23,39 @@ class SyncManager {
     OPERATOR: "operator",
   };
 
-  /**
-   * 角色身份文字常數
-   * 集中定義所有角色身份的顯示文字
-   * @static
-   */
   static ROLE_TEXTS = {
-    viewer: "檢視者", // 檢視者角色
-    operator: "操作者", // 操作者角色
-    local: "本機", // 本機專用角色
+    viewer: "檢視者",
+    operator: "操作者",
+    local: "本機",
   };
 
-  /**
-   * 連線狀態文字常數
-   * 集中定義所有連線狀態的顯示文字
-   * @static
-   */
   static STATUS_TEXTS = {
-    idle: "未同步", // 未連線至工作階段
-    viewer: "僅檢視", // 檢視者連線狀態
-    operator: "同步中", // 操作者連線狀態
-    offline: "已離線", // 伺服器已離線
+    idle: "未同步",
+    viewer: "檢視中",
+    operator: "同步中",
+    offline: "已離線",
   };
 
-  /**
-   * 頁面鍵名常數
-   * 集中定義系統中可用的頁面鍵名
-   */
   static PAGE = {
     PANEL: "panel",
-    EXPERIMENT: "experiment",
+    BOARD: "board",
   };
 
-  /**
-   * 頁面清單常數
-   * 集中定義所有系統頁面的名稱和路徑
-   * @static
-   */
   static PAGE_LIST = {
     panel: {
-      name: "機台面板", // 頁面顯示名稱
-      path: "index.html", // 頁面路徑 (index.html kept for backward compatibility)
+      name: "機台面板",
+      path: "index.html",
     },
-    experiment: {
-      name: "實驗管理", // 頁面顯示名稱
-      path: "board.html", // 頁面路徑
+    board: {
+      name: "實驗管理",
+      path: "board.html",
     },
   };
 
-  // ========== 靜態方法 - 角色文字 ==========
-  /**
-   * 取得角色身份文字
-   * 根據角色鍵名回傳對應的顯示文字，若無法識別則回傳原值
-   * @static
-   * @param {string} role - 角色鍵名（如 "viewer"、"operator"）
-   * @returns {string} 角色文字，預設回傳原值以防角色鍵名無法識別
-   */
   static getRoleText(role) {
-    if (!role) {
-      Logger.warn("getRoleText 收到無效角色值:", role);
-      return "未知角色";
-    }
     return this.ROLE_TEXTS[role] || role;
   }
 
-  /**
-   * 新增新的角色身份類型（用於動態擴展）
-   * @static
-   * @param {string} key - 角色鍵名
-   * @param {string} text - 顯示文字
-   * @returns {boolean} 若新增成功回傳 true，若鍵名已存在回傳 false
-   */
   static addRoleText(key, text) {
     if (this.ROLE_TEXTS.hasOwnProperty(key)) {
       Logger.warn("角色鍵名已存在，跳過新增:", key);
@@ -111,29 +65,10 @@ class SyncManager {
     return true;
   }
 
-  // ========== 靜態方法 - 狀態文字 ==========
-  /**
-   * 取得連線狀態文字
-   * 根據狀態鍵名回傳對應的顯示文字，若無法識別則回傳原值
-   * @static
-   * @param {string} status - 狀態鍵名（如 "idle"、"viewer"、"operator"、"offline"）
-   * @returns {string} 狀態文字，預設回傳原值以防狀態鍵名無法識別
-   */
   static getStatusText(status) {
-    if (!status) {
-      Logger.warn("getStatusText 收到無效狀態值:", status);
-      return "未知狀態";
-    }
     return this.STATUS_TEXTS[status] || status;
   }
 
-  /**
-   * 新增新的連線狀態類型（用於動態擴展）
-   * @static
-   * @param {string} key - 狀態鍵名
-   * @param {string} text - 顯示文字
-   * @returns {boolean} 若新增成功回傳 true，若鍵名已存在回傳 false
-   */
   static addStatusText(key, text) {
     if (this.STATUS_TEXTS.hasOwnProperty(key)) {
       Logger.warn("狀態鍵名已存在，跳過新增:", key);
@@ -146,38 +81,22 @@ class SyncManager {
   // ========== 靜態方法 - 頁面清單 ==========
   /**
    * 取得頁面名稱
-   * 根據頁面鍵名回傳對應的顯示名稱，若無法識別則回傳原值
-   * @static
-   * @param {string} pageKey - 頁面鍵名（index 或 experiment）
+   * @param {string} pageKey - 頁面鍵名
    * @returns {string} 頁面顯示名稱
    */
   static getPageName(pageKey) {
-    // 支援舊鍵名 'index' 的向後相容（對應到 PAGE.PANEL）
-    const key = pageKey === "index" ? this.PAGE.PANEL : pageKey;
-    return this.PAGE_LIST[key]?.name || pageKey;
+    return this.PAGE_LIST[pageKey]?.name || pageKey;
   }
 
   /**
    * 取得頁面路徑
-   * 根據頁面鍵名回傳對應的頁面路徑，若無法識別則回傳原值
-   * @static
-   * @param {string} pageKey - 頁面鍵名（panel 或 experiment）
+   * @param {string} pageKey - 頁面鍵名
    * @returns {string} 頁面路徑
    */
   static getPagePath(pageKey) {
-    // 支援舊鍵名 'index' 的向後相容（對應到 PAGE.PANEL）
-    const key = pageKey === "index" ? this.PAGE.PANEL : pageKey;
-    return this.PAGE_LIST[key]?.path || pageKey;
+    return this.PAGE_LIST[pageKey]?.path || pageKey;
   }
 
-  /**
-   * 新增新的頁面類型（用於動態擴展）
-   * @static
-   * @param {string} key - 頁面鍵名
-   * @param {string} name - 頁面顯示名稱
-   * @param {string} path - 頁面路徑
-   * @returns {boolean} 若新增成功回傳 true，若鍵名已存在回傳 false
-   */
   static addPage(key, name, path) {
     if (this.PAGE_LIST.hasOwnProperty(key)) {
       Logger.warn("頁面鍵名已存在，跳過新增:", key);
@@ -187,20 +106,19 @@ class SyncManager {
     return true;
   }
 
-  // ========== 實例方法 - 構造和初始化 ==========
   constructor() {
     this.core = new SyncManagerCore();
     this.ui = new SyncManagerUI(this.core);
     this.qr = new SyncManagerQR(this.core);
     this.sessions = new SyncManagerSessions(this.core);
     this.connectionCheckTimer = null;
-    this.connectionCheckInterval = 5000; // 預設5秒檢查一次
-    this.offlineCheckInterval = 20000; // 離線時20秒檢查一次
+    this.connectionCheckInterval = 5000;
+    this.offlineCheckInterval = 20000;
     this.serverOnline = null;
-    this.isCheckingConnection = false; // 防止重疊檢查
-    this.eventListeners = []; // 記錄所有事件監聽器，方便清理
-    this.isSyncMode = null; // 記錄同步模式狀態 (null=未知, true=同步, false=本機)
-    this.initialized = false; // 初始化完成標記
+    this.isCheckingConnection = false;
+    this.eventListeners = [];
+    this.isSyncMode = null;
+    this.initialized = false;
     this.initialize();
   }
 
@@ -222,8 +140,6 @@ class SyncManager {
 
         // 只在同步模式下初始化完整功能
         if (isSync) {
-          Logger.info("進入同步模式 - 初始化完整 UI、QR、Sessions");
-          // UI 的其他部分（控制面板、事件監聽等）
           this.ui.createControlPanel();
           this.ui.setupEventListeners();
           this.sessions.initialize();
@@ -231,7 +147,6 @@ class SyncManager {
           // 同步模式下立即更新膠囊狀態（根據實際 role）
           this.ui.updateIndicator();
         } else {
-          Logger.debug("進入本機模式 - 初始化控制面板以支援膠囊點擊");
           // 本機模式下設定角色為 LOCAL
           this.core.syncClient.role = SyncManager.ROLE.LOCAL;
           Logger.debug("本機模式設定角色為 LOCAL");
@@ -297,13 +212,13 @@ class SyncManager {
         );
       });
 
-    // 當工作階段加入時，初始化 QR 和 Sessions 模組（動態進入同步模式）
+    // 當工作階段加入時，初始化 QR 和 Sessions 模組（動態進入同步）
     window.addEventListener(SyncEvents.SESSION_JOINED, () => {
       Logger.debug("工作階段已加入，初始化 QR 和 Sessions 模組");
 
       // 如果之前在本機模式，現在需要動態初始化 QR 和 Sessions
       if (this.isSyncMode === false) {
-        Logger.info("動態進入同步模式 - 初始化 QR 和 Sessions");
+        Logger.debug("動態初始化 QR 與 Sessions（已加入工作階段）");
         this.isSyncMode = true;
         this.qr.initialize();
         this.sessions.initialize();
@@ -336,26 +251,19 @@ class SyncManager {
     });
   }
 
-  // ========== 實例方法 - 工作階段管理 ==========
-  /**
-   * 嘗試還原已儲存的工作階段連線
-   * 當頁面重新整理時，如果有之前儲存的 sessionId，自動重新連線
-   * @returns {Promise<boolean>} - true 表示同步模式，false 表示本機模式
-   */
   async attemptSessionRestore() {
     try {
-      // 從 sessionStorage 讀取（與 SyncClient 一致）
       const sessionId = sessionStorage.getItem("sync_sessionId");
       const clientId = sessionStorage.getItem("sync_clientId");
       const role =
         sessionStorage.getItem("sync_role") || SyncManager.ROLE.VIEWER;
 
       if (!sessionId || !clientId) {
-        Logger.debug("沒有已儲存的工作階段，進入本機模式", {
+        Logger.debug("沒有已儲存的工作階段，採用本機行為", {
           hasSessionId: !!sessionId,
           hasClientId: !!clientId,
         });
-        return false; // 本機模式
+        return false;
       }
 
       Logger.debug("偵測到已儲存的工作階段，嘗試還原", {
@@ -367,7 +275,7 @@ class SyncManager {
       // 等待伺服器心跳檢測
       const isOnline = await this.core.checkServerHealth();
       if (!isOnline) {
-        Logger.warn("伺服器離線，進入本機模式");
+        Logger.warn("伺服器離線，採用本機 fallback");
         return false; // 本機模式
       }
 
@@ -376,7 +284,7 @@ class SyncManager {
         const result = await this.core.syncClient.restoreSession(
           sessionId,
           clientId,
-          role, // 新增：傳遞儲存的角色
+          role,
         );
         if (result && result.success !== false) {
           Logger.info("工作階段還原成功", {
@@ -384,7 +292,7 @@ class SyncManager {
             clientId,
           });
 
-          // 新增：從伺服器取得工作階段的完整客戶端資訊
+          // 從伺服器取得工作階段的完整客戶端資訊
           try {
             const sessionInfo =
               await this.core.syncClient.getSessionClients(sessionId);
@@ -422,7 +330,7 @@ class SyncManager {
           return true; // 同步模式
         }
       } catch (error) {
-        Logger.warn("工作階段還原失敗，進入本機模式", error);
+        Logger.warn("工作階段還原失敗，採用本機 fallback", error);
         // 清除無效的工作階段資訊
         localStorage.removeItem("sync_session_id");
         sessionStorage.removeItem("sync_sessionId");
@@ -431,12 +339,11 @@ class SyncManager {
         return false; // 本機模式
       }
     } catch (error) {
-      Logger.error("還原工作階段出錯，進入本機模式", error);
+      Logger.error("還原工作階段出錯，採用本機 fallback", error);
       return false; // 本機模式
     }
   }
 
-  // ========== 實例方法 - 事件監聽 ==========
   setupEventListeners() {
     const sessionJoinedHandler = () => {
       this.ui.updateIndicator();
@@ -581,9 +488,7 @@ class SyncManager {
     });
   }
 
-  // ========== 實例方法 - 連線檢查 ==========
   startConnectionCheck() {
-    // 只在同步模式下才啟動連線檢查
     if (this.isSyncMode === false) {
       Logger.debug("本機模式，不啟動連線檢查");
       return;
@@ -593,7 +498,7 @@ class SyncManager {
       clearInterval(this.connectionCheckTimer);
     }
 
-    Logger.debug("啟動連線檢查，間隔", {
+    Logger.debug("啟動連線檢查", {
       interval: this.connectionCheckInterval,
     });
 
@@ -611,9 +516,7 @@ class SyncManager {
 
     if (newInterval !== this.connectionCheckInterval) {
       Logger.info(
-        `調整連線檢查間隔: ${
-          this.connectionCheckInterval
-        }ms → ${newInterval}ms (伺服器${this.serverOnline ? "線上" : "已離線"})`,
+        `調整連線檢查間隔: ${this.connectionCheckInterval}ms → ${newInterval}ms (伺服器${this.serverOnline ? "線上" : "已離線"})`,
       );
       this.connectionCheckInterval = newInterval;
       this.startConnectionCheck();
@@ -642,12 +545,10 @@ class SyncManager {
     }
   }
 
-  // ========== 實例方法 - 狀態同步 ==========
   async syncState(state) {
     return await this.core.syncState(state);
   }
 
-  // ========== 實例方法 - 查詢方法 ==========
   getSessionId() {
     return this.core.getSessionId();
   }
@@ -660,7 +561,6 @@ class SyncManager {
     return this.core.getRole();
   }
 
-  // ========== 實例方法 - 清理 ==========
   cleanup() {
     this.ui.cleanup();
     this.qr.cleanup();
@@ -673,4 +573,6 @@ window.SyncManager = SyncManager;
 window.syncManager = new SyncManager();
 // 暴露 syncClient 到全局，供其他模組使用（如實驗日誌管理器）
 window.syncClient = window.syncManager.core.syncClient;
+// 暴露 SyncEvents 到全局
+window.SyncEvents = SyncEvents;
 export { SyncManager }; // 使用命名匯出以維持一致性

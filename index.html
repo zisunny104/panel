@@ -69,22 +69,22 @@
         <img src="assets/ui/panel.webp" alt="機台操作面板" class="svg-panel" width="496" height="264" fetchpriority="high" />
 
         <!-- 電源開關與燈號區塊 -->
-        <div class="panel-bottom-row" id="panelBottomRow" style="display: flex;">
+        <div class="panel-bottom-row is-flex" id="panelBottomRow">
             <!-- 電源開關區 -->
-            <div class="power-switch-area" id="powerSwitchArea"
-                style="position: relative; width:189px; height:189px; display: none;">
+            <div class="power-switch-area is-hidden" id="powerSwitchArea"
+                style="position: relative; width:189px; height:189px;">
                 <img src="assets/ui/power/power_base.webp" class="power-base-img" alt="Power Base"
                     style="width:100%;height:100%;position:absolute;left:0;top:0;">
                 <img src="assets/ui/power/power_knob.webp" class="power-knob-img" id="powerKnob" alt="Power Knob"
                     style="position:absolute;left:50%;top:50%;width:100%;height:100%;transform:translate(-50%,-50%) scale(0.95);transition:transform 0.3s;">
             </div>
             <!-- 狀態燈號區 -->
-            <div class="power-light-area" id="powerLightArea"
-                style="position: relative; width:95px; height:95px; display: none;">
+            <div class="power-light-area is-hidden" id="powerLightArea"
+                style="position: relative; width:95px; height:95px;">
                 <img src="assets/ui/power/power_light_off.webp" class="power-light-off-img" alt="Power Light Off"
                     style="width:100%;height:100%;position:absolute;left:0;top:0;">
-                <img src="assets/ui/power/power_light_on.webp" class="power-light-on-img" id="powerLightOn"
-                    alt="Power Light On" style="width:100%;height:100%;position:absolute;left:0;top:0;display:none;">
+                <img src="assets/ui/power/power_light_on.webp" class="power-light-on-img is-hidden" id="powerLightOn"
+                    alt="Power Light On" style="width:100%;height:100%;position:absolute;left:0;top:0;">
             </div>
         </div>
 
@@ -96,7 +96,7 @@
     <div class="settings-panel" id="settingsPanel">
         <div class="settings-panel-header">
             <strong>設定面板</strong>
-            <button id="closeSettingsPanel" class="experiment-close-btn" title="關閉">
+            <button id="closeSettingsPanel" class="circle-close-btn" title="關閉">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                     stroke-linejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -274,10 +274,10 @@
     </div>
 
     <!-- 實驗面板 -->
-    <div class="experiment-panel" id="experimentPanel" style="display:none;">
+    <div class="experiment-panel is-hidden" id="experimentPanel">
         <div class="experiment-panel-header">
             <strong>實驗面板</strong>
-            <button id="closeExperimentPanel" class="experiment-close-btn" title="關閉">
+            <button id="closeExperimentPanel" class="circle-close-btn" title="關閉">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                     stroke-linejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -289,93 +289,18 @@
         <!-- 實驗內容 -->
         <div class="experiment-panel-body">
             <!-- 單元組合選擇區域 -->
-            <div class="combination-selector-section">
-                <h3>單元組合</h3>
-                <ul class="experiment-default-list" id="combinationSelector">
-                    <!-- 由 script.js 動態載入 -->
-                </ul>
-            </div>
+            <div id="combinationSelectorContainer"></div>
 
             <!-- 單元選擇與排序 -->
-            <div class="experiment-panel-units">
-                <div class="units-header">
-                    <span>實驗單元</span>
-                    <label class="select-all-checkbox">
-                        <input type="checkbox" id="selectAllUnits" checked>
-                        <span>全選</span>
-                    </label>
-                </div>
-
-                <div class="units-list-container">
-                    <ul class="experiment-units-list">
-                        <!-- 開機卡片 -->
-                        <li class="power-option-card startup-card">
-                            <label class="unit-checkbox">
-                                <input type="checkbox" id="includeStartup" checked>
-                            </label>
-                            <div class="unit-sort">
-                                <div class="unit-title">機器開機</div>
-                                <div class="unit-subtitle">POWER_ON • 等待使用者手動開機</div>
-                            </div>
-                        </li>
-
-                        <!-- 由 script.js 動態載入單元 -->
-
-                        <!-- 關機卡片會在 JavaScript 中動態新增到底部 -->
-                    </ul>
-                </div>
-            </div>
+            <div id="unitsPanelContainer"></div>
 
             <!-- 實驗控制區 -->
-            <div class="experiment-panel-actions" id="experimentPanelActions">
-                <div class="input-section">
-                    <div class="form-group">
-                        <label for="experimentIdInput">實驗ID:</label>
-                        <div class="experiment-id-group">
-                            <input type="text" id="experimentIdInput" class="form-input" maxlength="10"
-                                placeholder="載入中...">
-                            <button id="regenerateIdButton" class="btn-secondary" title="重新產生實驗ID">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                                    stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
-                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-                                    <path d="M21 3v5h-5"></path>
-                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-                                    <path d="M3 21v-5h5"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="participantNameInput">受試者名稱:</label>
-                        <input type="text" id="participantNameInput" class="form-input" placeholder="受試者名稱">
-                    </div>
-
-                    <div class="form-group experiment-control-group">
-                        <div class="experiment-control-header">
-                            <label>實驗控制</label>
-                            <div id="experimentTimer" class="experiment-timer">00:00.000</div>
-                        </div>
-
-                        <div id="experimentIdRow" class="experiment-start-row">
-                            <button id="startExperimentBtn" class="experiment-start-btn btn-success" title="">▶
-                                開始實驗</button>
-                        </div>
-
-                        <div id="experimentControlButtons" class="experiment-control-buttons">
-                            <button id="pauseExperimentBtn" class="experiment-pause-btn btn-primary" title="">⏸
-                                暫停</button>
-                            <button id="stopExperimentBtn" class="experiment-stop-btn btn-danger" title="">⏹
-                                停止</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div id="experimentControlsContainer"></div>
         </div>
     </div>
 
     <!-- 操作日誌面板 -->
-    <div class="logger-output" id="loggerOutput" style="display:none;">
+    <div class="logger-output is-hidden" id="loggerOutput">
         <div class="logger-panel-header">
             <strong>操作日誌</strong>
             <button id="copyLogButton" class="logger-panel-btn" title="複製日誌">
@@ -417,7 +342,7 @@
     <audio id="beepSound" src="assets/audio/beep.mp3" preload="auto"></audio>
 
     <!-- ===== 核心基礎 ===== -->
-    <!-- 全域核心：必須最先載入以提供 Logger 功能與錯誤捕捉 -->
+    <!-- Logger（必須最先載入） -->
     <script src="js/core/console-manager.js"></script>
 
     <!-- ===== 面板頁面管理器 ===== -->

@@ -125,14 +125,15 @@ class ConfigManager {
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
     const beepVolume = document.getElementById("beepVolume");
+    const mediaVolume = document.getElementById("mediaVolume");
 
     // 主縮放設定
     if (settings.mainScale !== undefined && scaleRange) {
       scaleRange.value = settings.mainScale;
       if (scaleNumberInput) scaleNumberInput.value = settings.mainScale;
       // 套用縮放
-      if (window.uiControls) {
-        window.uiControls.updateScale(settings.mainScale);
+      if (window.panelUIManager) {
+        window.panelUIManager.updateScale(settings.mainScale);
       }
     }
     // 上方間距設定
@@ -141,8 +142,8 @@ class ConfigManager {
       if (topSpacerNumberInput)
         topSpacerNumberInput.value = settings.topSpacerHeight;
       // 套用頂部間距
-      if (window.uiControls) {
-        window.uiControls.updateTopSpacer(settings.topSpacerHeight);
+      if (window.panelUIManager) {
+        window.panelUIManager.updateTopSpacer(settings.topSpacerHeight);
       }
     }
 
@@ -151,8 +152,8 @@ class ConfigManager {
       bottomSpacerRange.value = settings.bottomSpacerHeight;
       if (bottomSpacerNumberInput)
         bottomSpacerNumberInput.value = settings.bottomSpacerHeight;
-      if (window.uiControls) {
-        window.uiControls.updateBottomSpacer(settings.bottomSpacerHeight);
+      if (window.panelUIManager) {
+        window.panelUIManager.updateBottomSpacer(settings.bottomSpacerHeight);
       }
     }
 
@@ -161,8 +162,8 @@ class ConfigManager {
       powerScaleRange.value = settings.powerSwitchScale;
       if (powerScaleNumberInput)
         powerScaleNumberInput.value = settings.powerSwitchScale;
-      if (window.uiControls) {
-        window.uiControls.updatePowerScale(settings.powerSwitchScale);
+      if (window.panelUIManager) {
+        window.panelUIManager.updatePowerScale(settings.powerSwitchScale);
       }
     }
     // 按鈕標籤顯示
@@ -241,6 +242,14 @@ class ConfigManager {
     const topSpacerNumberInput = document.getElementById(
       "topSpacerNumberInput",
     );
+    const bottomSpacerRange = document.getElementById("bottomSpacerRange");
+    const bottomSpacerNumberInput = document.getElementById(
+      "bottomSpacerNumberInput",
+    );
+    const powerScaleRange = document.getElementById("powerScaleRange");
+    const powerScaleNumberInput = document.getElementById(
+      "powerScaleNumberInput",
+    );
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
@@ -250,8 +259,10 @@ class ConfigManager {
     const toggleMediaContent = document.getElementById("toggleMediaContent");
     const toggleBeepSound = document.getElementById("toggleBeepSound");
     const beepVolume = document.getElementById("beepVolume");
+    const mediaVolume = document.getElementById("mediaVolume");
 
     // 監聽所有設定相關元素的 input 事件
+    // 只對存在的元素添加監聽器，避免 null 引用錯誤
     [
       scaleRange,
       scaleNumberInput,
@@ -266,20 +277,12 @@ class ConfigManager {
       toggleTouchVisuals,
       toggleMediaAreaMarker,
       toggleMediaContent,
+      toggleBeepSound,
+      beepVolume,
+      mediaVolume,
     ].forEach((el) => {
       if (el) el.addEventListener("input", () => this.saveUserSettings());
     });
-
-    // 蜂鳴聲獨立監聽
-    if (toggleBeepSound) {
-      toggleBeepSound.addEventListener("input", () => this.saveUserSettings());
-    }
-    if (beepVolume) {
-      beepVolume.addEventListener("input", () => this.saveUserSettings());
-    }
-    if (mediaVolume) {
-      mediaVolume.addEventListener("input", () => this.saveUserSettings());
-    }
   }
 
   /**

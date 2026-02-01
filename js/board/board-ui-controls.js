@@ -21,11 +21,12 @@ const toggleGestureStats = function () {
   const detail = document.getElementById("gestureStatsDetail");
   const toggle = document.getElementById("gestureStatsToggle");
 
-  if (detail.style.display === "none") {
-    detail.style.display = "block";
+  const isHidden = detail.classList.contains("is-hidden");
+  if (isHidden) {
+    detail.classList.remove("is-hidden");
     toggle.style.transform = "rotate(180deg)";
   } else {
-    detail.style.display = "none";
+    detail.classList.add("is-hidden");
     toggle.style.transform = "rotate(0deg)";
   }
 };
@@ -35,8 +36,3 @@ window.toggleGestureStats = toggleGestureStats;
 
 //匯出ES6模組
 export { toggleLeftPanel, toggleGestureStats };
-
-
-
-
-

@@ -83,7 +83,6 @@
 
 /* ===== 實驗控制區域 ===== */
 .experiment-control-group {
-    margin-top: 15px;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -100,7 +99,7 @@
 }
 
 .experiment-control-header .experiment-timer {
-    display: none;
+    display: inline-block;
     font-family: 'Courier New', monospace;
     font-size: 14px;
     font-weight: 700;
@@ -200,6 +199,26 @@
     margin-top: 0;
     margin-bottom: 12px;
     font-weight: 700;
+}
+
+/* 使用 flex + gap 統一板塊內間距，移除 margin-bottom 重複間距 */
+.board-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 0;
+}
+
+/* Reset heading margins inside board-section to avoid doubled spacing
+   (we rely on `.board-section`'s `gap` for vertical spacing) */
+.board-section h2 {
+    margin: 0;
+}
+
+/* If `.input-section` is placed inside a `.board-section`, remove
+   its bottom margin so gap is the single source of spacing */
+.board-section .input-section {
+    margin-bottom: 0;
 }
 
 .form-group {
@@ -536,7 +555,7 @@ svg.icon-sm {
 
 /* 組合選擇器樣式 */
 .combination-selector {
-    margin-bottom: 15px;
+    margin-bottom: 0;
 }
 
 .combination-selector label {

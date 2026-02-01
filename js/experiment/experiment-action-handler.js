@@ -20,14 +20,14 @@ class ExperimentActionHandler {
    * 事件類型常數
    */
   static EVENT = {
-    ACTION_VALIDATED: 'action:validated',
-    ACTION_COMPLETED: 'action:completed',
-    ACTION_FAILED: 'action:failed',
-    GESTURE_DETECTED: 'action:gesture_detected',
-    SEQUENCE_COMPLETED: 'action:sequence_completed',
-    AUTO_PROGRESS: 'action:auto_progress',
-    REMOTE_ACTION: 'action:remote_action',
-    ERROR: 'action:error'
+    ACTION_VALIDATED: "action:validated",
+    ACTION_COMPLETED: "action:completed",
+    ACTION_FAILED: "action:failed",
+    GESTURE_DETECTED: "action:gesture_detected",
+    SEQUENCE_COMPLETED: "action:sequence_completed",
+    AUTO_PROGRESS: "action:auto_progress",
+    REMOTE_ACTION: "action:remote_action",
+    ERROR: "action:error",
   };
 
   constructor(config = {}) {
@@ -37,7 +37,7 @@ class ExperimentActionHandler {
       enableAutoProgress: config.enableAutoProgress !== false,
       autoProgressDelay: config.autoProgressDelay || 3000,
       enableGestureValidation: config.enableGestureValidation !== false,
-      ...config
+      ...config,
     };
 
     // 動作序列狀態
@@ -59,10 +59,9 @@ class ExperimentActionHandler {
     // 依賴注入
     this.dependencies = {
       flowManager: null,
-      hubManager: null
+      hubManager: null,
     };
-
-    Logger.debug('ExperimentActionHandler 初始化完成');
+    Logger.debug("ExperimentActionHandler 初始化完成");
   }
 
   // ==================== 依賴注入 ====================
@@ -72,7 +71,7 @@ class ExperimentActionHandler {
    */
   injectFlowManager(flowManager) {
     this.dependencies.flowManager = flowManager;
-    Logger.debug('FlowManager 已注入到 ActionHandler');
+    Logger.debug("FlowManager 已注入到 ActionHandler");
     return this;
   }
 
@@ -81,7 +80,7 @@ class ExperimentActionHandler {
    */
   injectHubManager(hubManager) {
     this.dependencies.hubManager = hubManager;
-    Logger.debug('HubManager 已注入到 ActionHandler');
+    Logger.debug("HubManager 已注入到 ActionHandler");
     return this;
   }
 
@@ -92,7 +91,7 @@ class ExperimentActionHandler {
    */
   initializeSequence(actions) {
     if (!Array.isArray(actions)) {
-      Logger.error('動作序列必須是陣列');
+      Logger.error("動作序列必須是陣列");
       return false;
     }
 
@@ -101,15 +100,15 @@ class ExperimentActionHandler {
     this.completedActions.clear();
     this.actionHistory = [];
 
-    Logger.debug('動作序列已初始化', {
-      actionCount: actions.length
+    Logger.debug("動作序列已初始化", {
+      actionCount: actions.length,
     });
 
     return true;
   }
 
   /**
-   * 取得當前動作
+   * 取得目前動作
    */
   getCurrentAction() {
     if (this.currentActionIndex >= this.currentActionSequence.length) {
@@ -137,9 +136,13 @@ class ExperimentActionHandler {
       current: this.currentActionIndex,
       total: this.currentActionSequence.length,
       completed: this.completedActions.size,
-      percentage: this.currentActionSequence.length > 0
-        ? Math.round((this.completedActions.size / this.currentActionSequence.length) * 100)
-        : 0
+      percentage:
+        this.currentActionSequence.length > 0
+          ? Math.round(
+              (this.completedActions.size / this.currentActionSequence.length) *
+                100,
+            )
+          : 0,
     };
   }
 
@@ -154,23 +157,28 @@ class ExperimentActionHandler {
     if (!currentAction) {
       return {
         valid: false,
-        error: '沒有當前動作'
+        error: "沒有目前動作",
       };
     }
 
     // 檢查動作 ID 是否符合
-    if (currentAction.actionId !== actionId && 
-        currentAction.expected_button !== actionId) {
+    if (
+      currentAction.actionId !== actionId &&
+      currentAction.expected_button !== actionId
+    ) {
       return {
         valid: false,
-        error: '動作不符合預期',
+        error: "動作不符合預期",
         expected: currentAction.expected_button || currentAction.actionId,
-        actual: actionId
+        actual: actionId,
       };
     }
 
     // 如果啟用手勢驗證，檢查手勢序列
-    if (this.config.enableGestureValidation && this.gestureSequence.length > 0) {
+    if (
+      this.config.enableGestureValidation &&
+      this.gestureSequence.length > 0
+    ) {
       const gestureValid = this.validateGesture(actionId);
       if (!gestureValid.valid) {
         return gestureValid;
@@ -180,12 +188,12 @@ class ExperimentActionHandler {
     this.emit(ExperimentActionHandler.EVENT.ACTION_VALIDATED, {
       actionId,
       actionData,
-      currentAction
+      currentAction,
     });
 
     return {
       valid: true,
-      action: currentAction
+      action: currentAction,
     };
   }
 
@@ -206,22 +214,22 @@ class ExperimentActionHandler {
       actionId,
       timestamp: Date.now(),
       correct: true,
-      ...actionData
+      ...actionData,
     });
 
     // 標記為完成
     this.completedActions.add(action.actionId);
     this.currentActionIndex++;
 
-    Logger.info('動作完成', {
+    Logger.info("動作完成", {
       actionId,
-      progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`
+      progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`,
     });
 
     this.emit(ExperimentActionHandler.EVENT.ACTION_COMPLETED, {
       actionId,
       action,
-      progress: this.getProgress()
+      progress: this.getProgress(),
     });
 
     // 檢查序列是否完成
@@ -236,7 +244,7 @@ class ExperimentActionHandler {
 
     // 遠端同步
     if (this.config.enableRemoteSync) {
-      this.syncActionToRemote(actionId, 'completed');
+      this.syncActionToRemote(actionId, "completed");
     }
 
     return true;
@@ -253,22 +261,74 @@ class ExperimentActionHandler {
       actionId,
       timestamp: Date.now(),
       correct: false,
-      error
+      error,
     });
 
-    Logger.warn('錯誤動作', {
+    Logger.warn("錯誤動作", {
       actionId,
       expected: currentAction?.actionId || currentAction?.expected_button,
-      error
+      error,
     });
 
     this.emit(ExperimentActionHandler.EVENT.ACTION_FAILED, {
       actionId,
       error,
-      expected: currentAction
+      expected: currentAction,
     });
 
     return false;
+  }
+
+  /**
+   * 完成目前動作（不進行驗證）
+   */
+  completeCurrentAction() {
+    const currentAction = this.getCurrentAction();
+    if (!currentAction) {
+      Logger.warn("沒有目前動作可完成");
+      return false;
+    }
+
+    // 記錄到歷史
+    this.actionHistory.push({
+      actionId: currentAction.actionId,
+      timestamp: Date.now(),
+      correct: true, // 直接完成視為正確
+      skipped: true, // 標記為跳過
+    });
+
+    // 標記為完成
+    this.completedActions.add(currentAction.actionId);
+    this.currentActionIndex++;
+
+    Logger.info("動作已完成（跳過）", {
+      actionId: currentAction.actionId,
+      progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`,
+    });
+
+    this.emit(ExperimentActionHandler.EVENT.ACTION_COMPLETED, {
+      actionId: currentAction.actionId,
+      action: currentAction,
+      progress: this.getProgress(),
+      skipped: true,
+    });
+
+    // 檢查序列是否完成
+    if (this.currentActionIndex >= this.currentActionSequence.length) {
+      this.handleSequenceCompleted();
+    } else {
+      // 啟用自動推進（如果配置）
+      if (this.config.enableAutoProgress) {
+        this.scheduleAutoProgress();
+      }
+    }
+
+    // 遠端同步
+    if (this.config.enableRemoteSync) {
+      this.syncActionToRemote(currentAction.actionId, "completed");
+    }
+
+    return true;
   }
 
   /**
@@ -292,15 +352,15 @@ class ExperimentActionHandler {
    */
   setGestureSequence(gestures) {
     if (!Array.isArray(gestures)) {
-      Logger.error('手勢序列必須是陣列');
+      Logger.error("手勢序列必須是陣列");
       return false;
     }
 
     this.gestureSequence = gestures;
     this.currentGestureIndex = 0;
 
-    Logger.debug('手勢序列已設定', {
-      gestureCount: gestures.length
+    Logger.debug("手勢序列已設定", {
+      gestureCount: gestures.length,
     });
 
     return true;
@@ -310,16 +370,16 @@ class ExperimentActionHandler {
    * 處理按鈕點擊手勢
    */
   handleButtonClick(buttonId) {
-    Logger.debug('處理按鈕點擊', buttonId);
+    Logger.debug("處理按鈕點擊", buttonId);
 
     this.emit(ExperimentActionHandler.EVENT.GESTURE_DETECTED, {
-      type: 'button_click',
+      type: "button_click",
       buttonId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return this.handleCorrectAction(buttonId, {
-      gestureType: 'button_click'
+      gestureType: "button_click",
     });
   }
 
@@ -331,7 +391,7 @@ class ExperimentActionHandler {
       return false;
     }
 
-    Logger.debug('處理手勢組合', gestures);
+    Logger.debug("處理手勢組合", gestures);
 
     // 驗證手勢序列
     for (let i = 0; i < gestures.length; i++) {
@@ -342,9 +402,9 @@ class ExperimentActionHandler {
     }
 
     this.emit(ExperimentActionHandler.EVENT.GESTURE_DETECTED, {
-      type: 'gesture_combination',
+      type: "gesture_combination",
       gestures,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return true;
@@ -361,7 +421,7 @@ class ExperimentActionHandler {
     if (this.currentGestureIndex >= this.gestureSequence.length) {
       return {
         valid: false,
-        error: '手勢序列已完成'
+        error: "手勢序列已完成",
       };
     }
 
@@ -370,9 +430,9 @@ class ExperimentActionHandler {
     if (expectedGesture !== gestureId) {
       return {
         valid: false,
-        error: '手勢順序不正確',
+        error: "手勢順序不正確",
         expected: expectedGesture,
-        actual: gestureId
+        actual: gestureId,
       };
     }
 
@@ -397,17 +457,17 @@ class ExperimentActionHandler {
     const flowManager = this.dependencies.flowManager;
 
     if (!flowManager) {
-      Logger.warn('FlowManager 未注入，無法執行步驟轉換');
+      Logger.warn("FlowManager 未注入，無法執行步驟轉換");
       return false;
     }
 
-    Logger.debug('執行步驟轉換', toStep);
+    Logger.debug("執行步驟轉換", toStep);
 
     // 觸發 FlowManager 的步驟轉換
     const success = flowManager.nextStep();
 
     if (success) {
-      // 清除當前動作序列，準備載入新步驟的動作
+      // 清除目前動作序列，準備載入新步驟的動作
       this.currentActionIndex = 0;
     }
 
@@ -419,7 +479,7 @@ class ExperimentActionHandler {
    */
   setTransitionCondition(condition) {
     this.transitionCondition = condition;
-    Logger.debug('步驟轉換條件已設定');
+    Logger.debug("步驟轉換條件已設定");
   }
 
   /**
@@ -430,7 +490,7 @@ class ExperimentActionHandler {
       return true;
     }
 
-    if (typeof this.transitionCondition === 'function') {
+    if (typeof this.transitionCondition === "function") {
       return this.transitionCondition();
     }
 
@@ -441,12 +501,12 @@ class ExperimentActionHandler {
    * 處理序列完成
    */
   handleSequenceCompleted() {
-    Logger.info('動作序列已完成');
+    Logger.info("動作序列已完成");
 
     this.emit(ExperimentActionHandler.EVENT.SEQUENCE_COMPLETED, {
       totalActions: this.currentActionSequence.length,
       completedActions: this.completedActions.size,
-      history: this.getActionHistory()
+      history: this.getActionHistory(),
     });
 
     // 檢查是否需要自動轉換到下一步
@@ -465,8 +525,8 @@ class ExperimentActionHandler {
     if (delay !== null) {
       this.config.autoProgressDelay = delay;
     }
-    Logger.debug('自動推進已啟用', {
-      delay: this.config.autoProgressDelay
+    Logger.debug("自動推進已啟用", {
+      delay: this.config.autoProgressDelay,
     });
   }
 
@@ -476,7 +536,7 @@ class ExperimentActionHandler {
   disableAutoProgress() {
     this.config.enableAutoProgress = false;
     this.clearAutoProgress();
-    Logger.debug('自動推進已禁用');
+    Logger.debug("自動推進已禁用");
   }
 
   /**
@@ -486,17 +546,17 @@ class ExperimentActionHandler {
     this.clearAutoProgress();
 
     this.autoProgressTimer = setTimeout(() => {
-      Logger.debug('自動推進觸發');
+      Logger.debug("自動推進觸發");
 
       const nextAction = this.getCurrentAction();
       if (nextAction) {
         this.emit(ExperimentActionHandler.EVENT.AUTO_PROGRESS, {
-          actionId: nextAction.actionId
+          actionId: nextAction.actionId,
         });
 
         // 自動執行下一個動作
         this.handleCorrectAction(nextAction.actionId, {
-          auto: true
+          auto: true,
         });
       }
     }, this.config.autoProgressDelay);
@@ -525,17 +585,17 @@ class ExperimentActionHandler {
     }
 
     const data = {
-      type: 'action_update',
+      type: "action_update",
       actionId,
       status,
       timestamp: Date.now(),
-      experimentId: hubManager.getExperimentId()
+      experimentId: hubManager.getExperimentId(),
     };
 
-    const success = hubManager.sendMessage('action_sync', data);
+    const success = hubManager.sendMessage("action_sync", data);
 
     if (success) {
-      Logger.debug('動作已同步到遠端', { actionId, status });
+      Logger.debug("動作已同步到遠端", { actionId, status });
     }
 
     return success;
@@ -547,27 +607,27 @@ class ExperimentActionHandler {
   handleRemoteAction(data) {
     const { actionId, status, source } = data;
 
-    Logger.debug('收到遠端動作', { actionId, status, source });
+    Logger.debug("收到遠端動作", { actionId, status, source });
 
     this.emit(ExperimentActionHandler.EVENT.REMOTE_ACTION, {
       actionId,
       status,
-      source
+      source,
     });
 
-    if (status === 'completed') {
-      // 標記為完成但不觸發本地邏輯
+    if (status === "completed") {
+      // 標記為完成但不觸發本機邏輯
       this.completedActions.add(actionId);
-      
+
       // 更新索引
       const actionIndex = this.currentActionSequence.findIndex(
-        a => a.actionId === actionId
+        (a) => a.actionId === actionId,
       );
-      
+
       if (actionIndex !== -1) {
         this.currentActionIndex = Math.max(
           this.currentActionIndex,
-          actionIndex + 1
+          actionIndex + 1,
         );
       }
     }
@@ -579,12 +639,12 @@ class ExperimentActionHandler {
    * 處理無效動作
    */
   handleInvalidAction(actionId, reason) {
-    Logger.error('無效動作', { actionId, reason });
+    Logger.error("無效動作", { actionId, reason });
 
     this.emit(ExperimentActionHandler.EVENT.ERROR, {
-      type: 'invalid_action',
+      type: "invalid_action",
       actionId,
-      reason
+      reason,
     });
 
     return false;
@@ -594,11 +654,11 @@ class ExperimentActionHandler {
    * 處理同步失敗
    */
   handleSyncFailure(error) {
-    Logger.error('同步失敗', error);
+    Logger.error("同步失敗", error);
 
     this.emit(ExperimentActionHandler.EVENT.ERROR, {
-      type: 'sync_failure',
-      error
+      type: "sync_failure",
+      error,
     });
   }
 
@@ -620,7 +680,7 @@ class ExperimentActionHandler {
    */
   off(eventType, callback) {
     if (!this.eventListeners.has(eventType)) return;
-    
+
     const listeners = this.eventListeners.get(eventType);
     const index = listeners.indexOf(callback);
     if (index > -1) {
@@ -633,9 +693,9 @@ class ExperimentActionHandler {
    */
   emit(eventType, data) {
     if (!this.eventListeners.has(eventType)) return;
-    
+
     const listeners = this.eventListeners.get(eventType);
-    listeners.forEach(callback => {
+    listeners.forEach((callback) => {
       try {
         callback(data);
       } catch (error) {
@@ -667,7 +727,7 @@ class ExperimentActionHandler {
       completedActions: this.completedActions.size,
       gestureSequence: [...this.gestureSequence],
       currentGestureIndex: this.currentGestureIndex,
-      config: { ...this.config }
+      config: { ...this.config },
     };
   }
 
@@ -682,7 +742,7 @@ class ExperimentActionHandler {
     this.gestureSequence = [];
     this.currentGestureIndex = 0;
     this.clearAutoProgress();
-    Logger.debug('ActionHandler 已重置');
+    Logger.debug("ActionHandler 已重置");
   }
 
   /**
@@ -692,16 +752,16 @@ class ExperimentActionHandler {
     this.reset();
     this.clearListeners();
     this.transitionCondition = null;
-    Logger.debug('ActionHandler 已銷毀');
+    Logger.debug("ActionHandler 已銷毀");
   }
 }
 
 // 導出到全域（用於向後相容）
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   window.ExperimentActionHandler = ExperimentActionHandler;
 }
 
 // 支援模組導出
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof module !== "undefined" && module.exports) {
   module.exports = ExperimentActionHandler;
 }

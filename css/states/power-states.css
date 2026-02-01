@@ -13,18 +13,29 @@
     z-index: 10;
     transform-origin: center center;
     /* ensure scale transforms from center */
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 .power-base-img,
 .power-knob-img,
-.power-light-off-img,
-.power-light-on-img {
+.power-light-off-img {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
     pointer-events: none;
+}
+
+.power-light-on-img {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 .power-knob-img {
@@ -35,7 +46,6 @@
 
 .power-light-on-img {
     z-index: 2;
-    display: none;
 }
 
 /* ================= 機器狀態訊息 ================= */

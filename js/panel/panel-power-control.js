@@ -18,8 +18,7 @@ class PowerControl {
     this.quickPowerOnBtn = document.getElementById("quickPowerOnBtn");
     this.powerKnob = document.getElementById("powerKnob");
     this.powerLightOn = document.getElementById("powerLightOn");
-
-    // 靜默初始化（移除詳細的 DOM 元素日誌）
+    this.powerLightArea = document.getElementById("powerLightArea");
     this.setupEventListeners();
     this.updatePowerUIWithoutSync(); // 初始化時不觸發同步事件
   }
@@ -35,25 +34,28 @@ class PowerControl {
     }
 
     if (this.powerLightOn) {
-      this.powerLightOn.style.display = this.isPowerOn ? "block" : "none";
+      if (this.isPowerOn) {
+        this.powerLightOn.classList.remove("is-hidden");
+        Logger.debug("電源燈號已亮起 (isPowerOn:", this.isPowerOn, ")");
+      } else {
+        this.powerLightOn.classList.add("is-hidden");
+        Logger.debug("電源燈號已熄滅 (isPowerOn:", this.isPowerOn, ")");
+      }
+    } else {
+      Logger.warn("powerLightOn 元素未找到");
     }
 
-    // 更新媒體控制按鈕狀態
     this.updateMediaControlButtons();
 
-    // 當電源狀態改變時，更新實驗模式按鈕樣式
     if (window.buttonManager) {
       window.buttonManager.updateExperimentButtonStyles();
-      // 確保按鈕禁用狀態也被更新
       window.buttonManager.updateMediaForCurrentAction();
     }
 
-    // 當電源狀態改變時，更新實驗模式媒體顯示
     if (window.panelExperiment && window.panelExperiment.isExperimentRunning) {
-      window.panelExperiment.showCurrentStepMediaOrHome();
+      window.panelPageManager._showCurrentStepMediaOrHome();
     }
 
-    // 觸發電源狀態同步事件
     this.dispatchPowerStateChanged();
   }
 
@@ -316,13 +318,13 @@ class PowerControl {
         e.preventDefault();
         e.stopPropagation();
 
-        // 開機動畫播放中且燈號亮著時才允許快速開機
+        // 開機動畫播放中且電源已開啟時才允許快速開機（跳過動畫）
         if (this.isPowerVideoPlaying && this.isPowerOn) {
           this.quickPowerOn();
         } else {
           if (window.logger) {
             window.logger.logAction(
-              `綠色燈號點擊 - 目前狀態不符合快速開機條件 (播放中:${this.isPowerVideoPlaying}, 燈號亮:${this.isPowerOn})`,
+              `綠色燈號點擊 - 目前狀態不符合快速開機條件 (播放中:${this.isPowerVideoPlaying}, 電源:${this.isPowerOn})`,
             );
           }
         }
@@ -343,6 +345,49 @@ class PowerControl {
       this.powerLightOn.title = "點擊可快速開機（開機動畫進行中時）";
     } else {
       Logger.debug("找不到綠色燈號元素 (powerLightOn)");
+    }
+
+    // 電源燈號區域點擊快速開機（擴展點擊區域）
+    if (this.powerLightArea) {
+      const powerLightAreaClickHandler = (e) => {
+        // 防止同一個物理點擊觸發多次（200ms 防抖）
+        if (
+          this.lastGreenLightClick &&
+          Date.now() - this.lastGreenLightClick < 200
+        ) {
+          return;
+        }
+        this.lastGreenLightClick = Date.now();
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 開機動畫播放中時才允許快速開機（跳過動畫）
+        if (this.isPowerVideoPlaying) {
+          this.quickPowerOn();
+        } else {
+          if (window.logger) {
+            window.logger.logAction(
+              `電源燈號區域點擊 - 目前狀態不符合快速開機條件 (播放中:${this.isPowerVideoPlaying})`,
+            );
+          }
+        }
+      };
+
+      // 為電源燈號區域添加點擊事件
+      this.powerLightArea.addEventListener(
+        "click",
+        powerLightAreaClickHandler,
+        false,
+      );
+
+      // 確保元素可以接收點擊事件
+      this.powerLightArea.style.cursor = "pointer";
+      this.powerLightArea.style.pointerEvents = "auto";
+      this.powerLightArea.style.userSelect = "none";
+      this.powerLightArea.title = "點擊可快速開機（開機動畫進行中時）";
+    } else {
+      Logger.debug("找不到電源燈號區域元素 (powerLightArea)");
     }
 
     // 設定同步事件監聽器
@@ -388,7 +433,8 @@ class PowerControl {
     ];
     powerButtons.forEach((button) => {
       if (button) {
-        button.style.display = isInteractive ? "block" : "none";
+        if (isInteractive) button.classList.remove("is-hidden");
+        else button.classList.add("is-hidden");
       }
     });
 
@@ -429,12 +475,9 @@ class PowerControl {
     // 記錄日誌
     if (window.logger) {
       window.logger.logAction(
-        "🚨 緊急停止已啟動，所有系統已停止，媒體區已清空，按鈕狀態已重置",
+        "緊急停止已啟動，所有系統已停止，媒體區已清空，按鈕狀態已重置",
       );
     }
-
-    // 顯示警告訊息
-    alert("🚨 緊急停止已啟動！\n所有系統已停止，請檢查裝置狀態。");
   }
 
   /**
@@ -485,7 +528,6 @@ class PowerControl {
       }
     }
 
-    this.updatePowerUI();
     this.enableAllButtons();
 
     // 通知實驗管理器電源狀態變化
@@ -514,13 +556,6 @@ class PowerControl {
         }
       }, 150); // 增加延遲時間
     }
-  }
-
-  /**
-   * 初始化電源狀態
-   */
-  initialize() {
-    this.updatePowerUI();
   }
 
   /**
@@ -639,22 +674,34 @@ class PowerControl {
     }
 
     if (this.powerLightOn) {
-      this.powerLightOn.style.display = this.isPowerOn ? "block" : "none";
+      if (this.isPowerOn) {
+        this.powerLightOn.classList.remove("is-hidden");
+        Logger.debug(
+          "電源燈號已亮起 (updatePowerUIWithoutSync, isPowerOn:",
+          this.isPowerOn,
+          ")",
+        );
+      } else {
+        this.powerLightOn.classList.add("is-hidden");
+        Logger.debug(
+          "電源燈號已熄滅 (updatePowerUIWithoutSync, isPowerOn:",
+          this.isPowerOn,
+          ")",
+        );
+      }
+    } else {
+      Logger.warn("powerLightOn 元素未找到 (updatePowerUIWithoutSync)");
     }
 
-    // 更新媒體控制按鈕狀態
     this.updateMediaControlButtons();
 
-    // 當電源狀態改變時，更新實驗模式按鈕樣式
     if (window.buttonManager) {
       window.buttonManager.updateExperimentButtonStyles();
-      // 確保按鈕禁用狀態也被更新
       window.buttonManager.updateMediaForCurrentAction();
     }
 
-    // 當電源狀態改變時，更新實驗模式媒體顯示
     if (window.panelExperiment && window.panelExperiment.isExperimentRunning) {
-      window.panelExperiment.showCurrentStepMediaOrHome();
+      window.panelPageManager._showCurrentStepMediaOrHome();
     }
   }
 

@@ -58,7 +58,7 @@
 }
 
 body.visual-hints-enabled .next-step-highlight {
-    animation: pulse-green 1.5s ease-in-out infinite;
+    animation: pulse-green-dark 1.5s ease-in-out infinite;
     filter: drop-shadow(0 0 8px rgba(40, 167, 69, 0.8));
 }
 
@@ -79,7 +79,7 @@ body.visual-hints-enabled .next-step-highlight-secondary {
 }
 
 body.visual-hints-enabled .next-step-highlight-shift {
-    animation: pulse-green 1.5s ease-in-out infinite;
+    animation: pulse-green-dark 1.5s ease-in-out infinite;
     filter: drop-shadow(0 0 8px rgba(40, 167, 69, 0.8));
 }
 
@@ -133,7 +133,7 @@ body.visual-hints-enabled #powerSwitchArea.next-step-highlight {
 }
 
 /* ================= 動畫定義 ================= */
-@keyframes pulse-green {
+@keyframes pulse-green-dark {
 
     0%,
     100% {
@@ -144,6 +144,48 @@ body.visual-hints-enabled #powerSwitchArea.next-step-highlight {
     50% {
         box-shadow: 0 0 0 8px rgba(40, 167, 69, 0),
             inset 0 0 0 2px rgba(40, 167, 69, 0.5);
+    }
+}
+
+@keyframes pulse-highlight {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse-highlight-secondary {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.03);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse-highlight-shift {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
+
+    100% {
+        transform: scale(1);
     }
 }
 

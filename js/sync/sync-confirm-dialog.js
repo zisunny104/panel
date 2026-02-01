@@ -90,7 +90,7 @@ class SyncConfirmDialogManager {
     const btnClose = confirmDialog.querySelector(".modal-close-btn");
     const overlay = confirmDialog; // confirmDialog itself is the overlay
     const modeButtons = confirmDialog.querySelectorAll(
-      ".sync-confirm-mode-btn"
+      ".sync-confirm-mode-btn",
     );
     const codeInput = confirmDialog.querySelector(".sync-confirm-code-input");
     const resetBtn = confirmDialog.querySelector(".sync-confirm-code-reset");
@@ -112,17 +112,17 @@ class SyncConfirmDialogManager {
 
       // 取得驗證狀態顯示區域
       const statusEl = confirmDialog.querySelector(
-        ".sync-confirm-checksum-status"
+        ".sync-confirm-checksum-status",
       );
 
       // 如果代碼為空，隱藏驗證狀態
       if (!editedCode.trim()) {
-        statusEl.style.display = "none";
+        statusEl.classList.add("is-hidden");
         return;
       }
 
       // 顯示驗證中的狀態
-      statusEl.style.display = "flex";
+      statusEl.classList.remove("is-hidden");
       statusEl.classList.remove("valid", "invalid");
       statusEl.querySelector(".sync-confirm-checksum-icon").textContent = "🔍";
       statusEl.querySelector(".sync-confirm-checksum-text").textContent =
@@ -141,7 +141,7 @@ class SyncConfirmDialogManager {
 
           // 確保元素仍存在且對話框未關閉
           const currentStatus = confirmDialog.querySelector(
-            ".sync-confirm-checksum-status"
+            ".sync-confirm-checksum-status",
           );
           if (!currentStatus) return;
 
@@ -150,34 +150,34 @@ class SyncConfirmDialogManager {
             currentStatus.classList.add("valid");
             currentStatus.classList.remove("invalid");
             currentStatus.querySelector(
-              ".sync-confirm-checksum-icon"
+              ".sync-confirm-checksum-icon",
             ).textContent = "✓";
             currentStatus.querySelector(
-              ".sync-confirm-checksum-text"
+              ".sync-confirm-checksum-text",
             ).textContent = "代碼有效";
           } else {
             currentStatus.classList.add("invalid");
             currentStatus.classList.remove("valid");
             currentStatus.querySelector(
-              ".sync-confirm-checksum-icon"
+              ".sync-confirm-checksum-icon",
             ).textContent = "✗";
             currentStatus.querySelector(
-              ".sync-confirm-checksum-text"
+              ".sync-confirm-checksum-text",
             ).textContent = "代碼無效或格式錯誤";
           }
         } catch (error) {
           Logger.error("驗證分享代碼時發生錯誤:", error);
           const currentStatus = confirmDialog.querySelector(
-            ".sync-confirm-checksum-status"
+            ".sync-confirm-checksum-status",
           );
           if (currentStatus) {
             currentStatus.classList.add("invalid");
             currentStatus.classList.remove("valid");
             currentStatus.querySelector(
-              ".sync-confirm-checksum-icon"
+              ".sync-confirm-checksum-icon",
             ).textContent = "!";
             currentStatus.querySelector(
-              ".sync-confirm-checksum-text"
+              ".sync-confirm-checksum-text",
             ).textContent = "驗證錯誤";
           }
         }
@@ -196,7 +196,7 @@ class SyncConfirmDialogManager {
       btn.addEventListener("click", (e) => {
         selectedRole = e.target.dataset.role;
         modeButtons.forEach((b) =>
-          b.classList.remove("sync-confirm-mode-active")
+          b.classList.remove("sync-confirm-mode-active"),
         );
         e.target.classList.add("sync-confirm-mode-active");
       });
@@ -211,7 +211,7 @@ class SyncConfirmDialogManager {
       try {
         // 顯示驗證中的狀態
         const confirmBtn = confirmDialog.querySelector(
-          ".sync-confirm-btn-confirm"
+          ".sync-confirm-btn-confirm",
         );
         const originalText = confirmBtn.textContent;
         confirmBtn.disabled = true;
@@ -220,7 +220,11 @@ class SyncConfirmDialogManager {
         // 使用 SyncClient 驗證分享代碼
         const syncClient = window.syncManager?.core?.syncClient;
         if (!syncClient) {
-          alert("同步服務未初始化");
+          if (window.indicatorManager) {
+            window.indicatorManager.showStatus("error", "同步服務未初始化");
+          } else {
+            alert("同步服務未初始化");
+          }
           confirmBtn.disabled = false;
           confirmBtn.textContent = originalText;
           return;
@@ -237,7 +241,14 @@ class SyncConfirmDialogManager {
           let reason = "代碼無效";
           if (result?.expired) reason = "代碼已過期";
           if (result?.used) reason = "代碼已被使用";
-          alert(`分享代碼無效\n${reason}\n請檢查代碼是否正確`);
+          if (window.indicatorManager) {
+            window.indicatorManager.showStatus(
+              "error",
+              `分享代碼無效: ${reason}`,
+            );
+          } else {
+            alert(`分享代碼無效\n${reason}\n請檢查代碼是否正確`);
+          }
           Logger.error("分享代碼驗證失敗:", result);
           return;
         }
@@ -247,7 +258,14 @@ class SyncConfirmDialogManager {
         if (onConfirm) onConfirm(editedCode, selectedRole);
       } catch (error) {
         Logger.error("驗證分享代碼時發生錯誤:", error);
-        alert("驗證分享代碼時發生錯誤，請重試");
+        if (window.indicatorManager) {
+          window.indicatorManager.showStatus(
+            "error",
+            "驗證分享代碼時發生錯誤，請重試",
+          );
+        } else {
+          alert("驗證分享代碼時發生錯誤，請重試");
+        }
       }
     };
 

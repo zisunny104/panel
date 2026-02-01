@@ -1,36 +1,29 @@
 /**
  * TimeSyncManager - 時間同步管理器
  *
- * 處理客戶端與伺服器的時間偏差校正
- * 確保多裝置間的時間戳一致性：
- * 1. 所有時間戳統一為毫秒級 Unix 時間戳
- * 2. 自動偵測客戶端與伺服器的時間偏差
- * 3. 提供校正後的伺服器時間供所有模組使用
+ * 處理客戶端時間格式化與同步
+ * 確保多裝置間的時間戳一致性
  */
 
 class TimeSyncManager {
   constructor() {
     // 時間偏差（毫秒）= 本機時間 - 伺服器時間
-    // 初始值為 0，表示假設時鐘同步
     this.timeOffset = 0;
 
     // 時間同步狀態
     this.isSynced = false;
     this.lastSyncTime = null;
-    this.syncCheckInterval = 5 * 60 * 1000; // 每 5 分鐘重新同步一次
-    this.syncCheckTimer = null;
 
-    // 時區設定（從設定檔案取得）
+    // 時區設定
     this.timezone = window.CONFIG?.timezone || "Asia/Taipei";
 
-    // 多次同步結果用於計算平均偏差（降低網路延遲影響）
+    // 多次同步結果用於計算平均偏差
     this.syncSamples = [];
     this.maxSamples = 3;
   }
 
   /**
    * 初始化時間同步
-   * 從伺服器取得參考時間，計算本機時間偏差
    */
   async initialize() {
     Logger.debug("初始化時間同步...");
@@ -40,7 +33,6 @@ class TimeSyncManager {
       Logger.debug("時間同步初始化完成");
     } catch (error) {
       Logger.warn("時間同步初始化失敗:", error);
-      // 初始化失敗不影響系統運作，使用本機時間
       this.isSynced = false;
     }
   }
@@ -273,25 +265,7 @@ class TimeSyncManager {
       return "格式化錯誤";
     }
   }
-
-  /**
-   * 清理資源
-   */
-  cleanup() {
-    this.stopPeriodicSync();
-    this.syncSamples = [];
-  }
 }
 
 // 建立全局時間同步管理器實例
 window.timeSyncManager = window.timeSyncManager || new TimeSyncManager();
-
-// UMD 模式：同時支援全域和 ES6 模組
-if (typeof window !== "undefined") {
-  window.TimeSyncManager = TimeSyncManager;
-}
-
-// 僅在模組環境中匯出（避免普通 script 語法錯誤）
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = TimeSyncManager;
-}

@@ -29,8 +29,8 @@ class PanelExperimentPower {
       this.manager.loadUnitsAndStart();
 
       // 更新按鈕顏色
-      if (window.mainApp?.setExperimentPanelButtonColor) {
-        window.mainApp.setExperimentPanelButtonColor("running");
+      if (window.panelPageManager?.setExperimentPanelButtonColor) {
+        window.panelPageManager.setExperimentPanelButtonColor("running");
       }
 
       // 記錄日誌
@@ -312,11 +312,11 @@ class PanelExperimentPower {
         window.logger.logAction("開機完成", null, null, false, false);
       }
       // 設定按鈕顏色為執行中
-      if (window.mainApp?.setExperimentPanelButtonColor) {
-        window.mainApp.setExperimentPanelButtonColor("running");
+      if (window.panelPageManager?.setExperimentPanelButtonColor) {
+        window.panelPageManager.setExperimentPanelButtonColor("running");
       } else {
         Logger.error(
-          "無法呼叫 setExperimentPanelButtonColor - window.mainApp 不存在或函數未定義",
+          "無法呼叫 setExperimentPanelButtonColor - window.panelPageManager 不存在或函數未定義",
         );
       }
 
@@ -324,34 +324,21 @@ class PanelExperimentPower {
       Logger.debug("電源已打開，準備載入單元資料和顯示按鈕高亮");
 
       //此時才初始化動作序列和顯示第一個按鈕高亮
-      if (!window.actionManager?.isInitialized) {
-        Logger.debug("打開電源後，開始載入單元資料和初始化動作序列");
-        // 等待 loadUnitsAndStart 完成後再執行 nextStep
-        this.manager.loadUnitsAndStart().then(() => {
-          // 根據設定面板的開關更新視覺提示
-          if (this.manager.ui) {
-            this.manager.ui.updateHighlightVisibility();
-          }
-
-          // 開始執行第一個步驟
-          setTimeout(() => {
-            if (this.manager.flow?.nextStep) {
-              this.manager.flow.nextStep();
-            }
-          }, 100);
-        });
-      } else {
-        // 已經初始化過，只更新按鈕高亮
-        if (window.buttonManager) {
-          Logger.debug("更新按鈕高亮");
-          window.buttonManager.updateMediaForCurrentAction();
-        }
-
+      Logger.debug("打開電源後，開始載入單元資料和初始化動作序列");
+      // 等待 loadUnitsAndStart 完成後再執行 nextStep
+      this.manager.loadUnitsAndStart().then(() => {
         // 根據設定面板的開關更新視覺提示
         if (this.manager.ui) {
           this.manager.ui.updateHighlightVisibility();
         }
-      }
+
+        // 開始執行第一個步驟
+        setTimeout(() => {
+          if (this.manager.flow?.nextStep) {
+            this.manager.flow.nextStep();
+          }
+        }, 100);
+      });
 
       //多螢幕同步：電源打開後廣播實驗狀態到其他裝置
       Logger.debug("電源打開後，廣播實驗初始化到其他裝置");

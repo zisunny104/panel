@@ -1,6 +1,6 @@
 /**
  * DataLoader - 從 scenarios.json 載入實驗資料
- * @returns {Promise<{units: Array, unit_combinations: Array, actions: Map, actionToStep: Map}>}
+ * @returns {Promise<{units: Array, unit_combinations: Array, sections: Array, gestures: Array, actions: Map, actionToStep: Map}>}
  */
 async function loadUnitsFromScenarios() {
   try {
@@ -38,7 +38,7 @@ async function loadUnitsFromScenarios() {
                         isLastActionInStep: action.isLastActionInStep,
                       });
                     } else {
-                      console.warn("動作缺少 action_id 或 actionId:", action);
+                      Logger.warn("動作缺少 action_id 或 actionId:", action);
                     }
                   });
                 }
@@ -60,9 +60,20 @@ async function loadUnitsFromScenarios() {
       });
     }
 
+    // 轉換 unit_combinations 欄位名稱為駝峰式
+    const unitCombinations = (scenariosData.unit_combinations || []).map(
+      (c) => ({
+        ...c,
+        combinationId: c.combination_id,
+        combinationName: c.combination_name,
+      }),
+    );
+
     return {
       units: Array.from(unitsMap.values()),
-      unit_combinations: scenariosData.unit_combinations || [],
+      unit_combinations: unitCombinations,
+      sections: scenariosData.sections || [],
+      gestures: scenariosData.gesture_list || [],
       actions: actionsMap,
       actionToStep: actionToStepMap,
     };
@@ -90,8 +101,6 @@ function buildActionSequenceFromUnits(unitIds, actionsMap, unitsData) {
     );
 }
 
-export { loadUnitsFromScenarios, buildActionSequenceFromUnits };
-
-// 為了向後相容性，也將函數新增到全域範圍
+// 移除 ES 模組 export，直接將函數指派到全域
 window.loadUnitsFromScenarios = loadUnitsFromScenarios;
 window.buildActionSequenceFromUnits = buildActionSequenceFromUnits;

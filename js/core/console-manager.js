@@ -217,22 +217,92 @@ class Logger {
 
   static debug(...args) {
     if (this.shouldLog("debug")) {
-      console.debug(...this.formatMessage("debug", ...args));
+      if (
+        args.length > 1 &&
+        typeof args[1] === "object" &&
+        args[1] !== null &&
+        !args[2]?.noGroup
+      ) {
+        if (console.groupCollapsed) {
+          console.groupCollapsed(...this.formatMessage("debug", args[0]));
+          console.log(args[1]);
+          console.groupEnd();
+        } else {
+          console.debug(...this.formatMessage("debug", ...args));
+        }
+      } else {
+        console.debug(...this.formatMessage("debug", ...args));
+      }
+    }
+  }
+
+  static groupCollapsed(...args) {
+    if (this.shouldLog("debug")) {
+      if (console.groupCollapsed) {
+        console.groupCollapsed(...this.formatMessage("debug", ...args));
+      } else {
+        console.debug(...this.formatMessage("debug", ...args));
+      }
     }
   }
 
   static info(...args) {
     if (this.shouldLog("info")) {
-      console.info(...this.formatMessage("info", ...args));
+      if (
+        args.length > 1 &&
+        typeof args[1] === "object" &&
+        args[1] !== null &&
+        !args[2]?.noGroup
+      ) {
+        if (console.groupCollapsed) {
+          console.groupCollapsed(...this.formatMessage("info", args[0]));
+          console.log(args[1]);
+          console.groupEnd();
+        } else {
+          console.info(...this.formatMessage("info", ...args));
+        }
+      } else {
+        console.info(...this.formatMessage("info", ...args));
+      }
     }
   }
 
   static warn(...args) {
-    console.warn(...this.formatMessage("warn", ...args));
+    if (
+      args.length > 1 &&
+      typeof args[1] === "object" &&
+      args[1] !== null &&
+      !args[2]?.noGroup
+    ) {
+      if (console.groupCollapsed) {
+        console.groupCollapsed(...this.formatMessage("warn", args[0]));
+        console.log(args[1]);
+        console.groupEnd();
+      } else {
+        console.warn(...this.formatMessage("warn", ...args));
+      }
+    } else {
+      console.warn(...this.formatMessage("warn", ...args));
+    }
   }
 
   static error(...args) {
-    console.error(...this.formatMessage("error", ...args));
+    if (
+      args.length > 1 &&
+      typeof args[1] === "object" &&
+      args[1] !== null &&
+      !args[2]?.noGroup
+    ) {
+      if (console.groupCollapsed) {
+        console.groupCollapsed(...this.formatMessage("error", args[0]));
+        console.log(args[1]);
+        console.groupEnd();
+      } else {
+        console.error(...this.formatMessage("error", ...args));
+      }
+    } else {
+      console.error(...this.formatMessage("error", ...args));
+    }
   }
 
   /**

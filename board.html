@@ -28,104 +28,27 @@
         <div class="left-panel">
             <h1>實驗管理</h1>
 
-            <div class="input-section">
+            <div class="input-section board-section" id="experimentSettings">
                 <h2>實驗設定</h2>
-                <div class="form-group">
-                    <label for="experimentIdInput">實驗ID:</label>
-                    <div class="experiment-id-group">
-                        <input type="text" id="experimentIdInput" class="form-input" maxlength="10"
-                            placeholder="載入中..." />
-                        <button id="regenerateIdButton" class="btn-secondary" title="重新產生實驗ID">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                                stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
-                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-                                <path d="M21 3v5h-5"></path>
-                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-                                <path d="M3 21v-5h5"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="participantName">受試者名稱:</label>
-                    <input type="text" id="participantName" class="form-input" placeholder="受試者名稱" />
-                </div>
 
-                <!-- 實驗控制按鈕 -->
-                <div class=" form-group experiment-control-group">
-                    <div class="experiment-control-header">
-                        <label>實驗控制</label>
-                        <div id="experimentTimer" class="experiment-timer">00:00.000</div>
-                    </div>
-                    <!-- 未開始實驗時的按鈕 -->
-                    <div id="experimentIdRow" class="experiment-start-row">
-                        <button id="startExperimentBtn" class="experiment-start-btn btn-success"
-                            onclick="app.startExperiment()">
-                            ▶ 開始實驗
-                        </button>
-                    </div>
-                    <!-- 實驗進行中的按鈕 -->
-                    <div id="experimentControlButtons" class="experiment-control-buttons">
-                        <button id="pauseExperimentBtn" class="experiment-pause-btn btn-primary"
-                            onclick="app.togglePauseExperiment()">
-                            ⏸ 暫停
-                        </button>
-                        <button id="stopExperimentBtn" class="experiment-stop-btn btn-danger"
-                            onclick="app.stopExperiment()">
-                            ⏹ 停止
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 分隔線 -->
-                <div class="divider"></div>
-
-                <!-- 實驗日誌面板 -->
-                <div class="form-group">
-                    <div class="log-header">
-                        <label>實驗日誌</label>
-                        <span id="logDownloadBtns" class="log-download-buttons">
-                            <button class="btn-secondary" onclick="downloadExperimentLog()">下載 JSONL</button>
-                        </span>
-                    </div>
-                    <div id="experimentLogDisplay" class="log-display">
-                        <div class="log-display-empty">等待實驗開始...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="input-section">
-                <h2>教學單元</h2>
+                <!-- 實驗控制區 -->
+                <div id="experimentControlsContainer"></div>
 
                 <!-- 單元組合選擇區域 -->
-                <div class="combination-selector-section">
-                    <h3>單元組合</h3>
-                    <ul class="experiment-default-list" id="combinationSelector">
-                        <!-- 由 script.js 動態載入 -->
-                    </ul>
-                </div>
+                <div id="combinationSelectorContainer"></div>
 
-                <!-- 教學單元選擇區域 -->
-                <div class="experiment-panel-units">
-                    <div class="units-header">
-                        <span>實驗單元</span>
-                        <label class="select-all-checkbox">
-                            <input type="checkbox" id="selectAllUnits" checked>
-                            <span>全選</span>
-                        </label>
-                    </div>
+                <!-- 單元選擇與排序 -->
+                <div id="unitsPanelContainer"></div>
 
-                    <div class="units-list-container scrollbar-gray">
-                        <ul class="experiment-units-list" id="experimentUnitsList">
-                            <!-- 動態載入教學單元 -->
-                        </ul>
-                    </div>
-                </div>
+                <!-- 統一的實驗日誌面板容器 -->
+                <div id="experimentLogContainer" class="logs-list-container"> </div>
+
             </div>
 
             <!-- 實驗統計資訊 -->
-            <div class="input-section" id="experimentStats" style="display: none;">
+            <div class="input-section board-section is-hidden" id="experimentStats">
                 <h2>實驗統計</h2>
+
                 <div class="stats-grid">
                     <div class="stat-box">
                         <div class="stat-label">手勢序列</div>
@@ -138,10 +61,12 @@
                 </div>
             </div>
 
+
             <!-- 實驗日誌列表 -->
-            <div class="input-section" id="experimentLogsList">
+            <div class="input-section board-section" id="experimentLogsList">
                 <div class="logs-section-header">
                     <h2>實驗日誌列表</h2>
+
                     <div class="logs-list-header">
                         <button id="refreshLogsBtn" class="btn-secondary" onclick="loadExperimentLogs()" title="重新整理">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -152,16 +77,16 @@
                                 <path d="M3 21v-5h5"></path>
                             </svg>
                         </button>
-                        <button id="downloadSelectedLogsBtn" class="btn-secondary" onclick="downloadSelectedLogs()"
-                            title="下載選取" style="display: none;">
+                        <button id="downloadSelectedLogsBtn" class="btn-secondary is-hidden"
+                            onclick="downloadSelectedLogs()" title="下載選取">
                             <svg class="svg-icon svg-md" viewBox="0 0 24 24">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                 <polyline points="7,10 12,15 17,10"></polyline>
                                 <line x1="12" y1="15" x2="12" y2="3"></line>
                             </svg>
                         </button>
-                        <button id="deleteSelectedLogsBtn" class="btn-danger" onclick="deleteSelectedLogs()"
-                            title="刪除選取" style="display: none;">
+                        <button id="deleteSelectedLogsBtn" class="btn-danger is-hidden" onclick="deleteSelectedLogs()"
+                            title="刪除選取">
                             <svg class="svg-icon svg-md" viewBox="0 0 24 24">
                                 <polyline points="3,6 5,6 21,6"></polyline>
                                 <path
@@ -173,6 +98,7 @@
                         </button>
                     </div>
                 </div>
+
                 <div class="form-group">
                     <div id="experimentLogsContainer" class="logs-list-container">
                         <div class="logs-list-loading">載入中...</div>
@@ -191,43 +117,11 @@
     </div>
 
     <!-- ===== 核心基礎設施 ===== -->
-    <!-- 全域核心 -->
+    <!-- Logger（必須最先載入） -->
     <script src="js/core/console-manager.js"></script>
-    <script src="js/core/config.js"></script>
 
-    <!-- 網路基礎設施 -->
-    <script src="js/core/websocket-client.js"></script>
-    <script src="js/core/time-sync-manager.js"></script>
-
-    <!-- ===== 同步系統 ===== -->
-    <!-- 同步客戶端 -->
-    <script src="js/sync/sync-client.js"></script>
-
-    <!-- 實驗中樞系統 -->
-    <script src="js/core/experiment-hub-client.js"></script>
-
-    <!-- ===== 工具與資料 ===== -->
-    <!-- 基礎工具 -->
-    <script type="module" src="js/core/random-utils.js"></script>
-    <script type="module" src="js/core/data-loader.js"></script>
-
-    <!-- ===== 狀態管理 ===== -->
-    <!-- 實驗狀態管理 -->
-    <script src="js/core/experiment-state-manager.js"></script>
-
-    <!-- ===== 實驗功能模組 ===== -->
-    <!-- 實驗動作管理 -->
-    <script src="js/core/action-manager.js"></script>
-
-    <!-- 實驗頁面管理器（會自動載入所需依賴） -->
+    <!-- 頁面入口：動態載入並協調所有其他模組 -->
     <script type="module" src="js/board/board-page-manager.js"></script>
-
-    <!-- ===== 同步與對話框 ===== -->
-    <!-- 同步確認對話框 -->
-    <script src="js/sync/sync-confirm-dialog.js"></script>
-
-    <!-- 同步管理器 -->
-    <script type="module" src="js/sync/sync-manager.js"></script>
 </body>
 
 </html>

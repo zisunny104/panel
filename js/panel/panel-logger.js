@@ -18,19 +18,7 @@ class PanelLogger {
     this.logContent = null;
     this.loggerFabButton = null;
 
-    this._fabClickHandler = (evt) => {
-      evt.stopPropagation();
-      Logger &&
-        Logger.debug &&
-        Logger.debug("FAB 被點擊", { target: evt.target });
-      try {
-        this.toggleLogger();
-      } catch (err) {
-        console.error("FAB 點擊處理錯誤：", err);
-      }
-    };
-    this._fabClickAttached = false;
-    this._lastFabToggleAt = 0;
+    // FAB click is handled by PanelUIManager to keep panel open/close logic consistent
 
     // 延遲初始化，等待 DOM 載入完成
     this.initializeDOMElements();
@@ -44,12 +32,10 @@ class PanelLogger {
       document.addEventListener("DOMContentLoaded", () => {
         this.setupDOMElements();
         this.setupEventListeners();
-        this.initializeLoggerState();
       });
     } else {
       this.setupDOMElements();
       this.setupEventListeners();
-      this.initializeLoggerState();
     }
   }
 
@@ -66,7 +52,11 @@ class PanelLogger {
    * 偵測是否在實驗模式
    */
   isExperimentMode() {
-    return window.experiment?.isExperimentRunning || false;
+    return (
+      (window.experimentFlowManager &&
+        window.experimentFlowManager.isExperimentRunning()) ||
+      false
+    );
   }
 
   /**
@@ -116,14 +106,17 @@ class PanelLogger {
       current_step: null,
     };
 
-    if (window.actionManager && window.actionManager.getProgress) {
+    if (
+      window.experimentActionHandler &&
+      window.experimentActionHandler.getProgress
+    ) {
       try {
-        const progress = window.actionManager.getProgress();
+        const progress = window.experimentActionHandler.getProgress();
         if (progress) {
           experimentInfo.action_progress = progress;
         }
       } catch (error) {
-        console.warn("取得動作進度時發生錯誤:", error);
+        Logger.warn("取得動作進度時發生錯誤:", error);
       }
     }
 
@@ -339,7 +332,7 @@ class PanelLogger {
   copyLog() {
     // 檢查是否有日誌內容
     if (this.logEntries.length === 0) {
-      console.warn("沒有日誌內容可複製");
+      Logger.warn("沒有日誌內容可複製");
       return;
     }
 
@@ -357,18 +350,17 @@ class PanelLogger {
         .writeText(logText)
         .then(() => {
           if (typeof Logger !== "undefined") {
-            Logger.debug("日誌已複製到剪貼簿（Clipboard API）");
+            Logger.debug("日誌已複製到剪貼簿");
           }
           this.logAction("日誌已複製到剪貼簿");
           this.showCopySuccess();
         })
         .catch((err) => {
-          this.handleCopyError("Clipboard API 複製失敗");
+          this.handleCopyError("複製失敗");
         });
     } else {
-      // Clipboard API 不可用，顯示錯誤
       this.handleCopyError(
-        "瀏覽器不支持自動複製功能，請手動選取並複製日誌內容",
+        "瀏覽器不支援自動複製功能，請手動選取並複製日誌內容",
       );
     }
   }
@@ -378,7 +370,6 @@ class PanelLogger {
    */
   handleCopyError(errorMessage) {
     Logger.error("複製功能錯誤:", errorMessage);
-    console.error(errorMessage);
     this.showCopyError();
   }
 
@@ -414,45 +405,38 @@ class PanelLogger {
    * 顯示日誌面板
    */
   showLoggerPanel() {
-    if (this.loggerOutput) {
-      this.loggerOutput.style.display = "flex";
-    }
-    // FAB按鈕保持可見，不隱藏
-    if (this.loggerFabButton) {
-      this.loggerFabButton.style.display = "flex";
-    }
-    localStorage.setItem("loggerMinimized", "false");
+    // Visibility controlled by PanelUIManager; kept for rare internal use
+    if (this.loggerOutput) this.loggerOutput.classList.remove("is-hidden");
+    try {
+      localStorage.setItem("loggerMinimized", "false");
+    } catch (e) {}
   }
 
   /**
    * 隱藏日誌面板
    */
   hideLoggerPanel() {
-    if (this.loggerOutput) {
-      this.loggerOutput.style.display = "none";
-    }
-    if (this.loggerFabButton) {
-      this.loggerFabButton.style.display = "flex";
-    }
-    localStorage.setItem("loggerMinimized", "true");
+    // Visibility controlled by PanelUIManager; kept for rare internal use
+    if (this.loggerOutput) this.loggerOutput.classList.add("is-hidden");
+    try {
+      localStorage.setItem("loggerMinimized", "true");
+    } catch (e) {}
+  }
+
+  /**
+   * 最小化日誌面板（保留 FAB 可見）
+   */
+  minimizeLogger() {
+    if (this.loggerOutput) this.loggerOutput.classList.add("is-hidden");
+    try {
+      localStorage.setItem("loggerMinimized", "true");
+    } catch (e) {}
   }
 
   /**
    * 切換日誌面板，加入短暫去抖動以避免多重輸入事件造成重複切換
    */
-  toggleLogger() {
-    const now = Date.now();
-    if (now - (this._lastFabToggleAt || 0) < 150) {
-      Logger && Logger.debug && Logger.debug("切換被抑制（debounce）");
-      return;
-    }
-    this._lastFabToggleAt = now;
-    if (this.loggerOutput && this.loggerOutput.style.display === "flex") {
-      this.hideLoggerPanel();
-    } else {
-      this.showLoggerPanel();
-    }
-  }
+  // toggleLogger removed; PanelUIManager handles panel toggling centrally
 
   /**
    * 設定事件監聽器
@@ -479,74 +463,21 @@ class PanelLogger {
     // 關閉按鈕
     const closeLoggerPanel = document.getElementById("closeLoggerPanel");
     if (closeLoggerPanel) {
-      closeLoggerPanel.addEventListener("click", () => this.hideLoggerPanel());
+      closeLoggerPanel.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.panelUIManager) window.panelUIManager.closePanel("logger");
+      });
     }
 
-    // FAB 按鈕：使用預先定義的 handler，並確保只綁定一次
-    if (this.loggerFabButton) {
-      if (!this._fabClickAttached) {
-        this.loggerFabButton.addEventListener("click", this._fabClickHandler);
-        this._fabClickAttached = true;
-        this.loggerFabButton._hasFabClickHandler = true;
-      }
-    }
-
-    // 點擊外部關閉日誌面板
-    this.setupOutsideClickListener();
-
-    // 移除日誌開關相關代碼，因為已從 HTML 中移除
+    // FAB handling is attached by PanelUIManager to centralize panel toggling
   }
 
   /**
    * 設定點擊外部關閉日誌面板的監聽器
    */
   setupOutsideClickListener() {
-    document.addEventListener("click", (e) => {
-      // 如果日誌面板沒有顯示，不處理
-      if (!this.loggerOutput || this.loggerOutput.style.display !== "flex") {
-        return;
-      }
-
-      // 檢查點擊是否在日誌面板內部
-      const isClickInsidePanel = this.loggerOutput.contains(e.target);
-
-      // 檢查點擊是否在 FAB 按鈕上
-      const isClickOnFab =
-        this.loggerFabButton && this.loggerFabButton.contains(e.target);
-
-      // 如果點擊在面板外部且不是 FAB 按鈕，關閉面板
-      if (!isClickInsidePanel && !isClickOnFab) {
-        this.hideLoggerPanel();
-      }
-    });
-  }
-
-  /**
-   * 初始化日誌狀態
-   */
-  initializeLoggerState() {
-    // 預設隱藏 logger panel，只顯示 FAB 按鈕
-    this.hideLoggerPanel();
-
-    // 偵測實驗模式並自動最小化
-    setTimeout(() => {
-      this.handleExperimentMode();
-    }, 100);
-  }
-
-  /**
-   * 處理實驗模式下的日誌面板行為
-   */
-  handleExperimentMode() {
-    if (this.isExperimentMode()) {
-      // 在實驗模式下，隱藏所有面板以減少干擾
-      if (window.panelManager) {
-        window.panelManager.closePanel("settings");
-        window.panelManager.closePanel("experiment");
-        window.panelManager.closePanel("logger");
-      }
-      Logger.debug("實驗模式偵測到，已自動隱藏所有面板");
-    }
+    // Outside-click handling is centralized in PanelUIManager.setupOutsideClickListener
   }
 }
 

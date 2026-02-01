@@ -18,7 +18,8 @@
     width: 41.1px;
     height: 41.1px;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    padding-left: 4px;
     background-color: rgba(255, 140, 0, 0.4);
     border: 1px solid rgba(255, 140, 0, 0.8);
     border-radius: 4px;
@@ -109,4 +110,106 @@
 
 .button-label-text.hidden {
     display: none;
+}
+
+/* ================= 動作按鈕樣式 ================= */
+
+/* 動作按鈕基礎樣式 */
+.button-overlay.action-button {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+/* 正確動作回饋 */
+.button-overlay.action-correct {
+    background-color: rgba(0, 255, 0, 0.8) !important;
+    border-color: rgba(0, 255, 0, 1) !important;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+    animation: action-correct-pulse 0.6s ease-out;
+}
+
+.button-overlay.action-correct .button-label-text {
+    color: white;
+    text-shadow: 0 0 8px rgba(0, 255, 0, 1);
+}
+
+/* 錯誤動作回饋 */
+.button-overlay.action-incorrect {
+    background-color: rgba(255, 0, 0, 0.8) !important;
+    border-color: rgba(255, 0, 0, 1) !important;
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+    animation: action-incorrect-shake 0.6s ease-out;
+}
+
+.button-overlay.action-incorrect .button-label-text {
+    color: white;
+    text-shadow: 0 0 8px rgba(255, 0, 0, 1);
+}
+
+/* 正確動作動畫 */
+@keyframes action-correct-pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7);
+    }
+
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 10px rgba(0, 255, 0, 0);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(0, 255, 0, 0);
+    }
+}
+
+/* 錯誤動作動畫 */
+@keyframes action-incorrect-shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translateX(-3px);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translateX(3px);
+    }
+}
+
+/* 共用：圓形關閉按鈕（實驗面板 / 設定面板等通用） */
+.circle-close-btn {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #333;
+    color: #fff;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    padding: 0;
+}
+
+.circle-close-btn:hover {
+    background: #ff8c00;
+}
+
+.circle-close-btn svg {
+    width: 16px;
+    height: 16px;
 }

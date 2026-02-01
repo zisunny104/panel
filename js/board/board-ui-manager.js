@@ -1,11 +1,12 @@
 /**
- * ExperimentUIManager - 實驗UI管理器
- * 負責處理所有UI相關的操作和事件
+ * BoardUIManager - Board 頁面 UI 管理器
+ * 負責處理 board.html 所有UI相關的操作和事件
  *
  * 注意：使用 experiment-utils.js 中通過 window 暴露的全局函數
+ * TODO: 逐步遷移至使用 js/experiment/experiment-ui-manager.js 的通用組件
  */
 
-class ExperimentUIManager {
+class BoardUIManager {
   constructor(coreManager) {
     this.core = coreManager;
     this.initialized = false;
@@ -21,7 +22,7 @@ class ExperimentUIManager {
     this.exposeGlobalFunctions();
     this.initialized = true;
 
-    Logger.debug("ExperimentUIManager 初始化完成");
+    Logger.debug("BoardUIManager 初始化完成");
   }
 
   /**
@@ -125,7 +126,7 @@ class ExperimentUIManager {
    * 智能重新產生實驗ID
    */
   async smartRegenerateExperimentId() {
-    const result = RandomUtils.generateNewExperimentId();
+    const result = RandomUtils.generateExperimentId();
 
     const experimentIdInput = document.getElementById("experimentIdInput");
     if (experimentIdInput) {
@@ -312,13 +313,181 @@ class ExperimentUIManager {
     const detail = document.getElementById("gestureStatsDetail");
     const toggle = document.getElementById("gestureStatsToggle");
 
-    if (detail.style.display === "none") {
-      detail.style.display = "block";
+    const isHidden = detail.classList.contains("is-hidden");
+    if (isHidden) {
+      detail.classList.remove("is-hidden");
       toggle.style.transform = "rotate(180deg)";
     } else {
-      detail.style.display = "none";
+      detail.classList.add("is-hidden");
       toggle.style.transform = "rotate(0deg)";
     }
+  }
+
+  /**
+   * 渲染統一UI
+   */
+  async renderUnifiedUI() {
+    try {
+      // 確保數據已經載入
+      if (!this.core.scriptData) {
+        await this.core.loadScenarioData();
+      }
+
+      // 如果有實驗系統管理器，使用它來渲染UI
+      if (window.experimentSystemManager) {
+        await window.experimentSystemManager.initializeUI(
+          {
+            combinationSelector: "#combinationSelectorContainer",
+            unitPanel: "#unitsPanelContainer",
+            experimentControls: "#experimentControlsContainer",
+          },
+          this.core.scriptData,
+        );
+
+        // 設置事件監聽器來處理頁面特定的邏輯
+        this._setupExperimentSystemEventHandlers();
+
+        Logger.debug("使用 ExperimentSystemManager 渲染UI完成");
+        return;
+      }
+
+      // 如果 ExperimentSystemManager 不可用，使用備用的 UI 管理器渲染
+      Logger.warn(
+        "ExperimentSystemManager 不可用，使用 ExperimentUIManager 作為備援來渲染UI",
+      );
+
+      try {
+        if (
+          !this.core.uiManager ||
+          typeof this.core.uiManager.initialize !== "function"
+        ) {
+          this.core.uiManager = new ExperimentUIManager();
+          // 設置為全域實例，確保其他模組可以存取
+          window.uiManager = this.core.uiManager;
+        }
+        // 初始化 UI manager（如果尚未初始化）
+        try {
+          this.core.uiManager.initialize();
+        } catch (e) {}
+
+        // 初始化 Panel UI 組件（包括實驗日誌面板）
+        try {
+          if (typeof this.core.uiManager.initializePanelUI === "function") {
+            await this.core.uiManager.initializePanelUI();
+          }
+        } catch (e) {
+          Logger.warn("初始化 Panel UI 失敗", e);
+        }
+
+        // 組合選擇器
+        const combos = (this.core.scriptData?.combinations || []).map((c) => ({
+          id: c.combinationId,
+          name: c.combinationName,
+          description: c.description || "",
+        }));
+        try {
+          this.core.uiManager.renderCombinationSelector(
+            "#combinationSelectorContainer",
+            combos,
+            { allowSelection: true },
+          );
+        } catch (e) {
+          Logger.warn("備援: 渲染組合選擇器失敗", e);
+        }
+
+        // 單元面板
+        const units = this.core.scriptData?.units || [];
+        try {
+          this.core.uiManager.renderUnitsPanel(
+            "#unitsPanelContainer",
+            units,
+            null,
+            {},
+          );
+        } catch (e) {
+          Logger.warn("備援: 渲染單元面板失敗", e);
+        }
+
+        // 實驗控制
+        try {
+          this.core.uiManager.renderExperimentControls(
+            "#experimentControlsContainer",
+            {},
+          );
+        } catch (e) {
+          Logger.warn("備援: 渲染實驗控制失敗", e);
+        }
+
+        // 綁定頁面特定的事件處理器
+        this._setupExperimentSystemEventHandlers();
+
+        Logger.debug("使用 ExperimentUIManager 備援渲染UI完成");
+        return;
+      } catch (err) {
+        Logger.error("備援渲染UI失敗:", err);
+        throw err;
+      }
+    } catch (error) {
+      Logger.error("渲染統一UI失敗:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 設置實驗系統事件處理器
+   * @private
+   */
+  _setupExperimentSystemEventHandlers() {
+    // 這裡可以添加頁面特定的邏輯，比如連接系統管理器的事件到頁面特定的處理器
+    // 例如：實驗開始/停止按鈕的事件處理
+  }
+
+  /**
+   * 渲染手勢類型參考面板
+   */
+  renderGestureTypesReference() {
+    const leftPanel = document.querySelector(".left-panel");
+    if (
+      !leftPanel ||
+      !this.core.scenariosData ||
+      !this.core.scenariosData.gesture_list
+    )
+      return;
+
+    // 檢查是否已經存在，避免重複新增
+    let refDiv = document.querySelector(".gesture-reference");
+    if (refDiv) {
+      refDiv.remove();
+    }
+
+    const gestureTypes = this.core.scenariosData.gesture_list;
+
+    refDiv = document.createElement("div");
+    refDiv.className = "gesture-reference";
+    refDiv.style.marginTop = "20px";
+    refDiv.innerHTML = `
+            <h2 style="cursor: pointer; display: flex; align-items: center; color: #2c3e50; margin-bottom: 12px; font-weight: 700;"
+                onclick="document.querySelector('.gesture-types-list').style.display =
+                document.querySelector('.gesture-types-list').style.display === 'none' ? 'block' : 'none'">
+                手勢參考 <span style="font-size: 12px; margin-left: auto;">▼</span>
+            </h2>
+            <div class="gesture-types-list" style="display: none;">
+                ${gestureTypes
+                  .map(
+                    (g) => `
+                    <div class="gesture-type-item">
+                        <span class="gesture-type-code">${g.gesture_id}</span>
+                        <span class="gesture-type-name">${g.gesture_name}</span>
+                        <span class="gesture-type-desc">${g.gesture_description}</span>
+                        <span style="font-size: 11px; color: #999; margin-left: auto;">${g.gesture_key}</span>
+                    </div>
+                `,
+                  )
+                  .join("")}
+            </div>
+        `;
+
+    leftPanel.appendChild(refDiv);
   }
 
   /**
@@ -332,9 +501,9 @@ class ExperimentUIManager {
     document.removeEventListener("dragend", this.handleDragEnd);
     document.removeEventListener("drop", this.handleDrop);
 
-    Logger.debug("ExperimentUIManager 已清理");
+    Logger.debug("BoardUIManager 已清理");
   }
 }
 
-// 匯出
-export { ExperimentUIManager };
+// 匯出到全局作用域
+window.BoardUIManager = BoardUIManager;

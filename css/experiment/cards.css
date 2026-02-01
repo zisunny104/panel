@@ -156,3 +156,148 @@
     background: #f5f5f5;
     border-radius: 8px;
 }
+
+/* ========== 手勢卡片內部元件樣式 ========== */
+.gesture-info-section {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.gesture-info-section.step-info {
+    background: #fef5f0;
+    border: 2px solid #ff9800;
+}
+
+.gesture-info-section.action-info {
+    background: #f5f5f5;
+    border: 2px solid #999;
+}
+
+.gesture-info-section .section-label {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.gesture-info-section .section-content {
+    font-size: 12px;
+    color: #333;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.gesture-action-btn {
+    padding: 10px;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.gesture-action-btn.correct {
+    background: #4caf50;
+}
+
+.gesture-action-btn.uncertain {
+    background: #ff9800;
+}
+
+.gesture-action-btn.incorrect {
+    background: #f44336;
+}
+
+.gesture-action-btn.next-step {
+    width: 100%;
+    background: #667eea;
+}
+
+.gesture-step-card {
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    background: white;
+    border: 2px solid #999;
+    border-radius: 6px;
+    padding: 8px;
+    overflow: hidden;
+}
+
+.gesture-step-card .step-id {
+    font-size: 9px;
+    color: #999;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.gesture-step-card .step-name {
+    font-size: 11px;
+    color: #333;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.gesture-actions-container {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 0;
+}
+
+.gesture-action-button {
+    flex-shrink: 0;
+    background: #e8eeff;
+    border: 2px solid #667eea;
+    border-radius: 6px;
+    padding: 8px;
+    white-space: nowrap;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    transition: all 0.2s;
+    min-width: 0;
+}
+
+.gesture-action-button .action-id {
+    font-size: 9px;
+    color: #667eea;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.gesture-action-button .action-name {
+    font-size: 12px;
+    color: #2c3e50;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ========== 合併的步驟說明區域 ========== */
+.gesture-info-section.action-info {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f5f5f5;
+    border: 2px solid #999;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+/* ========== 下一步按鈕 ========== */
+.gesture-next-button {
+    width: 100%;
+    padding: 10px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

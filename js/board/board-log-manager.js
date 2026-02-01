@@ -20,7 +20,7 @@ class ExperimentLogManager {
 
     // IndexedDB 設定
     this.dbName = "ExperimentLogsDB";
-    this.dbVersion = 1;
+    this.dbVersion = 2;
     this.pendingLogsStore = "pendingLogs";
     this.db = null;
 
@@ -281,9 +281,9 @@ class ExperimentLogManager {
     this.experimentStartTime = Date.now();
 
     // 取得裝置ID
-    let deviceId = null;
+    let clientId = null;
     if (window.syncClient) {
-      deviceId = window.syncClient.clientId;
+      clientId = window.syncClient.clientId;
     }
 
     // 取得實驗組合資訊
@@ -304,8 +304,8 @@ class ExperimentLogManager {
     };
 
     // 新增裝置ID（如果有）
-    if (deviceId) {
-      logEntry.d_id = deviceId;
+    if (clientId) {
+      logEntry.d_id = clientId;
     }
 
     // 新增實驗組合（如果有）
@@ -331,9 +331,9 @@ class ExperimentLogManager {
     }
 
     // 取得裝置ID
-    let deviceId = null;
+    let clientId = null;
     if (window.syncClient) {
-      deviceId = window.syncClient.clientId;
+      clientId = window.syncClient.clientId;
     }
 
     const logEntry = {
@@ -344,8 +344,8 @@ class ExperimentLogManager {
     };
 
     // 新增裝置ID（如果有）
-    if (deviceId) {
-      logEntry.d_id = deviceId;
+    if (clientId) {
+      logEntry.d_id = clientId;
     }
 
     this._addLog(logEntry);
@@ -362,9 +362,9 @@ class ExperimentLogManager {
       return;
     }
 
-    let deviceId = null;
+    let clientId = null;
     if (window.syncClient) {
-      deviceId = window.syncClient.clientId;
+      clientId = window.syncClient.clientId;
     }
 
     const logEntry = {
@@ -373,8 +373,8 @@ class ExperimentLogManager {
       exp_id: experimentId,
     };
 
-    if (deviceId) {
-      logEntry.d_id = deviceId;
+    if (clientId) {
+      logEntry.d_id = clientId;
     }
 
     this._addLog(logEntry);
@@ -391,9 +391,9 @@ class ExperimentLogManager {
       return;
     }
 
-    let deviceId = null;
+    let clientId = null;
     if (window.syncClient) {
-      deviceId = window.syncClient.clientId;
+      clientId = window.syncClient.clientId;
     }
 
     const logEntry = {
@@ -402,8 +402,8 @@ class ExperimentLogManager {
       exp_id: experimentId,
     };
 
-    if (deviceId) {
-      logEntry.d_id = deviceId;
+    if (clientId) {
+      logEntry.d_id = clientId;
     }
 
     this._addLog(logEntry);
@@ -422,9 +422,9 @@ class ExperimentLogManager {
     const experimentId = this._getCurrentExperimentId();
 
     // 取得裝置ID
-    let deviceId = null;
+    let clientId = null;
     if (window.syncClient) {
-      deviceId = window.syncClient.clientId;
+      clientId = window.syncClient.clientId;
     }
 
     // 取得手勢名稱
@@ -453,8 +453,8 @@ class ExperimentLogManager {
     if (stepId) {
       logEntry.s_id = stepId;
     }
-    if (deviceId) {
-      logEntry.d_id = deviceId;
+    if (clientId) {
+      logEntry.d_id = clientId;
     }
     this._addLog(logEntry);
     Logger.debug("記錄: 手勢步驟開始", logEntry);
@@ -469,9 +469,9 @@ class ExperimentLogManager {
     const experimentId = this._getCurrentExperimentId();
 
     // 取得裝置ID
-    let deviceId = null;
+    let clientId = null;
     if (window.syncClient) {
-      deviceId = window.syncClient.clientId;
+      clientId = window.syncClient.clientId;
     }
 
     // 取得手勢名稱
@@ -500,8 +500,8 @@ class ExperimentLogManager {
     if (stepId) {
       logEntry.s_id = stepId;
     }
-    if (deviceId) {
-      logEntry.d_id = deviceId;
+    if (clientId) {
+      logEntry.d_id = clientId;
     }
     this._addLog(logEntry);
     Logger.debug("記錄: 手勢步驟結束", logEntry);
@@ -547,12 +547,12 @@ class ExperimentLogManager {
    * @param {number} gestureIndex - 手勢索引 (可選)
    * @param {string} stepId - 步驟ID (可選)
    */
-  logAction(actionId, gestureIndex = null, stepId = null, deviceId = null) {
+  logAction(actionId, gestureIndex = null, stepId = null, clientId = null) {
     const experimentId = this._getCurrentExperimentId();
 
     // 如果未提供裝置 ID，嘗試從 SyncClient 取得
-    if (!deviceId && window.syncClient) {
-      deviceId = window.syncClient.clientId;
+    if (!clientId && window.syncClient) {
+      clientId = window.syncClient.clientId;
     }
 
     const logEntry = {
@@ -567,8 +567,8 @@ class ExperimentLogManager {
     if (stepId) {
       logEntry.s_id = stepId;
     }
-    if (deviceId) {
-      logEntry.d_id = deviceId;
+    if (clientId) {
+      logEntry.d_id = clientId;
     }
     this._addLog(logEntry);
     Logger.debug("記錄: 按鈕動作", logEntry);
@@ -1161,9 +1161,9 @@ class ExperimentLogManager {
    * 記錄遠端按鈕動作
    * @param {string} button - 按鈕ID (如 B5, B7 等)
    * @param {string} buttonFunction - 按鈕功能 (如 7, 9 等)
-   * @param {string} remoteDeviceId - 遠端裝置ID
+   * @param {string} remoteClientId - 遠端客戶端ID
    */
-  logRemoteButtonAction(button, buttonFunction, remoteDeviceId) {
+  logRemoteButtonAction(button, buttonFunction, remoteClientId) {
     const experimentId = this._getCurrentExperimentId();
 
     const logEntry = {
@@ -1173,7 +1173,7 @@ class ExperimentLogManager {
       participant: this.participantName || `受試者_${experimentId}`,
       button: button,
       function: buttonFunction,
-      remote_device_id: remoteDeviceId,
+      remote_client_id: remoteClientId,
     };
 
     this._addLog(logEntry);
@@ -1511,7 +1511,7 @@ class ExperimentLogManager {
       await window.experimentLogManager.clearLocalCache();
       alert("已刪除本機快取（IndexedDB 與常見 localStorage 鍵）");
     } catch (err) {
-      console.error("清理快取失敗", err);
+      Logger.error("清理快取失敗", err);
       alert(
         "清理快取失敗: " + (err && err.message ? err.message : String(err)),
       );

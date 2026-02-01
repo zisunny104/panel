@@ -1,34 +1,18 @@
 /**
  * ExperimentUIManager - 實驗UI管理器
- * 
+ *
  * 核心職責：
  * 1. 按鈕狀態管理（啟用/禁用/鎖定）
  * 2. 視覺高亮管理（按鈕高亮、電源按鈕高亮）
  * 3. UI 元件更新（進度條、計時器、狀態指示器）
  * 4. 樣式管理（CSS class 增刪改）
  * 5. 視覺提示控制（實驗模式視覺回饋）
- * 
- * 設計模式：
- * - 事件驅動：發出 UI 更新事件
- * - 依賴注入：可注入 FlowManager
- * - 單一職責：專注於 UI 層操作
- * 
- * 向後相容性：
- * - 保留原有的 CSS class 命名
- * - 保留原有的 DOM 元素 ID
- * - 保留原有的事件名稱
- * 
- * @version 1.0.0
- * @since Phase 3 - P1 Auxiliary Modules
  */
 
 class ExperimentUIManager {
   /**
    * 建構函式
    * @param {Object} config - 配置選項
-   * @param {boolean} config.enableVisualHints - 是否啟用視覺提示 (預設: true)
-   * @param {number} config.highlightDuration - 高亮持續時間 (ms, 預設: 300)
-   * @param {Object} config.selectors - DOM 元素選擇器映射
    */
   constructor(config = {}) {
     // 配置選項
@@ -49,6 +33,7 @@ class ExperimentUIManager {
       highlightedButtons: new Set(),
       lockedElements: new Set(),
       hiddenElements: new Set(),
+      panelUIInitialized: false,
     };
 
     // DOM 元素快取
@@ -111,20 +96,11 @@ class ExperimentUIManager {
 
   /**
    * 設定事件監聽器
-   * @private
    */
   _setupEventListeners() {
-    // 監聽視覺提示開關變化
-    const toggle = this.elements.get("visualHintsToggle");
-    if (toggle) {
-      const handler = (e) => {
-        this.setVisualHintsEnabled(e.target.checked);
-      };
-      toggle.addEventListener("change", handler);
-      this.listeners.set("visualHintsToggle", handler);
-    }
+    // minimal placeholder: panel-level listeners can be added here
+    this._log("設定事件監聽器: (placeholder)");
   }
-
   /**
    * 依賴注入：FlowManager
    */
@@ -136,6 +112,31 @@ class ExperimentUIManager {
 
     this.dependencies.flowManager = flowManager;
     this._log("已注入 FlowManager");
+
+    try {
+      // 鎖定事件：當實驗正在 RUNNING 或 PAUSED 時，禁用 experimentId 與 組合選擇
+      flowManager.on(ExperimentFlowManager.EVENT.LOCKED, () => {
+        this._log("收到 flow:locked，鎖定實驗相關輸入");
+        this._handleFlowLocked(true);
+      });
+
+      // 解鎖事件：實驗結束或重置時恢復
+      flowManager.on(ExperimentFlowManager.EVENT.UNLOCKED, () => {
+        this._log("收到 flow:unlocked，解除鎖定");
+        this._handleFlowLocked(false);
+      });
+
+      // 受試者名稱允許編輯事件（PAUSED 時為 true）
+      flowManager.on(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, (data) => {
+        const allowed = !!data?.allowed;
+        this._log("收到 flow:participant_edit，允許編輯受試者名稱:", allowed);
+        this._handleParticipantEditAllowed(allowed);
+      });
+
+      this._log("已綁定 FlowManager 事件: locked/unlocked/participant_edit");
+    } catch (e) {
+      this._warn("綁定 FlowManager 事件失敗", e);
+    }
   }
 
   // ==========================================
@@ -172,7 +173,11 @@ class ExperimentUIManager {
       button.title = reason;
     }
 
-    this._emit("button-disabled", { button, selector: buttonOrSelector, reason });
+    this._emit("button-disabled", {
+      button,
+      selector: buttonOrSelector,
+      reason,
+    });
   }
 
   /**
@@ -191,6 +196,62 @@ class ExperimentUIManager {
   }
 
   /**
+   * 處理 FlowManager 的鎖定/解鎖事件
+   * @private
+   */
+  _handleFlowLocked(locked) {
+    // 實驗 ID 輸入框
+    const idInput = document.querySelector("#experimentIdInput");
+    if (idInput) {
+      idInput.disabled = !!locked;
+      if (locked) {
+        idInput.classList.add("experiment-disabled");
+      } else {
+        idInput.classList.remove("experiment-disabled");
+      }
+    }
+
+    // 組合選擇器
+    const comboContainer = document.querySelector(
+      "#combinationSelectorContainer",
+    );
+    if (comboContainer) {
+      // 將所有互動元素設為 disabled
+      comboContainer
+        .querySelectorAll("button,input,li,select")
+        .forEach((el) => {
+          try {
+            el.disabled = !!locked;
+            if (locked) el.classList.add("experiment-disabled");
+            else el.classList.remove("experiment-disabled");
+          } catch (e) {}
+        });
+    }
+
+    // 若有需要，也可以發出事件
+    this._emit("flow:locked:ui", { locked });
+  }
+
+  /**
+   * 處理受試者名稱編輯允許信號
+   * @private
+   */
+  _handleParticipantEditAllowed(allowed) {
+    const pInput = document.querySelector("#participantNameInput");
+    if (pInput) {
+      // 當 allowed 為 true 表示可編輯，否則只讀
+      pInput.readOnly = !allowed;
+      if (allowed) {
+        pInput.classList.remove("experiment-disabled");
+        pInput.removeAttribute("disabled");
+      } else {
+        pInput.classList.add("experiment-disabled");
+        pInput.setAttribute("disabled", "true");
+      }
+    }
+  }
+
+  /**
    * 解鎖按鈕
    * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
    */
@@ -206,7 +267,7 @@ class ExperimentUIManager {
   }
 
   /**
-   * 批量啟用按鈕
+   * 批次啟用按鈕
    * @param {Array<string|HTMLElement>} buttons - 按鈕列表
    */
   enableButtons(buttons) {
@@ -214,7 +275,7 @@ class ExperimentUIManager {
   }
 
   /**
-   * 批量禁用按鈕
+   * 批次禁用按鈕
    * @param {Array<string|HTMLElement>} buttons - 按鈕列表
    * @param {string} reason - 禁用原因
    */
@@ -223,7 +284,7 @@ class ExperimentUIManager {
   }
 
   /**
-   * 批量鎖定按鈕
+   * 批次鎖定按鈕
    * @param {Array<string|HTMLElement>} buttons - 按鈕列表
    */
   lockButtons(buttons) {
@@ -231,7 +292,7 @@ class ExperimentUIManager {
   }
 
   /**
-   * 批量解鎖按鈕
+   * 批次解鎖按鈕
    * @param {Array<string|HTMLElement>} buttons - 按鈕列表
    */
   unlockButtons(buttons) {
@@ -243,7 +304,7 @@ class ExperimentUIManager {
   // ==========================================
 
   /**
-   * 高亮按鈕（添加視覺提示）
+   * 高亮按鈕（新增視覺提示）
    * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
    * @param {string} highlightType - 高亮類型 ('primary' | 'secondary' | 'shift')
    */
@@ -281,7 +342,7 @@ class ExperimentUIManager {
     button.classList.remove(
       "next-step-highlight",
       "next-step-highlight-secondary",
-      "next-step-highlight-shift"
+      "next-step-highlight-shift",
     );
     this.state.highlightedButtons.delete(button);
 
@@ -337,7 +398,7 @@ class ExperimentUIManager {
       btn.classList.remove(
         "next-step-highlight",
         "next-step-highlight-secondary",
-        "next-step-highlight-shift"
+        "next-step-highlight-shift",
       );
     });
 
@@ -406,8 +467,11 @@ class ExperimentUIManager {
   updatePauseIndicator(isPaused) {
     const indicator = this.elements.get("pauseIndicator");
     if (!indicator) return;
-
-    indicator.style.display = isPaused ? "block" : "none";
+    // prefer class-based hiding; use show/hide helpers for consistency
+    try {
+      if (isPaused) this.showElement(indicator, "block");
+      else this.hideElement(indicator);
+    } catch (e) {}
     indicator.textContent = isPaused ? "⏸ 暫停中" : "";
 
     this._emit("pause-indicator-updated", { isPaused });
@@ -427,7 +491,7 @@ class ExperimentUIManager {
 
   /**
    * 更新進度條
-   * @param {number} current - 當前進度
+   * @param {number} current - 目前進度
    * @param {number} total - 總進度
    */
   updateProgressBar(current, total) {
@@ -444,7 +508,7 @@ class ExperimentUIManager {
 
   /**
    * 更新步驟指示器
-   * @param {number} currentStep - 當前步驟索引
+   * @param {number} currentStep - 目前步驟索引
    * @param {number} totalSteps - 總步驟數
    */
   updateStepIndicator(currentStep, totalSteps) {
@@ -457,7 +521,7 @@ class ExperimentUIManager {
 
   /**
    * 更新單元指示器
-   * @param {number} currentUnit - 當前單元索引
+   * @param {number} currentUnit - 目前單元索引
    * @param {number} totalUnits - 總單元數
    * @param {string} unitName - 單元名稱
    */
@@ -486,7 +550,11 @@ class ExperimentUIManager {
     const element = this._getElement(elementOrSelector);
     if (!element) return;
 
-    element.style.display = displayType;
+    // remove class-based hidden flag if present (preference for class-based control)
+    if (element.classList.contains("is-hidden")) {
+      element.classList.remove("is-hidden");
+    }
+
     this.state.hiddenElements.delete(element);
 
     this._emit("element-shown", { element, selector: elementOrSelector });
@@ -500,7 +568,9 @@ class ExperimentUIManager {
     const element = this._getElement(elementOrSelector);
     if (!element) return;
 
-    element.style.display = "none";
+    // prefer class-based hiding to allow stylesheet control
+    element.classList.add("is-hidden");
+
     this.state.hiddenElements.add(element);
 
     this._emit("element-hidden", { element, selector: elementOrSelector });
@@ -515,7 +585,8 @@ class ExperimentUIManager {
     const element = this._getElement(elementOrSelector);
     if (!element) return;
 
-    if (element.style.display === "none") {
+    const isClassHidden = element.classList.contains("is-hidden");
+    if (isClassHidden) {
       this.showElement(element, displayType);
     } else {
       this.hideElement(element);
@@ -523,7 +594,7 @@ class ExperimentUIManager {
   }
 
   /**
-   * 批量顯示元素
+   * 批次顯示元素
    * @param {Array<string|HTMLElement>} elements - 元素列表
    * @param {string} displayType - display 類型
    */
@@ -532,7 +603,7 @@ class ExperimentUIManager {
   }
 
   /**
-   * 批量隱藏元素
+   * 批次隱藏元素
    * @param {Array<string|HTMLElement>} elements - 元素列表
    */
   hideElements(elements) {
@@ -544,7 +615,7 @@ class ExperimentUIManager {
   // ==========================================
 
   /**
-   * 添加 CSS class
+   * 新增 CSS class
    * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
    * @param {string|Array<string>} classNames - class 名稱（可以是陣列）
    */
@@ -555,7 +626,11 @@ class ExperimentUIManager {
     const classes = Array.isArray(classNames) ? classNames : [classNames];
     element.classList.add(...classes);
 
-    this._emit("class-added", { element, selector: elementOrSelector, classNames });
+    this._emit("class-added", {
+      element,
+      selector: elementOrSelector,
+      classNames,
+    });
   }
 
   /**
@@ -570,14 +645,18 @@ class ExperimentUIManager {
     const classes = Array.isArray(classNames) ? classNames : [classNames];
     element.classList.remove(...classes);
 
-    this._emit("class-removed", { element, selector: elementOrSelector, classNames });
+    this._emit("class-removed", {
+      element,
+      selector: elementOrSelector,
+      classNames,
+    });
   }
 
   /**
    * 切換 CSS class
    * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
    * @param {string} className - class 名稱
-   * @param {boolean} force - 強制添加/移除
+   * @param {boolean} force - 強制新增/移除
    */
   toggleClass(elementOrSelector, className, force = undefined) {
     const element = this._getElement(elementOrSelector);
@@ -650,7 +729,10 @@ class ExperimentUIManager {
       button.classList.remove("button-pressed");
     }, this.config.highlightDuration);
 
-    this._emit("button-press-animation-shown", { button, selector: buttonOrSelector });
+    this._emit("button-press-animation-shown", {
+      button,
+      selector: buttonOrSelector,
+    });
   }
 
   /**
@@ -674,7 +756,11 @@ class ExperimentUIManager {
       }
     }, interval);
 
-    this._emit("button-blink-started", { button, selector: buttonOrSelector, times });
+    this._emit("button-blink-started", {
+      button,
+      selector: buttonOrSelector,
+      times,
+    });
   }
 
   // ==========================================
@@ -726,15 +812,15 @@ class ExperimentUIManager {
   }
 
   /**
-   * 警告輸出
-   * @param {...any} args - 警告參數
+   * 錯誤輸出
+   * @param {...any} args - 錯誤參數
    * @private
    */
-  _warn(...args) {
-    if (typeof Logger !== "undefined" && Logger.warn) {
-      Logger.warn("[ExperimentUIManager]", ...args);
+  _error(...args) {
+    if (typeof Logger !== "undefined" && Logger.error) {
+      Logger.error("[ExperimentUIManager]", ...args);
     } else {
-      console.warn("[ExperimentUIManager]", ...args);
+      console.error("[ExperimentUIManager]", ...args);
     }
   }
 
@@ -819,6 +905,1434 @@ class ExperimentUIManager {
     this.initialized = false;
     this._emit("ui-manager-destroyed");
     this._log("UI 管理器已銷毀");
+  }
+
+  // ==========================================
+  // 通用UI組件渲染方法
+  // ==========================================
+
+  /**
+   * 渲染組合選擇器
+   * @param {HTMLElement|string} container - 容器元素或選擇器
+   * @param {Array} combinations - 組合資料陣列
+   * @param {Object} options - 可選配置
+   * @returns {HTMLElement} 渲染後的容器元素
+   */
+  renderCombinationSelector(container, combinations, options = {}) {
+    const containerEl =
+      typeof container === "string"
+        ? document.querySelector(container)
+        : container;
+    if (!containerEl) {
+      this._error("找不到容器元素:", container);
+      return null;
+    }
+    const renderNow = () => {
+      const config = {
+        showTitle: options.showTitle !== false,
+        title: options.title || "單元組合",
+        activeId: options.activeId || null,
+        onSelect: options.onSelect || null,
+        ...options,
+      };
+
+      // 如果容器是 ul 元素，直接在其中添加項目
+      if (containerEl.tagName === "UL") {
+        containerEl.innerHTML = combinations
+          .map(
+            (combo) => `
+        <li class="combination-item ${combo.id === config.activeId ? "active" : ""}"
+            data-combination-id="${combo.id}">
+          <div class="combo-name">${combo.name}</div>
+          <div class="combo-desc">${combo.description || ""}</div>
+        </li>
+      `,
+          )
+          .join("");
+        // 如果目標是 UL 元素且要求顯示標題，則在 UL 之前插入一個 h3 作為 fallback
+        if (config.showTitle) {
+          const existingTitle = containerEl.previousElementSibling;
+          if (
+            !existingTitle ||
+            !existingTitle.classList.contains("combination-selector-title")
+          ) {
+            const titleEl = document.createElement("h3");
+            titleEl.className = "combination-selector-title";
+            titleEl.textContent = config.title;
+            containerEl.parentNode &&
+              containerEl.parentNode.insertBefore(titleEl, containerEl);
+            this._log("組合選擇器: 已插入 fallback 標題", {
+              title: config.title,
+            });
+          }
+        }
+      } else {
+        // 否則產生完整的 HTML
+        const html = `
+        <div class="combination-selector-section">
+          ${config.showTitle ? `<h3>${config.title}</h3>` : ""}
+          <ul class="experiment-default-list">
+            ${combinations
+              .map(
+                (combo) => `
+              <li class="combination-item ${combo.id === config.activeId ? "active" : ""}"
+                  data-combination-id="${combo.id}">
+                <div class="combo-name">${combo.name}</div>
+                <div class="combo-desc">${combo.description || ""}</div>
+              </li>
+            `,
+              )
+              .join("")}
+          </ul>
+        </div>
+      `;
+        containerEl.innerHTML = html;
+      }
+
+      // 記錄容器與標題使用情況，便於偵錯
+      this._log("renderCombinationSelector: containerTag", {
+        tag: containerEl.tagName,
+        showTitle: config.showTitle,
+        title: config.title,
+      });
+
+      // 綁定點擊事件
+      if (config.onSelect) {
+        const items = containerEl.querySelectorAll(".combination-item");
+        items.forEach((item) => {
+          item.addEventListener("click", () => {
+            const comboId = item.dataset.combinationId;
+            // 移除所有 active class
+            items.forEach((i) => i.classList.remove("active"));
+            // 新增到點擊的項目
+            item.classList.add("active");
+            // 呼叫回調
+            config.onSelect(comboId);
+          });
+        });
+      }
+
+      this._log("組合選擇器已渲染", { count: combinations.length });
+      return containerEl;
+    };
+
+    // 如果面板祖先被隱藏 (display:none)，延遲渲染直到可見
+    const panelAncestor = containerEl.closest(".experiment-panel");
+    if (
+      panelAncestor &&
+      window.getComputedStyle(panelAncestor).display === "none"
+    ) {
+      const mo = new MutationObserver((mutations, obs) => {
+        if (window.getComputedStyle(panelAncestor).display !== "none") {
+          obs.disconnect();
+          renderNow();
+        }
+      });
+      mo.observe(panelAncestor, {
+        attributes: true,
+        attributeFilter: ["style", "class"],
+      });
+      return containerEl;
+    }
+
+    return renderNow();
+  }
+
+  /**
+   * 更新組合選擇器的選中狀態
+   * @param {HTMLElement|string} container - 容器元素或選擇器
+   * @param {string} activeId - 要選中的組合ID
+   */
+  updateCombinationSelection(container, activeId) {
+    const containerEl =
+      typeof container === "string"
+        ? document.querySelector(container)
+        : container;
+    if (!containerEl) {
+      this._warn("找不到容器元素:", container);
+      return;
+    }
+
+    // 移除所有 active class
+    const items = containerEl.querySelectorAll(".combination-item");
+    items.forEach((item) => item.classList.remove("active"));
+
+    // 為指定的組合添加 active class
+    const activeItem = containerEl.querySelector(
+      `[data-combination-id="${activeId}"]`,
+    );
+    if (activeItem) {
+      activeItem.classList.add("active");
+    }
+
+    this._log("組合選擇器選中狀態已更新", { activeId });
+  }
+
+  /**
+   * 渲染實驗單元面板
+   * @param {HTMLElement|string} container - 容器元素或選擇器
+   * @param {Array} units - 單元資料陣列
+   * @param {Array} unitIds - 要顯示的單元ID陣列（可選，用於過濾）
+   * @param {Object} options - 可選配置
+   * @returns {HTMLElement} 渲染後的容器元素
+   */
+  renderUnitsPanel(container, units, unitIds = null, options = {}) {
+    const containerEl =
+      typeof container === "string"
+        ? document.querySelector(container)
+        : container;
+    if (!containerEl) {
+      this._error("找不到容器元素:", container);
+      return null;
+    }
+
+    const renderNow = () => {
+      const config = {
+        showHeader: options.showHeader !== false,
+        headerTitle: options.headerTitle || "實驗單元",
+        showSelectAll: options.showSelectAll !== false,
+        showPowerOptions: options.showPowerOptions !== false,
+        includeStartup: options.includeStartup !== false,
+        includeShutdown: options.includeShutdown !== false,
+        enableSorting: options.enableSorting !== false,
+        onUnitToggle: options.onUnitToggle || null,
+        onReorder: options.onReorder || null,
+        ...options,
+      };
+
+      // 顯示所有單元，但根據 unitIds 設定預設勾選狀態
+      let displayUnits = units;
+      if (unitIds && Array.isArray(unitIds)) {
+        displayUnits = units.map((unit) => ({
+          ...unit,
+          checked: unitIds.includes(unit.unit_id || unit.id),
+        }));
+        this._log("設定單元勾選狀態:", {
+          total: units.length,
+          preselected: unitIds.length,
+          unitIds,
+        });
+      } else {
+        displayUnits = units.map((unit) => ({
+          ...unit,
+          checked: false,
+        }));
+      }
+
+      const html = `
+      <div class="experiment-panel-units">
+        ${
+          config.showHeader
+            ? `
+          <div class="units-header">
+            <span>${config.headerTitle}</span>
+            ${
+              config.showSelectAll
+                ? `
+              <label class="select-all-checkbox">
+                <input type="checkbox" id="selectAllUnits" checked>
+                <span>全選</span>
+              </label>
+            `
+                : ""
+            }
+          </div>
+        `
+            : ""
+        }
+        <div class="units-list-container">
+          <ul class="experiment-units-list">
+            ${
+              config.showPowerOptions && config.includeStartup
+                ? `
+              <li class="power-option-card startup-card">
+                <label class="unit-checkbox">
+                  <input type="checkbox" id="includeStartup" checked>
+                </label>
+                <div class="unit-sort">
+                  <div class="power-option-title">機器開機</div>
+                  <div class="power-option-subtitle">POWER_ON • 開始實驗前先開機</div>
+                </div>
+              </li>
+            `
+                : ""
+            }
+            ${displayUnits
+              .map(
+                (unit, index) => `
+              <li data-unit-id="${unit.unit_id || unit.id}">
+                <label class="unit-checkbox">
+                  <input type="checkbox" name="unitCheckbox" value="${unit.unit_id || unit.id}" ${unit.checked !== false ? "checked" : ""}>
+                </label>
+                <div class="unit-sort">
+                  <div class="unit-info-title">${unit.unit_name || unit.title || unit.name || "未命名單元"}</div>
+                  <div class="unit-info-subtitle">${unit.unit_id || unit.id} • ${unit.stepCount || unit.steps?.length || 0} 步驟</div>
+                </div>
+                ${
+                  config.enableSorting
+                    ? `
+                  <div class="unit-controls">
+                    <button class="unit-sort-btn unit-up-btn ${index === 0 ? "disabled" : ""}"
+                            title="上移" ${index === 0 ? "disabled" : ""}>▲</button>
+                    <button class="unit-sort-btn unit-down-btn ${index === displayUnits.length - 1 ? "disabled" : ""}"
+                            title="下移" ${index === displayUnits.length - 1 ? "disabled" : ""}>▼</button>
+                    <span class="unit-drag-handle" title="拖曳排序">⋮⋮</span>
+                  </div>
+                `
+                    : ""
+                }
+              </li>
+            `,
+              )
+              .join("")}
+            ${
+              config.showPowerOptions && config.includeShutdown
+                ? `
+              <li class="power-option-card shutdown-card">
+                <label class="unit-checkbox">
+                  <input type="checkbox" id="includeShutdown" checked>
+                </label>
+                <div class="unit-sort">
+                  <div class="power-option-title">機器關機</div>
+                  <div class="power-option-subtitle">POWER_OFF • 完成關機才結束實驗</div>
+                </div>
+              </li>
+            `
+                : ""
+            }
+          </ul>
+        </div>
+      </div>
+    `;
+
+      containerEl.innerHTML = html;
+
+      // 綁定全選事件
+      if (config.showSelectAll) {
+        const selectAllCheckbox = containerEl.querySelector("#selectAllUnits");
+        if (selectAllCheckbox) {
+          selectAllCheckbox.addEventListener("change", (e) => {
+            const checkboxes = containerEl.querySelectorAll(
+              'input[name="unitCheckbox"]',
+            );
+            checkboxes.forEach((cb) => (cb.checked = e.target.checked));
+            if (config.onUnitToggle) {
+              config.onUnitToggle({
+                type: "select-all",
+                checked: e.target.checked,
+              });
+            }
+          });
+        }
+      }
+
+      // 綁定單元切換事件
+      if (config.onUnitToggle) {
+        const checkboxes = containerEl.querySelectorAll(
+          'input[name="unitCheckbox"]',
+        );
+        checkboxes.forEach((checkbox) => {
+          checkbox.addEventListener("change", (e) => {
+            config.onUnitToggle({
+              type: "unit",
+              unitId: e.target.value,
+              checked: e.target.checked,
+            });
+          });
+        });
+      }
+
+      // 綁定排序按鈕事件
+      if (config.enableSorting && config.onReorder) {
+        const upButtons = containerEl.querySelectorAll(".unit-up-btn");
+        const downButtons = containerEl.querySelectorAll(".unit-down-btn");
+
+        upButtons.forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const li = e.target.closest("li");
+            const unitId = li.dataset.unitId;
+            // 交換順序
+            const unitList = containerEl.querySelector(
+              ".experiment-units-list",
+            );
+            const items = Array.from(
+              unitList.querySelectorAll("li[data-unit-id]"),
+            );
+            const currentIndex = items.findIndex(
+              (item) => item.dataset.unitId === unitId,
+            );
+            if (currentIndex > 0) {
+              // 交換 DOM
+              const temp = items[currentIndex];
+              items[currentIndex - 1].parentNode.insertBefore(
+                temp,
+                items[currentIndex - 1],
+              );
+              // 重新更新按鈕狀態
+              this._updateSortButtonStates(containerEl);
+              // 回調
+              config.onReorder({ unitId, direction: "up" });
+            }
+          });
+        });
+
+        downButtons.forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const li = e.target.closest("li");
+            const unitId = li.dataset.unitId;
+            // 交換順序
+            const unitList = containerEl.querySelector(
+              ".experiment-units-list",
+            );
+            const items = Array.from(
+              unitList.querySelectorAll("li[data-unit-id]"),
+            );
+            const currentIndex = items.findIndex(
+              (item) => item.dataset.unitId === unitId,
+            );
+            if (currentIndex < items.length - 1) {
+              // 交換 DOM
+              const nextItem = items[currentIndex + 1];
+              li.parentNode.insertBefore(nextItem, li);
+              // 重新更新按鈕狀態
+              this._updateSortButtonStates(containerEl);
+              // 回調
+              config.onReorder({ unitId, direction: "down" });
+            }
+          });
+        });
+      }
+
+      // 綁定拖曳事件
+      if (config.enableSorting) {
+        this._setupUnitDragAndDrop(containerEl, config);
+      }
+
+      this._log("單元面板已渲染", { count: displayUnits.length });
+      return containerEl;
+    };
+
+    const panelAncestor = containerEl.closest(".experiment-panel");
+    if (
+      panelAncestor &&
+      window.getComputedStyle(panelAncestor).display === "none"
+    ) {
+      const mo = new MutationObserver((mutations, obs) => {
+        if (window.getComputedStyle(panelAncestor).display !== "none") {
+          obs.disconnect();
+          renderNow();
+        }
+      });
+      mo.observe(panelAncestor, {
+        attributes: true,
+        attributeFilter: ["style", "class"],
+      });
+      return containerEl;
+    }
+
+    return renderNow();
+  }
+
+  /**
+   * 設定單元拖曳功能（使用原始的 mousemove + touchmove 方式）
+   * @private
+   */
+  _setupUnitDragAndDrop(containerEl, config) {
+    const unitList = containerEl.querySelector(".experiment-units-list");
+    if (!unitList) return;
+
+    let draggedLi = null;
+    let placeholder = null;
+
+    // 只對普通單元項目啟用拖曳，排除電源卡片
+    const handles = unitList.querySelectorAll(
+      "li:not(.power-option-card) .unit-drag-handle",
+    );
+
+    handles.forEach((handle) => {
+      handle.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        startDrag(handle, e.clientX, e.clientY);
+      });
+      handle.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        startDrag(handle, touch.clientX, touch.clientY);
+      });
+    });
+
+    const startDrag = (handle, startX, startY) => {
+      draggedLi = handle.closest("li");
+      if (!draggedLi) return;
+
+      placeholder = document.createElement("li");
+      placeholder.className = "drag-placeholder";
+      placeholder.style.height = `${draggedLi.offsetHeight}px`;
+
+      const originalStyle = draggedLi.style.cssText;
+      draggedLi.classList.add("dragging");
+      draggedLi.style.position = "fixed";
+      draggedLi.style.zIndex = "1000";
+      draggedLi.style.pointerEvents = "none";
+      draggedLi.style.width = `${draggedLi.offsetWidth}px`;
+      draggedLi.style.left = `${startX - draggedLi.offsetWidth / 2}px`;
+      draggedLi.style.top = `${startY - draggedLi.offsetHeight / 2}px`;
+      draggedLi.setAttribute("data-original-style", originalStyle);
+      draggedLi.parentNode.insertBefore(placeholder, draggedLi.nextSibling);
+      handle.classList.add("dragging-handle");
+
+      document.addEventListener("mousemove", onMouseDrag);
+      document.addEventListener("mouseup", onMouseDrop);
+      document.addEventListener("touchmove", onTouchDrag, { passive: false });
+      document.addEventListener("touchend", onTouchDrop);
+    };
+
+    const onMouseDrag = (e) => {
+      if (!draggedLi) return;
+      updateDragPosition(e.clientX, e.clientY);
+    };
+
+    const onTouchDrag = (e) => {
+      if (!draggedLi) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      updateDragPosition(touch.clientX, touch.clientY);
+    };
+
+    const updateDragPosition = (clientX, clientY) => {
+      draggedLi.style.left = `${clientX - draggedLi.offsetWidth / 2}px`;
+      draggedLi.style.top = `${clientY - draggedLi.offsetHeight / 2}px`;
+
+      // 只在普通單元項目之間進行排序，排除電源卡片
+      const items = Array.from(unitList.children).filter(
+        (item) => !item.classList.contains("power-option-card"),
+      );
+      let insertBefore = null;
+
+      for (let item of items) {
+        if (item === draggedLi || item === placeholder) continue;
+        const rect = item.getBoundingClientRect();
+        const itemCenterY = rect.top + rect.height / 2;
+        if (clientY < itemCenterY) {
+          insertBefore = item;
+          break;
+        }
+      }
+
+      // 確保插入位置在開機卡片之後，關機卡片之前
+      const startupCard = unitList.querySelector(".startup-card");
+      const shutdownCard = unitList.querySelector(".shutdown-card");
+
+      if (insertBefore) {
+        // 如果插入位置是開機卡片之前，則插入到開機卡片之後
+        if (insertBefore === startupCard) {
+          unitList.insertBefore(placeholder, startupCard.nextSibling);
+        } else {
+          unitList.insertBefore(placeholder, insertBefore);
+        }
+      } else {
+        // 如果沒有找到插入位置，插入到關機卡片之前
+        if (shutdownCard) {
+          unitList.insertBefore(placeholder, shutdownCard);
+        } else {
+          unitList.appendChild(placeholder);
+        }
+      }
+    };
+
+    const onMouseDrop = () => {
+      endDrag();
+    };
+
+    const onTouchDrop = () => {
+      endDrag();
+    };
+
+    const endDrag = () => {
+      if (!draggedLi || !placeholder) return;
+
+      document.removeEventListener("mousemove", onMouseDrag);
+      document.removeEventListener("mouseup", onMouseDrop);
+      document.removeEventListener("touchmove", onTouchDrag);
+      document.removeEventListener("touchend", onTouchDrop);
+
+      draggedLi.classList.remove("dragging");
+      const originalStyle = draggedLi.getAttribute("data-original-style") || "";
+      draggedLi.style.cssText = originalStyle;
+      draggedLi.removeAttribute("data-original-style");
+
+      placeholder.parentNode.insertBefore(draggedLi, placeholder);
+      placeholder.remove();
+
+      const handle = draggedLi.querySelector(".unit-drag-handle");
+      if (handle) handle.classList.remove("dragging-handle");
+
+      // 重新更新按鈕狀態
+      this._updateSortButtonStates(containerEl);
+
+      // 執行回調
+      if (config.onReorder) {
+        const allItems = Array.from(
+          unitList.querySelectorAll("li[data-unit-id]"),
+        );
+        const newIndex = allItems.indexOf(draggedLi);
+        config.onReorder({
+          unitId: draggedLi.dataset.unitId,
+          newIndex: newIndex,
+        });
+      }
+
+      draggedLi = null;
+      placeholder = null;
+    };
+
+    this._log("單元拖曳功能已啟用");
+  }
+
+  /**
+   * 更新排序按鈕狀態
+   * @private
+   */
+  _updateSortButtonStates(containerEl) {
+    const unitList = containerEl.querySelector(".experiment-units-list");
+    if (!unitList) return;
+
+    const items = Array.from(unitList.querySelectorAll("li[data-unit-id]"));
+
+    items.forEach((item, index) => {
+      const upBtn = item.querySelector(".unit-up-btn");
+      const downBtn = item.querySelector(".unit-down-btn");
+
+      if (upBtn) {
+        if (index === 0) {
+          upBtn.classList.add("disabled");
+          upBtn.disabled = true;
+        } else {
+          upBtn.classList.remove("disabled");
+          upBtn.disabled = false;
+        }
+      }
+
+      if (downBtn) {
+        if (index === items.length - 1) {
+          downBtn.classList.add("disabled");
+          downBtn.disabled = true;
+        } else {
+          downBtn.classList.remove("disabled");
+          downBtn.disabled = false;
+        }
+      }
+    });
+  }
+
+  /**
+   * 渲染實驗控制面板
+   * @param {HTMLElement|string} container - 容器元素或選擇器
+   * @param {Object} options - 可選配置
+   * @returns {HTMLElement} 渲染後的容器元素
+   */
+  renderExperimentControls(container, options = {}) {
+    const containerEl =
+      typeof container === "string"
+        ? document.querySelector(container)
+        : container;
+    if (!containerEl) {
+      this._error("找不到容器元素:", container);
+      return null;
+    }
+
+    const renderNow = () => {
+      const config = {
+        showExperimentId: options.showExperimentId !== false,
+        showParticipantName: options.showParticipantName !== false,
+        showTimer: options.showTimer !== false,
+        experimentId: options.experimentId || "",
+        participantName: options.participantName || "",
+        onStart: options.onStart || null,
+        onPause: options.onPause || null,
+        onStop: options.onStop || null,
+        onRegenerateId: options.onRegenerateId || null,
+        ...options,
+      };
+
+      const html = `
+      <div class="experiment-panel-actions" id="experimentPanelActions">
+        <div class="input-section">
+          ${
+            config.showExperimentId
+              ? `
+            <div class="form-group">
+              <label for="experimentIdInput">實驗ID:</label>
+              <div class="experiment-id-group">
+                <input type="text" id="experimentIdInput" class="form-input"
+                       maxlength="10" placeholder="載入中..." value="${config.experimentId}">
+                <button id="regenerateIdButton" class="btn-secondary" title="重新產生實驗ID">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                       stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                    <path d="M21 3v5h-5"></path>
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                    <path d="M3 21v-5h5"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          `
+              : ""
+          }
+
+          ${
+            config.showParticipantName
+              ? `
+            <div class="form-group">
+              <label for="participantNameInput">受試者名稱:</label>
+              <input type="text" id="participantNameInput" class="form-input"
+                     placeholder="受試者名稱" value="${config.participantName}">
+            </div>
+          `
+              : ""
+          }
+
+          <div class="form-group experiment-control-group">
+            <div class="experiment-control-header">
+              <label>實驗控制</label>
+              ${config.showTimer ? '<div id="experimentTimer" class="experiment-timer">00:00.000</div>' : ""}
+            </div>
+
+            <div id="experimentIdRow" class="experiment-start-row">
+              <button id="startExperimentBtn" class="experiment-start-btn btn-success">
+                ▶ 開始實驗
+              </button>
+            </div>
+
+            <div id="experimentControlButtons" class="experiment-control-buttons is-hidden">
+              <button id="pauseExperimentBtn" class="experiment-pause-btn btn-primary">
+                ⏸ 暫停
+              </button>
+              <button id="stopExperimentBtn" class="experiment-stop-btn btn-danger">
+                ⏹ 停止
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+      containerEl.innerHTML = html;
+
+      // 綁定事件
+      if (config.onStart) {
+        const startBtn = containerEl.querySelector("#startExperimentBtn");
+        if (startBtn) {
+          startBtn.addEventListener("click", () => {
+            // 隱藏開始按鈕，顯示控制按鈕
+            const startRow = containerEl.querySelector("#experimentIdRow");
+            const controlBtns = containerEl.querySelector(
+              "#experimentControlButtons",
+            );
+            if (startRow) {
+              this.hideElement(startRow);
+            }
+            if (controlBtns) {
+              this.showElement(controlBtns, "flex");
+            }
+
+            // 啟動計時器
+            if (config.showTimer) {
+              this.startExperimentTimer(
+                containerEl.querySelector("#experimentTimer"),
+              );
+            }
+
+            // 執行回調
+            config.onStart();
+          });
+        }
+      }
+
+      if (config.onPause) {
+        const pauseBtn = containerEl.querySelector("#pauseExperimentBtn");
+        if (pauseBtn) {
+          // 使用 data 屬性儲存暫停狀態，避免閉包問題
+          pauseBtn.dataset.isPaused = "false";
+
+          pauseBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const isPaused = pauseBtn.dataset.isPaused === "true";
+
+            if (!isPaused) {
+              // 切換到暫停狀態
+              if (this.pauseExperimentTimer()) {
+                pauseBtn.textContent = "⏯ 繼續";
+                pauseBtn.classList.remove("btn-primary");
+                pauseBtn.classList.add("btn-secondary");
+                pauseBtn.dataset.isPaused = "true";
+                if (config.onPause) {
+                  config.onPause();
+                }
+                this._log("暫停按鈕已切換到繼續狀態");
+              }
+            } else {
+              // 切換到繼續狀態
+              if (this.resumeExperimentTimer()) {
+                pauseBtn.textContent = "⏸ 暫停";
+                pauseBtn.classList.remove("btn-secondary");
+                pauseBtn.classList.add("btn-primary");
+                pauseBtn.dataset.isPaused = "false";
+                if (config.onResume) {
+                  config.onResume();
+                }
+                this._log("暫停按鈕已切換到暫停狀態");
+              }
+            }
+          });
+        }
+      }
+
+      if (config.onStop) {
+        const stopBtn = containerEl.querySelector("#stopExperimentBtn");
+        if (stopBtn) {
+          stopBtn.addEventListener("click", () => {
+            // 停止計時器
+            this.stopExperimentTimer();
+
+            // 重置暫停按鈕狀態
+            const pauseBtn = containerEl.querySelector("#pauseExperimentBtn");
+            if (pauseBtn) {
+              pauseBtn.textContent = "⏸ 暫停";
+              pauseBtn.classList.remove("btn-secondary");
+              pauseBtn.classList.add("btn-primary");
+              pauseBtn.dataset.isPaused = "false";
+            }
+
+            // 重置按鈕狀態
+            const startRow = containerEl.querySelector("#experimentIdRow");
+            const controlBtns = containerEl.querySelector(
+              "#experimentControlButtons",
+            );
+            if (startRow) {
+              this.showElement(startRow, "flex");
+            }
+            if (controlBtns) {
+              this.hideElement(controlBtns);
+            }
+
+            // 重置計時器顯示
+            if (config.showTimer) {
+              const timerEl = containerEl.querySelector("#experimentTimer");
+              if (timerEl) timerEl.textContent = "00:00.000";
+            }
+
+            // 執行回調
+            config.onStop();
+          });
+        }
+      }
+
+      if (config.onRegenerateId) {
+        const regenBtn = containerEl.querySelector("#regenerateIdButton");
+        if (regenBtn) {
+          regenBtn.addEventListener("click", config.onRegenerateId);
+        }
+      }
+
+      this._log("實驗控制面板已渲染");
+      return containerEl;
+    };
+
+    const panelAncestor = containerEl.closest(".experiment-panel");
+    if (
+      panelAncestor &&
+      window.getComputedStyle(panelAncestor).display === "none"
+    ) {
+      const mo = new MutationObserver((mutations, obs) => {
+        if (window.getComputedStyle(panelAncestor).display !== "none") {
+          obs.disconnect();
+          renderNow();
+        }
+      });
+      mo.observe(panelAncestor, {
+        attributes: true,
+        attributeFilter: ["style", "class"],
+      });
+      return containerEl;
+    }
+
+    return renderNow();
+  }
+
+  /**
+   * 計時器狀態（內部）
+   * @private
+   */
+  _timerState = {
+    running: false,
+    paused: false,
+    startTime: 0,
+    pausedTime: 0,
+    totalPausedDuration: 0,
+    intervalId: null,
+    timerElement: null,
+  };
+
+  /**
+   * 啟動實驗計時器
+   * @param {HTMLElement} timerElement - 計時器顯示元素
+   */
+  startExperimentTimer(timerElement) {
+    if (!timerElement) {
+      this._warn("計時器元素不存在");
+      return;
+    }
+
+    // 避免重複啟動
+    if (this._timerState.running) {
+      this._warn("計時器已在執行中");
+      return;
+    }
+
+    this._timerState.running = true;
+    this._timerState.paused = false;
+    this._timerState.startTime = Date.now();
+    this._timerState.totalPausedDuration = 0;
+    this._timerState.timerElement = timerElement;
+
+    // 每 10ms 更新一次（毫秒級精度）
+    this._timerState.intervalId = setInterval(() => {
+      const now = Date.now();
+      const elapsed =
+        now - this._timerState.startTime - this._timerState.totalPausedDuration;
+
+      const minutes = Math.floor(elapsed / 60000);
+      const seconds = Math.floor((elapsed % 60000) / 1000);
+      const milliseconds = Math.floor(elapsed % 1000);
+
+      const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${milliseconds.toString().padStart(3, "0")}`;
+      timerElement.textContent = timeStr;
+    }, 10);
+
+    this._log("實驗計時器已啟動");
+  }
+
+  /**
+   * 暫停實驗計時器
+   * @returns {boolean} 是否成功暫停
+   */
+  pauseExperimentTimer() {
+    if (!this._timerState.running) {
+      this._warn("計時器未在執行中");
+      return false;
+    }
+
+    if (this._timerState.paused) {
+      this._warn("計時器已處於暫停狀態");
+      return false;
+    }
+
+    this._timerState.paused = true;
+    this._timerState.pausedTime = Date.now();
+
+    if (this._timerState.intervalId) {
+      clearInterval(this._timerState.intervalId);
+      this._timerState.intervalId = null;
+    }
+
+    this._log("實驗計時器已暫停");
+    return true;
+  }
+
+  /**
+   * 恢復實驗計時器
+   * @returns {boolean} 是否成功恢復
+   */
+  resumeExperimentTimer() {
+    if (!this._timerState.running) {
+      this._warn("計時器未在執行中");
+      return false;
+    }
+
+    if (!this._timerState.paused) {
+      this._warn("計時器未在暫停狀態");
+      return false;
+    }
+
+    const pauseDuration = Date.now() - this._timerState.pausedTime;
+    this._timerState.totalPausedDuration += pauseDuration;
+    this._timerState.paused = false;
+
+    this._timerState.intervalId = setInterval(() => {
+      const now = Date.now();
+      const elapsed =
+        now - this._timerState.startTime - this._timerState.totalPausedDuration;
+
+      const minutes = Math.floor(elapsed / 60000);
+      const seconds = Math.floor((elapsed % 60000) / 1000);
+      const milliseconds = Math.floor(elapsed % 1000);
+
+      const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${milliseconds.toString().padStart(3, "0")}`;
+      if (this._timerState.timerElement) {
+        this._timerState.timerElement.textContent = timeStr;
+      }
+    }, 10);
+
+    this._log("實驗計時器已恢復");
+    return true;
+  }
+
+  /**
+   * 停止實驗計時器
+   */
+  stopExperimentTimer() {
+    if (!this._timerState.running) {
+      this._warn("計時器未在執行中");
+      return;
+    }
+
+    if (this._timerState.intervalId) {
+      clearInterval(this._timerState.intervalId);
+      this._timerState.intervalId = null;
+    }
+
+    this._timerState.running = false;
+    this._timerState.paused = false;
+    this._timerState.startTime = 0;
+    this._timerState.pausedTime = 0;
+    this._timerState.totalPausedDuration = 0;
+
+    this._log("實驗計時器已停止");
+  }
+
+  /**
+   * 取得計時器目前時間（毫秒）
+   * @returns {number} 經過的毫秒數
+   */
+  getElapsedTime() {
+    if (!this._timerState.running) {
+      return 0;
+    }
+
+    const now = Date.now();
+    let elapsed =
+      now - this._timerState.startTime - this._timerState.totalPausedDuration;
+
+    if (this._timerState.paused) {
+      elapsed =
+        this._timerState.pausedTime -
+        this._timerState.startTime -
+        this._timerState.totalPausedDuration;
+    }
+
+    return Math.max(0, elapsed);
+  }
+
+  /**
+   * 渲染實驗日誌面板（Board 專用）
+   * @param {HTMLElement|string} container - 容器元素或選擇器
+   * @param {Object} options - 可選配置
+   * @returns {HTMLElement} 渲染後的容器元素
+   */
+  renderExperimentLog(container, options = {}) {
+    const containerEl =
+      typeof container === "string"
+        ? document.querySelector(container)
+        : container;
+    if (!containerEl) {
+      this._error("找不到容器元素:", container);
+      return null;
+    }
+
+    const config = {
+      showDownloadButton: options.showDownloadButton !== false,
+      title: options.title || "實驗日誌",
+      emptyMessage: options.emptyMessage || "等待實驗開始...",
+      onDownload: options.onDownload || null,
+      ...options,
+    };
+
+    const html = `
+      <div class="form-group experiment-log-panel">
+        <div class="log-header">
+          <label>${config.title}</label>
+          ${
+            config.showDownloadButton
+              ? `
+            <span id="logDownloadBtns" class="log-download-buttons">
+              <button class="btn-secondary" id="downloadLogBtn">下載 JSONL</button>
+            </span>
+          `
+              : ""
+          }
+        </div>
+        <div id="experimentLogDisplay" class="log-display">
+          <div class="log-display-empty">${config.emptyMessage}</div>
+        </div>
+      </div>
+    `;
+
+    containerEl.innerHTML = html;
+
+    // 綁定下載事件
+    if (config.showDownloadButton && config.onDownload) {
+      const downloadBtn = containerEl.querySelector("#downloadLogBtn");
+      if (downloadBtn) {
+        downloadBtn.addEventListener("click", config.onDownload);
+      }
+    }
+
+    this._log("實驗日誌面板已渲染");
+    return containerEl;
+  }
+
+  /**
+   * 初始化 Panel 頁面的 UI 組件
+   * 只渲染系統管理器未處理的組件（如實驗日誌）
+   */
+  async initializePanelUI() {
+    try {
+      // 防止重複初始化
+      if (this.state.panelUIInitialized) {
+        this._log("Panel UI 已經初始化，跳過重複初始化");
+        return;
+      }
+
+      this._log("開始初始化 Panel UI 組件");
+
+      // 注意：組合選擇器、單元面板和實驗控制由 ExperimentSystemManager.initializeUI() 處理
+      // 此處只處理額外的UI組件，如實驗日誌面板
+
+      // 渲染實驗日誌面板（如果容器存在）
+      const experimentLogContainer = document.getElementById(
+        "experimentLogContainer",
+      );
+      if (experimentLogContainer) {
+        this.renderExperimentLog("#experimentLogContainer", {
+          showDownloadButton: true,
+          onDownload: () => {
+            this._handleExperimentLogDownload();
+          },
+        });
+      }
+
+      this._log("Panel UI 組件初始化完成");
+
+      // 標記為已初始化
+      this.state.panelUIInitialized = true;
+    } catch (error) {
+      this._error("初始化 Panel UI 失敗:", error);
+    }
+  }
+
+  /**
+   * 載入場景數據
+   * @private
+   */
+  async _loadScenariosData() {
+    try {
+      const response = await fetch("data/scenarios.json");
+      if (!response.ok) throw new Error("Failed to load scenarios.json");
+      return await response.json();
+    } catch (error) {
+      this._error("載入 scenarios.json 失敗:", error);
+      return null;
+    }
+  }
+
+  /**
+   * 準備單元數據
+   * @private
+   */
+  _prepareUnitsData(scriptData) {
+    if (!scriptData.sections) return [];
+
+    const units = [];
+    scriptData.sections.forEach((section) => {
+      if (section.units && Array.isArray(section.units)) {
+        section.units.forEach((unit) => {
+          units.push({
+            id: unit.unit_id,
+            title: unit.unit_name,
+            stepCount: unit.steps ? unit.steps.length : 0,
+            checked: true, // 預設全選
+          });
+        });
+      }
+    });
+
+    return units;
+  }
+
+  /**
+   * 處理組合選擇
+   * @private
+   */
+  _handleCombinationSelect(combinationId) {
+    this._log("選擇組合:", combinationId);
+
+    if (window.experimentCombinationManager) {
+      const combination =
+        window.experimentCombinationManager.getCombinationById(combinationId);
+      if (combination) {
+        const experimentId =
+          window.experimentHubManager?.getExperimentId?.() || null;
+        window.experimentCombinationManager.setCombination(
+          combination,
+          experimentId,
+        );
+      } else {
+        this._error("找不到組合:", combinationId);
+      }
+    } else {
+      this._error("experimentCombinationManager 不可用");
+    }
+  }
+
+  /**
+   * 處理單元切換
+   * @private
+   */
+  _handleUnitToggle(unitId, checked) {
+    this._log("單元切換:", unitId, checked);
+    // TODO: 實現單元切換邏輯
+  }
+
+  /**
+   * 處理單元重新排序
+   * @private
+   */
+  _handleUnitReorder(newOrder) {
+    this._log("單元重新排序:", newOrder);
+    // TODO: 實現單元排序邏輯
+  }
+
+  /**
+   * 處理實驗開始
+   * @private
+   */
+  _handleExperimentStart() {
+    this._log("開始實驗");
+
+    // 關閉所有面板（實驗、日誌、設定）
+    if (window.panelUIManager) {
+      window.panelUIManager.closePanel("experiment");
+      window.panelUIManager.closePanel("logger");
+      window.panelUIManager.closePanel("settings");
+      this._log("實驗開始：已關閉所有面板");
+    }
+
+    // 如果視覺提示已啟用，確保高亮顯示
+    if (this.isVisualHintsEnabled()) {
+      this.updateHighlightVisibility();
+      this._log("實驗開始：視覺提示已啟用並更新高亮");
+    }
+  }
+
+  /**
+   * 處理實驗暫停
+   * @private
+   */
+  _handleExperimentPause() {
+    this._log("暫停/繼續實驗");
+    // TODO: 實現暫停邏輯
+  }
+
+  /**
+   * 處理實驗停止
+   * @private
+   */
+  _handleExperimentStop() {
+    this._log("停止實驗");
+    // TODO: 實現停止邏輯
+  }
+
+  /**
+   * 處理重新產生ID
+   * @private
+   */
+  async _handleRegenerateId() {
+    this._log("重新產生實驗ID");
+
+    try {
+      // 檢查是否在同步模式，並選擇適當的產生方法
+      const hubManager = window.experimentHubManager;
+      let newId;
+      // 即使 hubManager 不存在，也允許在本機產生 ID（離線模式）
+      if (hubManager && hubManager.isInSyncMode && hubManager.isInSyncMode()) {
+        // 同步模式：使用中樞註冊邏輯
+        this._log("同步模式：產生新ID並註冊到中樞");
+        newId = await this._generateExperimentIdWithHub();
+      } else {
+        // 獨立模式：直接產生新ID
+        this._log("獨立/離線模式：直接產生新ID");
+        newId = this._generateExperimentId();
+      }
+
+      // 檢查產生的ID是否有效
+      if (!newId || typeof newId !== "string" || newId.trim().length === 0) {
+        this._error("重新產生實驗ID失敗：產生的ID無效或為空", {
+          generatedId: newId,
+        });
+        return;
+      }
+
+      this._log("已成功重新產生實驗ID:", newId);
+
+      // 更新UI中的輸入框
+      const idInput = document.querySelector("#experimentIdInput");
+      if (idInput) {
+        idInput.value = newId;
+        this._log("已更新UI中的實驗ID輸入框為:", newId);
+      } else {
+        this._warn("找不到實驗ID輸入框元素");
+      }
+
+      // 廣播ID更新到其他連線裝置
+      this._broadcastExperimentIdUpdate(newId);
+
+      // 觸發組合管理器的同步（如果需要）
+      if (window.experimentCombinationManager) {
+        // 通知組合管理器實驗ID已更改，可能需要重新同步
+        window.experimentCombinationManager.handleExperimentIdChanged(newId);
+      }
+    } catch (error) {
+      this._error("重新產生實驗ID失敗:", error);
+    }
+  }
+
+  /**
+   * 產生新的實驗ID（獨立模式）
+   * @private
+   * @returns {string} 新產生的實驗ID
+   */
+  _generateExperimentId() {
+    // 優先使用 ExperimentHubManager（若存在），否則使用 RandomUtils 或內建後備方法
+    if (
+      window.experimentHubManager &&
+      typeof window.experimentHubManager.generateExperimentId === "function"
+    ) {
+      return window.experimentHubManager.generateExperimentId();
+    }
+
+    if (
+      window.RandomUtils &&
+      typeof window.RandomUtils.generateExperimentId === "function"
+    ) {
+      return window.RandomUtils.generateExperimentId();
+    }
+
+    // 後備簡單產生器（6 位大寫英數）
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "";
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  /**
+   * 產生新的實驗ID並在同步模式下註冊到中樞
+   * @private
+   * @returns {Promise<string>} 新產生的實驗ID
+   */
+  async _generateExperimentIdWithHub() {
+    try {
+      this._log("產生新的實驗ID...");
+
+      // 產生新的實驗ID
+      const newId = this._generateExperimentId();
+
+      // 檢查是否在同步模式
+      const hubManager = window.experimentHubManager;
+      if (hubManager?.isInSyncMode?.()) {
+        this._log(`同步模式: 註冊新ID到中樞: ${newId}`);
+        // 在同步模式下，experimentHubManager.generateExperimentId() 應該已經處理了註冊
+      } else {
+        this._log(`獨立模式: 新ID僅存本機: ${newId}`);
+      }
+
+      return newId;
+    } catch (error) {
+      this._error("產生新實驗ID失敗:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 廣播實驗ID更新到其他連線裝置
+   * @private
+   * @param {string} experimentId - 新的實驗ID
+   */
+  _broadcastExperimentIdUpdate(experimentId) {
+    // 檢查是否存在同步工作階段
+    if (!window.syncManager?.core?.isConnected?.()) {
+      return;
+    }
+
+    const updateData = {
+      type: "experimentIdUpdate",
+      client_id:
+        window.syncManager?.core?.syncClient?.clientId || "experiment_panel",
+      experimentId: experimentId,
+      timestamp: new Date().toISOString(),
+    };
+
+    // 使用統一的同步機制
+    window.syncManager.core.syncState(updateData).catch((error) => {
+      this._warn("廣播實驗ID更新失敗:", error);
+    });
+
+    // 分派事件供本機同步管理器捕獲
+    document.dispatchEvent(
+      new CustomEvent("experimentStateChange", {
+        detail: updateData,
+      }),
+    );
+
+    this._log("已廣播實驗ID更新:", experimentId);
+  }
+
+  /**
+   * 處理實驗日誌下載
+   * @private
+   */
+  _handleExperimentLogDownload() {
+    this._log("下載實驗日誌");
+    // TODO: 實現日誌下載邏輯
+  }
+
+  /**
+   * 更新實驗日誌顯示
+   * @param {Array} logs - 日誌項目陣列
+   */
+  updateExperimentLog(logs) {
+    const logDisplay = document.querySelector("#experimentLogDisplay");
+    if (!logDisplay) {
+      this._warn("找不到日誌顯示區域");
+      return;
+    }
+
+    if (!logs || logs.length === 0) {
+      logDisplay.innerHTML =
+        '<div class="log-display-empty">等待實驗開始...</div>';
+      return;
+    }
+
+    const html = logs
+      .map(
+        (log) => `
+      <div class="log-entry" data-log-id="${log.id || ""}">
+        <div class="log-timestamp">${log.timestamp || ""}</div>
+        <div class="log-content">${log.message || log.action || ""}</div>
+        ${log.details ? `<div class="log-details">${JSON.stringify(log.details)}</div>` : ""}
+      </div>
+    `,
+      )
+      .join("");
+
+    logDisplay.innerHTML = html;
+    // 自動捲動到底部
+    logDisplay.scrollTop = logDisplay.scrollHeight;
+
+    this._log("實驗日誌已更新", { count: logs.length });
   }
 }
 

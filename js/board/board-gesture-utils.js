@@ -248,10 +248,6 @@ const goToNextStep = function (idx, gestureName) {
 // 暴露到 window 供 HTML 使用
 window.goToNextStep = goToNextStep;
 
-// ============ ES6 模組匯出 ============
-export { markGesture, goToNextStep };
-
-
-
-
-
+// ============ 全局作用域匯出 ============
+window.markGesture = markGesture;
+window.goToNextStep = goToNextStep;

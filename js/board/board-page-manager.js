@@ -1,23 +1,110 @@
 /**
  * BoardPageManager - 實驗頁面管理器
  *
- * 專門用於 board.html 頁面
+ * 專門用於 board.html 頁面，負責載入所有必要的腳本、
+ * 初始化各個管理器模組，並協調頁面各組件間的互動。
  */
-
-import { getExperimentHubManager } from "../sync/experiment-hub-manager.js";
-
-import { loadUnitsFromScenarios } from "../core/data-loader.js";
 
 class BoardPageManager {
   constructor() {
-    // 先載入依賴腳本，然後初始化
-    this.loadDependencies()
-      .then(() => {
-        this.initializeComponents();
-      })
-      .catch((error) => {
-        console.error("載入實驗頁面依賴失敗:", error);
+    // 初始化階段狀態
+    this.initStages = {
+      SCRIPTS_LOADING: "scripts_loading",
+      MODULES_INIT: "modules_init",
+      COMPONENTS_INIT: "components_init",
+      COMPLETE: "complete",
+    };
+
+    this.currentStage = null;
+    this.stageStartTime = null;
+
+    // 開始初始化
+    this.initialize();
+  }
+
+  /**
+   * 開始新的初始化階段
+   * @param {string} stage - 階段名稱
+   */
+  startStage(stage) {
+    this.currentStage = stage;
+    this.stageStartTime = performance.now();
+    Logger.debug(`開始階段: ${stage}`);
+  }
+
+  /**
+   * 結束當前初始化階段
+   */
+  endStage() {
+    if (this.currentStage && this.stageStartTime) {
+      const duration = performance.now() - this.stageStartTime;
+      Logger.debug(
+        `階段 ${this.currentStage} 完成 (<orange>${duration.toFixed(0)} ms</orange>)`,
+      );
+    }
+    this.currentStage = null;
+    this.stageStartTime = null;
+  }
+
+  /**
+   * 初始化 Board 頁面（載入腳本並初始化模組）
+   */
+  async initialize() {
+    const startTime = performance.now();
+    try {
+      Logger.debug("BoardPageManager 開始初始化");
+
+      // 階段 1：載入腳本
+      this.startStage(this.initStages.SCRIPTS_LOADING);
+      await this.loadAllScripts();
+      this.endStage();
+
+      // 階段 2：初始化模組
+      this.startStage(this.initStages.MODULES_INIT);
+      await this.initializeModules();
+      this.endStage();
+
+      // 階段 3：初始化其他組件
+      this.startStage(this.initStages.COMPONENTS_INIT);
+      await this.initializeOtherComponents();
+      this.endStage();
+
+      // 完成
+      this.currentStage = this.initStages.COMPLETE;
+      Logger.debug(
+        `BoardPageManager 初始化完成 (<orange>${(performance.now() - startTime).toFixed(0)} ms</orange>)`,
+      );
+    } catch (error) {
+      Logger.error(
+        `BoardPageManager 初始化失敗 (階段: ${this.currentStage}, 耗時: ${(performance.now() - startTime).toFixed(0)} ms)`,
+        error,
+      );
+      // 即使失敗也嘗試繼續基本功能
+      await this.initializeOtherComponents().catch((e) => {
+        Logger.error("初始化其他組件失敗:", e);
       });
+    }
+  }
+
+  /**
+   * 階段 1：載入所有腳本
+   */
+  async loadAllScripts() {
+    await this.loadDependencies();
+  }
+
+  /**
+   * 階段 2：初始化模組
+   */
+  async initializeModules() {
+    await this.initializeManagersSimplified();
+  }
+
+  /**
+   * 階段 3：初始化其他組件
+   */
+  async initializeOtherComponents() {
+    this.initializeRemainingComponents();
   }
 
   /**
@@ -25,22 +112,61 @@ class BoardPageManager {
    */
   async loadDependencies() {
     const dependencies = [
-      "js/board/board-log-manager.js",
-      "js/board/board-sync-manager.js",
-      "js/board/board-state-manager.js",
-      "js/board/board-ui-manager.js",
-      "js/board/board-utils.js",
+      // 核心基礎設施
+      { src: "js/core/console-manager.js", isModule: false },
+      { src: "js/core/config.js", isModule: false },
+      { src: "js/core/websocket-client.js", isModule: false },
+      { src: "js/core/time-sync-manager.js", isModule: false },
+      { src: "js/experiment/experiment-state-manager.js", isModule: false },
+
+      // 同步系統
+      { src: "js/sync/sync-client.js", isModule: false },
+      { src: "js/experiment/experiment-hub-manager.js", isModule: false },
+
+      // 核心工具
+      { src: "js/core/data-loader.js", isModule: false },
+      { src: "js/core/random-utils.js", isModule: false },
+
+      // 實驗模組架構
+      {
+        src: "js/experiment/experiment-combination-manager.js",
+        isModule: false,
+      },
+      { src: "js/experiment/experiment-flow-manager.js", isModule: false },
+      { src: "js/experiment/experiment-action-handler.js", isModule: false },
+      { src: "js/experiment/experiment-ui-manager.js", isModule: false },
+
+      // 實驗系統管理器
+      { src: "js/experiment/experiment-system-manager.js", isModule: false },
+
+      // 計時器管理
+      { src: "js/experiment/experiment-timer.js", isModule: false },
+
+      // Board 專用模組
+      { src: "js/board/board-log-manager.js", isModule: false },
+      { src: "js/board/board-log-ui.js", isModule: false },
+      { src: "js/board/board-export-manager.js", isModule: false },
+      { src: "js/board/board-sync-manager.js", isModule: false },
+      { src: "js/board/board-ui-manager.js", isModule: false },
+      { src: "js/board/board-gesture-utils.js", isModule: false },
+
+      // 同步與對話框
+      { src: "js/sync/sync-confirm-dialog.js", isModule: false },
+      { src: "js/core/sync-events-constants.js", isModule: true },
+      { src: "js/sync/sync-manager.js", isModule: true },
     ];
 
-    for (const scriptPath of dependencies) {
-      await this.loadScript(scriptPath);
-    }
+    // 並行載入所有腳本以提升效能
+    const promises = dependencies.map((dep) =>
+      this.loadScript(dep.src, dep.isModule),
+    );
+    await Promise.all(promises);
   }
 
   /**
    * 動態載入腳本
    */
-  loadScript(src) {
+  loadScript(src, isModule = false) {
     return new Promise((resolve, reject) => {
       // 檢查是否已經載入
       if (document.querySelector(`script[src="${src}"]`)) {
@@ -50,92 +176,139 @@ class BoardPageManager {
 
       const script = document.createElement("script");
       script.src = src;
-      script.onload = resolve;
+      if (isModule) {
+        script.type = "module";
+      }
+      script.onload = () => resolve();
       script.onerror = () => reject(new Error(`載入腳本失敗: ${src}`));
       document.head.appendChild(script);
     });
   }
 
   /**
-   * 初始化組件（在依賴載入後調用）
+   * 簡化的管理器初始化
    */
-  initializeComponents() {
-    // 基礎資料
-    this.scenariosData = null;
-    this.scriptData = null;
-    this.gesturesData = null;
+  async initializeManagersSimplified() {
+    try {
+      // 初始化核心管理器
+      window.experimentHubManager = new ExperimentHubManager();
+      window.experimentUIManager = new ExperimentUIManager();
+      window.experimentCombinationManager = new ExperimentCombinationManager();
 
-    // 目前狀態
-    this.currentUnit = null;
-    this.currentStep = 0;
-    this.currentCombination = null;
-    this.currentUnitOrder = [];
+      // 初始化系統管理器
+      const instance = new ExperimentSystemManager({
+        combinationManager: window.experimentCombinationManager,
+        uiManager: window.experimentUIManager,
+        hubManager: window.experimentHubManager,
+        flowManager: window.experimentFlowManager,
+      });
+      await instance.initialize();
+      window.experimentSystemManager = instance;
 
-    // 工作階段與實驗控制
-    this.sessionId = this.generateSessionId();
-    this.experimentRunning = false;
-    this.experimentPaused = false;
-    this.experimentStartTime = null; // 修復：改為 null，避免顯示 1970-01-01
-    this.experimentElapsedTime = 0;
-    this.experimentTimerInterval = null;
-
-    // 統計資料
-    this.gestureStats = {};
-
-    // 受試者資訊
-    this.subjectName = "";
-    this.lastSavedSubjectName = "";
-    this.pendingExperimentIdUpdate = null;
-    this.pendingSubjectNameUpdate = null;
-
-    // Action 管理
-    this.actionsMap = new Map();
-    this.actionToStepMap = new Map();
-    this.currentActionSequence = [];
-    this.currentActionIndex = 0;
-    this.completedActions = new Set();
-
-    // 時間追蹤
-    this.actionTimings = new Map(); // action 執行時間
-
-    // 遠端事件重複排除機制
-    this.processedRemoteActions = new Map(); // 已處理的遠端動作
-    this.remotActionDedupeWindow = 500; // 重複排除機制時間視窗（毫秒）
-
-    this.pendingExperimentIdUpdate = null; // 等待實驗結束後同步的實驗ID更新
-
-    // 匯出管理器
-    this.exportManager = new BoardExportManager(this);
-
-    this.init();
+      Logger.debug("所有管理器已初始化");
+    } catch (error) {
+      Logger.error("初始化模組失敗:", error);
+      throw error;
+    }
   }
+
+  /**
+   * 初始化其餘組件（在管理器初始化之後）
+   */
+  initializeRemainingComponents() {
+    try {
+      // 基礎資料
+      this.scenariosData = null;
+      this.scriptData = null;
+      this.gesturesData = null;
+
+      // 目前狀態
+      this.currentUnit = null;
+      this.currentStep = 0;
+      this.currentCombination = null;
+      this.currentUnitOrder = [];
+
+      // 工作階段與實驗控制
+      this.sessionId = this.generateSessionId();
+      this.experimentRunning = false;
+
+      // 統計資料
+      this.gestureStats = {};
+
+      // 受試者資訊
+      this.subjectName = "";
+      this.lastSavedSubjectName = "";
+      this.pendingExperimentIdUpdate = null;
+      this.pendingSubjectNameUpdate = null;
+
+      // Action 管理
+      this.actionsMap = new Map();
+      this.actionToStepMap = new Map();
+      this.currentActionSequence = [];
+      this.currentActionIndex = 0;
+      this.completedActions = new Set();
+
+      // 時間追蹤
+      this.actionTimings = new Map(); // action 執行時間
+
+      // 遠端事件重複排除機制
+      this.processedRemoteActions = new Map(); // 已處理的遠端動作
+      this.remotActionDedupeWindow = 500; // 重複排除機制時間視窗（毫秒）
+
+      // 匯出管理器
+      this.exportManager = new BoardExportManager(this);
+
+      // UI 管理器 - 使用全域實例
+      this.uiManager = window.experimentUIManager;
+
+      // 初始化 Board UI 管理器
+      this.boardUIManager = new BoardUIManager(this);
+      this.boardUIManager.init();
+
+      // 開始初始化其他組件
+      this.init();
+    } catch (error) {
+      Logger.error("初始化其餘組件失敗:", error);
+      // 即使失敗也嘗試繼續基本功能
+      this.init();
+    }
+  }
+
+  /**
+   * 使用統一的 UI 管理器渲染所有界面組件
+   */
 
   generateSessionId() {
-    return "EXP_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    return RandomUtils.generateExperimentId();
   }
 
-  /** 產生新的實驗ID */
-  generateNewExperimentId() {
-    const result = RandomUtils.generateNewExperimentId();
+  /**
+   * 產生新的實驗ID
+   */
+  generateExperimentId() {
+    const result = RandomUtils.generateExperimentId();
 
     const experimentIdInput = document.getElementById("experimentIdInput");
     if (experimentIdInput) {
       experimentIdInput.value = result;
     }
 
-    //廣播新的實驗ID到同步工作階段
-    this.broadcastExperimentIdUpdate(result);
+    // 廣播新的實驗ID到同步工作階段
+    window.experimentSyncManager.broadcastExperimentIdUpdate(result);
 
+    Logger.info(`新的實驗ID已產生: ${result}`);
     return result;
   }
 
-  /** 產生新的實驗ID 並在同步模式下註冊到中樞 */
-  async generateNewExperimentIdWithHub() {
+  /**
+   * 產生新的實驗ID 並在同步模式下註冊到中樞
+   */
+  async generateExperimentIdWithHub() {
     try {
       Logger.debug("產生新的實驗ID...");
 
       // 產生新的實驗ID
-      const newId = RandomUtils.generateNewExperimentId();
+      const newId = RandomUtils.generateExperimentId();
 
       // 更新UI
       const experimentIdInput = document.getElementById("experimentIdInput");
@@ -147,13 +320,13 @@ class BoardPageManager {
       const hubManager = getExperimentHubManager();
       if (hubManager?.isInSyncMode?.()) {
         Logger.debug(`同步模式: 註冊新ID到中樞: ${newId}`);
-        await this.registerExperimentIdToHub(newId);
+        await window.experimentSyncManager.registerExperimentIdToHub(newId);
       } else {
         Logger.debug(`獨立模式: 新ID僅存本機: ${newId}`);
       }
 
       // 廣播新的實驗ID
-      this.broadcastExperimentIdUpdate(newId);
+      window.experimentSyncManager.broadcastExperimentIdUpdate(newId);
 
       Logger.info(`新的實驗ID已產生: ${newId}`);
       return newId;
@@ -170,7 +343,7 @@ class BoardPageManager {
     // 檢查是否在同步模式
     if (!hubManager?.isInSyncMode?.()) {
       Logger.debug("直接產生新的實驗ID");
-      await this.generateNewExperimentIdWithHub();
+      await this.generateExperimentIdWithHub();
       this.selectDefaultCombination();
       return;
     }
@@ -205,38 +378,21 @@ class BoardPageManager {
         }
 
         // 廣播同步
-        this.broadcastExperimentIdUpdate(hubExperimentId);
+        window.experimentSyncManager.broadcastExperimentIdUpdate(
+          hubExperimentId,
+        );
       } else {
         // 實驗ID與中樞相同或中樞沒有ID，產生新的ID
         Logger.info("產生新的實驗ID並廣播");
-        await this.generateNewExperimentIdWithHub();
+        await this.generateExperimentIdWithHub();
       }
 
       this.selectDefaultCombination();
     } catch (error) {
       Logger.error("檢查中樞狀態失敗:", error);
       // 出錯時仍產生新的ID
-      await this.generateNewExperimentIdWithHub();
+      await this.generateExperimentIdWithHub();
       this.selectDefaultCombination();
-    }
-  }
-
-  /** 註冊實驗ID到中樞 */
-  async registerExperimentIdToHub(experimentId) {
-    try {
-      Logger.debug(`開始註冊實驗ID到中樞: ${experimentId}`);
-      const hubManager = getExperimentHubManager();
-      const success = await hubManager.registerExperimentId(
-        experimentId,
-        "experiment_manager",
-      );
-      if (success) {
-        Logger.info(`實驗ID已成功註冊到中樞: ${experimentId}`);
-      } else {
-        Logger.warn(`實驗ID註冊失敗: ${experimentId}`);
-      }
-    } catch (error) {
-      Logger.warn(`無法連線到實驗中樞: ${error.message}`);
     }
   }
 
@@ -244,31 +400,33 @@ class BoardPageManager {
    * 初始化實驗頁面管理器
    */
   async init() {
-    await this.loadScript();
-    this.renderCombinations();
-    this.renderGestureTypesReference();
-    await this.renderUnitList();
-
-    const selectAllUnits = document.getElementById("selectAllUnits");
-    if (selectAllUnits) {
-      selectAllUnits.addEventListener("change", (e) =>
-        this.toggleSelectAllUnits(e.target.checked),
-      );
+    await this.loadScenarioData();
+    // 渲染統一UI
+    if (this.boardUIManager) {
+      await this.boardUIManager.renderUnifiedUI();
+      this.boardUIManager.renderGestureTypesReference();
+    } else {
+      Logger.warn("BoardUIManager 不可用，跳過UI渲染");
     }
 
     // 初始化實驗ID
     const experimentIdInput = document.getElementById("experimentIdInput");
     const regenerateIdBtn = document.getElementById("regenerateIdButton");
 
+    if (!experimentIdInput) {
+      Logger.error("找不到 experimentIdInput 元素，無法初始化實驗ID");
+      return;
+    }
+
     Logger.debug("初始化實驗ID...");
 
     let experimentId = null;
 
     // 第1步：檢查是否在同步模式，優先從中樞取得
-    const hubManager = getExperimentHubManager();
-    const isInSyncMode = hubManager.isInSyncMode();
+    const hubManager = window.experimentHubManager;
+    const isInSyncMode = hubManager?.isInSyncMode?.() || false;
 
-    if (isInSyncMode && hubManager?.hubClient) {
+    if (isInSyncMode) {
       Logger.debug("第1優先：檢測到同步模式，嘗試從中樞讀取ID");
       try {
         experimentId = await hubManager.getExperimentId();
@@ -301,10 +459,12 @@ class BoardPageManager {
     if (!experimentId) {
       if (isInSyncMode) {
         Logger.debug("第4步：同步模式無ID，產生新ID");
-        await this.generateNewExperimentIdWithHub();
+        const newId = await this.generateExperimentIdWithHub();
+        Logger.debug(`已產生新的實驗ID: ${newId}`);
       } else {
         Logger.debug("第4步：本機模式無ID，產生新ID");
-        this.generateNewExperimentId();
+        const newId = this.generateExperimentId();
+        Logger.debug(`已產生新的實驗ID: ${newId}`);
       }
     }
 
@@ -314,7 +474,7 @@ class BoardPageManager {
     // 綁定實驗ID輸入框事件
     experimentIdInput.addEventListener("change", async () => {
       if (!experimentIdInput.value.trim()) {
-        await this.generateNewExperimentIdWithHub();
+        await this.generateExperimentIdWithHub();
         return;
       }
 
@@ -325,7 +485,9 @@ class BoardPageManager {
       const hubManager = getExperimentHubManager();
       if (hubManager?.isInSyncMode?.()) {
         Logger.debug("註冊手動輸入的實驗ID到中樞");
-        await this.registerExperimentIdToHub(newExperimentId);
+        await window.experimentSyncManager.registerExperimentIdToHub(
+          newExperimentId,
+        );
       } else {
         Logger.debug("實驗ID僅存本機");
       }
@@ -334,14 +496,13 @@ class BoardPageManager {
         const combination =
           this.scriptData.combinations[
             this.scriptData.combinations.findIndex(
-              (c) =>
-                c.combination_id === this.currentCombination.combination_id,
+              (c) => c.combinationId === this.currentCombination.combinationId,
             )
           ];
         await this.loadScriptForCombination(combination, newExperimentId);
       }
 
-      this.broadcastExperimentIdUpdate(newExperimentId);
+      window.experimentSyncManager.broadcastExperimentIdUpdate(newExperimentId);
     });
 
     // 綁定重新產生按鈕事件
@@ -359,8 +520,25 @@ class BoardPageManager {
     this.setupRemoteEventListeners();
   }
 
-  async loadScript() {
+  async loadScenarioData() {
     try {
+      // 確保 loadUnitsFromScenarios 已經被定義
+      if (typeof window.loadUnitsFromScenarios === "undefined") {
+        // 等待 data-loader.js 完成加載
+        let attempts = 0;
+        while (
+          typeof window.loadUnitsFromScenarios === "undefined" &&
+          attempts < 100
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          attempts++;
+        }
+
+        if (typeof window.loadUnitsFromScenarios === "undefined") {
+          throw new Error("loadUnitsFromScenarios 未能成功定義");
+        }
+      }
+
       // 使用資料轉換器載入完整的 units 和 actions 資料
       const convertedData = await loadUnitsFromScenarios();
 
@@ -392,101 +570,6 @@ class BoardPageManager {
   /**
    * 渲染手勢類型參考面板
    */
-  renderGestureTypesReference() {
-    const leftPanel = document.querySelector(".left-panel");
-    if (!leftPanel || !this.scenariosData || !this.scenariosData.gesture_list)
-      return;
-
-    // 檢查是否已經存在，避免重複新增
-    let refDiv = document.querySelector(".gesture-reference");
-    if (refDiv) {
-      refDiv.remove();
-    }
-
-    const gestureTypes = this.scenariosData.gesture_list;
-
-    refDiv = document.createElement("div");
-    refDiv.className = "gesture-reference";
-    refDiv.style.marginTop = "20px";
-    refDiv.innerHTML = `
-            <h2 style="cursor: pointer; display: flex; align-items: center; color: #2c3e50; margin-bottom: 12px; font-weight: 700;"
-                onclick="document.querySelector('.gesture-types-list').style.display =
-                document.querySelector('.gesture-types-list').style.display === 'none' ? 'block' : 'none'">
-                手勢參考 <span style="font-size: 12px; margin-left: auto;">▼</span>
-            </h2>
-            <div class="gesture-types-list" style="display: none;">
-                ${gestureTypes
-                  .map(
-                    (g) => `
-                    <div class="gesture-type-item">
-                        <span class="gesture-type-code">${g.gesture_id}</span>
-                        <span class="gesture-type-name">${g.gesture_name}</span>
-                        <span class="gesture-type-desc">${g.gesture_description}</span>
-                        <span style="font-size: 11px; color: #999; margin-left: auto;">${g.gesture_key}</span>
-                    </div>
-                `,
-                  )
-                  .join("")}
-            </div>
-        `;
-
-    leftPanel.appendChild(refDiv);
-  }
-
-  /**
-   * 渲染組合選擇器
-   */
-  renderCombinations() {
-    if (!this.scriptData || !this.scriptData.combinations) return;
-
-    // 找出所有組合列表容器（index.html 和 experiment.html 共用）
-    const selectors = document.querySelectorAll(".experiment-default-list");
-
-    selectors.forEach((selector) => {
-      selector.innerHTML = "";
-
-      this.scriptData.combinations.forEach((combo, index) => {
-        const li = document.createElement("li");
-        li.className = "combination-item";
-        li.dataset.combinationId = combo.combination_id;
-        li.innerHTML = `
-          <div class="combo-name">${combo.combination_name}</div>
-          <div class="combo-desc">${combo.description}</div>
-        `;
-        li.onclick = () => this.selectCombination(index);
-        selector.appendChild(li);
-      });
-    });
-
-    // 渲染後重新套用預設選擇的 active 類
-    this.applyDefaultCombinationSelection();
-  }
-  /**
-   * 套用預設組合選擇的視覺效果
-   */
-  applyDefaultCombinationSelection() {
-    if (!this.scriptData || !this.scriptData.combinations) return;
-
-    const defaultCombinationId =
-      window.CONFIG?.experiment?.defaultCombinationId;
-    let defaultIndex = 0;
-
-    // 如果設定中有預設組合ID，查找對應的索引
-    if (defaultCombinationId) {
-      defaultIndex = this.scriptData.combinations.findIndex(
-        (c) => c.combination_id === defaultCombinationId,
-      );
-      // 如果找不到，使用第一個
-      if (defaultIndex === -1) {
-        defaultIndex = 0;
-      }
-    }
-
-    // 套用 active 類到對應的卡片
-    document.querySelectorAll(".combination-item").forEach((el, i) => {
-      el.classList.toggle("active", i === defaultIndex);
-    });
-  }
 
   /**
    * 選擇預設組合並載入手勢序列
@@ -503,7 +586,7 @@ class BoardPageManager {
     );
     if (cachedCombinationId) {
       const cachedIndex = this.scriptData.combinations.findIndex(
-        (c) => c.combination_id === cachedCombinationId,
+        (c) => c.combinationId === cachedCombinationId,
       );
       if (cachedIndex !== -1) {
         selectedIndex = cachedIndex;
@@ -516,7 +599,7 @@ class BoardPageManager {
         window.CONFIG?.experiment?.defaultCombinationId;
       if (defaultCombinationId) {
         const defaultIndex = this.scriptData.combinations.findIndex(
-          (c) => c.combination_id === defaultCombinationId,
+          (c) => c.combinationId === defaultCombinationId,
         );
         if (defaultIndex !== -1) {
           selectedIndex = defaultIndex;
@@ -550,20 +633,14 @@ class BoardPageManager {
     // 儲存到本機快取
     localStorage.setItem(
       "last_selected_combination_id",
-      combination.combination_id,
+      combination.combinationId,
     );
 
     // 更新 UI 顯示選中狀態
     this.updateCombinationSelection(index);
 
-    // 使用中央 CombinationSelector 進行選擇
-    if (window.CombinationSelector) {
-      window.CombinationSelector.selectCombination(combination);
-    } else {
-      Logger.warn("CombinationSelector 未載入");
-      // 降級方案：使用內部邏輯
-      this.updateUnitListForCombination(combination);
-    }
+    // 更新單元列表以匹配組合要求
+    this.updateUnitListForCombination(combination);
 
     // 取得實驗ID (如果有的話)
     const experimentId = document
@@ -587,8 +664,13 @@ class BoardPageManager {
    * @param {Object} combination - 組合物件
    */
   updateUnitListForCombination(combination) {
-    const unitList = document.querySelector("#experimentUnitsList");
-    if (!unitList) return;
+    const unitList = document.querySelector(
+      "#unitsPanelContainer .experiment-units-list",
+    );
+    if (!unitList) {
+      this._warn("找不到單元列表容器");
+      return;
+    }
 
     // 取得該組合包含的單元ID，並按正確順序排列
     // 使用統一的 RandomUtils 處理組合邏輯
@@ -619,17 +701,22 @@ class BoardPageManager {
     const normalItems = Array.from(
       unitList.querySelectorAll("li:not(.power-option-card)"),
     );
-    const _startupCard = unitList.querySelector(".startup-card");
+    const startupCard = unitList.querySelector(".startup-card");
     const shutdownCard = unitList.querySelector(".shutdown-card");
 
     // 按照 combinationUnitIds 的順序重新排列
     combinationUnitIds.forEach((unitId) => {
       const li = normalItems.find((item) => item.dataset.unitId === unitId);
       if (li) {
-        // 移到最後但在關機卡片之前
-        if (shutdownCard) {
+        // 移到最後但在電源選項卡片之前
+        if (shutdownCard && shutdownCard.parentNode === unitList) {
+          // 確保 shutdownCard 是 unitList 的子節點
           unitList.insertBefore(li, shutdownCard);
+        } else if (startupCard && startupCard.parentNode === unitList) {
+          // 如果沒有 shutdownCard，使用 startupCard
+          unitList.insertBefore(li, startupCard);
         } else {
+          // 如果都沒有電源選項卡片，添加到列表末尾
           unitList.appendChild(li);
         }
       }
@@ -649,13 +736,13 @@ class BoardPageManager {
     try {
       // 確保實驗ID不為空
       if (!experimentId || !experimentId.trim()) {
-        experimentId = this.generateNewExperimentId();
+        experimentId = this.generateExperimentId();
       }
 
       // 建立組合內容
       const script = {
-        combination_id: combination.combination_id,
-        combination_name: combination.combination_name,
+        combination_id: combination.combinationId,
+        combination_name: combination.combinationName,
         description: combination.description,
         experiment_id: experimentId,
         units_sequence: [],
@@ -1124,21 +1211,21 @@ class BoardPageManager {
                         <div style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
                             <button onclick="window.markGesture(${idx}, 'correct', '${
                               gesture.name
-                            }')" style="padding: 10px; background: #4caf50; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center;">
+                            }')" class="gesture-action-btn correct">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round">
                                     <circle cx="12" cy="12" r="8.5" />
                                 </svg>
                             </button>
                             <button onclick="window.markGesture(${idx}, 'uncertain', '${
                               gesture.name
-                            }')" style="padding: 10px; background: #ff9800; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center;">
+                            }')" class="gesture-action-btn uncertain">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
                                     <polygon points="12,4.5 20.5,19.5 3.5,19.5" />
                                 </svg>
                             </button>
                             <button onclick="window.markGesture(${idx}, 'incorrect', '${
                               gesture.name
-                            }')" style="padding: 10px; background: #f44336; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center;">
+                            }')" class="gesture-action-btn incorrect">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round">
                                     <line x1="5.5" y1="5.5" x2="18.5" y2="18.5" />
                                     <line x1="18.5" y1="5.5" x2="5.5" y2="18.5" />
@@ -1150,9 +1237,9 @@ class BoardPageManager {
                         ${
                           gesture.reason
                             ? `
-                            <div style="margin-bottom: 15px; padding: 10px; background: #fef5f0; border: 2px solid #ff9800; border-radius: 6px; overflow: hidden;">
-                                <div style="font-size: 11px; color: #666; margin-bottom: 5px;">對應步驟</div>
-                                <div style="font-size: 12px; color: #333; font-weight: 500; word-break: break-word;">${convertColorTags(
+                            <div class="gesture-info-section step-info">
+                                <div class="section-label">對應步驟</div>
+                                <div class="section-content">${convertColorTags(
                                   gesture.reason,
                                 )}</div>
                             </div>
@@ -1171,16 +1258,16 @@ class BoardPageManager {
                           (gesture.step_name ||
                             (gesture.actions && gesture.actions.length > 0))
                             ? `
-                            <div style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border: 2px solid #999; border-radius: 6px; overflow: hidden;">
+                            <div class="gesture-info-section action-info">
                                 <!-- 上排：步驟說明 -->
                                 ${
                                   gesture.step_name
                                     ? `
-                                    <div style="margin-bottom: 10px; flex-shrink: 0; background: white; border: 2px solid #999; border-radius: 6px; padding: 8px; overflow: hidden;">
-                                        <div style="font-size: 9px; color: #999; font-weight: 600; margin-bottom: 3px;">${
+                                    <div class="gesture-step-card">
+                                        <div class="step-id">${
                                           gesture.step_id || "N/A"
                                         }</div>
-                                        <div style="font-size: 11px; color: #333; font-weight: 500; word-break: break-word;">${convertColorTags(
+                                        <div class="step-name">${convertColorTags(
                                           gesture.step_name,
                                         )}</div>
                                     </div>
@@ -1192,12 +1279,12 @@ class BoardPageManager {
                                 ${
                                   gesture.actions && gesture.actions.length > 0
                                     ? `
-                                    <div style="display: flex; gap: 6px; overflow-x: auto; padding: 2px 0;">
+                                    <div class="gesture-actions-container">
                                         ${gesture.actions
                                           .map(
                                             (action, actionIdx) => `
                                             <button
-                                              class="action-button"
+                                              class="action-button gesture-action-button"
                                               data-action-id="${
                                                 action.action_id
                                               }"
@@ -1205,12 +1292,11 @@ class BoardPageManager {
                                               data-completed="false"
                                               onclick="window.handleActionClick(this, '${
                                                 action.action_id
-                                              }', ${idx})"
-                                              style="flex-shrink: 0; background: #e8eeff; border: 2px solid #667eea; border-radius: 6px; padding: 8px; white-space: nowrap; cursor: pointer; font-family: inherit; font-size: inherit; transition: all 0.2s; min-width: 0;">
-                                                <div style="font-size: 9px; color: #667eea; font-weight: 600; margin-bottom: 2px;">${
+                                              }', ${idx})">
+                                                <div class="action-id">${
                                                   action.action_id
                                                 }</div>
-                                                <div style="font-size: 12px; color: #2c3e50; font-weight: 500; white-space: nowrap;">${convertColorTags(
+                                                <div class="action-name">${convertColorTags(
                                                   action.action_name,
                                                 )}</div>
                                             </button>
@@ -1229,7 +1315,7 @@ class BoardPageManager {
                         <!-- 下一步按鈕 -->
                         <button onclick="window.goToNextStep(${idx}, '${
                           gesture.name
-                        }')" style="width: 100%; padding: 10px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center;">
+                        }')" class="gesture-next-button">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="9,18 15,12 9,6" />
                             </svg>
@@ -1252,7 +1338,8 @@ class BoardPageManager {
 
     if (script && script.gestures && script.gestures.length > 0) {
       // 顯示統計面板
-      statsPanel.style.display = "block";
+      if (statsPanel.classList.contains("is-hidden"))
+        statsPanel.classList.remove("is-hidden");
 
       // 更新手勢步驟數量
       document.getElementById("statGestureCount").textContent =
@@ -1292,7 +1379,8 @@ class BoardPageManager {
       }
     } else {
       // 隱藏統計面板
-      statsPanel.style.display = "none";
+      if (!statsPanel.classList.contains("is-hidden"))
+        statsPanel.classList.add("is-hidden");
     }
   }
 
@@ -1542,275 +1630,83 @@ class BoardPageManager {
     };
   }
 
+  /**
+   * 此方法已廢棄 - 單元列表渲染已整合到 renderUnifiedUI 中
+   * @deprecated 使用 renderUnifiedUI 代替
+   */
   async renderUnitList() {
-    try {
-      const response = await fetch("./data/scenarios.json");
-      if (!response.ok) {
-        throw new Error("scenarios.json 載入失敗: " + response.status);
-      }
-      const data = await response.json();
-
-      const unitList = document.querySelector("#experimentUnitsList");
-      if (!unitList) return;
-
-      // 清空列表
-      unitList.innerHTML = "";
-
-      // 首先新增開機卡片到最前面
-      this.addStartupCard(unitList);
-
-      // 從 scenarios.json 的 sections[0] 中讀取單元
-      if (data && data.sections && data.sections.length > 0) {
-        const section = data.sections[0];
-        if (section.units && Array.isArray(section.units)) {
-          section.units.forEach((unit) => {
-            const li = this.createUnitListItem(unit);
-            unitList.appendChild(li);
-          });
-
-          // 新增關機卡片到底部
-          this.addShutdownCard(unitList);
-
-          this.updateSelectAllState();
-          this.updateUnitButtonStates();
-          //不在這裡調用 onUnitSelectionChanged()
-          // 初始化時不應該觸發單元選擇改變，否則會產生 custom 組合覆蓋預設組合
-          // 預設組合的載入由 selectDefaultCombination() 負責
-        } else {
-          throw new Error("scenarios.json 中找不到單元資料");
-        }
-      } else {
-        throw new Error("scenarios.json 格式錯誤或找不到 sections");
-      }
-    } catch (err) {
-      const unitList = document.querySelector("#experimentUnitsList");
-      if (unitList) {
-        const errorLi = document.createElement("li");
-        errorLi.style.color = "red";
-        errorLi.textContent = err.message;
-        unitList.appendChild(errorLi);
-      }
-    }
+    Logger.warn("renderUnitList() 已廢棄，請使用 renderUnifiedUI() 代替");
   }
 
-  addStartupCard(unitList) {
-    const startupCard = document.createElement("li");
-    startupCard.className = "power-option-card startup-card";
-    startupCard.innerHTML = `
-            <label class="unit-checkbox">
-                <input type="checkbox" id="includeStartup" checked>
-            </label>
-            <div class="unit-sort">
-                <div class="unit-title">機器開機</div>
-                <div class="unit-subtitle">POWER_ON • 等待使用者手動開機</div>
-            </div>
-        `;
-    unitList.appendChild(startupCard);
-
-    const includeStartup = startupCard.querySelector("#includeStartup");
-    if (includeStartup) {
-      includeStartup.addEventListener("change", (e) => {
-        this.includeStartup = e.target.checked;
-      });
-    }
-  }
-
-  addShutdownCard(unitList) {
-    const shutdownCard = document.createElement("li");
-    shutdownCard.className = "power-option-card shutdown-card";
-    shutdownCard.innerHTML = `
-            <label class="unit-checkbox">
-                <input type="checkbox" id="includeShutdown" checked>
-            </label>
-            <div class="unit-sort">
-                <div class="unit-title">機器關機</div>
-                <div class="unit-subtitle">POWER_OFF • 完成關機才結束實驗</div>
-            </div>
-        `;
-    unitList.appendChild(shutdownCard);
-
-    const includeShutdown = shutdownCard.querySelector("#includeShutdown");
-    if (includeShutdown) {
-      includeShutdown.addEventListener("change", (e) => {
-        this.includeShutdown = e.target.checked;
-      });
-    }
-  }
-
-  createUnitListItem(unit) {
-    const li = document.createElement("li");
-    li.dataset.unitId = unit.unit_id;
-    li.draggable = true;
-
-    // 勾選框
-    const label = document.createElement("label");
-    label.className = "unit-checkbox";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = true;
-    checkbox.addEventListener("change", () => {
-      this.updateSelectAllState();
-      this.onUnitSelectionChanged();
-    });
-    label.appendChild(checkbox);
-    li.appendChild(label);
-
-    // 單元名稱
-    const unitInfo = document.createElement("div");
-    unitInfo.className = "unit-sort";
-    unitInfo.innerHTML = `
-            <div>${unit.unit_name || unit.unit_id}</div>
-            <div>${unit.unit_id} • ${
-              unit.steps ? unit.steps.length : 0
-            } 步驟</div>
-        `;
-    li.appendChild(unitInfo);
-
-    // 控制按鈕組
-    const controlsGroup = document.createElement("div");
-    controlsGroup.className = "unit-controls";
-
-    // 上移按鈕
-    const upBtn = document.createElement("button");
-    upBtn.className = "unit-sort-btn unit-up-btn";
-    upBtn.title = "上移";
-    upBtn.innerHTML = "▲";
-    upBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.moveUnit(li, -1);
-    });
-    controlsGroup.appendChild(upBtn);
-
-    // 下移按鈕
-    const downBtn = document.createElement("button");
-    downBtn.className = "unit-sort-btn unit-down-btn";
-    downBtn.title = "下移";
-    downBtn.innerHTML = "▼";
-    downBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.moveUnit(li, 1);
-    });
-    controlsGroup.appendChild(downBtn);
-
-    // 拖曳排序
-    const dragHandle = document.createElement("span");
-    dragHandle.className = "unit-drag-handle";
-    dragHandle.title = "拖曳排序";
-    dragHandle.innerHTML = "⋮⋮";
-    dragHandle.style.cursor = "grab";
-    controlsGroup.appendChild(dragHandle);
-
-    li.appendChild(controlsGroup);
-
-    // 綁定拖曳事件
-    li.addEventListener("dragstart", (e) => this.onDragStart(e));
-    li.addEventListener("dragover", (e) => this.onDragOver(e));
-    li.addEventListener("drop", (e) => this.onDrop(e));
-    li.addEventListener("dragend", (e) => this.onDragEnd(e));
-
-    return li;
-  }
-
-  updateSelectAllState() {
-    const unitList = document.querySelector("#experimentUnitsList");
-    const selectAllCheckbox = document.getElementById("selectAllUnits");
-    if (!unitList || !selectAllCheckbox) return;
-
-    // 只考慮普通單元項目，排除電源卡片
-    const normalItems = unitList.querySelectorAll("li:not(.power-option-card)");
-    const checkboxes = Array.from(normalItems)
-      .map((li) => li.querySelector('input[type="checkbox"]'))
-      .filter((cb) => cb);
-    const checkedBoxes = checkboxes.filter((cb) => cb.checked);
-
-    if (checkboxes.length === 0) {
-      selectAllCheckbox.indeterminate = false;
-      selectAllCheckbox.checked = false;
-    } else if (checkedBoxes.length === checkboxes.length) {
-      selectAllCheckbox.indeterminate = false;
-      selectAllCheckbox.checked = true;
-    } else if (checkedBoxes.length > 0) {
-      selectAllCheckbox.indeterminate = true;
-      selectAllCheckbox.checked = false;
-    } else {
-      selectAllCheckbox.indeterminate = false;
-      selectAllCheckbox.checked = false;
-    }
-  }
-
-  toggleSelectAllUnits(checked) {
-    const unitList = document.querySelector("#experimentUnitsList");
+  handleUnitReorder(arg1, arg2) {
+    // 支援兩種呼叫格式： (fromIndex, toIndex) 或 ({ unitId, direction: 'up'|'down' })
+    Logger.debug("handleUnitReorder called", { arg1, arg2 });
+    const unitList = document.querySelector(
+      "#unitsPanelContainer .experiment-units-list",
+    );
     if (!unitList) return;
 
-    // 只對普通單元項目進行全選操作，排除電源卡片
-    const normalItems = unitList.querySelectorAll("li:not(.power-option-card)");
-    normalItems.forEach((li) => {
-      const checkbox = li.querySelector('input[type="checkbox"]');
-      if (checkbox) {
-        checkbox.checked = checked;
+    const items = Array.from(unitList.querySelectorAll("li[data-unit-id]"));
+
+    // Numeric indices
+    if (typeof arg1 === "number" && typeof arg2 === "number") {
+      const fromIndex = arg1;
+      const toIndex = arg2;
+      if (
+        fromIndex < 0 ||
+        fromIndex >= items.length ||
+        toIndex < 0 ||
+        toIndex >= items.length
+      ) {
+        return;
       }
-    });
-
-    // 觸發選擇改變事件
-    this.onUnitSelectionChanged();
-  }
-
-  onDragStart(e) {
-    this.draggedElement = e.target.closest("li:not(.power-option-card)");
-    if (this.draggedElement) {
-      this.draggedElement.style.opacity = "0.5";
-      e.dataTransfer.effectAllowed = "move";
-    }
-  }
-
-  onDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-
-    const target = e.target.closest("li:not(.power-option-card)");
-    if (target && target !== this.draggedElement) {
-      target.style.borderTop = "2px solid #667eea";
-    }
-  }
-
-  onDrop(e) {
-    e.preventDefault();
-
-    const target = e.target.closest("li:not(.power-option-card)");
-    if (target && target !== this.draggedElement) {
-      const unitList = document.querySelector("#experimentUnitsList");
-      const allItems = Array.from(
-        unitList.querySelectorAll("li:not(.power-option-card)"),
-      );
-
-      const draggedIndex = allItems.indexOf(this.draggedElement);
-      const targetIndex = allItems.indexOf(target);
-
-      if (draggedIndex < targetIndex) {
-        target.parentNode.insertBefore(this.draggedElement, target.nextSibling);
+      const itemToMove = items[fromIndex];
+      if (!itemToMove || !itemToMove.parentNode) return;
+      if (fromIndex < toIndex) {
+        itemToMove.parentNode.insertBefore(
+          itemToMove,
+          items[toIndex].nextSibling,
+        );
       } else {
-        target.parentNode.insertBefore(this.draggedElement, target);
+        itemToMove.parentNode.insertBefore(itemToMove, items[toIndex]);
       }
-
+      // 更新按鈕狀態與選取
+      if (typeof this.updateUnitButtonStates === "function")
+        this.updateUnitButtonStates();
       this.onUnitSelectionChanged();
-    }
-  }
-
-  onDragEnd(e) {
-    if (this.draggedElement) {
-      this.draggedElement.style.opacity = "1";
+      return;
     }
 
-    // 清除所有拖曳視覺提示
-    document.querySelectorAll("#experimentUnitsList li").forEach((li) => {
-      li.style.borderTop = "none";
-    });
+    // Object format { unitId, newIndex } or { unitId, direction }
+    if (arg1 && typeof arg1 === "object") {
+      const { unitId, direction, newIndex } = arg1;
+      if (!unitId) return;
 
-    this.draggedElement = null;
+      const currentIndex = items.findIndex(
+        (it) => it.dataset.unitId === unitId,
+      );
+      if (currentIndex === -1) return;
+
+      // newIndex or direction provided: UI 已處理 DOM 移動，這裡只更新狀態與選取（避免重複操作 DOM）
+      Logger.debug(
+        "handleUnitReorder: object-format received, syncing states",
+        { unitId, direction, newIndex },
+      );
+      if (typeof this.updateUnitButtonStates === "function")
+        this.updateUnitButtonStates();
+      this.onUnitSelectionChanged();
+      return;
+
+      return;
+    }
+
+    Logger.warn("handleUnitReorder: unsupported arguments", arg1, arg2);
   }
 
   moveUnit(li, direction) {
-    const unitList = document.querySelector("#experimentUnitsList");
+    const unitList = document.querySelector(
+      "#unitsPanelContainer .experiment-units-list",
+    );
     if (!unitList) return;
 
     const allItems = Array.from(
@@ -1832,13 +1728,39 @@ class BoardPageManager {
     this.updateUnitButtonStates();
   }
 
-  updateUnitButtonStates() {
+  /**
+   * 更新全選複選框的狀態
+   */
+  updateSelectAllState() {
+    const selectAllCheckbox = document.querySelector("#selectAllUnits");
+    if (!selectAllCheckbox) return;
+
     const unitList = document.querySelector("#experimentUnitsList");
+    if (!unitList) return;
+
+    const checkboxes = Array.from(
+      unitList.querySelectorAll('input[name="unitCheckbox"]'),
+    );
+    const checkedCount = checkboxes.filter((cb) => cb.checked).length;
+
+    selectAllCheckbox.checked = checkedCount === checkboxes.length;
+    selectAllCheckbox.indeterminate =
+      checkedCount > 0 && checkedCount < checkboxes.length;
+  }
+
+  updateUnitButtonStates() {
+    const unitList = document.querySelector(
+      "#unitsPanelContainer .experiment-units-list",
+    );
     if (!unitList) return;
 
     const allItems = Array.from(
       unitList.querySelectorAll("li:not(.power-option-card)"),
     );
+
+    Logger.debug("updateUnitButtonStates: itemCount", {
+      count: allItems.length,
+    });
 
     allItems.forEach((li, index) => {
       const upBtn = li.querySelector(".unit-up-btn");
@@ -1860,7 +1782,9 @@ class BoardPageManager {
     this.updateUnitButtonStates();
 
     // 取得目前選擇的單元順序
-    const unitList = document.querySelector("#experimentUnitsList");
+    const unitList = document.querySelector(
+      "#unitsPanelContainer .experiment-units-list",
+    );
     if (!unitList) return;
 
     const selectedUnits = [];
@@ -1959,8 +1883,8 @@ class BoardPageManager {
     const experimentData = {
       experiment_id: experimentId,
       subject_name: subjectName,
-      combination_id: this.currentCombination.combination_id,
-      combination_name: this.currentCombination.combination_name,
+      combination_id: this.currentCombination.combinationId,
+      combination_name: this.currentCombination.combinationName,
       unit_count: validUnits.length,
       gesture_count: this.currentCombination.gestures.length,
       start_time: new Date().toISOString(),
@@ -2020,7 +1944,7 @@ class BoardPageManager {
     this.toggleExperimentUI(true); // 鎖定 UI
 
     // 註冊實驗狀態到中樞
-    this.registerExperimentStateToHub({
+    window.experimentSyncManager.registerExperimentStateToHub({
       experiment_id: experimentData.experiment_id,
       subject_name: experimentData.subject_name,
       combination_name: experimentData.combination_name,
@@ -2029,35 +1953,10 @@ class BoardPageManager {
       is_running: true,
     });
 
-    // 啟動計時器
-    resetTimer();
-    toggleTimer();
-
-    // 初始化實驗計時器顯示
-    this.experimentStartTime = Date.now();
-    this.experimentElapsedTime = 0;
-    const experimentTimerDisplay = document.getElementById("experimentTimer");
-    if (experimentTimerDisplay) {
-      experimentTimerDisplay.style.display = "block";
+    // 啟動計時器 - 委派給 experiment-timer.js
+    if (window.experimentTimerManager) {
+      window.experimentTimerManager.startExperimentTimer();
     }
-
-    // 建立實驗計時器間隔器
-    this.experimentTimerInterval = setInterval(() => {
-      if (!this.experimentPaused && this.experimentRunning) {
-        this.experimentElapsedTime = Date.now() - this.experimentStartTime;
-        const totalSeconds = Math.floor(this.experimentElapsedTime / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        const milliseconds = this.experimentElapsedTime % 1000;
-        const timeString = `${String(minutes).padStart(2, "0")}:${String(
-          seconds,
-        ).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
-
-        if (experimentTimerDisplay) {
-          experimentTimerDisplay.textContent = timeString;
-        }
-      }
-    }, 50); // 每 50 毫秒更新一次，以便毫秒顯示更流暢
 
     // 初始化受試者名稱狀態
     const subjectNameInput = document.getElementById("subjectName");
@@ -2100,7 +1999,7 @@ class BoardPageManager {
         this.loadedUnits = loadedUnits;
       }
       Logger.info(
-        `套用等待中的組合更新: ${currentCombination?.combination_name || "未知組合"}`,
+        `套用等待中的組合更新: ${currentCombination?.combinationName || "未知組合"}`,
       );
       this.pendingCombinationUpdate = null;
     }
@@ -2112,7 +2011,7 @@ class BoardPageManager {
           experimentId:
             document.getElementById("experimentIdInput")?.value || "",
           subjectName: document.getElementById("subjectName")?.value || "",
-          combinationName: this.currentCombination?.combination_name || "",
+          combinationName: this.currentCombination?.combinationName || "",
         },
       }),
     );
@@ -2132,7 +2031,8 @@ class BoardPageManager {
       // 顯示下載按鈕
       const logDownloadBtns = document.getElementById("logDownloadBtns");
       if (logDownloadBtns) {
-        logDownloadBtns.style.display = "inline";
+        if (logDownloadBtns.classList.contains("is-hidden"))
+          logDownloadBtns.classList.remove("is-hidden");
       }
     }
 
@@ -2159,16 +2059,9 @@ class BoardPageManager {
       });
     }
 
-    // 清除實驗計時器間隔器
-    if (this.experimentTimerInterval) {
-      clearInterval(this.experimentTimerInterval);
-      this.experimentTimerInterval = null;
-    }
-
-    // 隱藏實驗計時器顯示
-    const experimentTimerDisplay = document.getElementById("experimentTimer");
-    if (experimentTimerDisplay) {
-      experimentTimerDisplay.style.display = "none";
+    // 停止計時器 - 委派給 experiment-timer.js
+    if (window.experimentTimerManager) {
+      window.experimentTimerManager.stopExperimentTimer();
     }
 
     // 解鎖 UI
@@ -2176,10 +2069,10 @@ class BoardPageManager {
 
     //廣播實驗停止狀態到其他連線裝置（僅人為停止時廣播）
     if (isManualStop) {
-      this.broadcastExperimentStop();
+      window.experimentSyncManager.broadcastExperimentStop();
     } else {
       // 自動停止時，產生新的實驗ID（會自動廣播到同步工作階段）
-      const newId = this.generateNewExperimentId();
+      const newId = this.generateExperimentId();
 
       // 更新日誌管理器的實驗ID
       if (window.experimentLogManager) {
@@ -2206,17 +2099,20 @@ class BoardPageManager {
       return;
     }
 
-    // 切換暫停狀態
-    this.experimentPaused = !this.experimentPaused;
-
     const pauseBtn = document.getElementById("pauseExperimentBtn");
+    const isPaused = window.experimentTimerManager?.experimentPaused ?? false;
+    const newPausedState = !isPaused;
+
+    // 更新按鈕文本
     if (pauseBtn) {
-      pauseBtn.textContent = this.experimentPaused ? "▶ 繼續" : "⏸ 暫停";
+      pauseBtn.textContent = newPausedState ? "▶ 繼續" : "⏸ 暫停";
     }
 
-    if (this.experimentPaused) {
-      // 暫停實驗
-      toggleTimer();
+    if (newPausedState) {
+      // 暫停實驗 - 委派給 experiment-timer.js
+      if (window.experimentTimerManager) {
+        window.experimentTimerManager.pauseExperimentTimer();
+      }
       if (window.logger) {
         window.logger.logExperimentPause();
       }
@@ -2227,10 +2123,12 @@ class BoardPageManager {
         }),
       );
       //廣播暫停狀態到其他連線裝置
-      this.broadcastExperimentPauseState(true);
+      window.experimentSyncManager.broadcastExperimentPauseState(true);
     } else {
-      // 繼續實驗
-      toggleTimer();
+      // 繼續實驗 - 委派給 experiment-timer.js
+      if (window.experimentTimerManager) {
+        window.experimentTimerManager.resumeExperimentTimer();
+      }
       if (window.logger) {
         window.logger.logExperimentResume();
       }
@@ -2241,7 +2139,7 @@ class BoardPageManager {
         }),
       );
       //廣播還原狀態到其他連線裝置
-      this.broadcastExperimentPauseState(false);
+      window.experimentSyncManager.broadcastExperimentPauseState(false);
     }
   }
 
@@ -2280,16 +2178,17 @@ class BoardPageManager {
     );
 
     if (experimentIdRow) {
-      experimentIdRow.style.display = locked ? "none" : "flex";
+      experimentIdRow.classList.toggle("is-hidden", locked);
     }
     if (experimentControlButtons) {
-      experimentControlButtons.style.display = locked ? "flex" : "none";
+      experimentControlButtons.classList.toggle("is-hidden", !locked);
     }
 
     // 實驗中時隱藏計時器按鈕顯示區
     const experimentTimer = document.getElementById("experimentTimer");
     if (experimentTimer && locked) {
-      experimentTimer.style.display = "inline";
+      if (experimentTimer.classList.contains("is-hidden"))
+        experimentTimer.classList.remove("is-hidden");
     }
   }
 
@@ -2416,7 +2315,9 @@ class BoardPageManager {
       //處理面板的暫停訊號
       else if (state.type === "experiment_paused" && state.source === "panel") {
         // 接收到機台面板的暫停訊號
-        if (!this.experimentPaused) {
+        const isPaused =
+          window.experimentTimerManager?.experimentPaused ?? false;
+        if (!isPaused) {
           this.togglePauseExperiment();
         }
       }
@@ -2426,7 +2327,9 @@ class BoardPageManager {
         state.source === "panel"
       ) {
         // 接收到機台面板的還原訊號
-        if (this.experimentPaused) {
+        const isPaused =
+          window.experimentTimerManager?.experimentPaused ?? false;
+        if (isPaused) {
           this.togglePauseExperiment();
         }
       }
@@ -2436,7 +2339,9 @@ class BoardPageManager {
         state.source === "panel"
       ) {
         // 接收到機台面板的停止訊號
-        if (this.experimentRunning || this.experimentPaused) {
+        const isPaused =
+          window.experimentTimerManager?.experimentPaused ?? false;
+        if (this.experimentRunning || isPaused) {
           //響應遠端停止訊號時不廣播（false = 不廣播）
           this.stopExperiment(false);
         }
@@ -2474,7 +2379,7 @@ class BoardPageManager {
       const hubManager = getExperimentHubManager();
 
       // 避免自己廣播的回音
-      if (client_id === hubManager.hubClient.clientId) {
+      if (client_id === hubManager.getClientId()) {
         return;
       }
 
@@ -2489,11 +2394,14 @@ class BoardPageManager {
     });
 
     // 監聽組合選擇事件
-    document.addEventListener("combination_selected", (event) => {
-      const { combination } = event.detail;
+    document.addEventListener("combination:selected", (event) => {
+      const { combination, unitIds } = event.detail;
       if (combination) {
         // 更新目前組合
         this.currentCombination = combination;
+
+        // 更新單元列表以匹配組合要求
+        this.updateUnitListForCombination(combination);
 
         // 載入對應的腳本
         const experimentId = document
@@ -2802,7 +2710,7 @@ class BoardPageManager {
     // 如果提供了 action_id，直接使用；否則使用目前 action
     let targetActionId = actionId;
     if (!targetActionId) {
-      const currentAction = window.actionManager?.getCurrentAction();
+      const currentAction = window.experimentActionHandler?.getCurrentAction();
       if (!currentAction) {
         Logger.warn("無法取得目前 action");
         return;
@@ -2924,111 +2832,6 @@ class BoardPageManager {
   }
 
   /** 註冊實驗狀態到中樞 */
-  async registerExperimentStateToHub(stateData) {
-    try {
-      const _params = new URLSearchParams({
-        action: "register",
-        experiment_id: stateData.experiment_id || "",
-        subject_name: stateData.subject_name || "",
-        combination_name: stateData.combination_name || "",
-        combination_id: stateData.combination_id || "",
-        gesture_count: stateData.gesture_count || 0,
-        gesture_sequence: JSON.stringify(stateData.gesture_sequence || []),
-        current_step: stateData.current_step || 0,
-        is_running: stateData.is_running ? "true" : "false",
-        source: "experiment_manager",
-      });
-
-      // 移除 PHP 調用
-      // 狀態管理由 ExperimentStateManager 和 WebSocket 處理
-      Logger.debug("跳過 PHP API 調用");
-    } catch (error) {
-      Logger.warn("註冊實驗狀態失敗:", error);
-    }
-  }
-
-  /** 廣播實驗ID更新到其他連線裝置 */
-  broadcastExperimentIdUpdate(experimentId) {
-    // 檢查是否存在同步工作階段
-    if (!window.syncManager?.core?.isConnected?.()) {
-      return;
-    }
-
-    const updateData = {
-      type: "experimentIdUpdate",
-      client_id:
-        window.syncManager?.core?.syncClient?.clientId || "experiment_panel",
-      experimentId: experimentId,
-      timestamp: new Date().toISOString(),
-    };
-
-    // 使用統一的同步機制
-    window.syncManager.core.syncState(updateData).catch((error) => {
-      Logger.warn("廣播實驗ID更新失敗:", error);
-    });
-
-    // 分派事件供本機同步管理器捕獲
-    document.dispatchEvent(
-      new CustomEvent("experimentStateChange", {
-        detail: updateData,
-      }),
-    );
-  }
-
-  /** 廣播暫停/還原狀態到其他連線裝置 */
-  broadcastExperimentPauseState(isPaused) {
-    // 檢查是否存在同步工作階段
-    if (!window.syncManager?.core?.isConnected()) {
-      return;
-    }
-
-    const updateData = {
-      type: isPaused ? "experimentPaused" : "experimentResumed",
-      client_id: window.syncManager?.clientId || "experiment_panel",
-      experimentId: document.getElementById("experimentIdInput")?.value || "",
-      isPaused: isPaused,
-      timestamp: new Date().toISOString(),
-    };
-
-    // 同步到伺服器
-    window.syncManager.core.syncState(updateData).catch((error) => {
-      Logger.warn("同步實驗暫停狀態失敗:", error);
-    });
-
-    // 分派事件供本機同步管理器捕獲
-    document.dispatchEvent(
-      new CustomEvent("experimentStateChange", {
-        detail: updateData,
-      }),
-    );
-  }
-
-  /** 廣播實驗停止狀態到其他連線裝置 */
-  broadcastExperimentStop() {
-    // 檢查是否存在同步工作階段
-    if (!window.syncManager?.core?.isConnected()) {
-      return;
-    }
-
-    const updateData = {
-      type: "experimentStopped",
-      client_id: window.syncManager?.clientId || "experiment_panel",
-      experimentId: document.getElementById("experimentIdInput")?.value || "",
-      timestamp: new Date().toISOString(),
-    };
-
-    // 同步到伺服器
-    window.syncManager.core.syncState(updateData).catch((error) => {
-      Logger.warn("同步實驗停止狀態失敗:", error);
-    });
-
-    // 分派事件供本機同步管理器捕獲
-    document.dispatchEvent(
-      new CustomEvent("experimentStateChange", {
-        detail: updateData,
-      }),
-    );
-  }
 
   /** 處理遠端實驗開始 */
   handleRemoteExperimentStarted(detail) {
@@ -3091,22 +2894,21 @@ class BoardPageManager {
     }
 
     // 如果已經暫停，忽略
-    if (this.experimentPaused) {
+    const isPaused = window.experimentTimerManager?.experimentPaused ?? false;
+    if (isPaused) {
       return;
     }
 
-    // 同步暫停狀態
-
-    this.experimentPaused = true;
+    // 同步暫停狀態 - 委派給 experiment-timer.js
+    if (window.experimentTimerManager) {
+      window.experimentTimerManager.pauseExperimentTimer();
+    }
 
     // 更新暫停按鈕顯示
     const pauseBtn = document.getElementById("pauseExperimentBtn");
     if (pauseBtn) {
       pauseBtn.textContent = "▶ 繼續";
     }
-
-    // 停止計時器
-    toggleTimer();
 
     // 記錄日誌
     if (window.logger) {
@@ -3126,13 +2928,15 @@ class BoardPageManager {
     }
 
     // 如果未暫停，忽略
-    if (!this.experimentPaused) {
+    const isPaused = window.experimentTimerManager?.experimentPaused ?? false;
+    if (!isPaused) {
       return;
     }
 
-    // 同步還原狀態
-
-    this.experimentPaused = false;
+    // 同步還原狀態 - 委派給 experiment-timer.js
+    if (window.experimentTimerManager) {
+      window.experimentTimerManager.resumeExperimentTimer();
+    }
 
     // 更新暫停按鈕顯示
     const pauseBtn = document.getElementById("pauseExperimentBtn");
@@ -3140,16 +2944,13 @@ class BoardPageManager {
       pauseBtn.textContent = "⏸ 暫停";
     }
 
-    // 繼續計時器
-    toggleTimer();
-
     // 記錄日誌
     if (window.logger) {
       window.logger.logAction("遠端繼續實驗", null, null, false, false);
     }
 
     this.logAction("remote_experiment_resumed", {
-      remote_device_id: detail.remote_device_id,
+      remote_client_id: detail.remote_client_id,
     });
   }
 
@@ -3197,11 +2998,11 @@ globalThis.app = window.boardPageManager;
 const _app = globalThis.app; // 為了向後相容
 
 // 暴露工具函式到全域作用域供 HTML 使用
-window.toggleTimer = toggleTimer;
-window.formatDuration = formatDuration;
-window.resetTimer = resetTimer;
-window.timerLongPressStart = timerLongPressStart;
-window.timerLongPressEnd = timerLongPressEnd;
+window.toggleTimer = window.toggleTimer;
+window.formatDuration = window.formatDuration;
+window.resetTimer = window.resetTimer;
+window.timerLongPressStart = window.timerLongPressStart;
+window.timerLongPressEnd = window.timerLongPressEnd;
 
 /**
  * 處理 action 按鈕點擊（供 HTML onclick 使用）
@@ -3247,9 +3048,9 @@ window.markActionCompleted = function (
   isRemote = false,
 ) {
   // 取得裝置 ID
-  let deviceId = null;
+  let clientId = null;
   if (window.syncClient) {
-    deviceId = window.syncClient.clientId;
+    clientId = window.syncClient.clientId;
   }
 
   // 更新按鈕狀態
@@ -3264,7 +3065,7 @@ window.markActionCompleted = function (
       actionId,
       gestureIndex,
       null,
-      deviceId,
+      clientId,
     );
   }
 
@@ -3275,7 +3076,7 @@ window.markActionCompleted = function (
         type: "action_completed",
         action_id: actionId,
         gesture_index: gestureIndex,
-        device_id: deviceId,
+        client_id: clientId,
         timestamp: new Date().toISOString(),
       })
       .catch((error) => {
@@ -3296,9 +3097,9 @@ window.cancelActionCompletion = function (
   gestureIndex,
 ) {
   // 取得裝置 ID
-  let deviceId = null;
+  let clientId = null;
   if (window.syncClient) {
-    deviceId = window.syncClient.clientId;
+    clientId = window.syncClient.clientId;
   }
 
   // 還原按鈕狀態
@@ -3313,7 +3114,7 @@ window.cancelActionCompletion = function (
       `${actionId}_CANCELLED`,
       gestureIndex,
       null,
-      deviceId,
+      clientId,
     );
   }
 
@@ -3324,7 +3125,7 @@ window.cancelActionCompletion = function (
         type: "action_cancelled",
         action_id: actionId,
         gesture_index: gestureIndex,
-        device_id: deviceId,
+        client_id: clientId,
         timestamp: new Date().toISOString(),
       })
       .catch((error) => {
@@ -3332,7 +3133,3 @@ window.cancelActionCompletion = function (
       });
   }
 };
-window.markGesture = markGesture;
-window.goToNextStep = goToNextStep;
-window.toggleLeftPanel = toggleLeftPanel;
-window.toggleGestureStats = toggleGestureStats;

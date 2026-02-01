@@ -46,22 +46,15 @@ export function generateShareCode(calculateChecksum) {
 }
 
 /**
- * 產生實驗ID（含日期與隨機碼）
- * 格式: EXP{YYYYMMDD}{4位隨機大寫英數字}
- * 範例: "EXP20260109ABCD"
+ * 產生實驗ID
+ * 格式: 6位大寫英數字隨機碼
+ * 範例: "JHWH4A", "K3LM9P"
  */
 export function generateExperimentId() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const dateStr = `${year}${month}${day}`;
-
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let randomStr = "";
-  for (let i = 0; i < 4; i++) {
-    randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-
-  return `EXP${dateStr}${randomStr}`;
+  return result;
 }

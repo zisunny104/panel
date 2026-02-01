@@ -23,6 +23,13 @@
     scrollbar-color: #bbb #f5f5f5;
 }
 
+/* Space stacked board sections and other direct children consistently */
+.left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
 .left-panel::-webkit-scrollbar {
     width: 8px;
 }

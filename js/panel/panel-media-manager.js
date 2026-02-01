@@ -24,6 +24,30 @@ class MediaManager {
 
     // 監聽組合選擇事件，進行組合特定的預先載入
     this.setupEventListeners();
+
+    // 應用已儲存的媒體音量設定
+    this.applyStoredMediaVolume();
+
+    // 延遲預載基本媒體資源，避免影響初始載入性能
+    this.scheduleEssentialPreload();
+  }
+
+  /**
+   * 安排基本媒體資源的預載
+   */
+  scheduleEssentialPreload() {
+    // 等待 DOM 完全載入後，再延遲 1 秒開始預載
+    if (document.readyState === "complete") {
+      setTimeout(() => {
+        this.preloadAllMedia();
+      }, 1000);
+    } else {
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          this.preloadAllMedia();
+        }, 1000);
+      });
+    }
   }
 
   /**
@@ -31,7 +55,7 @@ class MediaManager {
    */
   setupEventListeners() {
     // 監聽組合選擇事件
-    document.addEventListener("combination_selected", (event) => {
+    document.addEventListener("combination:selected", (event) => {
       const combination = event.detail?.combination;
       if (combination) {
         setTimeout(() => this.preloadCombinationMedia(combination), 500);
@@ -165,7 +189,6 @@ class MediaManager {
 
     video.style.width = "100%";
     video.style.height = "100%";
-    video.style.display = "block";
     video.style.objectFit = "contain";
     video.style.outline = "none";
     video.style.border = "none";
@@ -254,7 +277,6 @@ class MediaManager {
 
     img.style.width = "100%";
     img.style.height = "100%";
-    img.style.display = "block";
     img.style.objectFit = "contain";
 
     img.addEventListener("error", (e) => {
@@ -287,12 +309,12 @@ class MediaManager {
     video.src = src;
     video.style.width = "100%";
     video.style.height = "100%";
-    video.style.display = "block";
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
     video.setAttribute("preload", "auto");
     video.controls = options.controls || false;
     video.muted = options.muted ?? true;
+    video.volume = this.mediaVolume; // 應用媒體音量設定
     video.autoplay = true;
 
     this.mediaArea.appendChild(video);
@@ -352,7 +374,7 @@ class MediaManager {
 
     const video = this.playMedia("assets/units/SYSTEM/home_page.mp4", {
       controls: false,
-      muted: true,
+      muted: false, // 不強制靜音，使用音量設定
       loop: true,
       autoplay: true,
       onError: (e, errorInfo) => {
@@ -407,6 +429,15 @@ class MediaManager {
       autoplay: true,
       loop: false,
       scrollIntoView: true,
+      onEnded: () => {
+        // 媒體播放結束時，通知 PanelPageManager 處理
+        if (
+          window.panelPageManager &&
+          window.panelPageManager._handleMediaEnd
+        ) {
+          window.panelPageManager._handleMediaEnd();
+        }
+      },
     });
 
     return mediaElement;
@@ -433,7 +464,7 @@ class MediaManager {
     ) {
       // 預先載入圖片
       preloadElement = document.createElement("img");
-      preloadElement.style.display = "none"; // 不顯示，只預先載入
+      preloadElement.classList.add("is-hidden"); // 不顯示，只預先載入
       preloadElement.src = mediaFile;
       preloadElement.setAttribute("data-preload", "true");
       document.body.appendChild(preloadElement);
@@ -446,7 +477,7 @@ class MediaManager {
     ) {
       // 預先載入影片（使用 preload 屬性）
       preloadElement = document.createElement("video");
-      preloadElement.style.display = "none";
+      preloadElement.classList.add("is-hidden");
       preloadElement.src = mediaFile;
       preloadElement.setAttribute("preload", "auto");
       preloadElement.setAttribute("data-preload", "true");
@@ -506,19 +537,19 @@ class MediaManager {
     }
 
     // 更新顯示狀態
-    if (window.uiControls) {
+    if (window.panelUIManager) {
       const toggleMediaAreaMarker = document.getElementById(
         "toggleMediaAreaMarker",
       );
       const toggleMediaContent = document.getElementById("toggleMediaContent");
 
       if (toggleMediaAreaMarker) {
-        window.uiControls.updateMediaAreaMarkerVisibility(
+        window.panelUIManager.updateMediaAreaMarkerVisibility(
           toggleMediaAreaMarker.checked,
         );
       }
       if (toggleMediaContent) {
-        window.uiControls.updateMediaContentVisibility(
+        window.panelUIManager.updateMediaContentVisibility(
           toggleMediaContent.checked,
         );
       }
@@ -835,6 +866,7 @@ class MediaManager {
 
     const currentCombination =
       providedCombination ||
+      window.experimentCombinationManager?.getCurrentCombination() ||
       window.experimentManager?.currentCombination ||
       window.combinationSelector?.currentCombination;
 
@@ -994,10 +1026,25 @@ class MediaManager {
       Logger.warn("收集組合媒體檔案失敗:", error);
     }
 
+    // 簡化輸出：列出數量與前幾筆示例；若開發者想看完整清單，使用可展開的 console 群組
+    const filesArray = Array.from(mediaFiles);
     Logger.debug(
-      "collectCombinationMediaFiles: 收集到的組合媒體檔案 =",
-      Array.from(mediaFiles),
+      `collectCombinationMediaFiles: 收集到 ${filesArray.length} 個媒體檔案`,
     );
+    if (filesArray.length > 0) {
+      Logger.debug("示例媒體檔案:", filesArray.slice(0, 6));
+      try {
+        if (console && typeof console.groupCollapsed === "function") {
+          Logger.groupCollapsed(
+            `[PanelMediaManager] 全部媒體檔案 (${filesArray.length})`,
+          );
+          Logger.debug(filesArray);
+          console.groupEnd();
+        }
+      } catch (e) {
+        // 若 console 不可用 或 發生錯誤，保持安靜
+      }
+    }
 
     return Array.from(mediaFiles);
   }
@@ -1113,14 +1160,17 @@ class MediaManager {
   setMediaVolume(volume) {
     this.mediaVolume = Math.max(0, Math.min(1, volume));
 
-    // 更新目前播放中的媒體音量
-    const currentMedia = this.mediaArea?.querySelector("video, audio");
-    if (currentMedia) {
-      currentMedia.volume = this.mediaVolume;
-    }
+    // 更新所有播放中的媒體音量
+    const allMediaElements = document.querySelectorAll("video, audio");
+    allMediaElements.forEach((media) => {
+      if (!media.muted) {
+        // 只更新非靜音的媒體
+        media.volume = this.mediaVolume;
+      }
+    });
 
-    // 更新首頁影片音量
-    if (this.homePageVideoElement) {
+    // 特別更新首頁影片（以防它被靜音設定影響）
+    if (this.homePageVideoElement && !this.homePageVideoElement.muted) {
       this.homePageVideoElement.volume = this.mediaVolume;
     }
   }
@@ -1131,6 +1181,19 @@ class MediaManager {
    */
   getMediaVolume() {
     return this.mediaVolume;
+  }
+
+  /**
+   * 應用已儲存的媒體音量設定
+   */
+  applyStoredMediaVolume() {
+    // 檢查是否有已儲存的媒體音量設定
+    const configSettings = window.configManager?.userSettings || {};
+    const storedVolume =
+      configSettings.mediaVolume ?? localStorage.getItem("mediaVolume") ?? 70; // 預設 70%
+
+    // 將百分比轉換為小數並應用
+    this.setMediaVolume(parseInt(storedVolume) / 100);
   }
 
   /**

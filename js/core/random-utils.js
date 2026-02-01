@@ -62,7 +62,7 @@ function getCombinationUnitIds(combination, experimentId = null) {
       const seededRandom = createSeededRandom(seed);
       const randomized = shuffleArray(
         [...combination.units.randomizable],
-        seededRandom
+        seededRandom,
       );
       unitIds = randomized;
     } else if (combination.units.randomizable) {
@@ -99,7 +99,7 @@ function getCombinationUnitIds(combination, experimentId = null) {
  * 產生新的實驗ID（6位字母數字隨機字串）
  * @returns {string} 產生的實驗ID
  */
-function generateNewExperimentId() {
+function generateExperimentId() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let result = "";
   for (let i = 0; i < 6; i++) {
@@ -108,13 +108,10 @@ function generateNewExperimentId() {
   return result;
 }
 
-// 匯出函數供其他模組使用
-export const RandomUtils = {
+// 移除 ES 模組 export，直接將物件指派到全域
+window.RandomUtils = {
   createSeededRandom,
   shuffleArray,
   getCombinationUnitIds,
-  generateNewExperimentId
+  generateExperimentId,
 };
-
-// 保持向後相容的全域物件
-window.RandomUtils = RandomUtils;

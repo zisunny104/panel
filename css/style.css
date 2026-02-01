@@ -18,10 +18,10 @@
 @import url('./components/control-panel.css');
 @import url('./components/toggle-switch.css');
 
-/* ===== 面板 ===== */
-@import url('./panels/experiment-panel.css');
-@import url('./panels/log-panel.css');
-@import url('./panels/maintenance-panel.css');
+/* ===== 面板 (已移至 features/panels) ===== */
+@import url('./features/panels/experiment-panel.css');
+@import url('./features/panels/log-panel.css');
+@import url('./features/panels/maintenance-panel.css');
 
 /* ===== 狀態 ===== */
 @import url('./states/power-states.css');
@@ -50,3 +50,69 @@
 @import url('./experiment/stats.css');
 @import url('./experiment/units.css');
 @import url('./experiment/log-view-modal.css');
+/*@import url('./experiment/ui-components.css');*/
+
+/* ===== CLS 改善（為動態內容預留空間） =====
+    為主要容器與常見會動態載入內容的區塊設定最小高度
+    以減少 Content Layout Shift（CLS）事件。保留必要的彈性。
+*/
+.container.scrollbar-gray {
+   min-height: calc(100vh - 48px);
+}
+
+/* 主要實驗區塊：保守設定 min-height 以降低 CLS */
+#experimentLogContainer,
+#experimentLogsContainer,
+.logs-list-container,
+#combinationSelectorContainer,
+#unitsPanelContainer,
+#experimentControlsContainer,
+.sync-sessions-overlay .modal-body {
+   min-height: 140px;
+   min-width: 220px;
+   box-sizing: border-box;
+}
+
+/* 輕量 skeleton（CSS-only，保守）：非強制使用，僅提供預留視覺 */
+.skeleton {
+   background-color: #f3f3f3;
+   position: relative;
+   overflow: hidden;
+}
+
+.skeleton-line {
+   height: 12px;
+   margin: 8px 0;
+   background: linear-gradient(90deg, #f3f3f3 0%, #ececec 50%, #f3f3f3 100%);
+   background-size: 200% 100%;
+   animation: skeleton-shimmer 1.2s linear infinite;
+   border-radius: 4px;
+}
+
+@keyframes skeleton-shimmer {
+   from {
+      background-position: 200% 0;
+   }
+
+   to {
+      background-position: -200% 0;
+   }
+}
+
+/* 避免圖片、SVG 等在載入時造成尺寸變動 */
+img,
+.svg-icon {
+   max-width: 100%;
+   height: auto;
+   display: block;
+}
+
+/* Utility class for hiding elements via class toggling (preferred over inline styles) */
+.is-hidden {
+   display: none !important;
+}
+
+/* Utility class for forcing flex via class instead of inline style */
+.is-flex {
+   display: flex !important;
+}

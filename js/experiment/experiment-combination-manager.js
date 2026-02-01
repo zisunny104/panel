@@ -1,51 +1,35 @@
 /**
  * ExperimentCombinationManager - 實驗組合管理器
- * Phase 2 - P0 核心模組
- *
- * 職責：
- * 1. 組合載入與管理
- * 2. 隨機化邏輯
- * 3. 預設組合處理
- * 4. 組合同步廣播
- *
- * 提取來源：
- * - panel-experiment-units.js (組合載入與管理)
- * - combination-selector.js (隨機化邏輯)
- * - random-utils.js (隨機工具)
+ * 負責組合載入、隨機化、快取和同步功能
  */
 
 class ExperimentCombinationManager {
-  /**
-   * 事件類型常數
-   */
   static EVENT = {
-    COMBINATION_LOADED: 'combination:loaded',
-    COMBINATION_SELECTED: 'combination:selected',
-    COMBINATION_CHANGED: 'combination:changed',
-    UNITS_RANDOMIZED: 'combination:units_randomized',
-    ERROR: 'combination:error'
+    COMBINATION_LOADED: "combination:loaded",
+    COMBINATION_SELECTED: "combination:selected",
+    COMBINATION_CHANGED: "combination:changed",
+    UNITS_RANDOMIZED: "combination:units_randomized",
+    ERROR: "combination:error",
   };
 
   constructor(config = {}) {
-    // 配置
     this.config = {
-      dataPath: config.dataPath || 'data/scenarios.json',
-      defaultCombinationId: config.defaultCombinationId || window.CONFIG?.experiment?.defaultCombinationId,
+      dataPath: config.dataPath || "data/scenarios.json",
+      defaultCombinationId:
+        config.defaultCombinationId ||
+        window.CONFIG?.experiment?.defaultCombinationId,
       enableRandomization: config.enableRandomization !== false,
       cacheEnabled: config.cacheEnabled !== false,
-      ...config
+      ...config,
     };
 
-    // 狀態
     this.scriptData = null;
     this.currentCombination = null;
     this.loadedUnits = [];
     this.isInitialized = false;
-
-    // 事件監聽器
+    this.readyPromise = null; // Promise to wait for initialization
     this.eventListeners = new Map();
 
-    // 初始化
     this.initialize();
   }
 
@@ -53,198 +37,228 @@ class ExperimentCombinationManager {
    * 初始化管理器
    */
   async initialize() {
-    try {
-      // 載入 script 資料
+    if (this.readyPromise) return this.readyPromise;
+
+    this.readyPromise = (async () => {
       await this.loadScriptData();
 
-      // 從快取恢復組合（如果有）
       if (this.config.cacheEnabled) {
         await this.restoreFromCache();
       }
 
-      // 如果沒有恢復到組合，套用預設組合
       if (!this.currentCombination) {
         await this.applyDefaultCombination();
       }
 
       this.isInitialized = true;
-      Logger.debug('ExperimentCombinationManager 初始化完成', {
-        currentCombination: this.currentCombination?.name
-      });
-    } catch (error) {
-      Logger.error('ExperimentCombinationManager 初始化失敗', error);
-      this.emit(ExperimentCombinationManager.EVENT.ERROR, {
-        type: 'initialization_failed',
-        error
-      });
-    }
+      Logger.debug("ExperimentCombinationManager 初始化完成");
+    })();
+
+    return this.readyPromise;
   }
 
-  // ==================== 組合載入 ====================
+  // ==================== 公開 API ====================
 
   /**
-   * 載入 script 資料
+   * 設定組合
+   * @param {Object} combination - 組合物件
+   * @param {string} experimentId - 實驗ID
+   * @param {Object} options - 選項
    */
-  async loadScriptData() {
-    if (this.scriptData) {
-      return this.scriptData;
+  async setCombination(combination, experimentId = null, options = {}) {
+    if (!combination || !this.validateCombination(combination).valid) {
+      Logger.error("無效的組合", combination);
+      return false;
     }
 
-    try {
-      const response = await fetch(this.config.dataPath);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    const oldCombination = this.currentCombination;
+    this.currentCombination = combination;
+    this.loadedUnits = this.getCombinationUnitIds(combination, experimentId);
+
+    if (this.config.cacheEnabled && !options.skipCache) {
+      this.saveToCache(combination);
+    }
+
+    if (!options.silent) {
+      this.emit(ExperimentCombinationManager.EVENT.COMBINATION_SELECTED, {
+        combination,
+        unitIds: this.loadedUnits,
+        experimentId,
+      });
+
+      if (oldCombination?.combinationId !== combination.combinationId) {
+        this.emit(ExperimentCombinationManager.EVENT.COMBINATION_CHANGED, {
+          oldCombination,
+          newCombination: combination,
+        });
       }
-
-      this.scriptData = await response.json();
-      this.emit(ExperimentCombinationManager.EVENT.COMBINATION_LOADED, {
-        data: this.scriptData
-      });
-
-      Logger.debug('script 資料載入完成', {
-        combinations: this.scriptData.unit_combinations?.length || 0
-      });
-
-      return this.scriptData;
-    } catch (error) {
-      Logger.error('載入 script 資料失敗', error);
-      this.emit(ExperimentCombinationManager.EVENT.ERROR, {
-        type: 'load_failed',
-        error
-      });
-      return null;
     }
+
+    Logger.debug("組合已設定", combination.combinationName);
+    return true;
   }
 
   /**
-   * 取得所有可用組合
-   */
-  getAvailableCombinations() {
-    if (!this.scriptData) {
-      Logger.warn('script 資料尚未載入');
-      return [];
-    }
-    return this.scriptData.unit_combinations || [];
-  }
-
-  /**
-   * 根據 ID 取得組合
-   */
-  getCombinationById(combinationId) {
-    const combinations = this.getAvailableCombinations();
-    return combinations.find(c => c.combination_id === combinationId);
-  }
-
-  /**
-   * 取得當前組合
+   * 取得目前組合
    */
   getCurrentCombination() {
     return this.currentCombination;
   }
 
   /**
-   * 設定組合
+   * 取得所有可用組合
    */
-  async setCombination(combination, experimentId = null, options = {}) {
-    if (!combination) {
-      Logger.warn('setCombination: 組合為空');
-      return false;
-    }
-
-    const oldCombination = this.currentCombination;
-    this.currentCombination = combination;
-
-    // 取得單元 ID 列表（包含隨機化處理）
-    const unitIds = this.getCombinationUnitIds(combination, experimentId);
-    this.loadedUnits = unitIds;
-
-    // 儲存到快取
-    if (this.config.cacheEnabled && !options.skipCache) {
-      this.saveToCache(combination);
-    }
-
-    // 觸發事件
-    if (!options.silent) {
-      this.emit(ExperimentCombinationManager.EVENT.COMBINATION_SELECTED, {
-        combination,
-        unitIds,
-        experimentId
-      });
-
-      if (oldCombination && oldCombination.combination_id !== combination.combination_id) {
-        this.emit(ExperimentCombinationManager.EVENT.COMBINATION_CHANGED, {
-          oldCombination,
-          newCombination: combination
-        });
-      }
-    }
-
-    Logger.debug('組合已設定', {
-      name: combination.name,
-      unitCount: unitIds.length,
-      isRandomized: combination.is_randomizable
-    });
-
-    return true;
+  getAvailableCombinations() {
+    return this.scriptData?.unit_combinations || [];
   }
 
   /**
-   * 驗證組合有效性
+   * 根據 ID 取得組合
    */
-  validateCombination(combination) {
-    if (!combination) {
-      return { valid: false, error: '組合不能為空' };
+  getCombinationById(combinationId) {
+    return this.getAvailableCombinations().find(
+      (c) => c.combinationId === combinationId,
+    );
+  }
+
+  /**
+   * 取得載入的單元列表
+   */
+  getLoadedUnits() {
+    return [...this.loadedUnits];
+  }
+
+  /**
+   * 產生隨機組合
+   */
+  generateRandomCombination(seed = null) {
+    const combinations = this.getAvailableCombinations();
+    if (combinations.length === 0) return null;
+
+    if (!seed) {
+      // 無種子時使用原生隨機
+      const randomIndex = Math.floor(Math.random() * combinations.length);
+      return combinations[randomIndex];
     }
 
-    if (!combination.combination_id) {
-      return { valid: false, error: '組合缺少 combination_id' };
+    // 有種子時必須使用 RandomUtils 確保可重現性
+    if (!window.RandomUtils || !window.RandomUtils.createSeededRandom) {
+      throw new Error(
+        "RandomUtils 不可用：無法產生可重現的隨機組合。請確保 random-utils.js 已正確載入。",
+      );
     }
 
-    if (!combination.name) {
-      return { valid: false, error: '組合缺少 name' };
+    const seededRandom = window.RandomUtils.createSeededRandom(seed);
+    const randomIndex = Math.floor(seededRandom() * combinations.length);
+    return combinations[randomIndex];
+  }
+
+  // ==================== 資料載入 ====================
+
+  /**
+   * 等待初始化完成
+   */
+  async ready() {
+    return this.readyPromise || this.initialize();
+  }
+
+  /**
+   * 載入 script 資料
+   */
+  async loadScriptData() {
+    if (this.scriptData) return this.scriptData;
+
+    const response = await fetch(this.config.dataPath);
+    if (!response.ok) {
+      throw new Error(`載入失敗: ${response.status}`);
     }
 
-    if (!combination.units) {
-      return { valid: false, error: '組合缺少 units' };
+    this.scriptData = await response.json();
+
+    // 轉換欄位名稱為駝峰式
+    if (this.scriptData?.unit_combinations) {
+      this.scriptData.unit_combinations = this.scriptData.unit_combinations.map(
+        (c) => ({
+          ...c,
+          combinationId: c.combination_id,
+          combinationName: c.combination_name,
+        }),
+      );
     }
 
-    return { valid: true };
+    this.emit(ExperimentCombinationManager.EVENT.COMBINATION_LOADED, {
+      data: this.scriptData,
+    });
+
+    return this.scriptData;
+  }
+
+  // ==================== 預設組合 ====================
+
+  /**
+   * 套用預設組合
+   */
+  async applyDefaultCombination() {
+    if (this.currentCombination) return true;
+
+    if (!this.scriptData) {
+      await this.loadScriptData();
+    }
+
+    const defaultCombo = this.getDefaultCombination();
+    const experimentId =
+      window.experimentHubManager?.getExperimentId?.() || null;
+
+    if (defaultCombo) {
+      return this.setCombination(defaultCombo, experimentId);
+    }
+
+    // 備案：使用第一個可用組合
+    const combinations = this.getAvailableCombinations();
+    if (combinations.length > 0) {
+      return this.setCombination(combinations[0], experimentId);
+    }
+
+    return false;
+  }
+
+  /**
+   * 取得預設組合
+   */
+  getDefaultCombination() {
+    if (this.config.defaultCombinationId) {
+      return this.getCombinationById(this.config.defaultCombinationId);
+    }
+    return this.getAvailableCombinations()[0] || null;
   }
 
   // ==================== 隨機化邏輯 ====================
 
   /**
    * 處理組合單元的隨機化邏輯
-   * @param {Object} combination - 組合物件
-   * @param {string} experimentId - 實驗ID（用作種子）
-   * @returns {Array} 排序後的單元ID列表
    */
   getCombinationUnitIds(combination, experimentId = null) {
     let unitIds = [];
 
     if (Array.isArray(combination.units)) {
-      // 簡單陣列格式
       unitIds = combination.units;
-    } else if (combination.units && typeof combination.units === 'object') {
-      // 複雜格式（隨機化）
-      if (this.config.enableRandomization && 
-          combination.is_randomizable && 
-          combination.units.randomizable) {
-        
-        const seed = experimentId || 'default';
+    } else if (combination.units) {
+      if (
+        this.config.enableRandomization &&
+        combination.is_randomizable &&
+        combination.units.randomizable
+      ) {
+        const seed = experimentId || "default";
         unitIds = this.shuffleWithSeed(combination.units.randomizable, seed);
-        
         this.emit(ExperimentCombinationManager.EVENT.UNITS_RANDOMIZED, {
           combination,
           seed,
-          unitIds
+          unitIds,
         });
       } else if (combination.units.randomizable) {
-        // 非隨機化，直接使用 randomizable 的順序
         unitIds = [...combination.units.randomizable];
       }
 
-      // 處理 fixed 單元
       if (combination.units.fixed) {
         unitIds = this.insertFixedUnits(unitIds, combination.units.fixed);
       }
@@ -261,10 +275,10 @@ class ExperimentCombinationManager {
     const fixedLast = [];
     const fixedOther = [];
 
-    fixedUnits.forEach(fixed => {
-      if (fixed.position === 'first') {
+    fixedUnits.forEach((fixed) => {
+      if (fixed.position === "first") {
         fixedFirst.push(fixed.unit_id);
-      } else if (fixed.position === 'last') {
+      } else if (fixed.position === "last") {
         fixedLast.push(fixed.unit_id);
       } else {
         fixedOther.push(fixed.unit_id);
@@ -275,175 +289,42 @@ class ExperimentCombinationManager {
   }
 
   /**
-   * 使用種子洗牌陣列
+   * 使用種子洗牌陣列（依賴統一的 RandomUtils）
    */
   shuffleWithSeed(array, seed) {
-    const seededRandom = this.createSeededRandom(seed);
-    return this.shuffleArray([...array], seededRandom);
+    if (
+      !window.RandomUtils ||
+      !window.RandomUtils.shuffleArray ||
+      !window.RandomUtils.createSeededRandom
+    ) {
+      throw new Error(
+        "RandomUtils 不可用：無法進行隨機化操作。請確保 random-utils.js 已正確載入。",
+      );
+    }
+
+    const seededRandom = window.RandomUtils.createSeededRandom(seed);
+    return window.RandomUtils.shuffleArray([...array], seededRandom);
   }
 
-  /**
-   * 基於種子建立可重現的隨機數產生器
-   * @param {string|number} seed - 種子值
-   * @returns {Function} 隨機數產生函數（0-1 之間）
-   */
-  createSeededRandom(seed) {
-    let numericSeed = 0;
-    
-    if (typeof seed === 'string') {
-      for (let i = 0; i < seed.length; i++) {
-        numericSeed = ((numericSeed << 5) - numericSeed + seed.charCodeAt(i)) & 0xffffffff;
-      }
-    } else {
-      numericSeed = seed || 0;
-    }
-
-    // 使用線性同餘產生器 (LCG)
-    return function() {
-      numericSeed = (numericSeed * 1664525 + 1013904223) & 0xffffffff;
-      return (numericSeed >>> 0) / 4294967296;
-    };
-  }
+  // ==================== 同步功能 ====================
 
   /**
-   * 使用 Fisher-Yates 演算法洗牌陣列
-   * @param {Array} array - 要洗牌的陣列
-   * @param {Function} randomFunc - 隨機數產生函數
-   * @returns {Array} 洗牌後的新陣列
-   */
-  shuffleArray(array, randomFunc) {
-    const result = [...array];
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(randomFunc() * (i + 1));
-      [result[i], result[j]] = [result[j], result[i]];
-    }
-    return result;
-  }
-
-  /**
-   * 生成隨機組合（從可用組合中隨機選擇）
-   */
-  generateRandomCombination(seed = null) {
-    const combinations = this.getAvailableCombinations();
-    
-    if (combinations.length === 0) {
-      Logger.warn('沒有可用組合');
-      return null;
-    }
-
-    if (!seed) {
-      // 真隨機
-      const randomIndex = Math.floor(Math.random() * combinations.length);
-      return combinations[randomIndex];
-    } else {
-      // 基於種子的可重現隨機
-      const seededRandom = this.createSeededRandom(seed);
-      const randomIndex = Math.floor(seededRandom() * combinations.length);
-      return combinations[randomIndex];
-    }
-  }
-
-  /**
-   * 設定隨機種子（用於測試）
-   */
-  setRandomSeed(seed) {
-    this._testSeed = seed;
-    Logger.debug('隨機種子已設定', seed);
-  }
-
-  /**
-   * 取得隨機種子（用於測試）
-   */
-  getRandomSeed() {
-    return this._testSeed;
-  }
-
-  // ==================== 預設處理 ====================
-
-  /**
-   * 套用預設組合
-   */
-  async applyDefaultCombination(experimentId = null) {
-    // 確保資料已載入
-    if (!this.scriptData) {
-      await this.loadScriptData();
-    }
-
-    if (!this.scriptData) {
-      Logger.error('無法載入 script 資料');
-      return false;
-    }
-
-    // 1. 嘗試使用設定的預設組合
-    if (this.config.defaultCombinationId) {
-      const defaultCombination = this.getCombinationById(this.config.defaultCombinationId);
-      
-      if (defaultCombination) {
-        await this.setCombination(defaultCombination, experimentId);
-        Logger.debug('已套用預設組合', defaultCombination.name);
-        return true;
-      } else {
-        Logger.warn('預設組合不存在', this.config.defaultCombinationId);
-      }
-    }
-
-    // 2. 備選方案：使用第一個可用組合
-    const combinations = this.getAvailableCombinations();
-    if (combinations.length > 0) {
-      await this.setCombination(combinations[0], experimentId);
-      Logger.debug('已套用第一個可用組合', combinations[0].name);
-      return true;
-    }
-
-    Logger.error('沒有任何可用組合');
-    return false;
-  }
-
-  /**
-   * 取得預設組合
-   */
-  getDefaultCombination() {
-    if (this.config.defaultCombinationId) {
-      return this.getCombinationById(this.config.defaultCombinationId);
-    }
-
-    const combinations = this.getAvailableCombinations();
-    return combinations[0] || null;
-  }
-
-  // ==================== 同步廣播 ====================
-
-  /**
-   * 廣播組合選擇（透過 SyncClient）
+   * 廣播組合選擇
    */
   broadcastCombinationSelection(combination = null) {
     const targetCombination = combination || this.currentCombination;
-    
-    if (!targetCombination) {
-      Logger.warn('沒有組合可廣播');
-      return false;
-    }
+    if (!targetCombination || !this.isInSyncSession()) return false;
 
-    // 檢查是否在同步會話中
-    if (!this.isInSyncSession()) {
-      Logger.debug('不在同步會話中，跳過廣播');
-      return false;
-    }
-
-    // 使用 SyncClient 廣播
-    if (window.syncClient && typeof window.syncClient.syncState === 'function') {
-      const updateData = {
-        type: 'combination_selected',
+    if (window.syncClient?.syncState) {
+      window.syncClient.syncState({
+        type: "combination_selected",
         combination: targetCombination,
-        timestamp: new Date().toISOString()
-      };
-
-      window.syncClient.syncState(updateData);
-      Logger.debug('組合選擇已廣播', targetCombination.name);
+        timestamp: new Date().toISOString(),
+      });
+      Logger.debug("組合選擇已廣播", targetCombination.combinationName);
       return true;
     }
 
-    Logger.warn('SyncClient 不可用');
     return false;
   }
 
@@ -451,16 +332,13 @@ class ExperimentCombinationManager {
    * 處理遠端組合選擇
    */
   handleRemoteCombinationSelection(combination, experimentId = null) {
-    if (!this.isInSyncSession()) {
-      return;
-    }
-
-    Logger.debug('收到遠端組合選擇', combination.name);
+    if (!this.isInSyncSession()) return;
+    Logger.debug("收到遠端組合選擇", combination.combinationName);
     this.setCombination(combination, experimentId, { skipCache: false });
   }
 
   /**
-   * 檢查是否在同步會話中
+   * 檢查是否在同步工作階段中
    */
   isInSyncSession() {
     return window.syncManager?.isInSession?.() || false;
@@ -473,66 +351,105 @@ class ExperimentCombinationManager {
    */
   saveToCache(combination = null) {
     const targetCombination = combination || this.currentCombination;
-    
-    if (!targetCombination) {
-      return;
-    }
+    if (!targetCombination) return;
 
-    try {
-      const cacheData = {
-        combination_id: targetCombination.combination_id,
-        name: targetCombination.name,
-        timestamp: Date.now()
-      };
+    const cacheData = {
+      combinationId: targetCombination.combinationId,
+      combinationName: targetCombination.combinationName,
+      timestamp: Date.now(),
+    };
 
-      localStorage.setItem('experiment_current_combination', JSON.stringify(cacheData));
-      Logger.debug('組合已儲存到快取', targetCombination.name);
-    } catch (error) {
-      Logger.error('儲存組合到快取失敗', error);
-    }
+    localStorage.setItem(
+      "experimentCurrentCombination",
+      JSON.stringify(cacheData),
+    );
+    Logger.debug("組合已儲存到快取", targetCombination.combinationName);
   }
 
   /**
    * 從快取恢復組合
    */
   async restoreFromCache() {
-    try {
-      const cached = localStorage.getItem('experiment_current_combination');
-      
-      if (!cached) {
-        return false;
-      }
+    const raw = localStorage.getItem("experimentCurrentCombination");
+    if (!raw) return false;
 
-      const cacheData = JSON.parse(cached);
-      const combination = this.getCombinationById(cacheData.combination_id);
+    const cacheData = JSON.parse(raw);
+    const combination = this.getCombinationById(cacheData.combinationId);
 
-      if (combination) {
-        await this.setCombination(combination, null, { silent: true, skipCache: true });
-        Logger.debug('已從快取恢復組合', combination.name);
-        return true;
-      }
-
-      Logger.warn('快取的組合不存在', cacheData.combination_id);
-      return false;
-    } catch (error) {
-      Logger.error('從快取恢復組合失敗', error);
+    if (!combination) {
+      this.clearCache();
       return false;
     }
+
+    return this.setCombination(combination, null, {
+      silent: true,
+      skipCache: true,
+    });
   }
 
   /**
    * 清除快取
    */
   clearCache() {
-    try {
-      localStorage.removeItem('experiment_current_combination');
-      Logger.debug('組合快取已清除');
-    } catch (error) {
-      Logger.error('清除快取失敗', error);
-    }
+    localStorage.removeItem("experimentCurrentCombination");
+    Logger.debug("組合快取已清除");
   }
 
-  // ==================== 事件通知 ====================
+  // ==================== 驗證與工具 ====================
+
+  /**
+   * 驗證組合有效性
+   */
+  validateCombination(combination) {
+    if (!combination) {
+      return { valid: false, error: "組合不能為空" };
+    }
+
+    if (!combination.combinationId) {
+      return { valid: false, error: "組合缺少 combinationId" };
+    }
+
+    if (!combination.combinationName) {
+      return { valid: false, error: "組合缺少 combinationName" };
+    }
+
+    if (!combination.units) {
+      return { valid: false, error: "組合缺少 units" };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * 取得管理器狀態
+   */
+  getState() {
+    return {
+      currentCombination: this.currentCombination,
+      loadedUnits: [...this.loadedUnits],
+      isInitialized: this.isInitialized,
+      config: { ...this.config },
+    };
+  }
+
+  /**
+   * 重置管理器
+   */
+  reset() {
+    this.currentCombination = null;
+    this.loadedUnits = [];
+    this.clearCache();
+    Logger.debug("ExperimentCombinationManager 已重置");
+  }
+
+  /**
+   * 處理實驗ID改變事件
+   */
+  handleExperimentIdChanged(newExperimentId) {
+    Logger.debug("ExperimentCombinationManager: 實驗ID已改變", newExperimentId);
+  }
+
+  // ==================== 事件系統 ====================
 
   /**
    * 註冊事件監聽器
@@ -550,7 +467,7 @@ class ExperimentCombinationManager {
    */
   off(eventType, callback) {
     if (!this.eventListeners.has(eventType)) return;
-    
+
     const listeners = this.eventListeners.get(eventType);
     const index = listeners.indexOf(callback);
     if (index > -1) {
@@ -562,16 +479,21 @@ class ExperimentCombinationManager {
    * 觸發事件
    */
   emit(eventType, data) {
-    if (!this.eventListeners.has(eventType)) return;
-    
-    const listeners = this.eventListeners.get(eventType);
-    listeners.forEach(callback => {
-      try {
-        callback(data);
-      } catch (error) {
-        Logger.error(`事件處理器錯誤 (${eventType})`, error);
-      }
+    if (this.eventListeners.has(eventType)) {
+      this.eventListeners.get(eventType).forEach((callback) => {
+        try {
+          callback(data);
+        } catch (error) {
+          Logger.error(`事件處理器錯誤 (${eventType})`, error);
+        }
+      });
+    }
+
+    const customEvent = new CustomEvent(eventType, {
+      detail: data,
+      bubbles: true,
     });
+    document.dispatchEvent(customEvent);
   }
 
   /**
@@ -584,56 +506,9 @@ class ExperimentCombinationManager {
       this.eventListeners.clear();
     }
   }
-
-  // ==================== 工具方法 ====================
-
-  /**
-   * 取得管理器狀態
-   */
-  getState() {
-    return {
-      currentCombination: this.currentCombination,
-      loadedUnits: [...this.loadedUnits],
-      isInitialized: this.isInitialized,
-      config: { ...this.config }
-    };
-  }
-
-  /**
-   * 取得單元列表
-   */
-  getLoadedUnits() {
-    return [...this.loadedUnits];
-  }
-
-  /**
-   * 重置管理器
-   */
-  reset() {
-    this.currentCombination = null;
-    this.loadedUnits = [];
-    this.clearCache();
-    Logger.debug('ExperimentCombinationManager 已重置');
-  }
-
-  /**
-   * 銷毀管理器
-   */
-  destroy() {
-    this.reset();
-    this.clearListeners();
-    this.scriptData = null;
-    this.isInitialized = false;
-    Logger.debug('ExperimentCombinationManager 已銷毀');
-  }
 }
 
-// 導出到全域（用於向後相容）
-if (typeof window !== 'undefined') {
+// 導出到全域
+if (typeof window !== "undefined") {
   window.ExperimentCombinationManager = ExperimentCombinationManager;
-}
-
-// 支援模組導出
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = ExperimentCombinationManager;
 }
