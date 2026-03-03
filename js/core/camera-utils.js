@@ -64,7 +64,7 @@ class CameraUtils {
   }
 
   /**
-   * 停止當前串流
+   * 停止目前串流
    */
   async stopCurrentStream() {
     if (this.currentStream) {

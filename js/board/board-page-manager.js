@@ -17,6 +17,7 @@ class BoardPageManager {
 
     this.currentStage = null;
     this.stageStartTime = null;
+    this._listenersSetup = false; // 防止事件監聽器重複設置
 
     // 開始初始化
     this.initialize();
@@ -33,7 +34,7 @@ class BoardPageManager {
   }
 
   /**
-   * 結束當前初始化階段
+   * 結束目前初始化階段
    */
   endStage() {
     if (this.currentStage && this.stageStartTime) {
@@ -97,6 +98,8 @@ class BoardPageManager {
    * 階段 2：初始化模組
    */
   async initializeModules() {
+    // 先加載 scenarioData，以便在 SystemManager 初始化時可用
+    await this.loadScenarioData();
     await this.initializeManagersSimplified();
   }
 
@@ -143,16 +146,16 @@ class BoardPageManager {
       { src: "js/experiment/experiment-timer.js", isModule: false },
 
       // Board 專用模組
-      { src: "js/board/board-log-manager.js", isModule: false },
-      { src: "js/board/board-log-ui.js", isModule: false },
-      { src: "js/board/board-export-manager.js", isModule: false },
+      { src: "js/board/board-log-manager.js", isModule: true },
+      { src: "js/board/board-log-ui.js", isModule: true },
       { src: "js/board/board-sync-manager.js", isModule: false },
       { src: "js/board/board-ui-manager.js", isModule: false },
       { src: "js/board/board-gesture-utils.js", isModule: false },
 
       // 同步與對話框
+      { src: "js/sync/experiment-sync-manager.js", isModule: false },
       { src: "js/sync/sync-confirm-dialog.js", isModule: false },
-      { src: "js/core/sync-events-constants.js", isModule: true },
+      { src: "js/constants/sync-events-constants.js", isModule: true },
       { src: "js/sync/sync-manager.js", isModule: true },
     ];
 
@@ -190,15 +193,66 @@ class BoardPageManager {
    */
   async initializeManagersSimplified() {
     try {
-      // 初始化核心管理器
       window.experimentHubManager = new ExperimentHubManager();
-      window.experimentUIManager = new ExperimentUIManager();
       window.experimentCombinationManager = new ExperimentCombinationManager();
+      // 不在這裡呼叫 ready()，讓 ExperimentSystemManager.initialize() 處理
+      // 這樣事件監聽器才能在初始化前設置好
+
+      // 初始化 ExperimentFlowManager
+      if (
+        typeof ExperimentFlowManager !== "undefined" &&
+        !window.experimentFlowManager
+      ) {
+        window.experimentFlowManager = new ExperimentFlowManager();
+        // 注入依賴
+        if (
+          window.experimentCombinationManager &&
+          typeof window.experimentFlowManager.injectCombinationManager ===
+            "function"
+        ) {
+          window.experimentFlowManager.injectCombinationManager(
+            window.experimentCombinationManager,
+          );
+        }
+        if (
+          window.experimentHubManager &&
+          typeof window.experimentFlowManager.injectHubManager === "function"
+        ) {
+          window.experimentFlowManager.injectHubManager(
+            window.experimentHubManager,
+          );
+        }
+        if (
+          window.experimentActionHandler &&
+          typeof window.experimentFlowManager.injectActionHandler === "function"
+        ) {
+          window.experimentFlowManager.injectActionHandler(
+            window.experimentActionHandler,
+          );
+        }
+        Logger.debug("ExperimentFlowManager 已初始化");
+      }
+
+      // 初始化 ExperimentUIManager (統一配置)
+      if (typeof ExperimentUIManager !== "undefined" && !window.uiManager) {
+        window.uiManager = new ExperimentUIManager({
+          enableVisualHints: true,
+          debug: false,
+        });
+        if (typeof window.uiManager.initialize === "function") {
+          window.uiManager.initialize();
+        }
+        Logger.debug("ExperimentUIManager 已初始化");
+      }
+
+      // 在 SystemManager 初始化之前先設置事件監聽器
+      // 這樣才能接收到 initialize() 中發出的 experimentSystem:combinationSelected 事件
+      this._setupEventListeners();
 
       // 初始化系統管理器
       const instance = new ExperimentSystemManager({
         combinationManager: window.experimentCombinationManager,
-        uiManager: window.experimentUIManager,
+        uiManager: window.uiManager,
         hubManager: window.experimentHubManager,
         flowManager: window.experimentFlowManager,
       });
@@ -222,11 +276,11 @@ class BoardPageManager {
       this.scriptData = null;
       this.gesturesData = null;
 
-      // 目前狀態
-      this.currentUnit = null;
-      this.currentStep = 0;
-      this.currentCombination = null;
-      this.currentUnitOrder = [];
+      // 目前狀態（保留已在 modules_init 階段載入的組合資料）
+      this.currentUnit = this.currentUnit || null;
+      this.currentStep = this.currentStep || 0;
+      this.currentCombination = this.currentCombination || null;
+      this.currentUnitOrder = this.currentUnitOrder || [];
 
       // 工作階段與實驗控制
       this.sessionId = this.generateSessionId();
@@ -248,22 +302,19 @@ class BoardPageManager {
       this.currentActionIndex = 0;
       this.completedActions = new Set();
 
-      // 時間追蹤
-      this.actionTimings = new Map(); // action 執行時間
-
       // 遠端事件重複排除機制
       this.processedRemoteActions = new Map(); // 已處理的遠端動作
       this.remotActionDedupeWindow = 500; // 重複排除機制時間視窗（毫秒）
 
-      // 匯出管理器
-      this.exportManager = new BoardExportManager(this);
-
       // UI 管理器 - 使用全域實例
-      this.uiManager = window.experimentUIManager;
+      this.uiManager = window.uiManager;
 
       // 初始化 Board UI 管理器
       this.boardUIManager = new BoardUIManager(this);
       this.boardUIManager.init();
+
+      // 事件監聽器已在 initializeManagersSimplified() 中設置
+      // 確保在 ExperimentSystemManager.initialize() 之前監聽
 
       // 開始初始化其他組件
       this.init();
@@ -278,129 +329,268 @@ class BoardPageManager {
    * 使用統一的 UI 管理器渲染所有界面組件
    */
 
-  generateSessionId() {
-    return RandomUtils.generateExperimentId();
-  }
-
   /**
-   * 產生新的實驗ID
+   * 設置事件監聽器（僅應被調用一次）
+   * @private
    */
-  generateExperimentId() {
-    const result = RandomUtils.generateExperimentId();
-
-    const experimentIdInput = document.getElementById("experimentIdInput");
-    if (experimentIdInput) {
-      experimentIdInput.value = result;
-    }
-
-    // 廣播新的實驗ID到同步工作階段
-    window.experimentSyncManager.broadcastExperimentIdUpdate(result);
-
-    Logger.info(`新的實驗ID已產生: ${result}`);
-    return result;
-  }
-
-  /**
-   * 產生新的實驗ID 並在同步模式下註冊到中樞
-   */
-  async generateExperimentIdWithHub() {
-    try {
-      Logger.debug("產生新的實驗ID...");
-
-      // 產生新的實驗ID
-      const newId = RandomUtils.generateExperimentId();
-
-      // 更新UI
-      const experimentIdInput = document.getElementById("experimentIdInput");
-      if (experimentIdInput) {
-        experimentIdInput.value = newId;
-      }
-
-      // 檢查是否在同步模式
-      const hubManager = getExperimentHubManager();
-      if (hubManager?.isInSyncMode?.()) {
-        Logger.debug(`同步模式: 註冊新ID到中樞: ${newId}`);
-        await window.experimentSyncManager.registerExperimentIdToHub(newId);
-      } else {
-        Logger.debug(`獨立模式: 新ID僅存本機: ${newId}`);
-      }
-
-      // 廣播新的實驗ID
-      window.experimentSyncManager.broadcastExperimentIdUpdate(newId);
-
-      Logger.info(`新的實驗ID已產生: ${newId}`);
-      return newId;
-    } catch (error) {
-      Logger.error("產生新實驗ID失敗:", error);
-      throw error;
-    }
-  }
-
-  /** 智慧重新產生實驗ID - 檢查中樞同步狀態 */
-  async smartRegenerateExperimentId() {
-    const hubManager = getExperimentHubManager();
-
-    // 檢查是否在同步模式
-    if (!hubManager?.isInSyncMode?.()) {
-      Logger.debug("直接產生新的實驗ID");
-      await this.generateExperimentIdWithHub();
-      this.selectDefaultCombination();
+  _setupEventListeners() {
+    // 防止重複監聽器設置
+    if (this._listenersSetup) {
+      Logger.warn("BoardPageManager 事件監聽器已設置，跳過重複設置");
       return;
     }
 
-    try {
-      // 取得中樞的實驗ID
-      const hubExperimentId = await hubManager.getExperimentId();
-      const currentExperimentId = document
-        .getElementById("experimentIdInput")
-        ?.value?.trim();
+    this._listenersSetup = true;
 
-      Logger.debug(
-        `中樞ID: ${hubExperimentId}, 本機ID: ${currentExperimentId}`,
+    // 監聽 ExperimentSystemManager 的組合選擇事件
+    window.addEventListener("experimentSystem:combinationSelected", (event) => {
+      const { combination, experimentId } = event.detail;
+      this._handleSystemCombinationSelected(combination, experimentId);
+    });
+
+    // 監聽 ExperimentFlowManager 事件（用於 board 端特定的同步和記錄邏輯）
+    if (window.experimentFlowManager) {
+      window.experimentFlowManager.on(
+        ExperimentFlowManager.EVENT.STARTED,
+        (data) => {
+          this._handleFlowStarted(data);
+        },
       );
-
-      if (
-        hubExperimentId &&
-        currentExperimentId &&
-        hubExperimentId !== currentExperimentId
-      ) {
-        // 實驗ID與中樞不同，同步到中樞的ID
-        Logger.info(`實驗ID與中樞不同，同步到中樞ID: ${hubExperimentId}`);
-        this.experimentId = hubExperimentId;
-        const experimentIdInput = document.getElementById("experimentIdInput");
-        if (experimentIdInput) {
-          experimentIdInput.value = hubExperimentId;
-        }
-
-        // 更新日誌管理器
-        if (window.experimentLogManager) {
-          window.experimentLogManager.setExperimentId(hubExperimentId);
-        }
-
-        // 廣播同步
-        window.experimentSyncManager.broadcastExperimentIdUpdate(
-          hubExperimentId,
-        );
-      } else {
-        // 實驗ID與中樞相同或中樞沒有ID，產生新的ID
-        Logger.info("產生新的實驗ID並廣播");
-        await this.generateExperimentIdWithHub();
-      }
-
-      this.selectDefaultCombination();
-    } catch (error) {
-      Logger.error("檢查中樞狀態失敗:", error);
-      // 出錯時仍產生新的ID
-      await this.generateExperimentIdWithHub();
-      this.selectDefaultCombination();
+      window.experimentFlowManager.on(
+        ExperimentFlowManager.EVENT.PAUSED,
+        (data) => {
+          this._handleFlowPaused(data);
+        },
+      );
+      window.experimentFlowManager.on(
+        ExperimentFlowManager.EVENT.RESUMED,
+        (data) => {
+          this._handleFlowResumed(data);
+        },
+      );
+      window.experimentFlowManager.on(
+        ExperimentFlowManager.EVENT.STOPPED,
+        (data) => {
+          this._handleFlowStopped(data);
+        },
+      );
+      window.experimentFlowManager.on(
+        ExperimentFlowManager.EVENT.LOCKED,
+        (data) => {
+          this._handleFlowLocked(data);
+        },
+      );
+      window.experimentFlowManager.on(
+        ExperimentFlowManager.EVENT.UNLOCKED,
+        (data) => {
+          this._handleFlowUnlocked(data);
+        },
+      );
     }
+  }
+
+  /**
+   * 處理 ExperimentSystemManager 的組合選擇事件
+   * @private
+   */
+  async _handleSystemCombinationSelected(combination, experimentId) {
+    Logger.debug("_handleSystemCombinationSelected: 收到組合選擇事件", {
+      combinationName: combination?.combinationName,
+      combinationId: combination?.combinationId,
+      experimentId,
+    });
+
+    // 更新 board 端的目前組合參照
+    this.currentCombination = combination;
+
+    // 載入對應的腳本（board 專屬邏輯 — 建構手勢序列等）
+    try {
+      await this.loadScriptForCombination(combination, experimentId);
+      Logger.debug("_handleSystemCombinationSelected: 手勢序列載入完成");
+    } catch (error) {
+      Logger.error("_handleSystemCombinationSelected: 載入手勢序列失敗", error);
+    }
+  }
+
+  /**
+   * 處理 ExperimentFlowManager 的 STARTED 事件
+   * @private
+   * 觸發時機：ExperimentFlowManager.startExperiment() 完成
+   * 目的：初始化 Board 端的記錄、同步等特定功能
+   */
+  _handleFlowStarted(data) {
+    Logger.info("Board: 實驗已開始，初始化記錄和同步", { units: data.units });
+
+    // 同步 experimentRunning 旗標，避免 _autoStartExperimentIfNeeded 重複觸發
+    this.experimentRunning = true;
+
+    // 初始化日誌管理器的實驗資訊
+    if (window.experimentLogManager) {
+      const experimentIdInput = document.getElementById("experimentIdInput");
+      const experimentId = experimentIdInput?.value || data.experimentId || "";
+
+      window.experimentLogManager.experimentId = experimentId;
+      window.experimentLogManager.experimentStartTime = new Date();
+
+      Logger.debug(`日誌管理器已初始化: ID=${experimentId}`);
+    }
+
+    // 啟動同步管理器（如果在同步模式）
+    if (window.experimentSyncManager) {
+      try {
+        const isSyncMode =
+          window.experimentHubManager?.isInSyncMode?.() || false;
+
+        if (isSyncMode) {
+          // 同步模式：通知伺服器實驗已開始
+          window.experimentSyncManager.onExperimentStart?.({
+            units: data.units,
+            timestamp: data.timestamp,
+          });
+          Logger.debug("Board: 已通知同步伺服器實驗開始");
+        } else {
+          Logger.debug("Board: 本機模式，不觸發遠端同步");
+        }
+      } catch (error) {
+        Logger.error("Board: 初始化同步管理器失敗:", error);
+      }
+    }
+  }
+
+  /**
+   * 處理 FlowManager PAUSED 事件（board 端）
+   * 分發 DOM 事件供 _bindDomEvents 廣播兩端
+   */
+  _handleFlowPaused(data) {
+    document.dispatchEvent(
+      new CustomEvent("experiment_paused", { detail: data }),
+    );
+    Logger.debug("Board: 實驗已暫停");
+  }
+
+  /**
+   * 處理 FlowManager RESUMED 事件（board 端）
+   * 分發 DOM 事件供 _bindDomEvents 廣播兩端
+   */
+  _handleFlowResumed(data) {
+    document.dispatchEvent(
+      new CustomEvent("experiment_resumed", { detail: data }),
+    );
+    Logger.debug("Board: 實驗已繼續");
+  }
+
+  /**
+   * 處理 ExperimentFlowManager 的 STOPPED 事件
+   * @private
+   * 觸發時機：ExperimentFlowManager.stopExperiment() 完成
+   * 目的：保存日誌、停止同步、處理實驗結束邏輯
+   */
+  _handleFlowStopped(data) {
+    Logger.info("Board: 實驗已停止，清理資源和保存日誌", {
+      reason: data.reason,
+      completedUnits: data.completedUnits,
+    });
+
+    // 同步 experimentRunning 旗標
+    this.experimentRunning = false;
+
+    // 停止日誌記錄並準備匯出
+    if (window.experimentLogManager) {
+      try {
+        // 立即保存所有待處理的日誌
+        if (
+          typeof window.experimentLogManager.flushPendingLogs === "function"
+        ) {
+          window.experimentLogManager.flushPendingLogs();
+        }
+
+        Logger.debug("Board: 已清空日誌緩衝區");
+
+        // 如果需要，可以觸發日誌匯出對話框
+        // this._showLogExportDialog(data);
+      } catch (error) {
+        Logger.error("Board: 處理日誌保存失敗:", error);
+      }
+    }
+
+    // 停止同步管理器
+    if (window.experimentSyncManager) {
+      try {
+        const isSyncMode =
+          window.experimentHubManager?.isInSyncMode?.() || false;
+
+        if (isSyncMode) {
+          window.experimentSyncManager.onExperimentStop?.({
+            reason: data.reason,
+            completedUnits: data.completedUnits,
+            timestamp: data.timestamp,
+          });
+          Logger.debug("Board: 已通知同步伺服器實驗停止");
+        }
+      } catch (error) {
+        Logger.error("Board: 停止同步管理器失敗:", error);
+      }
+    }
+  }
+
+  /**
+   * 處理 ExperimentFlowManager 的 LOCKED 事件
+   * @private
+   */
+  _handleFlowLocked(data) {
+    Logger.debug("收到 ExperimentFlowManager LOCKED 事件:", data);
+    // 鎖定 board 端的 UI 控制
+    this._setBoardControlsLocked(true);
+  }
+
+  /**
+   * 處理 ExperimentFlowManager 的 UNLOCKED 事件
+   * @private
+   */
+  _handleFlowUnlocked(data) {
+    Logger.debug("收到 ExperimentFlowManager UNLOCKED 事件:", data);
+    // 解鎖 board 端的 UI 控制
+    this._setBoardControlsLocked(false);
+  }
+
+  /**
+   * 設置 board 控制項的鎖定狀態
+   * @private
+   * @param {boolean} locked - 是否鎖定
+   */
+  _setBoardControlsLocked(locked) {
+    Logger.debug(`設置 board 控制項鎖定狀態: ${locked}`);
+
+    // 鎖定/解鎖主要控制按鈕
+    const startBtn = document.getElementById("startExperimentBtn");
+    const stopBtn = document.getElementById("stopExperimentBtn");
+    const regenerateBtn = document.getElementById("regenerateExperimentIdBtn");
+
+    if (startBtn) startBtn.disabled = locked;
+    // 停止按鈕邏輯與 locked 相反：實驗進行中（locked=true）才可用，未執行時停用
+    if (stopBtn) stopBtn.disabled = !locked;
+    if (regenerateBtn) regenerateBtn.disabled = locked;
+
+    // 更新按鈕樣式以反映鎖定狀態（停止按鈕不參與 locked 樣式）
+    const lockableButtons = [startBtn, regenerateBtn].filter((btn) => btn);
+    lockableButtons.forEach((btn) => {
+      if (locked) {
+        btn.classList.add("locked");
+      } else {
+        btn.classList.remove("locked");
+      }
+    });
+  }
+
+  generateSessionId() {
+    return RandomUtils.generateExperimentId();
   }
 
   /**
    * 初始化實驗頁面管理器
    */
   async init() {
-    await this.loadScenarioData();
+    // scenariosData 已在 initializeModules() 中加載
     // 渲染統一UI
     if (this.boardUIManager) {
       await this.boardUIManager.renderUnifiedUI();
@@ -409,109 +599,9 @@ class BoardPageManager {
       Logger.warn("BoardUIManager 不可用，跳過UI渲染");
     }
 
-    // 初始化實驗ID
-    const experimentIdInput = document.getElementById("experimentIdInput");
-    const regenerateIdBtn = document.getElementById("regenerateIdButton");
-
-    if (!experimentIdInput) {
-      Logger.error("找不到 experimentIdInput 元素，無法初始化實驗ID");
-      return;
-    }
-
-    Logger.debug("初始化實驗ID...");
-
-    let experimentId = null;
-
-    // 第1步：檢查是否在同步模式，優先從中樞取得
-    const hubManager = window.experimentHubManager;
-    const isInSyncMode = hubManager?.isInSyncMode?.() || false;
-
-    if (isInSyncMode) {
-      Logger.debug("第1優先：檢測到同步模式，嘗試從中樞讀取ID");
-      try {
-        experimentId = await hubManager.getExperimentId();
-        if (experimentId) {
-          Logger.debug(`從中樞取得實驗ID: ${experimentId}`);
-          experimentIdInput.value = experimentId;
-        }
-      } catch (error) {
-        Logger.debug(`中樞讀取失敗: ${error.message}，嘗試其他來源`);
-      }
-    }
-
-    // 第2步：如果中樞沒取到，檢查快照ID
-    if (!experimentId && window.experimentStateManager?.experimentId) {
-      experimentId = window.experimentStateManager.experimentId;
-      Logger.debug(`第2優先：使用快照ID: ${experimentId}`);
-      experimentIdInput.value = experimentId;
-    }
-
-    // 第3步：如果還沒有，檢查輸入框是否已有值
-    if (!experimentId) {
-      const inputValue = experimentIdInput.value.trim();
-      if (inputValue) {
-        experimentId = inputValue;
-        Logger.debug(`第3優先：使用輸入框ID: ${experimentId}`);
-      }
-    }
-
-    // 第4步：都沒有ID，根據模式決定是否產生新ID
-    if (!experimentId) {
-      if (isInSyncMode) {
-        Logger.debug("第4步：同步模式無ID，產生新ID");
-        const newId = await this.generateExperimentIdWithHub();
-        Logger.debug(`已產生新的實驗ID: ${newId}`);
-      } else {
-        Logger.debug("第4步：本機模式無ID，產生新ID");
-        const newId = this.generateExperimentId();
-        Logger.debug(`已產生新的實驗ID: ${newId}`);
-      }
-    }
-
-    // 選擇預設組合
-    this.selectDefaultCombination();
-
-    // 綁定實驗ID輸入框事件
-    experimentIdInput.addEventListener("change", async () => {
-      if (!experimentIdInput.value.trim()) {
-        await this.generateExperimentIdWithHub();
-        return;
-      }
-
-      const newExperimentId = experimentIdInput.value.trim();
-      Logger.debug(`使用者手動輸入實驗ID: ${newExperimentId}`);
-
-      // 只在同步模式下註冊到中樞
-      const hubManager = getExperimentHubManager();
-      if (hubManager?.isInSyncMode?.()) {
-        Logger.debug("註冊手動輸入的實驗ID到中樞");
-        await window.experimentSyncManager.registerExperimentIdToHub(
-          newExperimentId,
-        );
-      } else {
-        Logger.debug("實驗ID僅存本機");
-      }
-
-      if (this.currentCombination) {
-        const combination =
-          this.scriptData.combinations[
-            this.scriptData.combinations.findIndex(
-              (c) => c.combinationId === this.currentCombination.combinationId,
-            )
-          ];
-        await this.loadScriptForCombination(combination, newExperimentId);
-      }
-
-      window.experimentSyncManager.broadcastExperimentIdUpdate(newExperimentId);
-    });
-
-    // 綁定重新產生按鈕事件
-    if (regenerateIdBtn) {
-      regenerateIdBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        await this.smartRegenerateExperimentId();
-      });
-    }
+    // 實驗ID初始化、輸入框事件、預設組合選擇
+    // 統一由 ExperimentSystemManager.initializeUI() 處理
+    // 此處不重複綁定，避免多重事件監聽
 
     // 綁定受試者名稱變更事件
     this.setupSubjectNameListener();
@@ -521,9 +611,11 @@ class BoardPageManager {
   }
 
   async loadScenarioData() {
+    Logger.debug("loadScenarioData: 開始載入情節資料");
     try {
       // 確保 loadUnitsFromScenarios 已經被定義
       if (typeof window.loadUnitsFromScenarios === "undefined") {
+        Logger.debug("loadScenarioData: 等待 loadUnitsFromScenarios 函式載入");
         // 等待 data-loader.js 完成加載
         let attempts = 0;
         while (
@@ -538,6 +630,8 @@ class BoardPageManager {
           throw new Error("loadUnitsFromScenarios 未能成功定義");
         }
       }
+
+      Logger.debug("loadScenarioData: loadUnitsFromScenarios 已就緒");
 
       // 使用資料轉換器載入完整的 units 和 actions 資料
       const convertedData = await loadUnitsFromScenarios();
@@ -562,6 +656,12 @@ class BoardPageManager {
         sections: this.scenariosData.sections,
         units: convertedData.units,
       };
+
+      Logger.debug("loadScenarioData: 情節資料載入完成", {
+        gestureList_count: this.scenariosData?.gesture_list?.length || 0,
+        sections_count: this.scenariosData?.sections?.length || 0,
+        combinations_count: convertedData?.unit_combinations?.length || 0,
+      });
     } catch (error) {
       Logger.error("載入 scenarios.json 失敗:", error);
     }
@@ -572,172 +672,27 @@ class BoardPageManager {
    */
 
   /**
-   * 選擇預設組合並載入手勢序列
-   * 優先順序：本機快取 > 設定預設 > 第一個
-   */
-  selectDefaultCombination() {
-    if (!this.scriptData || !this.scriptData.combinations) return;
-
-    let selectedIndex = 0;
-
-    // 優先檢查本機快取
-    const cachedCombinationId = localStorage.getItem(
-      "last_selected_combination_id",
-    );
-    if (cachedCombinationId) {
-      const cachedIndex = this.scriptData.combinations.findIndex(
-        (c) => c.combinationId === cachedCombinationId,
-      );
-      if (cachedIndex !== -1) {
-        selectedIndex = cachedIndex;
-      }
-    }
-
-    // 如果沒有快取，使用設定中的預設組合
-    if (selectedIndex === 0 && !cachedCombinationId) {
-      const defaultCombinationId =
-        window.CONFIG?.experiment?.defaultCombinationId;
-      if (defaultCombinationId) {
-        const defaultIndex = this.scriptData.combinations.findIndex(
-          (c) => c.combinationId === defaultCombinationId,
-        );
-        if (defaultIndex !== -1) {
-          selectedIndex = defaultIndex;
-        }
-      }
-    }
-
-    // 如果都沒有，使用第一個
-    if (
-      selectedIndex === 0 &&
-      !cachedCombinationId &&
-      !window.CONFIG?.experiment?.defaultCombinationId
-    ) {
-      // 使用列表第一個組合
-    }
-
-    // 載入選定的組合
-    this.selectCombination(selectedIndex);
-  }
-
-  /**
-   * 選擇指定的組合
-   * @param {number} index - 組合索引
-   */
-  selectCombination(index) {
-    if (!this.scriptData || !this.scriptData.combinations) return;
-
-    const combination = this.scriptData.combinations[index];
-    this.currentCombination = combination;
-
-    // 儲存到本機快取
-    localStorage.setItem(
-      "last_selected_combination_id",
-      combination.combinationId,
-    );
-
-    // 更新 UI 顯示選中狀態
-    this.updateCombinationSelection(index);
-
-    // 更新單元列表以匹配組合要求
-    this.updateUnitListForCombination(combination);
-
-    // 取得實驗ID (如果有的話)
-    const experimentId = document
-      .getElementById("experimentIdInput")
-      .value.trim();
-    this.loadScriptForCombination(combination, experimentId);
-  }
-
-  /**
-   * 更新組合卡片的視覺選中狀態
-   */
-  updateCombinationSelection(selectedIndex) {
-    const cards = document.querySelectorAll(".combination-item");
-    cards.forEach((card, index) => {
-      card.classList.toggle("active", index === selectedIndex);
-    });
-  }
-
-  /**
-   * 更新單元列表以匹配組合要求
-   * @param {Object} combination - 組合物件
-   */
-  updateUnitListForCombination(combination) {
-    const unitList = document.querySelector(
-      "#unitsPanelContainer .experiment-units-list",
-    );
-    if (!unitList) {
-      this._warn("找不到單元列表容器");
-      return;
-    }
-
-    // 取得該組合包含的單元ID，並按正確順序排列
-    // 使用統一的 RandomUtils 處理組合邏輯
-    const experimentId =
-      document.getElementById("experimentIdInput").value.trim() || "default";
-    const combinationUnitIds = RandomUtils.getCombinationUnitIds(
-      combination,
-      experimentId,
-    );
-
-    // 更新單元選擇狀態
-    // 先取消全部選擇
-    unitList
-      .querySelectorAll('li:not(.power-option-card) input[type="checkbox"]')
-      .forEach((checkbox) => {
-        checkbox.checked = false;
-      });
-
-    // 然後只選擇該組合中的單元
-    unitList.querySelectorAll("li:not(.power-option-card)").forEach((li) => {
-      const checkbox = li.querySelector('input[type="checkbox"]');
-      if (combinationUnitIds.includes(li.dataset.unitId)) {
-        checkbox.checked = true;
-      }
-    });
-
-    // 重新排序單元列表以配對組合順序
-    const normalItems = Array.from(
-      unitList.querySelectorAll("li:not(.power-option-card)"),
-    );
-    const startupCard = unitList.querySelector(".startup-card");
-    const shutdownCard = unitList.querySelector(".shutdown-card");
-
-    // 按照 combinationUnitIds 的順序重新排列
-    combinationUnitIds.forEach((unitId) => {
-      const li = normalItems.find((item) => item.dataset.unitId === unitId);
-      if (li) {
-        // 移到最後但在電源選項卡片之前
-        if (shutdownCard && shutdownCard.parentNode === unitList) {
-          // 確保 shutdownCard 是 unitList 的子節點
-          unitList.insertBefore(li, shutdownCard);
-        } else if (startupCard && startupCard.parentNode === unitList) {
-          // 如果沒有 shutdownCard，使用 startupCard
-          unitList.insertBefore(li, startupCard);
-        } else {
-          // 如果都沒有電源選項卡片，添加到列表末尾
-          unitList.appendChild(li);
-        }
-      }
-    });
-
-    // 更新全選狀態和按鈕狀態
-    this.updateSelectAllState();
-    this.updateUnitButtonStates();
-  }
-
-  /**
    * 為組合載入對應的腳本資料
    * @param {Object} combination - 組合物件
    * @param {string} experimentId - 實驗ID
    */
   async loadScriptForCombination(combination, experimentId) {
+    Logger.debug("loadScriptForCombination: 開始載入組合腳本", {
+      combinationName: combination?.combinationName,
+      experimentId,
+    });
     try {
       // 確保實驗ID不為空
       if (!experimentId || !experimentId.trim()) {
-        experimentId = this.generateExperimentId();
+        experimentId = window.experimentSystemManager
+          ? window.experimentSystemManager.getExperimentId() ||
+            RandomUtils.generateExperimentId()
+          : RandomUtils.generateExperimentId();
       }
+
+      Logger.debug("loadScriptForCombination: 實驗ID確認完成", {
+        experimentId,
+      });
 
       // 建立組合內容
       const script = {
@@ -749,25 +704,37 @@ class BoardPageManager {
         gestures: [],
       };
 
-      // 建立單元序列
-      const unitIds = RandomUtils.getCombinationUnitIds(
+      // 建立單元序列（統一使用 CombinationManager 管理排序邏輯）
+      const unitIds = window.experimentCombinationManager.getCombinationUnitIds(
         combination,
         experimentId,
       );
+      Logger.debug("loadScriptForCombination: 單元序列模式", { unitIds });
 
-      const confirmGesture = this.scenariosData.gesture_list.find(
+      const confirmGesture = this.scenariosData?.gesture_list?.find(
         (g) => g.gesture_id === "confirm",
       );
-      const nextGesture = this.scenariosData.gesture_list.find(
+      const nextGesture = this.scenariosData?.gesture_list?.find(
         (g) => g.gesture_id === "next",
       );
-      const prevGesture = this.scenariosData.gesture_list.find(
+      const prevGesture = this.scenariosData?.gesture_list?.find(
         (g) => g.gesture_id === "prev",
       );
-      const openGesture = this.scenariosData.gesture_list.find(
+      const openGesture = this.scenariosData?.gesture_list?.find(
         (g) => g.gesture_id === "open",
       );
-      const section = this.scenariosData.sections[0];
+      const section = this.scenariosData?.sections?.[0];
+
+      Logger.debug("loadScriptForCombination: 手勢載入來源狀態", {
+        openGesture_loaded: !!openGesture,
+        confirmGesture_loaded: !!confirmGesture,
+        nextGesture_loaded: !!nextGesture,
+        prevGesture_loaded: !!prevGesture,
+        section_loaded: !!section,
+        scenariosData_exists: !!this.scenariosData,
+        gestureList_count: this.scenariosData?.gesture_list?.length || 0,
+        sections_count: this.scenariosData?.sections?.length || 0,
+      });
 
       if (this.scenariosData && this.scenariosData.sections) {
         // 開機步驟
@@ -1047,12 +1014,27 @@ class BoardPageManager {
             actions: [],
           });
         }
+      } else {
+        Logger.warn(
+          "loadScriptForCombination: scenariosData 或 sections 不存在",
+        );
+      }
+
+      Logger.debug("loadScriptForCombination: 手勢序列建構完成", {
+        gesture_count: script.gestures.length,
+        unit_count: script.units_sequence.length,
+        combination_name: script.combination_name,
+      });
+
+      if (script.gestures.length === 0) {
+        Logger.warn("loadScriptForCombination: 警告：沒有產生任何手勢！");
       }
 
       this.currentCombination = script;
+      Logger.debug("loadScriptForCombination: 呼叫 renderUnitDetail()");
       this.renderUnitDetail();
     } catch (error) {
-      Logger.error("載入組合劇本失敗:", error);
+      Logger.error("loadScriptForCombination: 載入組合劇本失敗", error);
     }
   }
 
@@ -1060,10 +1042,28 @@ class BoardPageManager {
    * 渲染單元詳細內容
    */
   renderUnitDetail() {
-    if (!this.currentCombination) return;
+    Logger.debug("renderUnitDetail: 開始渲染手勢序列面板", {
+      hasCombination: !!this.currentCombination,
+      gesture_count: this.currentCombination?.gestures?.length || 0,
+    });
+
+    if (!this.currentCombination) {
+      Logger.warn("renderUnitDetail: currentCombination 為空，無法渲染");
+      return;
+    }
 
     const contentArea = document.getElementById("contentArea");
+    if (!contentArea) {
+      Logger.warn("renderUnitDetail: contentArea 元素不存在");
+      return;
+    }
+
     const script = this.currentCombination;
+
+    Logger.debug("renderUnitDetail: 開始建構 HTML", {
+      combination_name: script.combination_name,
+      gesture_count: script.gestures?.length || 0,
+    });
 
     // 轉換顏色標籤的函數
     const convertColorTags = (text) => {
@@ -1175,8 +1175,8 @@ class BoardPageManager {
                         }
 
                         <!-- 手勢口令區域（可點擊計時） -->
-                        <div id="timer-card-${idx}"
-                             style="margin-bottom: 15px; padding: 12px; background: ${bgColor}; border: 2px solid ${accentColor}; border-radius: 6px; cursor: pointer; user-select: none; position: relative;"
+                        <div id="timer-card-${idx}" class="timer-card"
+                             style="--timer-accent: ${accentColor}; background: ${bgColor}; border: 2px solid ${accentColor};"
                              onmousedown="window.timerLongPressStart(${idx})"
                              onmouseup="window.timerLongPressEnd(${idx})"
                              onmouseleave="window.timerLongPressEnd(${idx})"
@@ -1185,7 +1185,7 @@ class BoardPageManager {
                              onclick="window.toggleTimer(${idx})">
 
                             <!-- 計時顯示（右下角） -->
-                            <div id="timer-display-${idx}" style="position: absolute; bottom: 8px; right: 12px; font-family: 'Courier New', monospace; font-size: 14px; font-weight: 700; color: ${accentColor}; background: white; padding: 4px 8px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div id="timer-display-${idx}" class="timer-display" style="color: ${accentColor};">
                                 00:00.000
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
@@ -1327,6 +1327,23 @@ class BoardPageManager {
     }
 
     contentArea.innerHTML = html;
+    Logger.debug("renderUnitDetail: 手勢序列 HTML 已渲染到 DOM");
+
+    // 驗證元素是否真的被新增到 DOM
+    const gestureCards = contentArea.querySelectorAll("[id^='gesture-card-']");
+    Logger.debug("renderUnitDetail: 驗證渲染結果", {
+      rendered_cards_count: gestureCards.length,
+      expected_cards_count: this.currentCombination?.gestures?.length || 0,
+    });
+
+    if (
+      gestureCards.length === 0 &&
+      this.currentCombination?.gestures?.length > 0
+    ) {
+      Logger.warn(
+        "renderUnitDetail: HTML 中沒有找到手勢卡片，但 script 中有手勢",
+      );
+    }
 
     // 更新統計資訊面板
     this.updateExperimentStats();
@@ -1481,8 +1498,8 @@ class BoardPageManager {
    */
   initActionSequenceForCombination(combination, experimentId) {
     try {
-      // 取得單元ID序列 - 使用統一的 RandomUtils
-      const unitIds = RandomUtils.getCombinationUnitIds(
+      // 取得單元ID序列（統一使用 CombinationManager 管理排序邏輯）
+      const unitIds = window.experimentCombinationManager.getCombinationUnitIds(
         combination,
         experimentId,
       );
@@ -1528,7 +1545,6 @@ class BoardPageManager {
         end_ms: null,
         duration_ms: null,
       });
-      // 開始追蹤 Action: actionId
     }
   }
 
@@ -1735,7 +1751,9 @@ class BoardPageManager {
     const selectAllCheckbox = document.querySelector("#selectAllUnits");
     if (!selectAllCheckbox) return;
 
-    const unitList = document.querySelector("#experimentUnitsList");
+    const unitList = document.querySelector(
+      "#unitsPanelContainer .experiment-units-list",
+    );
     if (!unitList) return;
 
     const checkboxes = Array.from(
@@ -1743,7 +1761,8 @@ class BoardPageManager {
     );
     const checkedCount = checkboxes.filter((cb) => cb.checked).length;
 
-    selectAllCheckbox.checked = checkedCount === checkboxes.length;
+    selectAllCheckbox.checked =
+      checkedCount === checkboxes.length && checkboxes.length > 0;
     selectAllCheckbox.indeterminate =
       checkedCount > 0 && checkedCount < checkboxes.length;
   }
@@ -1778,8 +1797,9 @@ class BoardPageManager {
   }
 
   onUnitSelectionChanged() {
-    // 更新按鈕狀態
+    // 更新按鈕狀態和全選狀態
     this.updateUnitButtonStates();
+    this.updateSelectAllState();
 
     // 取得目前選擇的單元順序
     const unitList = document.querySelector(
@@ -1819,7 +1839,7 @@ class BoardPageManager {
     }
   }
 
-  startExperiment() {
+  async startExperiment() {
     // 驗證至少選擇一個教學單元
     const checkedUnits = document.querySelectorAll(
       '.unit-checkbox input[type="checkbox"]:checked',
@@ -1866,16 +1886,17 @@ class BoardPageManager {
       return;
     }
 
-    // 記錄實驗開始
-    let subjectName = document.getElementById("subjectName").value.trim();
+    const subjectNameEl = document.getElementById("subjectName");
+    let subjectName = subjectNameEl
+      ? subjectNameEl.value.trim()
+      : this.subjectName || "";
 
     // 如果受試者名稱為空，自動產生「受試者_實驗ID」
     if (!subjectName) {
       subjectName = `受試者_${experimentId}`;
-      const subjectNameInput = document.getElementById("subjectName");
-      if (subjectNameInput) {
+      if (subjectNameEl) {
         // 更新輸入框，確保輸入欄等於實際使用的值
-        subjectNameInput.value = subjectName;
+        subjectNameEl.value = subjectName;
       }
       Logger.debug(`自動產生受試者名稱: ${subjectName}`);
     }
@@ -1903,30 +1924,19 @@ class BoardPageManager {
     if (firstGestureCard) {
       firstGestureCard.scrollIntoView({ behavior: "smooth", block: "start" });
 
-      // 新增浮起效果
+      // 新增浮起效果 + 目前手勢卡片外框標示
       firstGestureCard.classList.remove("gesture-card-inactive");
-      firstGestureCard.classList.add("gesture-card-active");
-
-      // 高亮第一個步驟（計時器區域）
-      const timerCard = document.getElementById("timer-card-0");
-      if (timerCard) {
-        timerCard.style.boxShadow = "0 0 0 4px #4caf50";
-        setTimeout(() => {
-          timerCard.style.boxShadow = "";
-        }, 1500);
-      }
+      firstGestureCard.classList.add(
+        "gesture-card-active",
+        "gesture-card-current",
+      );
 
       //不在這裡記錄第一個步驟開始
       // 第一個步驟開始應該等到使用者點擊計時器開始計時時才記錄
       // 參見 experiment-timer-utils.js 的 toggleTimer 函數
     }
 
-    // 更新實驗狀態
-    this.experimentRunning = true;
-
     // 分發事件供同步管理器使用
-    // 準備廣播 experiment_started 事件，手勢數: this.currentCombination.gestures?.length || 0
-
     document.dispatchEvent(
       new CustomEvent("experiment_started", {
         detail: {
@@ -1934,14 +1944,12 @@ class BoardPageManager {
           subjectName: experimentData.subject_name,
           combinationId: experimentData.combination_id,
           combinationName: experimentData.combination_name,
-          gestureSequence: this.currentCombination.gestures, // 完整的手勢序列
+          gestureSequence: this.currentCombination.gestures,
           unitCount: experimentData.unit_count,
           gestureCount: experimentData.gesture_count,
         },
       }),
     );
-
-    this.toggleExperimentUI(true); // 鎖定 UI
 
     // 註冊實驗狀態到中樞
     window.experimentSyncManager.registerExperimentStateToHub({
@@ -1953,10 +1961,8 @@ class BoardPageManager {
       is_running: true,
     });
 
-    // 啟動計時器 - 委派給 experiment-timer.js
-    if (window.experimentTimerManager) {
-      window.experimentTimerManager.startExperimentTimer();
-    }
+    // 通知 FlowManager 實驗開始（統一驅動鎖定/計時器/UI 更新/experimentRunning 旗標）
+    await window.experimentFlowManager.startExperiment();
 
     // 初始化受試者名稱狀態
     const subjectNameInput = document.getElementById("subjectName");
@@ -1966,7 +1972,7 @@ class BoardPageManager {
     }
   }
 
-  stopExperiment(isManualStop = true) {
+  async stopExperiment(isManualStop = true) {
     // 檢查是否正在進行實驗
     if (!this.experimentRunning) {
       return;
@@ -2038,11 +2044,13 @@ class BoardPageManager {
 
     this.logAction("experiment_stopped", experimentData);
 
-    // 移除所有卡片的浮起效果
-    document.querySelectorAll(".gesture-card-active").forEach((card) => {
-      card.classList.remove("gesture-card-active");
-      card.classList.add("gesture-card-inactive");
-    });
+    // 移除所有卡片的浮起效果與目前標示
+    document
+      .querySelectorAll(".gesture-card-active, .gesture-card-current")
+      .forEach((card) => {
+        card.classList.remove("gesture-card-active", "gesture-card-current");
+        card.classList.add("gesture-card-inactive");
+      });
 
     // 停止所有計時器（不使用 toggleTimer 避免觸發日誌記錄）
     if (window.timerStates) {
@@ -2064,131 +2072,41 @@ class BoardPageManager {
       window.experimentTimerManager.stopExperimentTimer();
     }
 
-    // 解鎖 UI
-    this.toggleExperimentUI(false);
-
-    //廣播實驗停止狀態到其他連線裝置（僅人為停止時廣播）
-    if (isManualStop) {
-      window.experimentSyncManager.broadcastExperimentStop();
-    } else {
-      // 自動停止時，產生新的實驗ID（會自動廣播到同步工作階段）
-      const newId = this.generateExperimentId();
-
-      // 更新日誌管理器的實驗ID
-      if (window.experimentLogManager) {
-        window.experimentLogManager.setExperimentId(newId);
-      }
-
-      // 更新受試者名稱為新的預設值
-      const subjectNameInput = document.getElementById("subjectName");
-      if (subjectNameInput) {
-        subjectNameInput.value = `受試者_${newId}`;
-        this.subjectName = subjectNameInput.value;
-      }
-    }
-
-    // 顯示統計面板
-    setTimeout(() => {
-      this.exportManager.displayStatisticsOnPage();
-    }, 500);
-  }
-
-  togglePauseExperiment() {
-    // 檢查是否正在進行實驗
-    if (!this.experimentRunning) {
-      return;
-    }
-
-    const pauseBtn = document.getElementById("pauseExperimentBtn");
-    const isPaused = window.experimentTimerManager?.experimentPaused ?? false;
-    const newPausedState = !isPaused;
-
-    // 更新按鈕文本
-    if (pauseBtn) {
-      pauseBtn.textContent = newPausedState ? "▶ 繼續" : "⏸ 暫停";
-    }
-
-    if (newPausedState) {
-      // 暫停實驗 - 委派給 experiment-timer.js
-      if (window.experimentTimerManager) {
-        window.experimentTimerManager.pauseExperimentTimer();
-      }
-      if (window.logger) {
-        window.logger.logExperimentPause();
-      }
-      // 分發暫停事件
-      document.dispatchEvent(
-        new CustomEvent("experiment_paused", {
-          detail: { isPaused: true },
-        }),
-      );
-      //廣播暫停狀態到其他連線裝置
-      window.experimentSyncManager.broadcastExperimentPauseState(true);
-    } else {
-      // 繼續實驗 - 委派給 experiment-timer.js
-      if (window.experimentTimerManager) {
-        window.experimentTimerManager.resumeExperimentTimer();
-      }
-      if (window.logger) {
-        window.logger.logExperimentResume();
-      }
-      // 分發還原事件
-      document.dispatchEvent(
-        new CustomEvent("experiment_resumed", {
-          detail: { isPaused: false },
-        }),
-      );
-      //廣播還原狀態到其他連線裝置
-      window.experimentSyncManager.broadcastExperimentPauseState(false);
-    }
-  }
-
-  toggleExperimentUI(locked) {
-    // 實驗 ID 欄位
-    const experimentIdInput = document.getElementById("experimentIdInput");
-    const regenerateIdBtn = document.getElementById("regenerateIdButton");
-    if (experimentIdInput) experimentIdInput.disabled = locked;
-    if (regenerateIdBtn) regenerateIdBtn.disabled = locked;
-
-    // 受試者名稱欄位
-    const subjectNameInput = document.getElementById("subjectName");
-    if (subjectNameInput) subjectNameInput.disabled = locked;
-
-    // 組合選擇按鈕
-    document.querySelectorAll(".combination-item").forEach((btn) => {
-      btn.style.pointerEvents = locked ? "none" : "auto";
-      btn.style.opacity = locked ? "0.5" : "1";
-    });
-
-    // 單元勾選框
-    document
-      .querySelectorAll('.unit-checkbox input[type="checkbox"]')
-      .forEach((cb) => {
-        cb.disabled = locked;
-      });
-
-    // 全選按鈕
-    const selectAllBtn = document.getElementById("selectAllUnits");
-    if (selectAllBtn) selectAllBtn.disabled = locked;
-
-    // 切換開始/停止按鈕顯示
-    const experimentIdRow = document.getElementById("experimentIdRow");
-    const experimentControlButtons = document.getElementById(
-      "experimentControlButtons",
+    // 通知 FlowManager 實驗停止（統一驅動解鎖/UI 重設）
+    // 同時 FlowManager 的 STOPPED 事件會觸發 _handleFlowStopped 並分發 DOM experiment_stopped 事件
+    // _bindDomEvents 會自動捕獲 experiment_stopped 並廣播兩端，不需手動再呼叫 broadcastExperimentStop
+    window.experimentFlowManager.stopExperiment(
+      isManualStop ? "manual" : "auto",
     );
 
-    if (experimentIdRow) {
-      experimentIdRow.classList.toggle("is-hidden", locked);
-    }
-    if (experimentControlButtons) {
-      experimentControlButtons.classList.toggle("is-hidden", !locked);
-    }
+    //實驗停止的廣播已由 document experiment_stopped 事件 → _bindDomEvents 自動處理
+    //僅自動停止時需要後續操作
+    if (!isManualStop) {
+      // 自動停止時，產生新的實驗ID（委派給 SystemManager）
+      if (window.experimentSystemManager) {
+        const newId =
+          await window.experimentSystemManager.regenerateExperimentId();
 
-    // 實驗中時隱藏計時器按鈕顯示區
-    const experimentTimer = document.getElementById("experimentTimer");
-    if (experimentTimer && locked) {
-      if (experimentTimer.classList.contains("is-hidden"))
-        experimentTimer.classList.remove("is-hidden");
+        // 更新受試者名稱為新的預設值
+        const subjectNameInput = document.getElementById("subjectName");
+        if (subjectNameInput && newId) {
+          subjectNameInput.value = `受試者_${newId}`;
+          this.subjectName = subjectNameInput.value;
+        }
+      }
+    }
+  }
+
+  /**
+   * 暫停/繼續實驗 —帶過 FlowManager（統一驅動計時器、UI、同步廣播）
+   */
+  togglePauseExperiment() {
+    if (!this.experimentRunning) return;
+    const fm = window.experimentFlowManager;
+    if (fm.isPaused) {
+      fm.resumeExperiment();
+    } else {
+      fm.pauseExperiment();
     }
   }
 
@@ -2376,7 +2294,7 @@ class BoardPageManager {
     // 監聽來自實驗中樞的實驗ID廣播更新
     window.addEventListener("experiment_id_broadcasted", (event) => {
       const { experimentId, client_id } = event.detail;
-      const hubManager = getExperimentHubManager();
+      const hubManager = window.experimentHubManager;
 
       // 避免自己廣播的回音
       if (client_id === hubManager.getClientId()) {
@@ -2393,23 +2311,9 @@ class BoardPageManager {
       }
     });
 
-    // 監聽組合選擇事件
-    document.addEventListener("combination:selected", (event) => {
-      const { combination, unitIds } = event.detail;
-      if (combination) {
-        // 更新目前組合
-        this.currentCombination = combination;
-
-        // 更新單元列表以匹配組合要求
-        this.updateUnitListForCombination(combination);
-
-        // 載入對應的腳本
-        const experimentId = document
-          .getElementById("experimentIdInput")
-          .value.trim();
-        this.loadScriptForCombination(combination, experimentId);
-      }
-    });
+    // combination:selected DOM 事件不再於此監聽
+    // 統一透過 experimentSystem:combinationSelected 處理
+    // （由 _setupEventListeners 中的 _handleSystemCombinationSelected 接收）
 
     //新增：監聽遠端按鈕動作
     window.addEventListener("remote_button_action", (event) => {
@@ -2699,16 +2603,12 @@ class BoardPageManager {
     contentArea.appendChild(cardsContainer);
   }
 
-  /** 顯示遠端按鈕動作的視覺回饋 - 使用 action_id 直接定位卡片 */
   showRemoteActionFeedback(actionId, buttonData, timestamp) {
     const actionCards = document.querySelectorAll(".action-button");
     if (actionCards.length === 0) {
       Logger.warn("找不到動作卡片");
       return;
     }
-
-    // 如果提供了 action_id，直接使用；否則使用目前 action
-    let targetActionId = actionId;
     if (!targetActionId) {
       const currentAction = window.experimentActionHandler?.getCurrentAction();
       if (!currentAction) {
@@ -2718,7 +2618,6 @@ class BoardPageManager {
       targetActionId = currentAction.action_id;
     }
 
-    // 用 data-action-id 屬性找到配對的卡片
     let highlightedCard = null;
     let gestureIndex = null;
 
@@ -2730,20 +2629,16 @@ class BoardPageManager {
         highlightedCard = card;
         gestureIndex = cardGestureIdx;
 
-        // 使用 markActionCompleted 標記為已完成（綠色 + 記錄日誌）
         if (window.markActionCompleted) {
-          window.markActionCompleted(
-            card,
-            targetActionId,
-            gestureIndex,
-            true, // isRemote = true，表示來自遠端
-          );
+          window.markActionCompleted(card, targetActionId, gestureIndex, true);
         }
 
-        // 新增高亮效果（視覺回饋）
+        if (gestureIndex !== null && window.toggleTimer) {
+          window.toggleTimer(parseInt(gestureIndex));
+        }
+
         card.classList.add("remote-action-completed");
 
-        // 2秒後移除高亮（保留綠色完成狀態）
         setTimeout(() => {
           card.classList.remove("remote-action-completed");
         }, 2000);
@@ -2777,13 +2672,11 @@ class BoardPageManager {
         matchedCard.style.background = "#4caf50";
         matchedCard.style.boxShadow = "0 0 12px rgba(76, 175, 80, 0.6)";
         matchedCard.style.transition = "all 0.3s ease";
-
         if (window.experimentLogManager) {
           window.experimentLogManager.logAction(
             matchedActionId,
             this.currentStep,
             null,
-            remoteClientId,
           );
         }
         setTimeout(() => {
@@ -3061,12 +2954,7 @@ window.markActionCompleted = function (
 
   // 記錄到實驗日誌（只有非遠端同步時才記錄，避免重複）
   if (!isRemote && window.experimentLogManager) {
-    window.experimentLogManager.logAction(
-      actionId,
-      gestureIndex,
-      null,
-      clientId,
-    );
+    window.experimentLogManager.logAction(actionId, gestureIndex, null);
   }
 
   // 如果是本機操作（非遠端同步），則廣播到其他裝置
@@ -3114,7 +3002,6 @@ window.cancelActionCompletion = function (
       `${actionId}_CANCELLED`,
       gestureIndex,
       null,
-      clientId,
     );
   }
 
@@ -3132,4 +3019,96 @@ window.cancelActionCompletion = function (
         Logger.warn("同步動作取消狀態失敗:", error);
       });
   }
+};
+
+// ==================== 手勢序列匯出功能 ====================
+
+/**
+ * 匯出手勢序列到剪貼板
+ * 格式:
+ *   [實驗ID] [gesture1] [gesture2] ...
+ *   只包含基本手勢類型 (open, confirm, next, prev, reload 等)
+ */
+window.exportGestureSequence = function () {
+  try {
+    // 取得目前選定的組合
+    const boardPageManager = window.boardPageManager;
+
+    if (!boardPageManager || !boardPageManager.currentCombination) {
+      alert("請先選擇一個組合");
+      return;
+    }
+
+    const combination = boardPageManager.currentCombination;
+    const gestures = combination.gestures || [];
+
+    if (gestures.length === 0) {
+      alert("沒有手勢序列資料");
+      return;
+    }
+
+    // 取得實驗ID（如果有輸入框）
+    const experimentIdInput = document.getElementById("experimentIdInput");
+    const experimentId = experimentIdInput?.value || "N/A";
+
+    // 構建文本內容: 實驗ID + 所有手勢類型
+    const gestureTypes = gestures
+      .map((g) => {
+        // 優先用 gesture 欄位（hand gesture type），否則用 gesture_id
+        return g.gesture || g.gesture_id || "?";
+      })
+      .join(" ");
+    const textContent = `${experimentId} ${gestureTypes}`;
+
+    // 複製到剪貼板
+    navigator.clipboard
+      .writeText(textContent)
+      .then(() => {
+        // 顯示複製成功提示
+        const btn = document.getElementById("exportGestureSequenceBtn");
+        if (btn) {
+          const originalHTML = btn.innerHTML;
+          const originalBg = btn.style.background;
+          btn.innerHTML = "✓ 已複製";
+          btn.style.background = "#4caf50";
+
+          setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.background = originalBg;
+          }, 2000);
+        }
+
+        Logger.info("已複製手勢序列", textContent);
+      })
+      .catch((err) => {
+        Logger.error("複製到剪貼板失敗:", err);
+        // 備用方案：使用傳統方法
+        window.fallbackCopyGestureSequence(textContent);
+      });
+  } catch (error) {
+    Logger.error("匯出手勢序列失敗:", error);
+    alert("匯出失敗，請查看控制台");
+  }
+};
+
+/**
+ * 備用複製方法 (舊瀏覽器相容)
+ */
+window.fallbackCopyGestureSequence = function (text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-999999px";
+  document.body.appendChild(textArea);
+  textArea.select();
+
+  try {
+    document.execCommand("copy");
+    alert("已複製到剪貼板");
+  } catch (error) {
+    alert("複製失敗，請手動複製");
+    console.error(error);
+  }
+
+  document.body.removeChild(textArea);
 };

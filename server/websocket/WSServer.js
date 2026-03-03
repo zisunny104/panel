@@ -12,6 +12,7 @@ import { WebSocketServer } from "ws";
 import { SERVER_CONFIG } from "../config/server.js";
 import { Logger } from "../utils/logger.js";
 import { metrics } from "../metrics.js";
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 
 export class WSServer {
   constructor(httpServer) {
@@ -239,7 +240,7 @@ export class WSServer {
    */
   sendConnectionSuccess(ws, wsConnectionId) {
     const message = {
-      type: "connected",
+      type: WS_PROTOCOL.S2C.CONNECTED,
       data: {
         wsConnectionId,
         serverTime: Math.floor(Date.now() / 1000),

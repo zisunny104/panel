@@ -262,7 +262,7 @@ class ConfigManager {
     const mediaVolume = document.getElementById("mediaVolume");
 
     // 監聽所有設定相關元素的 input 事件
-    // 只對存在的元素添加監聽器，避免 null 引用錯誤
+    // 只對存在的元素新增監聽器，避免 null 引用錯誤
     [
       scaleRange,
       scaleNumberInput,

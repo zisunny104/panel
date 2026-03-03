@@ -57,6 +57,18 @@ svg {
     display: block;
 }
 
+/* SVG 尺寸類別 */
+.icon-sm {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.5;
+}
+
+.svg-md {
+    width: 20px;
+    height: 20px;
+}
+
 .svg-outline {
     fill: none;
     stroke: currentColor;
@@ -152,4 +164,22 @@ svg {
 
 .shadow-lg {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* ================= 工具類別 ================= */
+/* 隱藏/顯示工具 */
+.is-hidden {
+    display: none !important;
+}
+
+.is-flex {
+    display: flex !important;
+}
+
+/* 圖片與 SVG 預設樣式 */
+img,
+.svg-icon {
+    max-width: 100%;
+    height: auto;
+    display: block;
 }

@@ -1,7 +1,9 @@
 /**
- * IndicatorManager
- * 負責膠囊指示器與短暫狀態訊息（toast-like）顯示。
- * 提供簡潔、專責的 API 給 sync UI 與其他模組使用。
+ * IndicatorManager - 膠囊指示器與狀態訊息管理器
+ *
+ * 負責建立、管理膠囊指示器（支援 idle/connected/error/connecting 等狀態）
+ * 與短暫狀態訊息（toast），支援 success/error/info/warning 四種類型。
+ * 以單例形式暴露至 window.indicatorManager 供各模組使用。
  */
 class IndicatorManager {
   constructor() {
@@ -11,14 +13,20 @@ class IndicatorManager {
   }
 
   _initContainers() {
-    try {
-      this.statusContainer = document.createElement("div");
-      this.statusContainer.className = "indicator-status-container";
-      this.statusContainer.setAttribute("aria-live", "polite");
-      document.body.appendChild(this.statusContainer);
-    } catch (e) {
-      Logger.warn("IndicatorManager init failed", e);
-    }
+    this.statusContainer = document.createElement("div");
+    this.statusContainer.className = "indicator-status-container";
+    this.statusContainer.setAttribute("aria-live", "polite");
+  }
+
+  /**
+   * 將狀態容器掛載到指定的面板容器中
+   * @param {HTMLElement} panelContent - modal 面板的內容區域
+   */
+  attachToPanel(panelContent) {
+    if (!this.statusContainer || !panelContent) return;
+    // 確保移到正確的父元素下
+    panelContent.appendChild(this.statusContainer);
+    Logger.debug("IndicatorManager: statusContainer 已掛載至面板");
   }
 
   createCapsuleIndicator(onClickCallback) {
@@ -67,11 +75,18 @@ class IndicatorManager {
    * type: 'success' | 'error' | 'info' | 'warning'
    */
   showStatus(type, message, timeout = 4000) {
-    if (!message) return;
+    if (!message || !this.statusContainer) return;
+
+    // 若尚未掛載到 DOM，暫時附加到 body 作為備援
+    if (!this.statusContainer.parentNode) {
+      document.body.appendChild(this.statusContainer);
+    }
+
+    ":" + String(now.getSeconds()).padStart(2, "0");
 
     const msg = document.createElement("div");
     msg.className = `indicator-status ${type || "info"}`;
-    msg.textContent = message;
+    msg.innerHTML = `<span class="indicator-status-time">${ts}</span> ${this._escapeHtml(message)}`;
     this.statusContainer.appendChild(msg);
 
     // screen-reader friendly
@@ -82,11 +97,14 @@ class IndicatorManager {
       setTimeout(() => msg.remove(), 300);
     }, timeout);
   }
+
+  /** 防止 XSS */
+  _escapeHtml(str) {
+    const el = document.createElement("span");
+    el.textContent = str;
+    return el.innerHTML;
+  }
 }
 
-// 單例放到 window，其他模組可直接使用 window.indicatorManager
-try {
-  window.indicatorManager = window.indicatorManager || new IndicatorManager();
-} catch (e) {
-  Logger.warn("Failed to instantiate IndicatorManager", e);
-}
+// 單例暴露到 window，其他模組可直接使用 window.indicatorManager
+window.indicatorManager = window.indicatorManager || new IndicatorManager();

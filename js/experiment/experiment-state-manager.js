@@ -1,6 +1,8 @@
 /**
  * ExperimentStateManager - 本機實驗狀態管理器
- * 已從 `js/core/experiment-state-manager.js` 移轉到 `js/experiment/`，成為 canonical 位置。
+ *
+ * 管理實驗 ID、受試者名稱、組合資料、單元列表、執行狀態及時序資料，
+ * 提供狀態快照還原與多裝置同步支援。
  */
 
 class ExperimentStateManager {
@@ -35,15 +37,28 @@ class ExperimentStateManager {
   setupInputSync() {
     const experimentIdInput = document.getElementById("experimentIdInput");
     if (experimentIdInput) {
+      // 對 input 做去抖，避免高頻輸入導致 race 或大量同步
+      let _debounceTimer = null;
+      const DEBOUNCE_MS = 300;
+
       experimentIdInput.addEventListener("input", (e) => {
         const newId = e.target.value.trim();
-        if (newId !== this.experimentId) {
-          this.setExperimentId(newId, "input");
-        }
+        if (_debounceTimer) clearTimeout(_debounceTimer);
+        _debounceTimer = setTimeout(() => {
+          if (newId !== this.experimentId) {
+            this.setExperimentId(newId, "input");
+          }
+          _debounceTimer = null;
+        }, DEBOUNCE_MS);
       });
 
+      // change 事件立即同步（例如離開欄位時）
       experimentIdInput.addEventListener("change", (e) => {
         const newId = e.target.value.trim();
+        if (_debounceTimer) {
+          clearTimeout(_debounceTimer);
+          _debounceTimer = null;
+        }
         if (newId !== this.experimentId) {
           this.setExperimentId(newId, "input");
         }
@@ -140,6 +155,27 @@ class ExperimentStateManager {
 
       if (window.experimentLogManager) {
         window.experimentLogManager.setExperimentId(experimentId, source);
+      }
+
+      // 如果有 Hub 管理器，且更新不是來自 Hub，才同步到 Hub（避免 hub -> local -> hub 迴圈）
+      try {
+        if (
+          source !== "hub" &&
+          source !== "hub_state" &&
+          window.experimentHubManager &&
+          typeof window.experimentHubManager.setExperimentId === "function"
+        ) {
+          const hubCurrent =
+            typeof window.experimentHubManager.getExperimentId === "function"
+              ? window.experimentHubManager.getExperimentId()
+              : null;
+          if (hubCurrent !== experimentId) {
+            // 使用現有的 Hub API，同步時保留 source 資訊
+            window.experimentHubManager.setExperimentId(experimentId, source);
+          }
+        }
+      } catch (err) {
+        Logger && Logger.warn && Logger.warn("同步實驗ID到 Hub 失敗:", err);
       }
 
       this.emit &&
@@ -297,9 +333,7 @@ class ExperimentStateManager {
     if (window.experimentHubManager?.isInSyncMode?.()) {
       Logger &&
         Logger.debug &&
-        Logger.debug(
-          `[ExperimentStateManager] 同步模式，註冊實驗ID到中樞: ${newId}`,
-        );
+        Logger.debug(`同步模式，註冊實驗ID到中樞: ${newId}`);
       window.experimentHubManager.registerExperimentId &&
         window.experimentHubManager.registerExperimentId(
           newId,
@@ -308,9 +342,7 @@ class ExperimentStateManager {
     } else {
       Logger &&
         Logger.debug &&
-        Logger.debug(
-          `[ExperimentStateManager] 獨立模式，實驗ID僅存本機: ${newId}`,
-        );
+        Logger.debug(`獨立模式，實驗ID僅存本機: ${newId}`);
     }
 
     return newId;

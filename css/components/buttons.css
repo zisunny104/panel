@@ -213,3 +213,17 @@
     width: 16px;
     height: 16px;
 }
+
+/* ================= 鎖定狀態樣式 ================= */
+.button-overlay.locked,
+button.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.button-overlay.locked:hover,
+button.locked:hover {
+    background-color: rgba(255, 140, 0, 0.4);
+    transform: none;
+}

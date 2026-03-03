@@ -1,0 +1,61 @@
+/* ===== Board 頁面響應式樣式 ===== */
+
+/* 實驗面板響應式 */
+@media (max-width: 1280px) {
+    .experiment-panel {
+        max-width: 90vw;
+    }
+}
+
+@media (max-width: 1024px) {
+    .experiment-panel {
+        max-width: 95vw;
+    }
+
+    .experiment-panel-header {
+        flex-direction: column;
+    }
+
+    .experiment-panel-defaults {
+        min-height: auto;
+    }
+
+    .experiment-panel-actions {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 768px) {
+    .experiment-panel {
+        max-width: 100vw;
+        border-radius: 0;
+    }
+
+    .experiment-panel-header {
+        padding: 12px;
+    }
+
+    .experiment-panel-defaults {
+        padding: 12px;
+    }
+
+    .experiment-panel-actions {
+        gap: 6px;
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .left-panel {
+        width: 100%;
+    }
+
+    .left-panel.hidden {
+        margin-left: -100%;
+    }
+
+    .experiment-panel-actions button {
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+}

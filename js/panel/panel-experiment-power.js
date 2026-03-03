@@ -84,7 +84,7 @@ class PanelExperimentPower {
    * 高亮電源開關
    */
   highlightPowerSwitch(highlight) {
-    // 使用正確的選擇器匹配電源按鈕
+    // 使用正確的選擇器符合電源按鈕
     const powerButtons = document.querySelectorAll(".media-power-btn");
     powerButtons.forEach((button) => {
       if (highlight) {
@@ -160,7 +160,7 @@ class PanelExperimentPower {
   broadcastPowerStateChange(isPowerOn) {
     if (window.syncManager?.core?.isConnected?.()) {
       const powerStateData = {
-        type: window.SyncDataTypes.POWER_STATE_CHANGED,
+        type: window.SYNC_DATA_TYPES.POWER_STATE_CHANGED,
         source: "panel",
         clientId: this.manager.clientId,
         is_power_on: isPowerOn,
@@ -439,3 +439,4 @@ class PanelExperimentPower {
 
 // 匯出電源管理器類別（實例化時需要傳入manager）
 window.PanelExperimentPower = PanelExperimentPower;
+

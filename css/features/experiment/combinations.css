@@ -1,9 +1,6 @@
 /* ========== 組合選擇器區塊樣式 ========== */
 .combination-selector-section {
-    padding: 12px;
-    background: #f9f9f9;
-    border: 2px solid #ddd;
-    border-radius: 6px;
+    /* 內部樣式由外層 .experiment-ui-card 處理 */
 }
 
 .combination-selector-section h3 {

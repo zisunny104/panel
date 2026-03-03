@@ -38,42 +38,29 @@ const markGesture = function (idx, status, gestureName) {
         gesture_name: gestureName,
         mark_status: status,
         timer_value: timerValue,
-        timestamp: timestamp
+        timestamp: timestamp,
       })
       .catch((error) => {
         Logger.warn("同步手勢標記失敗:", error);
       });
   }
 
-  // 視覺回饋
+  // 視覺回饋（500ms 時效粗邊框，以 CSS class 控制避免 inline style 競爭）
   const card = document.getElementById(`timer-card-${idx}`);
   if (card) {
-    const timerState = window.timerStates[idx];
-    const originalBorderColor =
-      card.getAttribute("data-original-border-color") ||
-      window.getComputedStyle(card).borderColor;
+    // 移除既有的標記 class（避免快速連點時動畫重複疊加）
+    card.classList.remove(
+      "timer-card-marked-correct",
+      "timer-card-marked-uncertain",
+      "timer-card-marked-incorrect",
+      "timer-card-pressed",
+    );
+    // force reflow 讓動畫能重新觸發
+    void card.offsetWidth;
 
-    // 根據標記類型改變 outline 顏色
-    if (status === "correct") {
-      card.style.outline = "4px solid #4caf50";
-    } else if (status === "uncertain") {
-      card.style.outline = "4px solid #ff9800";
-    } else if (status === "incorrect") {
-      card.style.outline = "4px solid #f44336";
-    }
-    card.style.outlineOffset = "-2px";
-
-    // 延遲後還原
-    const delayTime = 500;
-    setTimeout(() => {
-      if (timerState?.running) {
-        card.style.outline = `4px solid ${originalBorderColor}`;
-        card.style.outlineOffset = "-2px";
-      } else {
-        card.style.outline = "none";
-        card.style.outlineOffset = "0";
-      }
-    }, delayTime);
+    const markedClass = `timer-card-marked-${status}`;
+    card.classList.add(markedClass);
+    setTimeout(() => card.classList.remove(markedClass), 500);
   }
 
   // 如果有 logger，記錄到日誌系統
@@ -83,7 +70,7 @@ const markGesture = function (idx, status, gestureName) {
       gesture: gestureName,
       status: status,
       timer: timerValue,
-      timestamp: timestamp
+      timestamp: timestamp,
     });
   }
 
@@ -102,8 +89,6 @@ const markGesture = function (idx, status, gestureName) {
 // 暴露到 window 供 HTML 使用
 window.markGesture = markGesture;
 
-// ============ 下一步功能 ============
-
 /**
  * 進行下一步（自動停止計時）
  * @param {number} idx - 目前步驟索引
@@ -113,13 +98,10 @@ const goToNextStep = function (idx, gestureName) {
   const timerValue =
     document.getElementById(`timer-display-${idx}`)?.textContent || "00:00.000";
 
-  // 停止計時器
-  const state = window.timerStates[idx];
-  if (state && state.running) {
-    clearInterval(window.timerIntervals[idx]);
-    state.running = false;
-    state.elapsedTime += Date.now() - state.startTime;
-    window.timerStates[idx] = state;
+  // 停止計時器（透過公開 API，避免直接操作內部狀態）
+  const mgr = window.experimentTimerManager;
+  if (mgr?.timerStates?.[idx]?.running) {
+    mgr.toggleIndexedTimer(idx);
   }
 
   // 更新完成計數
@@ -140,7 +122,7 @@ const goToNextStep = function (idx, gestureName) {
         step_index: idx,
         gesture_name: gestureName,
         timer_value: timerValue,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       })
       .catch((error) => {
         Logger.warn("同步下一步動作失敗:", error);
@@ -153,7 +135,7 @@ const goToNextStep = function (idx, gestureName) {
       from_step: idx,
       gesture: gestureName,
       final_timer: timerValue,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -173,7 +155,10 @@ const goToNextStep = function (idx, gestureName) {
     // 最後一個步驟，結束實驗
     const currentCard = document.getElementById(`gesture-card-${idx}`);
     if (currentCard) {
-      currentCard.classList.remove("gesture-card-active");
+      currentCard.classList.remove(
+        "gesture-card-active",
+        "gesture-card-current",
+      );
       currentCard.classList.add("gesture-card-inactive");
     }
 
@@ -193,12 +178,12 @@ const goToNextStep = function (idx, gestureName) {
             setTimeout(() => {
               // 找實驗設定區塊 - 通常是左面板的第一個 input-section
               const experimentSection = document.querySelector(
-                ".left-panel .input-section"
+                ".left-panel .input-section",
               );
               if (experimentSection) {
                 experimentSection.scrollIntoView({
                   behavior: "smooth",
-                  block: "start"
+                  block: "start",
                 });
               }
             }, 300);
@@ -222,32 +207,19 @@ const goToNextStep = function (idx, gestureName) {
   const currentCard = document.getElementById(`gesture-card-${idx}`);
   const nextCard = document.getElementById(`gesture-card-${idx + 1}`);
 
-  // 移除目前卡片的浮起效果
+  // 移除目前卡片的浮起效果與目前標示
   if (currentCard) {
-    currentCard.classList.remove("gesture-card-active");
+    currentCard.classList.remove("gesture-card-active", "gesture-card-current");
     currentCard.classList.add("gesture-card-inactive");
   }
 
-  // 新增下一個卡片的浮起效果
+  // 新增下一個卡片的浮起效果與目前標示
   if (nextCard) {
     nextCard.scrollIntoView({ behavior: "smooth", block: "center" });
     nextCard.classList.remove("gesture-card-inactive");
-    nextCard.classList.add("gesture-card-active");
-
-    // 邊框高亮效果
-    const timerCard = nextCard.querySelector(`#timer-card-${idx + 1}`);
-    if (timerCard) {
-      timerCard.style.boxShadow = "0 0 0 3px #667eea";
-      setTimeout(() => {
-        timerCard.style.boxShadow = "";
-      }, 800);
-    }
+    nextCard.classList.add("gesture-card-active", "gesture-card-current");
   }
 };
 
 // 暴露到 window 供 HTML 使用
-window.goToNextStep = goToNextStep;
-
-// ============ 全局作用域匯出 ============
-window.markGesture = markGesture;
 window.goToNextStep = goToNextStep;

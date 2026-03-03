@@ -73,13 +73,13 @@ export class ExperimentService {
         `
         INSERT INTO experiment_ids (id, experiment_id, session_id, created_at, data)
         VALUES (?, ?, ?, ?, ?)
-      `
+      `,
       ).run(
         id,
         experimentId,
         sessionId,
         createdAt,
-        JSON.stringify(experimentData)
+        JSON.stringify(experimentData),
       );
 
       return {
@@ -113,7 +113,7 @@ export class ExperimentService {
         SELECT id, experiment_id, session_id, created_at, data
         FROM experiment_ids
         WHERE experiment_id = ?
-      `
+      `,
         )
         .get(experimentId);
 
@@ -148,7 +148,7 @@ export class ExperimentService {
         FROM experiment_ids
         WHERE session_id = ?
         ORDER BY created_at DESC
-      `
+      `,
         )
         .all(sessionId);
 
@@ -250,7 +250,7 @@ export class ExperimentService {
         UPDATE experiment_ids
         SET data = ?
         WHERE experiment_id = ?
-      `
+      `,
       ).run(JSON.stringify(updatedData), experimentId);
 
       return {
@@ -291,7 +291,7 @@ export class ExperimentService {
         FROM experiment_ids
         ORDER BY created_at DESC
         LIMIT ? OFFSET ?
-      `
+      `,
         )
         .all(pageSize, offset);
 

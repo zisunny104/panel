@@ -1,9 +1,6 @@
 /* ========== 教學單元選擇面板 ========== */
 .experiment-panel-units {
-    background: #f9f9f9;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    padding: 12px;
+    /* 內部樣式由外層 .experiment-ui-card 處理 */
     max-height: 300px;
     display: flex;
     flex-direction: column;
@@ -51,6 +48,11 @@
     accent-color: #667eea;
     width: 16px;
     height: 16px;
+}
+
+/* 確保 indeterminate 狀態的樣式正確顯示 */
+.select-all-checkbox input[type="checkbox"]:indeterminate {
+    accent-color: #667eea;
 }
 
 .unit-checkbox {
@@ -114,20 +116,35 @@
     border-color: rgba(244, 67, 54, 0.5);
 }
 
-.power-option-card .unit-sort {
-    flex: 1;
-    cursor: pointer;
-}
-
-.power-option-card .unit-title {
+/* 電源選項卡片文字樣式 */
+.power-option-title {
     font-weight: bold;
-    color: #fff;
+    color: #333;
     font-size: 0.9rem;
 }
 
-.power-option-card .unit-subtitle {
+.power-option-subtitle {
     font-size: 0.8rem;
-    color: #ccc;
+    color: #666;
+}
+
+/* 單元資訊文字樣式 */
+.unit-info-title {
+    font-weight: bold;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.unit-info-subtitle {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+/* Make the unit-sort area non-interactive for power option cards */
+.power-option-card .unit-sort {
+    flex: 1;
+    cursor: default;
+    pointer-events: none;
 }
 
 .unit-sort {

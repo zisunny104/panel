@@ -117,7 +117,7 @@ class MediaManager {
     } else {
       Logger.error(`不支援的媒體格式: ${src}`);
       this.mediaArea.innerHTML =
-        '<div class="media-error-message">不支援的媒體格式</div>';
+        "<div class=\"media-error-message\">不支援的媒體格式</div>";
       return null;
     }
 
@@ -1003,21 +1003,6 @@ class MediaManager {
               }
             }
           }
-
-          // 從 units.json 中查找對應的單元
-          const unitsResponse = await fetch("./data/units.json");
-          const unitsData = await unitsResponse.json();
-
-          if (unitsData.units) {
-            const unit = unitsData.units.find((u) => u.unit_id === unitId);
-            if (unit && unit.steps) {
-              unit.steps.forEach((step) => {
-                if (step.media_file) {
-                  mediaFiles.add(step.media_file);
-                }
-              });
-            }
-          }
         } catch (error) {
           Logger.warn(`收集單元 ${unitId} 的媒體檔案失敗:`, error);
         }
@@ -1035,9 +1020,7 @@ class MediaManager {
       Logger.debug("示例媒體檔案:", filesArray.slice(0, 6));
       try {
         if (console && typeof console.groupCollapsed === "function") {
-          Logger.groupCollapsed(
-            `[PanelMediaManager] 全部媒體檔案 (${filesArray.length})`,
-          );
+          Logger.groupCollapsed(`全部媒體檔案 (${filesArray.length})`);
           Logger.debug(filesArray);
           console.groupEnd();
         }
@@ -1213,3 +1196,11 @@ class MediaManager {
 
 // 匯出單例
 window.mediaManager = new MediaManager();
+
+// 通知其他模組 mediaManager 已載入
+if (
+  window.panelUIManager &&
+  typeof window.panelUIManager.applyPendingMediaVolume === "function"
+) {
+  window.panelUIManager.applyPendingMediaVolume();
+}

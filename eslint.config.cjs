@@ -23,7 +23,7 @@ module.exports = [
       "no-console": "off",
       quotes: ["warn", "double"],
       semi: ["warn", "always"],
-      "comma-dangle": ["warn", "never"],
+      "comma-dangle": ["warn", "always-multiline"],
     },
   },
 ];

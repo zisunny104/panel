@@ -1,17 +1,9 @@
 /**
  * ExperimentFlowManager - 實驗流程管理器
- * Phase 2 - P0 核心模組
  *
- * 職責：
- * 1. 實驗生命週期管理（開始、暫停、結束）
- * 2. 步驟流程控制
- * 3. 單元進度控制
- * 4. 狀態查詢
- * 5. 事件發布
- * 6. 依賴注入支援
- *
- * 提取來源：
- * - panel-experiment-flow.js (核心流程控制邏輯)
+ * 負責實驗生命週期控制（開始、暫停、恢復、停止、完成）、
+ * 步驟與單元進度管理，並發布流程事件供其他模組訂閱。
+ * 與 ExperimentTimerManager 和 UI 層互動以驅動實驗進行。
  */
 
 class ExperimentFlowManager {
@@ -20,7 +12,7 @@ class ExperimentFlowManager {
    */
   static STATE = {
     IDLE: "idle", // 閒置（未開始）
-    RUNNING: "running", // 執行中
+    RUNNING: "running", // 進行中
     PAUSED: "paused", // 暫停
     STOPPED: "stopped", // 已停止
     COMPLETED: "completed", // 已完成
@@ -135,7 +127,7 @@ class ExperimentFlowManager {
    */
   async startExperiment(options = {}) {
     if (this.isRunning) {
-      Logger.warn("實驗已在執行中");
+      Logger.warn("實驗已在進行中");
       return false;
     }
 
@@ -166,7 +158,7 @@ class ExperimentFlowManager {
       // 鎖定變更（禁止變更 experimentId/組合）
       this.locked = true;
       this.emit(ExperimentFlowManager.EVENT.LOCKED, { locked: true });
-      // 在執行中不允許修改受試者名稱
+      // 在進行中不允許修改受試者名稱
       this.emit(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, {
         allowed: false,
       });
@@ -202,7 +194,7 @@ class ExperimentFlowManager {
    */
   pauseExperiment() {
     if (!this.isRunning) {
-      Logger.warn("實驗未運行，無法暫停");
+      Logger.warn("實驗未進行，無法暫停");
       return false;
     }
 
@@ -242,7 +234,7 @@ class ExperimentFlowManager {
    */
   resumeExperiment() {
     if (!this.isRunning) {
-      Logger.warn("實驗未運行，無法恢復");
+      Logger.warn("實驗未進行，無法恢復");
       return false;
     }
 
@@ -279,7 +271,7 @@ class ExperimentFlowManager {
    */
   stopExperiment(reason = "manual") {
     if (!this.isRunning) {
-      Logger.warn("實驗未運行，無法停止");
+      Logger.warn("實驗未進行，無法停止");
       return false;
     }
 
@@ -318,7 +310,7 @@ class ExperimentFlowManager {
    */
   completeExperiment() {
     if (!this.isRunning) {
-      Logger.warn("實驗未運行，無法標記為完成");
+      Logger.warn("實驗未進行，無法標記為完成");
       return false;
     }
 
@@ -388,7 +380,7 @@ class ExperimentFlowManager {
    */
   nextStep() {
     if (!this.isRunning || this.isPaused) {
-      Logger.warn("實驗未運行或已暫停，無法前進");
+      Logger.warn("實驗未進行或已暫停，無法前進");
       return false;
     }
 
@@ -398,7 +390,6 @@ class ExperimentFlowManager {
       return false;
     }
 
-    const currentStep = this.getCurrentStep();
     const oldStepIndex = this.currentStepIndex;
 
     // 檢查是否還有下一步
@@ -429,7 +420,7 @@ class ExperimentFlowManager {
    */
   prevStep() {
     if (!this.isRunning) {
-      Logger.warn("實驗未運行，無法後退");
+      Logger.warn("實驗未進行，無法後退");
       return false;
     }
 
@@ -465,7 +456,7 @@ class ExperimentFlowManager {
    */
   jumpToStep(unitIndex, stepIndex) {
     if (!this.isRunning) {
-      Logger.warn("實驗未運行，無法跳轉");
+      Logger.warn("實驗未進行，無法跳轉");
       return false;
     }
 
@@ -521,7 +512,7 @@ class ExperimentFlowManager {
    */
   nextUnit() {
     if (!this.isRunning) {
-      Logger.warn("實驗未運行，無法前進到下一單元");
+      Logger.warn("實驗未進行，無法前進到下一單元");
       return false;
     }
 
@@ -558,7 +549,7 @@ class ExperimentFlowManager {
    */
   prevUnit() {
     if (!this.isRunning) {
-      Logger.warn("實驗未運行，無法後退到上一單元");
+      Logger.warn("實驗未進行，無法後退到上一單元");
       return false;
     }
 
@@ -735,7 +726,7 @@ class ExperimentFlowManager {
    */
   enableAutoProgress(delay = 3000) {
     if (!this.config.enableAutoProgress) {
-      Logger.warn("自動推進功能已禁用");
+      Logger.warn("自動推進功能已停用");
       return false;
     }
 
@@ -752,7 +743,7 @@ class ExperimentFlowManager {
   }
 
   /**
-   * 禁用自動推進
+   * 停用自動推進
    */
   disableAutoProgress() {
     this.clearAutoProgress();

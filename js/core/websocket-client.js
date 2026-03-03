@@ -18,7 +18,7 @@ class WebSocketClient {
       reconnectInterval: options.reconnectInterval || 3000, // 3秒
       maxReconnectAttempts: options.maxReconnectAttempts || 5,
       storagePrefix: options.storagePrefix || "panel_", // sessionStorage 前綴
-      autoReconnect: options.autoReconnect !== false
+      autoReconnect: options.autoReconnect !== false,
     };
 
     // 連接狀態
@@ -103,10 +103,33 @@ class WebSocketClient {
       throw new Error("缺少 sessionId，無法連接");
     }
 
-    // 4. 建立 WebSocket 連接
+    // 4. 清除舊連接（防止舊 onclose 觸發幽靈重連）
+    if (this.ws) {
+      const oldWs = this.ws;
+      oldWs.onopen = null;
+      oldWs.onmessage = null;
+      oldWs.onclose = null;
+      oldWs.onerror = null;
+      if (
+        oldWs.readyState === WebSocket.OPEN ||
+        oldWs.readyState === WebSocket.CONNECTING
+      ) {
+        oldWs.close(1000, "Replaced by new connection");
+      }
+      this.ws = null;
+      Logger.debug("[WebSocketClient] 已清除舊連接");
+    }
+
+    // 5. 清除待處理的重連計時器
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    // 6. 建立 WebSocket 連接
     Logger.info(
       "[WebSocketClient] 正在連接到 WebSocket 伺服器...",
-      this.config.url
+      this.config.url,
     );
 
     try {
@@ -146,53 +169,53 @@ class WebSocketClient {
 
       // 路由訊息到對應處理器
       switch (type) {
-        case "connected":
+        case window.WS_PROTOCOL.S2C.CONNECTED:
           this.handleConnected(data);
           break;
 
-        case "auth_success":
+        case window.WS_PROTOCOL.S2C.AUTH_SUCCESS:
           this.handleAuthSuccess(data);
           break;
 
-        case "clear_sync_data":
+        case window.WS_PROTOCOL.S2C.CLEAR_SYNC_DATA:
           Logger.warn("[WebSocketClient] 處理 clear_sync_data 訊息");
           this.handleClearSyncData(data);
           break;
 
-        case "heartbeat_ack":
+        case window.WS_PROTOCOL.S2C.HEARTBEAT_ACK:
           this.handleHeartbeatAck(data);
           break;
 
-        case "session_state":
+        case window.WS_PROTOCOL.S2C.SESSION_STATE:
           this.emit("session_state", data);
           break;
 
-        case "session_state_update":
+        case window.WS_PROTOCOL.S2C.SESSION_STATE_UPDATE:
           this.emit("state_update", data);
           break;
 
-        case "client_joined":
+        case window.WS_PROTOCOL.S2C.CLIENT_JOINED:
           this.emit("client_joined", data);
           break;
 
-        case "client_left":
+        case window.WS_PROTOCOL.S2C.CLIENT_LEFT:
           this.emit("client_left", data);
           break;
 
-        case "client_reconnected":
+        case window.WS_PROTOCOL.S2C.CLIENT_RECONNECTED:
           this.emit("client_reconnected", data);
           break;
 
-        case "state_update_ack":
+        case window.WS_PROTOCOL.S2C.STATE_UPDATE_ACK:
           // 狀態更新確認回應，記錄但不需要特殊處理
           Logger.debug("[WebSocketClient] 伺服器確認狀態更新", data);
           break;
 
-        case "experiment_started":
-        case "experiment_paused":
-        case "experiment_resumed":
-        case "experiment_stopped":
-        case "experiment_id_changed":
+        case window.WS_PROTOCOL.S2C.EXPERIMENT_STARTED:
+        case window.WS_PROTOCOL.S2C.EXPERIMENT_PAUSED:
+        case window.WS_PROTOCOL.S2C.EXPERIMENT_RESUMED:
+        case window.WS_PROTOCOL.S2C.EXPERIMENT_STOPPED:
+        case window.WS_PROTOCOL.S2C.EXPERIMENT_ID_CHANGED:
           this.emit(`experiment_${type.split("_")[1]}`, data);
           break;
 
@@ -231,16 +254,16 @@ class WebSocketClient {
     Logger.debug("[WebSocketClient] 正在認證...", {
       sessionId: this.sessionId,
       clientId: this.clientId,
-      role: this.role
+      role: this.role,
     });
 
     this.send({
-      type: "auth",
+      type: window.WS_PROTOCOL.C2S.AUTH,
       data: {
         sessionId: this.sessionId,
         clientId: this.clientId,
-        role: this.role
-      }
+        role: this.role,
+      },
     });
   }
 
@@ -282,18 +305,18 @@ class WebSocketClient {
 
   /**
    * 處理清除同步數據命令
-   * 當伺服器發現工作階段不存在時，通知客戶端清除本機的同步信息
+   * 當伺服器發現工作階段不存在時，通知客戶端清除本機的同步資訊
    */
   handleClearSyncData(data) {
     const { reason, message } = data;
 
     Logger.warn(
-      `[WebSocketClient] 接收到清除同步數據命令 [${reason}]: ${message}`
+      `[WebSocketClient] 接收到清除同步數據命令 [${reason}]: ${message}`,
     );
 
-    // 禁用自動重連，避免無限重連循環
+    // 停用自動重連，避免無限重連循環
     this.config.autoReconnect = false;
-    Logger.debug("[WebSocketClient] 已禁用自動重連");
+    Logger.debug("[WebSocketClient] 已停用自動重連");
 
     // 清除本機同步資訊
     this.clearLocalSyncData();
@@ -303,13 +326,13 @@ class WebSocketClient {
       detail: {
         reason,
         message,
-        timestamp: Date.now()
-      }
+        timestamp: Date.now(),
+      },
     });
 
     Logger.debug("[WebSocketClient] 準備派發 sync_data_cleared 事件", {
       reason,
-      message
+      message,
     });
 
     window.dispatchEvent(clearEvent);
@@ -319,11 +342,11 @@ class WebSocketClient {
     this.emit("sync_data_cleared", {
       reason,
       message,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     Logger.info(
-      `[WebSocketClient] 已派發內部 sync_data_cleared 事件 [${reason}]`
+      `[WebSocketClient] 已派發內部 sync_data_cleared 事件 [${reason}]`,
     );
 
     // 延遲斷開連線，給 SyncManager 時間處理事件
@@ -341,7 +364,7 @@ class WebSocketClient {
    */
   clearLocalSyncData() {
     try {
-      // 清除 sessionStorage 中的同步信息
+      // 清除 sessionStorage 中的同步資訊
       sessionStorage.removeItem("syncClientState_sessionId");
       sessionStorage.removeItem("syncClientState_clientId");
       sessionStorage.removeItem("syncClientState_role");
@@ -358,7 +381,7 @@ class WebSocketClient {
    */
   handleClose(event) {
     Logger.info(
-      `[WebSocketClient] WebSocket 連接已關閉 [${event.code}]: ${event.reason}`
+      `[WebSocketClient] WebSocket 連接已關閉 [${event.code}]: ${event.reason}`,
     );
 
     this.isAuthenticated = false;
@@ -396,9 +419,9 @@ class WebSocketClient {
         new CustomEvent("websocket_session_invalid", {
           detail: {
             reason: "session_not_found",
-            originalError: data
-          }
-        })
+            originalError: data,
+          },
+        }),
       );
     }
 
@@ -413,7 +436,7 @@ class WebSocketClient {
     const delay = this.config.reconnectInterval * this.reconnectAttempts;
 
     Logger.info(
-      `[WebSocketClient] 將在 ${delay}ms 後嘗試重新連接 (第 ${this.reconnectAttempts} 次)`
+      `[WebSocketClient] 將在 ${delay}ms 後嘗試重新連接 (第 ${this.reconnectAttempts} 次)`,
     );
 
     this.reconnectTimer = setTimeout(() => {
@@ -421,7 +444,7 @@ class WebSocketClient {
       this.connect({
         sessionId: this.sessionId,
         clientId: this.clientId,
-        role: this.role
+        role: this.role,
       });
     }, delay);
   }
@@ -435,17 +458,17 @@ class WebSocketClient {
     this.heartbeatTimer = setInterval(() => {
       if (this.isAuthenticated) {
         this.send({
-          type: "heartbeat",
+          type: window.WS_PROTOCOL.C2S.HEARTBEAT,
           data: {
             clientId: this.clientId,
-            timestamp: Date.now()
-          }
+            timestamp: Date.now(),
+          },
         });
       }
     }, this.config.heartbeatInterval);
 
     Logger.debug(
-      `[WebSocketClient] 心跳已啟動 (間隔: ${this.config.heartbeatInterval}ms)`
+      `[WebSocketClient] 心跳已啟動 (間隔: ${this.config.heartbeatInterval}ms)`,
     );
   }
 
@@ -492,7 +515,7 @@ class WebSocketClient {
     if (this.messageQueue.length === 0) return;
 
     Logger.debug(
-      `[WebSocketClient] 發送佇列中的 ${this.messageQueue.length} 條訊息`
+      `[WebSocketClient] 發送佇列中的 ${this.messageQueue.length} 條訊息`,
     );
 
     while (this.messageQueue.length > 0) {
@@ -506,12 +529,12 @@ class WebSocketClient {
    */
   updateState(state) {
     this.send({
-      type: "state_update",
+      type: window.WS_PROTOCOL.C2S.STATE_UPDATE,
       data: {
         sessionId: this.sessionId,
         clientId: this.clientId,
-        state
-      }
+        state,
+      },
     });
   }
 
@@ -586,7 +609,7 @@ class WebSocketClient {
         Logger.debug("[WebSocketClient] 從 sessionStorage 恢復連接資訊:", {
           clientId,
           sessionId,
-          role
+          role,
         });
         return { clientId, sessionId, role };
       }
@@ -624,7 +647,7 @@ class WebSocketClient {
     this.connect({
       sessionId: this.sessionId,
       clientId: this.clientId,
-      role: this.role
+      role: this.role,
     });
   }
 
@@ -634,7 +657,7 @@ class WebSocketClient {
   close() {
     Logger.info("[WebSocketClient] 正在關閉 WebSocket 連接...");
 
-    this.config.autoReconnect = false; // 禁用自動重連
+    this.config.autoReconnect = false; // 停用自動重連
     this.stopHeartbeat();
 
     if (this.reconnectTimer) {
@@ -670,7 +693,7 @@ class WebSocketClient {
       clientId: this.clientId,
       sessionId: this.sessionId,
       role: this.role,
-      reconnectAttempts: this.reconnectAttempts
+      reconnectAttempts: this.reconnectAttempts,
     };
   }
 }

@@ -401,37 +401,8 @@ class PanelLogger {
     }
   }
 
-  /**
-   * 顯示日誌面板
-   */
-  showLoggerPanel() {
-    // Visibility controlled by PanelUIManager; kept for rare internal use
-    if (this.loggerOutput) this.loggerOutput.classList.remove("is-hidden");
-    try {
-      localStorage.setItem("loggerMinimized", "false");
-    } catch (e) {}
-  }
-
-  /**
-   * 隱藏日誌面板
-   */
-  hideLoggerPanel() {
-    // Visibility controlled by PanelUIManager; kept for rare internal use
-    if (this.loggerOutput) this.loggerOutput.classList.add("is-hidden");
-    try {
-      localStorage.setItem("loggerMinimized", "true");
-    } catch (e) {}
-  }
-
-  /**
-   * 最小化日誌面板（保留 FAB 可見）
-   */
-  minimizeLogger() {
-    if (this.loggerOutput) this.loggerOutput.classList.add("is-hidden");
-    try {
-      localStorage.setItem("loggerMinimized", "true");
-    } catch (e) {}
-  }
+  // showLoggerPanel / hideLoggerPanel / minimizeLogger 已移除
+  // 所有面板開關統一透過 PanelUIManager.openPanel / closePanel 處理
 
   /**
    * 切換日誌面板，加入短暫去抖動以避免多重輸入事件造成重複切換
@@ -460,24 +431,7 @@ class PanelLogger {
       copyLogButton.addEventListener("click", () => this.copyLog());
     }
 
-    // 關閉按鈕
-    const closeLoggerPanel = document.getElementById("closeLoggerPanel");
-    if (closeLoggerPanel) {
-      closeLoggerPanel.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (window.panelUIManager) window.panelUIManager.closePanel("logger");
-      });
-    }
-
-    // FAB handling is attached by PanelUIManager to centralize panel toggling
-  }
-
-  /**
-   * 設定點擊外部關閉日誌面板的監聽器
-   */
-  setupOutsideClickListener() {
-    // Outside-click handling is centralized in PanelUIManager.setupOutsideClickListener
+    // 關閉按鈕 / FAB 按鈕 / 點擊外部關閉 — 統一由 PanelUIManager 處理
   }
 }
 

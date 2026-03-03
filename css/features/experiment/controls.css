@@ -1,0 +1,186 @@
+/* ===== 實驗控制區域 ===== */
+
+/* 實驗ID輸入區域 */
+.experiment-id-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.experiment-id-group .form-input {
+    flex: 1;
+    height: 40px;
+    box-sizing: border-box;
+}
+
+.experiment-id-group .btn-secondary {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.experiment-id-group .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
+}
+
+.experiment-id-group .experiment-timer {
+    display: none;
+    font-size: 0.9rem;
+    color: #666;
+    white-space: nowrap;
+}
+
+/* 受試者名稱輸入區域 */
+.participant-name-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.participant-name-group .form-input {
+    flex: 1;
+    height: 40px;
+    box-sizing: border-box;
+}
+
+.participant-name-group .btn-secondary {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.participant-name-group .btn-secondary:hover {
+    background: #e9ecef;
+    border-color: #bbb;
+}
+
+/* 實驗控制區域 */
+.experiment-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 0;
+    /* 移除多餘的 margin，因為它是最後一個元素 */
+}
+
+.experiment-control-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.experiment-control-header label {
+    font-weight: 600;
+}
+
+.experiment-control-header .experiment-timer {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #666;
+    background: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 開始實驗區域 */
+.experiment-start-row {
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+    margin-top: 10px;
+}
+
+.experiment-start-row .experiment-start-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.experiment-start-row .experiment-start-btn:hover {
+    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+/* 實驗控制按鈕 */
+.experiment-control-buttons {
+    display: none;
+    gap: 8px;
+    flex-direction: row;
+    margin-top: 10px;
+}
+
+.experiment-control-buttons button {
+    flex: 1;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.experiment-control-buttons .experiment-pause-btn {
+    background: #667eea;
+    color: white;
+}
+
+.experiment-control-buttons .experiment-pause-btn:hover {
+    background: #5568d3;
+}
+
+.experiment-control-buttons .experiment-resume-btn {
+    background: #4caf50;
+    color: white;
+}
+
+.experiment-control-buttons .experiment-resume-btn:hover {
+    background: #45a049;
+}
+
+.experiment-control-buttons .experiment-stop-btn {
+    background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.experiment-control-buttons .experiment-stop-btn:hover {
+    background: linear-gradient(135deg, #da190b 0%, #c41a0a 100%);
+    box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4);
+}

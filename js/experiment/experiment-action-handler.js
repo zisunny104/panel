@@ -531,12 +531,12 @@ class ExperimentActionHandler {
   }
 
   /**
-   * 禁用自動推進
+   * 停用自動推進
    */
   disableAutoProgress() {
     this.config.enableAutoProgress = false;
     this.clearAutoProgress();
-    Logger.debug("自動推進已禁用");
+    Logger.debug("自動推進已停用");
   }
 
   /**

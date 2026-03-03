@@ -72,7 +72,7 @@ server/
 ├── .env                              # 環境變數設定（運行時）
 ├── .env.example                      # 環境變數範例（版本控制）
 ├── config/
-│   ├── server.js (86 行)             # 伺服器設定（連接埠、CORS、靜態檔案）
+│   ├── server.js (126 行)             # 伺服器設定（連接埠、CORS、WebSocket、工作階段、速率限制）
 │   ├── database.js (31 行)           # SQLite 連線設定與 PRAGMA 優化
 │   └── constants.js (72 行)          # 常數定義（超時、限制等）
 ├── database/
@@ -137,7 +137,7 @@ data/
 ├── buttons.json (131 行) # 按鈕設定（位置、標籤、動作）
 ├── gestures.json (57 行) # 手勢識別設定
 ├── config.json (32 行) # 前端業務設定（UI、功能開關、時區）
-└── ref.txt (9 行) # 參考信息
+└── ref.txt (9 行) # 參考資訊
 
 ```
 
@@ -145,41 +145,41 @@ data/
 
 #### js/core/ - 核心模組
 
-| **config.js** (402 行) | `ConfigManager` | 設定管理與版本管理。方法：loadConfigSettings, resetUserSettingsToDefaults, applySettings, saveUserSettings, loadVersionInfo |
-| **console-manager.js** (139 行) | `Logger` | 統一日誌記錄（多級別）。方法：debug, info, warn, error, setLogLevel, shouldLog, formatMessage |
-| **data-loader.js** (90 行) | 導出函數 | 從 units.json 載入實驗資料。函數：loadUnitsFromScenarios(), buildActionSequenceFromUnits() |
+| **config.js** (414 行) | `ConfigManager` | 設定管理與版本管理。方法：loadConfigSettings, resetUserSettingsToDefaults, applySettings, saveUserSettings, loadVersionInfo |
+| **console-manager.js** (325 行) | `Logger` | 統一日誌記錄（多級別）。方法：debug, info, warn, error, setLogLevel, shouldLog, formatMessage |
+| **data-loader.js** (107 行) | 導出函數 | 從 units.json 載入實驗資料。函數：loadUnitsFromScenarios(), buildActionSequenceFromUnits() |
 | **websocket-client.js** (684 行) | `WebSocketClient` | WebSocket 連接管理。方法：connect, disconnect, send, on, off, handleOpen, handleMessage, handleClose, handleError |
-| **time-sync-manager.js** (266 行) | `TimeSyncManager` | 時間同步與格式化。方法：initialize, syncWithServer, getServerTime, getTimeOffset, isSynchronized |
-| **experiment-state-manager.js** (550 行) | `ExperimentStateManager` | 本機狀態管理。方法：setupSync, setupInputSync, setupHubSync, setExperimentId, setParticipantName, setCurrentCombination, restoreSnapshot |
+| **time-sync-manager.js** (272 行) | `TimeSyncManager` | 時間同步與格式化。方法：initialize, syncWithServer, getServerTime, getTimeOffset, isSynchronized |
+| **camera-utils.js** (200 行) | `CameraUtils` | 相機裝置列舉、啟動、停止、重試。方法：enumerateDevices, start, stop, retry |
 | **sync-events-constants.js** (141 行) | 導出常數 | 同步事件常數定義。常數：SyncEvents, SyncDataTypes。函數：getEventName, isSyncEvent, getAllSyncEvents |
-| **random-utils.js** (121 行) | 導出物件 | 可重現隨機化工具。物件：RandomUtils。函數：createSeededRandom, shuffleArray, getCombinationUnitIds, generateExperimentId |
+| **random-utils.js** (118 行) | 導出物件 | 可重現隨機化工具。物件：RandomUtils。函數：createSeededRandom, shuffleArray, getCombinationUnitIds, generateExperimentId |
 
 #### js/panel/ - 面板控制模組
 
 | 文件                                   | 類                     | 主要功能                                                                                                                                                                                                               |
 | -------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **panel-page-manager.js** (303 行)     | `PanelPageManager`     | 面板頁面腳本載入協調。方法：initialize, loadCoreScripts, loadUIScripts, loadExperimentScripts, loadSyncScripts, loadScript, onInitializationComplete                                                                   |
+| **panel-page-manager.js** (756 行)     | `PanelPageManager`     | 面板頁面腳本載入協調。方法：initialize, loadCoreScripts, loadUIScripts, loadExperimentScripts, loadSyncScripts, loadScript, onInitializationComplete                                                                   |
 | **panel-button-manager.js** (1461 行)  | `ButtonManager`        | 按鈕互動與邏輯。方法：loadButtonFunctions, clearButtonFunctions, simulateButtonClick, setupEventListeners, updateExperimentButtonStyles, handleButtonPressed                                                           |
-| **panel-ui-manager.js** (910 行)       | `PanelUIManager`       | UI 控制項與視覺設定。方法：updateScale, updateTopSpacer, updateBottomSpacer, updatePowerScale, updateButtonLabelVisibility, updateButtonColorVisibility, updateTouchVisuals, setupEventListeners, initializeUIControls |
-| **panel-power-control.js** (747 行)    | `PowerControl`         | 電源狀態管理。方法：updatePowerUI, setPowerState, updatePowerUIWithoutSync, updateMediaControlButtons, dispatchPowerStateChanged, setupEventListeners, disableAllButtons, enableAllButtons                             |
-| **panel-media-manager.js** (1118 行)   | `MediaManager`         | 媒體預載入與快取。方法：setupEventListeners, playMedia, processMediaSrc, setupVideoElement, setupImageElement, playMediaInArea, preloadMedia, preloadCombinationMedia, stopHomePageLoop, playHomePageLoop              |
-| **panel-logger.js** (553 行)           | `PanelLogger`          | 操作日誌記錄。方法：initializeDOMElements, setupDOMElements, isExperimentMode, formatDateTime, getExperimentInfo, logAction, toggleLogger, showLogger, hideLogger, clearLog, exportLog                                 |
-| **panel-experiment-power.js** (405 行) | `PanelExperimentPower` | 電源管理與狀態監控。方法：handlePowerOn, handlePowerOff, highlightPowerSwitch, checkPowerState, setPowerState, handlePowerStateChange                                                                                  |
-| **panel-sync-manager.js** (235 行)     | `PanelSyncManager`     | 面板同步管理。方法：initialize, setupEventListeners, handleSyncStateChange, updateSyncIndicator, showSyncPanel, hideSyncPanel                                                                                          |
+| **panel-ui-manager.js** (1190 行)      | `PanelUIManager`       | UI 控制項與視覺設定。方法：updateScale, updateTopSpacer, updateBottomSpacer, updatePowerScale, updateButtonLabelVisibility, updateButtonColorVisibility, updateTouchVisuals, setupEventListeners, initializeUIControls |
+| **panel-power-control.js** (811 行)    | `PowerControl`         | 電源狀態管理。方法：updatePowerUI, setPowerState, updatePowerUIWithoutSync, updateMediaControlButtons, dispatchPowerStateChanged, setupEventListeners, disableAllButtons, enableAllButtons                             |
+| **panel-media-manager.js** (1222 行)   | `MediaManager`         | 媒體預載入與快取。方法：setupEventListeners, playMedia, processMediaSrc, setupVideoElement, setupImageElement, playMediaInArea, preloadMedia, preloadCombinationMedia, stopHomePageLoop, playHomePageLoop              |
+| **panel-logger.js** (486 行)           | `PanelLogger`          | 操作日誌記錄。方法：initializeDOMElements, setupDOMElements, isExperimentMode, formatDateTime, getExperimentInfo, logAction, toggleLogger, showLogger, hideLogger, clearLog, exportLog                                 |
+| **panel-experiment-power.js** (442 行) | `PanelExperimentPower` | 電源管理與狀態監控。方法：handlePowerOn, handlePowerOff, highlightPowerSwitch, checkPowerState, setPowerState, handlePowerStateChange                                                                                  |
+| **panel-sync-manager.js** (200 行)     | `PanelSyncManager`     | 面板同步管理。方法：initialize, setupEventListeners, handleSyncStateChange, updateSyncIndicator, showSyncPanel, hideSyncPanel                                                                                          |
 
 #### js/sync/ - 同步模組
 
-| 文件                                    | 類                         | 主要功能                                                                                                                                                                                                                    |
-| --------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **sync-manager.js** (674 行)            | `SyncManager`              | 同步管理主入口。方法：initialize, setupInitialization。常數：ROLE, STATUS, ROLE_TEXTS, STATUS_TEXTS, PAGE, PAGE_LIST                                                                                                        |
-| **sync-manager-core.js** (673 行)       | `SyncManagerCore`          | 同步核心邏輯。方法：initDependencies, getBaseUrl, generateQRContent, createSession, joinSession, restoreSession, syncState, processOfflineQueue, syncCurrentStateToHub                                                      |
-| **sync-manager-ui.js** (1291 行)        | `SyncManagerUI`            | UI 膠囊指示器與控制面板。方法：initialize, createCapsuleIndicator, createControlPanel, updateIndicator, updateUIState, showPanel, hidePanel, setupEventListeners, bindEvents                                                |
-| **sync-manager-sessions.js** (966 行)   | `SyncManagerSessions`      | 工作階段管理 UI。方法：initialize, showSessionsPanel, loadSessionsData, renderSessionsList, bindEvents, refreshSessionsList, downloadSession, deleteSession                                                                 |
-| **sync-manager-qr.js** (1483 行)        | `SyncManagerQR`            | QR Code 產生與掃描。方法：initialize, checkUrlParameters, generateQRCode, startQRScanner, stopQRScanner, refreshDeviceList, handleQRScanResult                                                                              |
-| **sync-confirm-dialog.js** (279 行)     | `SyncConfirmDialogManager` | 加入工作階段確認對話。方法：showJoinConfirmation                                                                                                                                                                            |
-| **sync-client.js** (949 行)             | `SyncClient`               | WebSocket + REST API 同步客戶端。方法：setupGlobalEventHandlers, initializeSync, setupWebSocketHandlers, createSession, joinSession, restoreSession, syncState, getShareCodeInfo, startHeartbeatCheck, loadState, saveState |
-| **experiment-sync-manager.js** (350 行) | `ExperimentSyncManager`    | 實驗同步管理。方法：initialize, setupEventListeners, handleExperimentStateChange, syncExperimentState, broadcastExperimentUpdate                                                                                            |
-| **indicator-manager.js** (180 行)       | `IndicatorManager`         | 同步狀態指示器管理。方法：initialize, updateIndicator, showIndicator, hideIndicator, setStatus, animateIndicator                                                                                                            |
+| 文件                                    | 類                         | 主要功能                                                                                                                                                                                                                           |
+| --------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **sync-manager.js** (579 行)            | `SyncManager`              | 同步管理主入口。方法：initialize, setupInitialization。常數：ROLE, STATUS, ROLE_TEXTS, STATUS_TEXTS, PAGE, PAGE_LIST                                                                                                               |
+| **sync-manager-core.js** (529 行)       | `SyncManagerCore`          | 同步核心邏輯。方法：initDependencies, getBaseUrl, generateQRContent, createSession, joinSession, restoreSession, syncState, processOfflineQueue, syncCurrentStateToHub                                                             |
+| **sync-manager-ui.js** (1190 行)        | `SyncManagerUI`            | UI 膠囊指示器與控制面板。方法：initialize, createCapsuleIndicator, createControlPanel, updateIndicator, updateUIState, showPanel, hidePanel, setupEventListeners, bindEvents                                                       |
+| **sync-manager-sessions.js** (941 行)   | `SyncManagerSessions`      | 工作階段管理 UI。方法：initialize, showSessionsPanel, loadSessionsData, renderSessionsList, bindEvents, refreshSessionsList, downloadSession, deleteSession                                                                        |
+| **sync-manager-qr.js** (1190 行)        | `SyncManagerQR`            | QR Code 產生與掃描。方法：initialize, checkUrlParameters, generateQRCode, startQRScanner, stopQRScanner, refreshDeviceList, handleQRScanResult                                                                                     |
+| **sync-confirm-dialog.js** (297 行)     | `SyncConfirmDialogManager` | 加入工作階段確認對話。方法：showJoinConfirmation                                                                                                                                                                                   |
+| **sync-client.js** (826 行)             | `SyncClient`               | WebSocket + REST API 同步客戶端。方法：setupGlobalEventHandlers, initializeSync, setupWebSocketHandlers, createSession, joinSession, restoreSession, syncState, getShareCodeInfo, startHeartbeatCheck, loadState, saveState        |
+| **experiment-sync-manager.js** (161 行) | `ExperimentSyncCore`       | 實驗同步核心。方法：initialize, setupEventListeners, handleRemoteState, syncState。透過 IIFE 自動初始化為 `window.experimentSyncCore`，由 `board-sync-manager.js` 的 `ExperimentSyncAdapter` 包裝為 `window.experimentSyncManager` |
+| **indicator-manager.js** (93 行)        | `IndicatorManager`         | 同步狀態指示器管理。方法：initialize, updateIndicator, showIndicator, hideIndicator, setStatus, animateIndicator                                                                                                                   |
 
 #### js/experiment/ - 實驗管理模組
 
@@ -188,11 +188,10 @@ data/
 ```
 js/experiment/
 ├── experiment-action-handler.js      # ExperimentActionHandler - 動作處理與事件路由，支援注入 FlowManager、HubManager
-├── experiment-adapter.js.deprecated  # 向後相容的舊版適配器（已標註為 deprecated）
 ├── experiment-combination-manager.js # ExperimentCombinationManager - 組合載入、快取還原、隨機化與預設組合應用
 ├── experiment-flow-manager.js        # ExperimentFlowManager - 實驗流程協調（開始/暫停/停止/步進），接受 CombinationManager 注入
 ├── experiment-hub-manager.js         # ExperimentHubManager - 與實驗中樞/同步相關的延遲初始化與會話管理
-├── experiment-state-manager.js       # ExperimentStateManager - 實驗狀態管理與持久化
+├── experiment-state-manager.js       # ExperimentStateManager (375行) - 實驗狀態管理與持久化（從 js/core/ 遷移而來）
 ├── experiment-system-manager.js      # ExperimentSystemManager - 實驗系統統一管理器，協調各模組
 ├── experiment-timer.js               # ExperimentTimerManager - 統一計時器管理器
 └── experiment-ui-manager.js          # ExperimentUIManager - 實驗 UI 組件、計時器、按鈕狀態與視覺提示管理
@@ -208,10 +207,9 @@ js/board/
 ├── board-export-manager.js       # BoardExportManager - 統計資料匯出管理
 ├── board-log-manager.js          # BoardLogManager - 實驗日誌管理
 ├── board-log-ui.js               # BoardLogUI - 日誌UI組件
-├── board-sync-manager.js         # BoardSyncManager - 同步管理
-├── board-ui-manager.js           # BoardUIManager - UI管理
-├── board-gesture-utils.js        # BoardGestureUtils - 手勢處理工具
-└── board-ui-controls.js          # BoardUIControls - UI控制項
+├── board-sync-manager.js         # ExperimentSyncAdapter - 同步管理（包裝 ExperimentSyncCore，換出為 window.experimentSyncManager）
+├── board-ui-manager.js           # BoardUIManager - UI管理（含 toggleLeftPanel, toggleGestureStats）
+└── board-gesture-utils.js        # BoardGestureUtils - 手勢處理工具
 ```
 
 #### 檔案層級依賴與初始化順序
@@ -220,64 +218,52 @@ js/board/
 
 **Panel 頁面載入順序** (`PanelPageManager`):
 
-1. **Phase 1 - 核心模組** (js/core/\*)
-   - `console-manager.js` (Logger)
-   - `config.js` (ConfigManager)
-   - `websocket-client.js` (WebSocketClient)
-   - `time-sync-manager.js` (TimeSyncManager)
-   - `random-utils.js` (RandomUtils)
-   - `data-loader.js` (loadUnitsFromScenarios)
-   - `sync-client.js` (SyncClient)
+1. **Phase 1A - 核心模組** (`loadCoreScripts`, 並行載入)
+   - `js/core/console-manager.js` (Logger)
+   - `js/core/config.js` (ConfigManager)
+   - `js/core/websocket-client.js` (WebSocketClient)
+   - `js/core/time-sync-manager.js` (TimeSyncManager)
+   - `js/core/random-utils.js` (RandomUtils)
+   - `js/core/data-loader.js` (loadUnitsFromScenarios)
+   - `js/sync/indicator-manager.js` (IndicatorManager)
+   - `js/sync/sync-client.js` (SyncClient)
 
-2. **Phase 2 - UI 與面板模組** (js/panel/\*)
-   - `panel-page-manager.js` (PanelPageManager)
-   - `panel-ui-manager.js` (PanelUIManager)
-   - `panel-button-manager.js` (ButtonManager)
-   - `panel-logger.js` (PanelLogger)
-   - `panel-power-control.js` (PowerControl)
-   - `panel-media-manager.js` (MediaManager)
-   - `panel-experiment-power.js` (PanelExperimentPower)
-   - `panel-sync-manager.js` (PanelSyncManager)
+2. **Phase 1B - UI 模組** (`loadUIScripts`, 並行載入)
+   - `js/panel/panel-ui-manager.js` (PanelUIManager)
+   - `js/panel/panel-button-manager.js` (ButtonManager)
+   - `js/panel/panel-logger.js` (PanelLogger)
+   - `js/panel/panel-power-control.js` (PowerControl)
 
-3. **Phase 3 - 新實驗模組** (js/experiment/\*)
-   - `experiment-hub-manager.js` (ExperimentHubManager)
-   - `experiment-combination-manager.js` (ExperimentCombinationManager)
-   - `experiment-flow-manager.js` (ExperimentFlowManager)
-   - `experiment-action-handler.js` (ExperimentActionHandler)
-   - `experiment-ui-manager.js` (ExperimentUIManager)
+3. **Phase 1C - 實驗模組** (`loadExperimentScripts`, 並行載入)
+   - `js/experiment/experiment-state-manager.js` (ExperimentStateManager)
+   - `js/experiment/experiment-timer.js` (ExperimentTimerManager)
+   - `js/experiment/experiment-system-manager.js` (ExperimentSystemManager)
+   - `js/experiment/experiment-hub-manager.js` (ExperimentHubManager)
+   - `js/experiment/experiment-combination-manager.js` (ExperimentCombinationManager)
+   - `js/experiment/experiment-flow-manager.js` (ExperimentFlowManager)
+   - `js/experiment/experiment-action-handler.js` (ExperimentActionHandler)
+   - `js/experiment/experiment-ui-manager.js` (ExperimentUIManager)
+   - `js/panel/panel-media-manager.js` (MediaManager)
+   - `js/panel/panel-experiment-power.js` (PanelExperimentPower)
 
-4. **Phase 4 - 同步模組** (js/sync/\*)
-   - `sync-confirm-dialog.js` (SyncConfirmDialogManager)
-   - `sync-manager.js` (SyncManager)
+4. **Phase 1D - 同步模組** (`loadSyncScripts`, 並行載入)
+   - `js/sync/sync-confirm-dialog.js` (SyncConfirmDialogManager)
+   - `js/sync/sync-manager.js` (SyncManager, ES module)
+   - `js/panel/panel-sync-manager.js` (PanelSyncManager)
 
 **Board 頁面載入順序** (`BoardPageManager`):
 
-1. **核心基礎設施** (js/core/\*)
-   - `config.js`, `websocket-client.js`, `time-sync-manager.js`, `experiment-state-manager.js`
+**注意**: 所有 25 個腳本在單一批次中**全部並行載入**（`Promise.all`），以下為邏輯分類：
 
-2. **同步系統**
-   - `sync-client.js`, `experiment-hub-manager.js`
+- **核心基礎設施**: `console-manager.js`, `config.js`, `websocket-client.js`, `time-sync-manager.js`
+- **實驗狀態**: `experiment-state-manager.js`
+- **同步系統**: `sync-client.js`, `experiment-hub-manager.js`
+- **核心工具**: `data-loader.js`, `random-utils.js`
+- **實驗模組**: `experiment-combination-manager.js`, `experiment-flow-manager.js`, `experiment-action-handler.js`, `experiment-ui-manager.js`, `experiment-system-manager.js`, `experiment-timer.js`
+- **Board 專用**: `board-log-manager.js`, `board-log-ui.js`, `board-export-manager.js`, `board-sync-manager.js`, `board-ui-manager.js`, `board-gesture-utils.js`
+- **同步與對話框**: `experiment-sync-manager.js`, `sync-confirm-dialog.js`, `sync-events-constants.js` (ES module), `sync-manager.js` (ES module)
 
-3. **核心工具**
-   - `data-loader.js`, `random-utils.js`
-
-4. **新實驗模組** (js/experiment/\*)
-   - `experiment-system-manager.js`, `experiment-combination-manager.js`, `experiment-flow-manager.js`
-   - `experiment-action-handler.js`, `experiment-timer.js`, `experiment-ui-manager.js`
-
-5. **Board 專用模組** (js/board/\*)
-   - `board-log-manager.js`, `board-log-ui.js`, `board-sync-manager.js`
-   - `board-ui-manager.js`, `board-gesture-utils.js`, `board-ui-controls.js`
-
-6. **同步與對話框**
-   - `sync-events-constants.js`, `sync-manager.js`
-   - `sync-manager-core.js` (SyncManagerCore)
-   - `sync-manager-ui.js` (SyncManagerUI)
-   - `sync-manager-sessions.js` (SyncManagerSessions)
-   - `sync-manager-qr.js` (SyncManagerQR)
-   - `experiment-sync-manager.js` (ExperimentSyncManager)
-   - `indicator-manager.js` (IndicatorManager)
-   - `sync-confirm-dialog.js` (SyncConfirmDialogManager)
+`sync-manager.js` 作為 ES module 會透過 import 自動載入子模組：`sync-manager-core.js`, `sync-manager-ui.js`, `sync-manager-qr.js`, `sync-manager-sessions.js`
 
 注意事項：
 
@@ -316,28 +302,32 @@ css/
 │ ├── button-styles.css (88 行) # 按鈕樣式
 │ ├── buttons.css (96 行) # 按鈕變體
 │ ├── control-panel.css (182 行) # 控制面板樣式
+│ ├── forms.css # 表單樣式
 │ ├── general-buttons.css (119 行) # 一般按鈕
 │ ├── media-area.css (159 行) # 媒體區域樣式
 │ ├── power-button.css (64 行) # 電源按鈕樣式
 │ ├── svg-panel.css (16 行) # SVG 面板樣式
 │ ├── toggle-switch.css (132 行) # 切換開關樣式
 │ └── ui-buttons.css (154 行) # UI 按鈕樣式
-├── experiment/
-│ ├── base.css (32 行)
-│ ├── buttons.css (124 行)
-│ ├── cards.css (139 行)
-│ ├── combinations.css (88 行)
-│ ├── experiment-forms.css (737 行)
-│ ├── forms.css (383 行)
-│ ├── gestures.css (29 行)
-│ ├── layout.css (65 行)
-│ ├── log-view-modal.css (241 行)
-│ ├── stats.css (46 行)
-│ └── units.css (195 行)
-├── panels/
-│ ├── experiment-panel.css (503 行)
-│ ├── log-panel.css (159 行)
-│ └── maintenance-panel.css (182 行)
+├── features/
+│ ├── experiment/
+│ │ ├── buttons.css (124 行)
+│ │ ├── cards.css (139 行)
+│ │ ├── combinations.css (88 行)
+│ │ ├── controls.css
+│ │ ├── gestures.css (29 行)
+│ │ ├── layout.css (65 行)
+│ │ ├── log-view-modal.css (241 行)
+│ │ ├── logs.css
+│ │ ├── stats.css (46 行)
+│ │ └── units.css (195 行)
+│ └── panels/
+│   ├── experiment-panel.css (503 行)
+│   ├── log-panel.css (159 行)
+│   └── maintenance-panel.css (182 行)
+├── pages/
+│ ├── board-page.css # Board 頁面專用樣式
+│ └── panel-page.css # Panel 頁面專用樣式
 ├── states/
 │ ├── experiment-states.css (167 行)
 │ ├── interaction-states.css (103 行)
@@ -350,6 +340,7 @@ css/
 │ └── sessions.css (403 行)
 └── utilities/
 ├── animations.css (52 行)
+├── responsive-board.css # Board 頁面響應式設計
 └── responsive.css (84 行)
 
 ```
@@ -386,6 +377,10 @@ panel/
 ├── panel.code-workspace # VS Code 工作區設定
 └── favicon.ico # 網站圖標
 
+scripts/
+├── find_duplicate_logs.js # 重複日誌檢測工具
+└── update-version.js # 版本更新腳本
+
 ```
 
 ### docs/ - 文件目錄
@@ -394,7 +389,6 @@ panel/
 
 docs/
 ├── ARCHITECTURE.md # 架構文件（本文件）
-├── PAGE_MANAGERS_AND_EXPERIMENT_MODULES.md # 頁面管理器與實驗模組架構說明
 ├── PROJECT_TERMINOLOGY_GUIDE.md # 專案術語指南
 └── scenarios_structure.md # Scenarios 架構說明
 
@@ -431,28 +425,11 @@ npm run version:status
 
 ## 更新說明與已知問題
 
-### 最近更新（2026年2月）
-
-- ✅ 完整掃描並文件化所有 JavaScript 文件的類和方法
-- ✅ 更新目錄結構文件清單，包含每個文件的詳細方法列表
-- ✅ 移除過時或不存在的文件引用（如 `main.js`, `panel-manager.js`, `panel-experiment-timer.js`, `panel-experiment-media.js`, `panel-experiment-manager.js`, `board-state-manager.js`, `experiment-hub-client.js`）
-- ✅ 新增實際存在但文檔中未提到的文件（`experiment-system-manager.js`, `experiment-timer.js`, `experiment-sync-manager.js`, `indicator-manager.js`）
-- ✅ 確認核心方法實際存在於代碼中
-- ✅ 統一日誌管理：所有 console 輸出改用 Logger 管理器，避免多重前綴
-- ✅ 修正 `board.html` 相關錯誤：修復 `toggleTimer` 參照錯誤並新增/修正計時器相關函式
-- ✅ 新增/補上缺失類別：`BoardExportManager` 已實作以支援匯出功能
-- ✅ 設定與變數修正：`mediaVolume` 與相關媒體設定已加入並在設定檔中正確初始化
-- ✅ 實驗初始化流程改進：PageManager 於無實驗 ID 時會自動產生實驗 ID，並在可用時指示 `ExperimentCombinationManager` 重新套用預設組合
-- ✅ 快取與還原強化：`ExperimentCombinationManager` 改進快取還原的錯誤處理，對無效或損毀的快取會自動清理以避免靜默失敗
-- ✅ 模組注入修正：`setupModuleDependencies()` 現在包含明確的注入步驟（例如將 `ExperimentCombinationManager` 注入 `ExperimentFlowManager`），以確保模組間依賴正確綁定
-- ✅ 代碼清理：移除了各模組中的UMD導出模式，簡化為全域導出
-- ✅ 架構文檔更新：移除不存在的文件引用，添加新文件，更新載入順序
-
-### 日誌管理最佳實踐
+### 日誌管理
 
 **關鍵原則**：所有控制台輸出都應使用 `Logger` 統一管理，避免直接呼叫 `console.log/error/warn`
 
-#### 1. 日誌層級使用規範
+#### 日誌層級使用規範
 
 | 層級  | 用途             | 範例                             |
 | ----- | ---------------- | -------------------------------- |
@@ -468,30 +445,7 @@ npm run version:status
 - 異常情況和潛在問題 → **WARN**
 - 失敗和錯誤 → **ERROR**
 
-#### 2. Logger 使用模式
-
-```javascript
-// ❌ 錯誤：直接使用 console（會導致多重前綴）
-console.log("[PanelPageManager] 開始初始化");
-
-// ✅ 正確：檢查 Logger 可用性後使用
-if (typeof Logger !== "undefined") {
-  Logger.info("PanelPageManager 開始初始化");
-} else {
-  console.log("開始初始化"); // 備用方案
-}
-
-// ✅ 正確：詳細日誌用 debug
-Logger.debug(`載入核心腳本: ${script}`);
-
-// ✅ 正確：性能指標用 debug（含詳細計時）
-Logger.debug(`核心腳本載入完成 (耗時: ${duration}ms)`);
-
-// ✅ 正確：關鍵里程碑用 info
-Logger.info(`所有腳本載入完成 (總耗時: ${totalTime}ms)`);
-```
-
-#### 3. 避免多重前綴
+#### 避免多重前綴
 
 **問題**：
 
@@ -505,39 +459,6 @@ panel-page-manager.js:190                  ← 瀏覽器自動加的 sourceMap
 ```
 [INFO] [panel-page-manager.js:190] 開始初始化 (耗時: 69ms)
 ```
-
-#### 4. PanelPageManager 日誌改革範例
-
-**改革前**：
-
-```javascript
-console.log(
-  `[PanelPageManager] 開始初始化 (${new Date().toLocaleTimeString()})`,
-);
-console.log(`[PanelPageManager] 載入核心腳本: ${script}`); // 詳細，重複
-console.log(`[PanelPageManager] 腳本已快取: ${src}`); // 詳細，重複
-console.log(`[PanelPageManager] 核心腳本載入完成 (耗時: ${time}ms)`);
-```
-
-**改革後**：
-
-```javascript
-Logger.info("PanelPageManager 開始初始化");
-Logger.debug(`載入核心腳本: ${script}`); // 詳細日誌用 debug
-Logger.debug(`腳本已快取: ${src}`); // 詳細日誌用 debug
-Logger.debug(`核心腳本載入完成 (耗時: ${time}ms)`); // 計時用 debug
-Logger.info(`所有腳本載入完成 (總耗時: ${totalTime}ms)`); // 里程碑用 info
-```
-
-### 已知問題與待確認項目
-
-**TODO: 驗證下列方法的實際簽名與文檔是否一致**
-
-1. **TimeSyncManager.syncWithServer()** - 需確認此方法實現的詳細邏輯
-2. **SyncClient 重新連線邏輯** - 離線佇列處理機制的完整實現狀態需驗證
-3. **各模組間的職責邊界** - 需清楚劃分狀態管理和UI控制的職責分工
-
----
 
 ## 核心概念與變數定義
 

@@ -1,11 +1,8 @@
 /**
- * SyncConfirmDialogManager - 同步確認對話框管理器
+ * SyncConfirmDialogManager - 同步工作階段加入確認對話框
  *
- * 功能：
- * - 顯示加入同步工作階段的確認對話框
- * - 處理分享代碼輸入和即時驗證
- * - 支援角色選擇（檢視者/操作者）
- * - 提供統一的UI體驗給所有頁面使用
+ * 負責顯示加入同步工作階段的確認對話框，包含分享代碼驗證、
+ * 角色選擇與即時驗證回饋。
  */
 
 class SyncConfirmDialogManager {
@@ -32,6 +29,8 @@ class SyncConfirmDialogManager {
     // 建立對話框
     const confirmDialog = document.createElement("div");
     confirmDialog.className = "modal-overlay sync-confirm-dialog";
+    const viewerModeText = window.SyncManager.MODE_TEXTS.viewer;
+    const operatorModeText = window.SyncManager.MODE_TEXTS.operator;
     confirmDialog.innerHTML = `
       <div class="modal-container">
         <div class="modal-header">
@@ -64,8 +63,8 @@ class SyncConfirmDialogManager {
               <div class="sync-confirm-item">
                 <span class="sync-confirm-label">模式</span>
                 <div class="sync-confirm-mode-selector">
-                  <button class="sync-confirm-mode-btn" data-role="${window.SyncManager?.ROLE?.VIEWER}">檢視模式</button>
-                  <button class="sync-confirm-mode-btn" data-role="${window.SyncManager?.ROLE?.OPERATOR}">同步操作</button>
+                  <button class="sync-confirm-mode-btn" data-role="${window.SyncManager.ROLE.VIEWER}">${viewerModeText}</button>
+                  <button class="sync-confirm-mode-btn" data-role="${window.SyncManager.ROLE.OPERATOR}">${operatorModeText}</button>
                 </div>
               </div>
             </div>
@@ -131,19 +130,13 @@ class SyncConfirmDialogManager {
       // 延遲驗證（避免頻繁請求）
       validationTimeout = setTimeout(async () => {
         try {
-          // 使用 SyncClient 的方法驗證
-          const syncClient = window.syncManager?.core?.syncClient;
-          if (!syncClient) {
-            throw new Error("SyncClient 未初始化");
-          }
+          // 取得 SyncClient 實例驗證代碼有效性
+          const syncClient = window.syncManager.core.syncClient;
 
           const result = await syncClient.getShareCodeInfo(editedCode);
-
-          // 確保元素仍存在且對話框未關閉
           const currentStatus = confirmDialog.querySelector(
             ".sync-confirm-checksum-status",
           );
-          if (!currentStatus) return;
 
           // 有結果且未過期、未使用
           if (result && !result.expired && !result.used) {
@@ -170,16 +163,14 @@ class SyncConfirmDialogManager {
           const currentStatus = confirmDialog.querySelector(
             ".sync-confirm-checksum-status",
           );
-          if (currentStatus) {
-            currentStatus.classList.add("invalid");
-            currentStatus.classList.remove("valid");
-            currentStatus.querySelector(
-              ".sync-confirm-checksum-icon",
-            ).textContent = "!";
-            currentStatus.querySelector(
-              ".sync-confirm-checksum-text",
-            ).textContent = "驗證錯誤";
-          }
+          currentStatus.classList.add("invalid");
+          currentStatus.classList.remove("valid");
+          currentStatus.querySelector(
+            ".sync-confirm-checksum-icon",
+          ).textContent = "!";
+          currentStatus.querySelector(
+            ".sync-confirm-checksum-text",
+          ).textContent = "驗證錯誤";
         }
       }, 300); // 300ms延遲，使用者停止輸入時觸發
     });
@@ -204,32 +195,22 @@ class SyncConfirmDialogManager {
 
     const closeDialog = () => {
       confirmDialog.remove();
-      if (onCancel) onCancel();
+      onCancel?.();
     };
 
     const confirmAction = async () => {
+      // 顯示驗證中的狀態
+      const confirmBtn = confirmDialog.querySelector(
+        ".sync-confirm-btn-confirm",
+      );
+      const originalText = confirmBtn.textContent;
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "驗證中...";
+
+      // 取得 SyncClient 實例進行最終驗證
+      const syncClient = window.syncManager.core.syncClient;
+
       try {
-        // 顯示驗證中的狀態
-        const confirmBtn = confirmDialog.querySelector(
-          ".sync-confirm-btn-confirm",
-        );
-        const originalText = confirmBtn.textContent;
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = "驗證中...";
-
-        // 使用 SyncClient 驗證分享代碼
-        const syncClient = window.syncManager?.core?.syncClient;
-        if (!syncClient) {
-          if (window.indicatorManager) {
-            window.indicatorManager.showStatus("error", "同步服務未初始化");
-          } else {
-            alert("同步服務未初始化");
-          }
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = originalText;
-          return;
-        }
-
         const result = await syncClient.getShareCodeInfo(editedCode);
 
         // 還原按鈕狀態
@@ -241,31 +222,25 @@ class SyncConfirmDialogManager {
           let reason = "代碼無效";
           if (result?.expired) reason = "代碼已過期";
           if (result?.used) reason = "代碼已被使用";
-          if (window.indicatorManager) {
-            window.indicatorManager.showStatus(
-              "error",
-              `分享代碼無效: ${reason}`,
-            );
-          } else {
-            alert(`分享代碼無效\n${reason}\n請檢查代碼是否正確`);
-          }
+          window.indicatorManager.showStatus(
+            "error",
+            `分享代碼無效: ${reason}`,
+          );
           Logger.error("分享代碼驗證失敗:", result);
           return;
         }
 
         // 驗證通過，關閉對話框並執行Callback
         confirmDialog.remove();
-        if (onConfirm) onConfirm(editedCode, selectedRole);
+        onConfirm?.(editedCode, selectedRole);
       } catch (error) {
         Logger.error("驗證分享代碼時發生錯誤:", error);
-        if (window.indicatorManager) {
-          window.indicatorManager.showStatus(
-            "error",
-            "驗證分享代碼時發生錯誤，請重試",
-          );
-        } else {
-          alert("驗證分享代碼時發生錯誤，請重試");
-        }
+        window.indicatorManager.showStatus(
+          "error",
+          "驗證分享代碼時發生錯誤，請重試",
+        );
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = originalText;
       }
     };
 
@@ -283,9 +258,9 @@ class SyncConfirmDialogManager {
     };
     document.addEventListener("keydown", handleKeyPress);
 
-    // 如果有初始分享代碼，手動觸發驗證
-    if (code && code.trim()) {
-      // 模擬input事件來觸發驗證
+    // 如果有初始代碼，自動觸發驗證檢查
+    if (code?.trim()) {
+      // 透過 input 事件觸發驗證流程
       const inputEvent = new Event("input", { bubbles: true });
       codeInput.dispatchEvent(inputEvent);
     }

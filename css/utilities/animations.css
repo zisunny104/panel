@@ -15,6 +15,7 @@
 }
 
 @keyframes pulse-green {
+
     0%,
     100% {
         box-shadow: 0 0 12px rgba(0, 255, 127, 0.5);
@@ -26,6 +27,7 @@
 }
 
 @keyframes powerSwitchGlow {
+
     0%,
     100% {
         box-shadow: 0 0 20px rgba(0, 255, 0, 0.6), 0 0 40px rgba(0, 255, 0, 0.4), 0 0 60px rgba(0, 255, 0, 0.2);
@@ -41,9 +43,12 @@
 }
 
 @keyframes pulse-orange {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.5;
     }
@@ -54,8 +59,35 @@
         transform: translateX(-20px);
         opacity: 0;
     }
+
     100% {
         transform: translateX(0);
         opacity: 1;
+    }
+}
+
+/* ===== Skeleton Loading Animation ===== */
+.skeleton {
+    background-color: #f3f3f3;
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-line {
+    height: 12px;
+    margin: 8px 0;
+    background: linear-gradient(90deg, #f3f3f3 0%, #ececec 50%, #f3f3f3 100%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.2s linear infinite;
+    border-radius: 4px;
+}
+
+@keyframes skeleton-shimmer {
+    from {
+        background-position: 200% 0;
+    }
+
+    to {
+        background-position: -200% 0;
     }
 }

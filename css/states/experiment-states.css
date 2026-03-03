@@ -189,7 +189,7 @@ body.visual-hints-enabled #powerSwitchArea.next-step-highlight {
     }
 }
 
-/* ================= 按鈕禁用狀態 ================= */
+/* ================= 按鈕停用狀態 ================= */
 .button-overlay.temporarily-disabled {
     cursor: not-allowed;
     pointer-events: none;
@@ -210,13 +210,13 @@ body.visual-hints-enabled #powerSwitchArea.next-step-highlight {
     transform: none;
 }
 
-/* ================= 機器未開機時按鈕禁用狀態 ================= */
+/* ================= 機器未開機時按鈕停用狀態 ================= */
 .button-overlay.power-off-disabled {
     pointer-events: none;
     cursor: not-allowed;
 }
 
-/* ================= 實驗進行中控制禁用狀態 ================= */
+/* ================= 實驗進行中控制停用狀態 ================= */
 input:disabled,
 input.experiment-disabled {
     background-color: rgba(200, 200, 200, 0.3);

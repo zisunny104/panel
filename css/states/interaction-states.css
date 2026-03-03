@@ -29,46 +29,8 @@ video::-webkit-media-controls-overlay-play-button {
     display: none !important;
 }
 
-/* ================= 實驗面板分頁 ================= */
-.experiment-tabs {
-    display: flex;
-    gap: 0;
-    margin-bottom: 0.75rem;
-    margin-left: 0;
-    margin-right: 0;
-}
-
-.experiment-tab {
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    background: #333;
-    color: #ccc;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    border-radius: 0.375rem 0.375rem 0 0;
-    border-bottom: 0.125rem solid transparent;
-}
-
-.experiment-tab:first-child {
-    border-radius: 0.375rem 0 0 0;
-}
-
-.experiment-tab:last-child {
-    border-radius: 0 0.375rem 0 0;
-}
-
-.experiment-tab.active {
-    background: #ff8c00;
-    color: #fff;
-    border-bottom-color: #ff8c00;
-}
-
-.experiment-tab:hover:not(.active) {
-    background: #444;
-    color: #fff;
-}
+/* ================= 實驗面板分頁內容 ================= */
+/* 分頁基礎樣式（.experiment-tabs / .experiment-tab）已定義於 features/panels/experiment-panel.css */
 
 .experiment-tab-content {
     display: flex;

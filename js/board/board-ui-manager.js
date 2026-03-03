@@ -1,9 +1,8 @@
 /**
- * BoardUIManager - Board 頁面 UI 管理器
- * 負責處理 board.html 所有UI相關的操作和事件
+ * BoardUIManager - 管理 board 頁面的 UI 與互動
  *
- * 注意：使用 experiment-utils.js 中通過 window 暴露的全局函數
- * TODO: 逐步遷移至使用 js/experiment/experiment-ui-manager.js 的通用組件
+ * 負責處理受試者名稱輸入、按鈕事件、拖拽功能等 UI 互動，
+ * 並將實驗控制邏輯委派給 ExperimentSystemManager 處理。
  */
 
 class BoardUIManager {
@@ -29,14 +28,11 @@ class BoardUIManager {
    * 設置UI事件監聽器
    */
   setupEventListeners() {
-    // 實驗ID輸入框事件
-    this.setupExperimentIdInput();
+    // 實驗ID 輸入框事件由 ExperimentSystemManager 統一管理
+    // 此處不重複綁定 setupExperimentIdInput()
 
     // 受試者名稱輸入框事件
     this.setupParticipantNameInput();
-
-    // 按鈕事件
-    this.setupButtonEvents();
 
     // 拖拽功能
     this.setupDragAndDrop();
@@ -55,97 +51,7 @@ class BoardUIManager {
   }
 
   /**
-   * 設置實驗ID輸入框事件
-   */
-  setupExperimentIdInput() {
-    const experimentIdInput = document.getElementById("experimentIdInput");
-    if (experimentIdInput) {
-      experimentIdInput.addEventListener("input", (e) => {
-        this.core.experimentId = e.target.value;
-      });
-
-      experimentIdInput.addEventListener("change", async (e) => {
-        const newExperimentId = e.target.value;
-        if (newExperimentId && this.core.syncHandler) {
-          await this.handleExperimentIdChange(newExperimentId);
-        }
-      });
-    }
-
-    // 重新產生按鈕
-    const regenerateIdBtn = document.getElementById("regenerateIdBtn");
-    if (regenerateIdBtn) {
-      regenerateIdBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        await this.smartRegenerateExperimentId();
-      });
-    }
-  }
-
-  /**
-   * 處理實驗ID變更
-   */
-  async handleExperimentIdChange(newExperimentId) {
-    try {
-      // 驗證實驗ID格式
-      if (!this.validateExperimentId(newExperimentId)) {
-        alert("實驗ID格式無效");
-        return;
-      }
-
-      // 更新核心管理器的實驗ID
-      this.core.experimentId = newExperimentId;
-
-      // 如果有腳本資料，重新載入
-      if (this.core.currentCombination && this.core.scriptData) {
-        const combination = this.core.scriptData.combinations.find(
-          (c) =>
-            c.combination_id === this.core.currentCombination.combination_id,
-        );
-        if (combination) {
-          await this.core.loadScriptForCombination(
-            combination,
-            newExperimentId,
-          );
-        }
-      }
-
-      // 廣播更新
-      if (this.core.syncHandler) {
-        this.core.syncHandler.broadcastExperimentIdUpdate(newExperimentId);
-      }
-
-      Logger.debug(`實驗ID已更新為: ${newExperimentId}`);
-    } catch (error) {
-      Logger.error("更新實驗ID失敗:", error);
-      alert("更新實驗ID時發生錯誤");
-    }
-  }
-
-  /**
-   * 智能重新產生實驗ID
-   */
-  async smartRegenerateExperimentId() {
-    const result = RandomUtils.generateExperimentId();
-
-    const experimentIdInput = document.getElementById("experimentIdInput");
-    if (experimentIdInput) {
-      experimentIdInput.value = result;
-    }
-
-    await this.handleExperimentIdChange(result);
-  }
-
-  /**
-   * 驗證實驗ID格式
-   */
-  validateExperimentId(experimentId) {
-    // 基本驗證：不為空，至少3個字符
-    return experimentId && experimentId.length >= 3;
-  }
-
-  /**
-   * 設置受試者名稱輸入框事件
+   * 設定受試者名稱輸入框事件
    */
   setupParticipantNameInput() {
     const participantNameInput = document.getElementById("participantName");
@@ -178,14 +84,6 @@ class BoardUIManager {
   }
 
   /**
-   * 設置按鈕事件
-   */
-  setupButtonEvents() {
-    // 全域函數已由 experiment-utils.js 暴露到 window
-    // 無需再次綁定
-  }
-
-  /**
    * 設置拖拽功能
    */
   setupDragAndDrop() {
@@ -214,10 +112,6 @@ class BoardUIManager {
     document.addEventListener("keydown", (e) => {
       this.handleKeyDown(e);
     });
-
-    document.addEventListener("keyup", (e) => {
-      this.handleKeyUp(e);
-    });
   }
 
   /**
@@ -240,13 +134,6 @@ class BoardUIManager {
         }
         break;
     }
-  }
-
-  /**
-   * 處理鍵盤釋放事件
-   */
-  handleKeyUp(e) {
-    // 處理鍵盤釋放邏輯
   }
 
   /**
@@ -286,13 +173,6 @@ class BoardUIManager {
     if (this.core.gestureStats && data.gesture_name) {
       // 更新統計資料
     }
-  }
-
-  /**
-   * 渲染手勢統計列表
-   */
-  renderGestureStats() {
-    // 實現手勢統計渲染邏輯
   }
 
   /**
@@ -344,32 +224,6 @@ class BoardUIManager {
           this.core.scriptData,
         );
 
-        // 設置事件監聽器來處理頁面特定的邏輯
-        this._setupExperimentSystemEventHandlers();
-
-        Logger.debug("使用 ExperimentSystemManager 渲染UI完成");
-        return;
-      }
-
-      // 如果 ExperimentSystemManager 不可用，使用備用的 UI 管理器渲染
-      Logger.warn(
-        "ExperimentSystemManager 不可用，使用 ExperimentUIManager 作為備援來渲染UI",
-      );
-
-      try {
-        if (
-          !this.core.uiManager ||
-          typeof this.core.uiManager.initialize !== "function"
-        ) {
-          this.core.uiManager = new ExperimentUIManager();
-          // 設置為全域實例，確保其他模組可以存取
-          window.uiManager = this.core.uiManager;
-        }
-        // 初始化 UI manager（如果尚未初始化）
-        try {
-          this.core.uiManager.initialize();
-        } catch (e) {}
-
         // 初始化 Panel UI 組件（包括實驗日誌面板）
         try {
           if (typeof this.core.uiManager.initializePanelUI === "function") {
@@ -379,67 +233,16 @@ class BoardUIManager {
           Logger.warn("初始化 Panel UI 失敗", e);
         }
 
-        // 組合選擇器
-        const combos = (this.core.scriptData?.combinations || []).map((c) => ({
-          id: c.combinationId,
-          name: c.combinationName,
-          description: c.description || "",
-        }));
-        try {
-          this.core.uiManager.renderCombinationSelector(
-            "#combinationSelectorContainer",
-            combos,
-            { allowSelection: true },
-          );
-        } catch (e) {
-          Logger.warn("備援: 渲染組合選擇器失敗", e);
-        }
-
-        // 單元面板
-        const units = this.core.scriptData?.units || [];
-        try {
-          this.core.uiManager.renderUnitsPanel(
-            "#unitsPanelContainer",
-            units,
-            null,
-            {},
-          );
-        } catch (e) {
-          Logger.warn("備援: 渲染單元面板失敗", e);
-        }
-
-        // 實驗控制
-        try {
-          this.core.uiManager.renderExperimentControls(
-            "#experimentControlsContainer",
-            {},
-          );
-        } catch (e) {
-          Logger.warn("備援: 渲染實驗控制失敗", e);
-        }
-
-        // 綁定頁面特定的事件處理器
-        this._setupExperimentSystemEventHandlers();
-
-        Logger.debug("使用 ExperimentUIManager 備援渲染UI完成");
+        Logger.debug("使用 ExperimentSystemManager 渲染UI完成");
         return;
-      } catch (err) {
-        Logger.error("備援渲染UI失敗:", err);
-        throw err;
       }
+
+      // ExperimentSystemManager 不可用，拋出錯誤
+      throw new Error("ExperimentSystemManager 不可用，無法渲染UI");
     } catch (error) {
       Logger.error("渲染統一UI失敗:", error);
       throw error;
     }
-  }
-
-  /**
-   * 設置實驗系統事件處理器
-   * @private
-   */
-  _setupExperimentSystemEventHandlers() {
-    // 這裡可以添加頁面特定的邏輯，比如連接系統管理器的事件到頁面特定的處理器
-    // 例如：實驗開始/停止按鈕的事件處理
   }
 
   /**
@@ -496,7 +299,6 @@ class BoardUIManager {
   destroy() {
     // 移除事件監聽器
     document.removeEventListener("keydown", this.handleKeyDown);
-    document.removeEventListener("keyup", this.handleKeyUp);
     document.removeEventListener("dragstart", this.handleDragStart);
     document.removeEventListener("dragend", this.handleDragEnd);
     document.removeEventListener("drop", this.handleDrop);

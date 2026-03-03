@@ -1,17 +1,8 @@
 /**
  * ExperimentHubManager - 實驗中樞管理器
- * Phase 2 - P0 核心模組
  *
- * 職責：
- * 1. 管理實驗 ID（板端、Hub端、組合ID）
- * 2. 同步模式管理（本機/Hub）
- * 3. Hub 通訊邏輯
- * 4. 事件通知機制
- *
- * 提取來源：
- * - panel-experiment-flow.js (ID 管理相關)
- * - panel-experiment-manager.js (同步模式相關)
- * - experiment-hub-client.js (Hub 通訊相關)
+ * 負責管理實驗 ID（板端、Hub 端、組合 ID）和同步模式（Local/Hub/Viewer），
+ * 處理與中樞伺服器的通訊和事件通知，支援多裝置協同實驗。
  */
 
 class ExperimentHubManager {
@@ -626,22 +617,19 @@ class ExperimentHubManager {
 
       // 轉發到全域事件系統，讓其他模組知道實驗已開始
       window.dispatchEvent(
-        new CustomEvent(
-          window.SyncEvents?.EXPERIMENT_STARTED || "experiment_started",
-          {
-            detail: {
-              ...data,
-              broadcasted: true,
-              timestamp: Date.now(),
-            },
+        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STARTED, {
+          detail: {
+            ...data,
+            broadcasted: true,
+            timestamp: Date.now(),
           },
-        ),
+        }),
       );
 
       // 如果是操作者角色，確保本地狀態同步
       if (this.connection.role === "operator") {
         Logger.debug("操作者收到實驗開始廣播，更新本地狀態");
-        // 可以在这里添加本地狀態同步邏輯
+        // 可以在这里新增本地狀態同步邏輯
       }
     } catch (error) {
       Logger.error("處理實驗開始廣播轉發失敗:", error);
@@ -744,8 +732,7 @@ class ExperimentHubManager {
       typeof window.syncClient.syncState === "function"
     ) {
       const updateData = {
-        type:
-          window.SyncDataTypes?.EXPERIMENT_ID_UPDATE || "experiment_id_update",
+        type: window.SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
         ...data,
       };
 

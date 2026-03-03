@@ -374,7 +374,7 @@ class PowerControl {
         }
       };
 
-      // 為電源燈號區域添加點擊事件
+      // 為電源燈號區域新增點擊事件
       this.powerLightArea.addEventListener(
         "click",
         powerLightAreaClickHandler,
@@ -631,7 +631,7 @@ class PowerControl {
       window.syncClient.role === window.SyncManager?.ROLE?.OPERATOR
     ) {
       const syncResult = window.syncClient.syncState({
-        type: window.SyncDataTypes.POWER_STATE_UPDATE,
+        type: window.SYNC_DATA_TYPES.POWER_STATE_UPDATE,
         clientId: window.syncClient?.clientId || "power_control",
         powerState: this.isPowerOn,
         isPowerVideoPlaying: this.isPowerVideoPlaying,
@@ -781,26 +781,30 @@ class PowerControl {
     const unit = window._allUnits?.find((u) => u.unit_id === unitId);
     const step = unit?.steps?.[window.panelExperiment.currentStepIndex];
 
-    if (step && step.interactions) {
-      // 找到第一個可用的操作
-      const firstInteractionKey = Object.keys(step.interactions)[0];
-      if (firstInteractionKey) {
-        // 延遲執行，確保開機流程完成
-        setTimeout(() => {
-          if (window.logger) {
-            window.logger.logAction(
-              `實驗模式自動開始第一個操作: ${firstInteractionKey}`,
-              "experiment_auto_start",
-            );
-          }
+    if (step && step.actions && Array.isArray(step.actions)) {
+      // 取得第一個動作
+      const firstAction = step.actions[0];
+      if (firstAction && firstAction.interactions) {
+        // 找到第一個可用的操作
+        const firstInteractionKey = Object.keys(firstAction.interactions)[0];
+        if (firstInteractionKey) {
+          // 延遲執行，確保開機流程完成
+          setTimeout(() => {
+            if (window.logger) {
+              window.logger.logAction(
+                `實驗模式自動開始第一個操作: ${firstInteractionKey}`,
+                "experiment_auto_start",
+              );
+            }
 
-          // 使用實驗管理器的 handleStepTransition 方法
-          const interaction = step.interactions[firstInteractionKey];
-          window.panelExperiment.handleStepTransition(
-            interaction,
-            firstInteractionKey,
-          );
-        }, 500);
+            // 使用實驗管理器的 handleStepTransition 方法
+            const interaction = firstAction.interactions[firstInteractionKey];
+            window.panelExperiment.handleStepTransition(
+              interaction,
+              firstInteractionKey,
+            );
+          }, 500);
+        }
       }
     }
   }
@@ -808,3 +812,4 @@ class PowerControl {
 
 // 匯出單例
 window.powerControl = new PowerControl();
+

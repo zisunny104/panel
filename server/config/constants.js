@@ -28,31 +28,6 @@ export const EXPERIMENT_ID_CONSTANTS = {
   // VALID_CREATE_CODE 從 SERVER_CONFIG 讀取
 };
 
-// WebSocket消息類型
-export const WS_MESSAGE_TYPES = {
-  // 連線管理
-  CONNECT: "connect",
-  DISCONNECT: "disconnect",
-  HEARTBEAT: "heartbeat",
-
-  // 工作階段管理
-  SESSION_JOINED: "session_joined",
-  SESSION_LEFT: "session_left",
-  SESSION_UPDATED: "session_updated",
-
-  // 狀態同步
-  STATE_UPDATE: "state_update",
-  STATE_BROADCAST: "state_broadcast",
-
-  // 實驗管理
-  EXPERIMENT_START: "experiment_start",
-  EXPERIMENT_UPDATE: "experiment_update",
-  EXPERIMENT_COMPLETE: "experiment_complete",
-
-  // 錯誤處理
-  ERROR: "error",
-};
-
 // HTTP響應碼
 export const HTTP_STATUS = {
   OK: 200,

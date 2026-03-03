@@ -30,7 +30,8 @@ class ExperimentCombinationManager {
     this.readyPromise = null; // Promise to wait for initialization
     this.eventListeners = new Map();
 
-    this.initialize();
+    // 不在 constructor 中自動初始化，由外部明確呼叫 initialize() 或 ready()
+    // 這樣可以確保事件監聽器在初始化前就已設置好
   }
 
   /**
@@ -381,9 +382,10 @@ class ExperimentCombinationManager {
       return false;
     }
 
+    // 從快取恢復時不再使用 silent: true
+    // 統一透過 setCombination 發送事件，確保 UI 正確初始化
     return this.setCombination(combination, null, {
-      silent: true,
-      skipCache: true,
+      skipCache: true, // 避免重複寫入快取
     });
   }
 
@@ -447,6 +449,26 @@ class ExperimentCombinationManager {
    */
   handleExperimentIdChanged(newExperimentId) {
     Logger.debug("ExperimentCombinationManager: 實驗ID已改變", newExperimentId);
+
+    // 如果有目前組合，以新 experimentId 為種子重新計算單元排序
+    if (this.currentCombination) {
+      this.loadedUnits = this.getCombinationUnitIds(
+        this.currentCombination,
+        newExperimentId,
+      );
+
+      // 觸發組合重新選擇事件，讓 UI 更新排序
+      this.emit(ExperimentCombinationManager.EVENT.COMBINATION_SELECTED, {
+        combination: this.currentCombination,
+        unitIds: this.loadedUnits,
+        experimentId: newExperimentId,
+      });
+
+      Logger.debug("組合單元已根據新實驗ID重新排序", {
+        combinationName: this.currentCombination.combinationName,
+        unitIds: this.loadedUnits,
+      });
+    }
   }
 
   // ==================== 事件系統 ====================

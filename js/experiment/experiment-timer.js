@@ -6,20 +6,18 @@
 
 class ExperimentTimerManager {
   constructor() {
-    // 實驗級別
     this.experimentStartTime = null;
     this.experimentElapsedMs = 0;
     this.experimentInterval = null;
     this.experimentPaused = false;
 
-    // indexed timers
-    this.timerStates = {}; // idx -> { running, startTime, elapsed }
-    this.timerIntervals = {}; // idx -> intervalId
-    this.longPressTimers = {}; // idx -> timeoutId
+    this.timerStates = {};
+    this.timerIntervals = {};
+    this.longPressTimers = {};
+    this.currentActiveIndex = null;
 
-    // update callbacks (optional)
-    this.onExperimentTick = null; // (ms)=>{}
-    this.onIndexedTick = null; // (idx, ms)=>{}
+    this.onExperimentTick = null;
+    this.onIndexedTick = null;
   }
 
   // ========== utility ==========
@@ -57,6 +55,16 @@ class ExperimentTimerManager {
       clearInterval(this.experimentInterval);
       this.experimentInterval = null;
     }
+
+    // 暫停所有運行中的手勢時間卡片計時器
+    Object.keys(this.timerStates).forEach((idx) => {
+      const state = this.timerStates[idx];
+      if (state && state.running) {
+        clearInterval(this.timerIntervals[idx]);
+        state.running = false;
+        state.elapsedTime += Date.now() - state.startTime;
+      }
+    });
   }
 
   resumeExperimentTimer() {
@@ -67,6 +75,9 @@ class ExperimentTimerManager {
     this.experimentStartTime = Date.now() - this.experimentElapsedMs;
     this.experimentPaused = false;
     this.startExperimentTimer();
+
+    // 註：手勢時間卡片計時器不自動恢復
+    // 使用者需要主動點擊手勢卡片以繼續計時
   }
 
   stopExperimentTimer() {
@@ -81,6 +92,20 @@ class ExperimentTimerManager {
       document.getElementById("experimentTimer") ||
       document.getElementById("experiment-timer");
     if (el) el.textContent = this.formatDuration(0);
+
+    // 停止所有手勢時間卡片計時器並重置狀態
+    Object.keys(this.timerStates).forEach((idx) => {
+      if (this.timerIntervals[idx]) {
+        clearInterval(this.timerIntervals[idx]);
+        this.timerIntervals[idx] = null;
+      }
+      const state = this.timerStates[idx];
+      if (state) {
+        state.running = false;
+        state.elapsedTime = 0;
+      }
+    });
+    this.currentActiveIndex = null;
   }
 
   getExperimentElapsedMs() {
@@ -105,13 +130,14 @@ class ExperimentTimerManager {
     const card = document.getElementById(`timer-card-${idx}`);
 
     if (state.running) {
-      // stop
       clearInterval(this.timerIntervals[idx]);
       state.running = false;
       state.elapsedTime += Date.now() - state.startTime;
       if (card) {
-        card.style.outline = "none";
-        card.style.outlineOffset = "0";
+        card.classList.remove("timer-card-pressed");
+      }
+      if (this.currentActiveIndex === idx) {
+        this.currentActiveIndex = null;
       }
       if (window.experimentLogManager && window.app) {
         const currentGesture = window.app.currentCombination?.gestures?.[idx];
@@ -120,15 +146,21 @@ class ExperimentTimerManager {
           window.experimentLogManager.logGestureStepPause(idx, stepId);
       }
     } else {
-      // start
+      if (this.currentActiveIndex !== null && this.currentActiveIndex !== idx) {
+        this._clearTimerOutline(this.currentActiveIndex);
+      }
+
       state.running = true;
       state.startTime = Date.now();
+      this.currentActiveIndex = idx;
+
+      // 按下計時器的短暫邊框回饋（CSS 動畫 400ms，使用 class 避免 inline style）
       if (card) {
-        const computedStyle = window.getComputedStyle(card);
-        const originalBorderColor = computedStyle.borderColor;
-        card.setAttribute("data-original-border-color", originalBorderColor);
-        card.style.outline = `4px solid ${originalBorderColor}`;
-        card.style.outlineOffset = "-2px";
+        card.classList.remove("timer-card-pressed");
+        // force reflow so animation retriggers if pressed rapidly
+        void card.offsetWidth;
+        card.classList.add("timer-card-pressed");
+        setTimeout(() => card.classList.remove("timer-card-pressed"), 400);
       }
 
       this.timerIntervals[idx] = setInterval(() => {
@@ -167,19 +199,30 @@ class ExperimentTimerManager {
     if (this.timerIntervals[idx]) {
       clearInterval(this.timerIntervals[idx]);
     }
-    const card = document.getElementById(`timer-card-${idx}`);
-    if (card) {
-      card.style.outline = "none";
-      card.style.outlineOffset = "0";
-    }
+    this._clearTimerOutline(idx);
     this.timerStates[idx] = {
       running: false,
       startTime: 0,
       elapsedTime: 0,
       justReset: true,
     };
+    if (this.currentActiveIndex === idx) {
+      this.currentActiveIndex = null;
+    }
     const display = document.getElementById(`timer-display-${idx}`);
     if (display) display.textContent = "00:00.000";
+  }
+
+  _clearTimerOutline(idx) {
+    const card = document.getElementById(`timer-card-${idx}`);
+    if (card) {
+      card.classList.remove(
+        "timer-card-pressed",
+        "timer-card-marked-correct",
+        "timer-card-marked-uncertain",
+        "timer-card-marked-incorrect",
+      );
+    }
   }
 
   getIndexedElapsedSeconds(idx) {

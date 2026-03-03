@@ -3,7 +3,7 @@
  * 負責 QR Code 產生與掃描功能
  */
 
-import { SyncEvents } from "../core/sync-events-constants.js";
+import { SYNC_EVENTS } from "../constants/index.js";
 import CameraUtils from "../core/camera-utils.js";
 
 export class SyncManagerQR {
@@ -237,7 +237,7 @@ export class SyncManagerQR {
           );
 
           // 更新UI
-          window.dispatchEvent(new Event(SyncEvents.SESSION_JOINED));
+          window.dispatchEvent(new Event(SYNC_EVENTS.SESSION_JOINED));
         } catch (error) {
           Logger.error("加入工作階段失敗:", error);
 
@@ -391,6 +391,11 @@ export class SyncManagerQR {
         width: 200,
         height: 200,
         data: qrUrl,
+        margin: 8,
+        qrOptions: {
+          typeNumber: 6,
+          errorCorrectionLevel: "M",
+        },
         dotsOptions: {
           color: "#000000",
           type: "rounded",
@@ -414,7 +419,7 @@ export class SyncManagerQR {
       const modeBtn = container.querySelector("#qrDefaultModeBtn");
       if (modeBtn) {
         const roleText = window.SyncManager?.getRoleText(role) || "未知角色";
-        modeBtn.innerHTML = `<strong>${roleText}</strong>`;
+        modeBtn.textContent = roleText;
         modeBtn.dataset.role = role;
       }
 
@@ -510,6 +515,12 @@ export class SyncManagerQR {
       return;
     }
 
+    // 清除上一次的倒數計時，避免異佈 interval 累積
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+
     // 如果沒有提供剩餘時間，使用預設的300秒
     let initialTime = remainingTime !== null ? remainingTime : 300;
     Logger.debug("使用倒數時間", {
@@ -535,7 +546,7 @@ export class SyncManagerQR {
         const qrSection = document.getElementById("qrCodeSection");
         if (qrSection) {
           qrSection.innerHTML =
-            '<div class="sync-qr-expired"> QR Code 已過期，請重新建立工作階段</div>';
+            "<div class=\"sync-qr-expired\"> QR Code 已過期，請重新建立工作階段</div>";
         }
         return;
       }
@@ -561,9 +572,7 @@ export class SyncManagerQR {
       color = "#ffc107"; // 黃色 - 少於2分鐘
     }
 
-    countdownElement.textContent = `有效期限: ${minutes}:${
-      secs < 10 ? "0" : ""
-    }${secs}`;
+    countdownElement.textContent = `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
     countdownElement.style.color = color;
   }
 
@@ -680,7 +689,7 @@ export class SyncManagerQR {
                     <select id="syncCameraSelect" class="sync-camera-select"></select>
                     <div class="sync-camera-filter">
                         <input id="syncCameraFilter" class="sync-camera-filter-input" placeholder="過濾相機（例如: 174f:1811 或 'Integrated'）" aria-label="過濾相機" />
-                        <button id="applyCameraFilterBtn" class="sync-camera-apply-btn" title="套用並選擇匹配的相機">選取</button>
+                        <button id="applyCameraFilterBtn" class="sync-camera-apply-btn" title="套用並選擇符合的相機">選取</button>
                     </div>
                 </div>
                 <div class="sync-scanner-status">對準 QR Code 掃描加入工作階段</div>
@@ -730,7 +739,7 @@ export class SyncManagerQR {
           }
           const originalHTML = copyBtn.innerHTML;
           copyBtn.innerHTML =
-            '<svg class="sync-icon sync-icon-checkmark" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+            "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
           copyBtn.classList.add("copied");
           Logger.info("已複製偵錯資訊到剪貼簿", debug);
           setTimeout(() => {
@@ -926,11 +935,11 @@ export class SyncManagerQR {
         );
 
         if (!matches.length) {
-          if (statusEl) statusEl.textContent = "找不到匹配的相機";
+          if (statusEl) statusEl.textContent = "找不到符合的相機";
           return;
         }
 
-        // 選擇第一個匹配項並啟動（同時儲存為使用者偏好，包含 label 備援）
+        // 選擇第一個符合項並啟動（同時儲存為使用者偏好，包含 label 備援）
         cameraSelect.value = matches[0].clientId;
         localStorage.setItem("preferredCameraId", matches[0].clientId);
         if (matches[0].label)

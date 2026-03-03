@@ -3,7 +3,7 @@
  * 負責膠囊指示器、控制面板、按鈕與輸入框
  */
 
-import { SyncEvents } from "../core/sync-events-constants.js";
+import { SYNC_EVENTS } from "../constants/index.js";
 import "./indicator-manager.js";
 
 export class SyncManagerUI {
@@ -210,11 +210,21 @@ export class SyncManagerUI {
         `;
 
     document.documentElement.appendChild(this.controlPanel);
+
+    // 將 indicator 狀態訊息容器掛載到 modal 面板內
+    if (window.indicatorManager) {
+      const panelContent = this.controlPanel.querySelector(
+        ".sync-panel-content",
+      );
+      if (panelContent) {
+        window.indicatorManager.attachToPanel(panelContent);
+      }
+    }
   }
 
   setupEventListeners() {
     try {
-      window.addEventListener(SyncEvents.SESSION_JOINED, (event) => {
+      window.addEventListener(SYNC_EVENTS.SESSION_JOINED, (event) => {
         const detail = event.detail || {};
         const { shareCode } = detail;
         if (shareCode) {
@@ -463,7 +473,7 @@ export class SyncManagerUI {
             shareSessionToggleBtn.classList.remove("hidden");
           }
 
-          this.core.qr.stopQRCodeCountdown();
+          window.syncManager?.qr?.stopQRCodeCountdown();
         });
       }
 
@@ -478,7 +488,7 @@ export class SyncManagerUI {
               .then(() => {
                 const originalHTML = copyShareCodeBtn.innerHTML;
                 copyShareCodeBtn.innerHTML =
-                  '<svg class="sync-icon sync-icon-checkmark" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+                  "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
                 copyShareCodeBtn.classList.add("copied");
 
                 setTimeout(() => {
@@ -527,7 +537,7 @@ export class SyncManagerUI {
               }
 
               const remainingTime = result.remainingTime || 300;
-              this.core.qr.startQRCodeCountdown(
+              window.syncManager?.qr?.startQRCodeCountdown(
                 remainingTime,
                 "shareQRCountdown",
               );
@@ -580,7 +590,7 @@ export class SyncManagerUI {
 
             const originalHTML = copyShareLinkBtn.innerHTML;
             copyShareLinkBtn.innerHTML =
-              '<svg class="sync-icon sync-icon-checkmark" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+              "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
             copyShareLinkBtn.classList.add("copied");
 
             setTimeout(() => {
@@ -615,12 +625,12 @@ export class SyncManagerUI {
     if (code.length < 9) {
       statusDiv.className = "sync-code-validation-indicator invalid";
       statusDiv.innerHTML =
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>";
       createBtn.disabled = true;
     } else if (code.length === 9) {
       statusDiv.className = "sync-code-validation-indicator valid";
       statusDiv.innerHTML =
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>';
+        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"20,6 9,17 4,12\"></polyline></svg>";
       createBtn.disabled = false;
     }
   }
@@ -780,7 +790,7 @@ export class SyncManagerUI {
     try {
       this.showStatus("info", "正在退出工作階段...");
 
-      this.core.qr.stopQRCodeCountdown();
+      window.syncManager?.qr?.stopQRCodeCountdown();
 
       localStorage.removeItem("sync_session_backup");
 
@@ -860,7 +870,7 @@ export class SyncManagerUI {
       const isValid = !shareCodeInfo.used && !shareCodeInfo.expired;
 
       if (isValid) {
-        this.core.qr.startQRCodeCountdown(
+        window.syncManager?.qr?.startQRCodeCountdown(
           shareCodeInfo.remainingTime,
           "shareQRCountdown",
         );
@@ -927,7 +937,7 @@ export class SyncManagerUI {
         }),
       );
 
-      this.core.qr.startQRCodeCountdown(300, "shareQRCountdown");
+      window.syncManager?.qr?.startQRCodeCountdown(300, "shareQRCountdown");
     } catch (error) {
       Logger.error("產生新分享代碼失敗:", error);
       throw error;

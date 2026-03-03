@@ -7,7 +7,7 @@ import { SyncManagerCore } from "./sync-manager-core.js";
 import { SyncManagerUI } from "./sync-manager-ui.js";
 import { SyncManagerQR } from "./sync-manager-qr.js";
 import { SyncManagerSessions } from "./sync-manager-sessions.js";
-import { SyncEvents } from "../core/sync-events-constants.js";
+import { SYNC_EVENTS } from "../constants/index.js";
 
 class SyncManager {
   static ROLE = {
@@ -27,6 +27,11 @@ class SyncManager {
     viewer: "檢視者",
     operator: "操作者",
     local: "本機",
+  };
+
+  static MODE_TEXTS = {
+    viewer: "檢視模式",
+    operator: "同步操作",
   };
 
   static STATUS_TEXTS = {
@@ -195,7 +200,7 @@ class SyncManager {
 
         // 初始化完成後，觸發事件讓日誌管理器知道 syncClient 已就緒
         window.dispatchEvent(
-          new CustomEvent(SyncEvents.CLIENT_INITIALIZED, {
+          new CustomEvent(SYNC_EVENTS.CLIENT_INITIALIZED, {
             detail: { serverOnline: online },
           }),
         );
@@ -206,14 +211,14 @@ class SyncManager {
         Logger.warn("伺服器心跳檢測失敗", error);
         // 即使心跳檢測失敗，也觸發初始化完成事件
         window.dispatchEvent(
-          new CustomEvent(SyncEvents.CLIENT_INITIALIZED, {
+          new CustomEvent(SYNC_EVENTS.CLIENT_INITIALIZED, {
             detail: { serverOnline: false },
           }),
         );
       });
 
     // 當工作階段加入時，初始化 QR 和 Sessions 模組（動態進入同步）
-    window.addEventListener(SyncEvents.SESSION_JOINED, () => {
+    window.addEventListener(SYNC_EVENTS.SESSION_JOINED, () => {
       Logger.debug("工作階段已加入，初始化 QR 和 Sessions 模組");
 
       // 如果之前在本機模式，現在需要動態初始化 QR 和 Sessions
@@ -241,12 +246,12 @@ class SyncManager {
       }
     };
     window.addEventListener(
-      SyncEvents.SERVER_STATUS_CHANGED,
+      SYNC_EVENTS.SERVER_STATUS_CHANGED,
       serverStatusHandler,
     );
     this.eventListeners.push({
       target: window,
-      event: SyncEvents.SERVER_STATUS_CHANGED,
+      event: SYNC_EVENTS.SERVER_STATUS_CHANGED,
       handler: serverStatusHandler,
     });
   }
@@ -312,7 +317,7 @@ class SyncManager {
 
           // 觸發工作階段還原事件
           window.dispatchEvent(
-            new CustomEvent(SyncEvents.SESSION_JOINED, {
+            new CustomEvent(SYNC_EVENTS.SESSION_JOINED, {
               detail: {
                 sessionId,
                 clientId,
@@ -349,20 +354,20 @@ class SyncManager {
       this.ui.updateIndicator();
       this.ui.updateConnectedSessionInfo();
     };
-    window.addEventListener(SyncEvents.SESSION_JOINED, sessionJoinedHandler);
+    window.addEventListener(SYNC_EVENTS.SESSION_JOINED, sessionJoinedHandler);
     this.eventListeners.push({
       target: window,
-      event: SyncEvents.SESSION_JOINED,
+      event: SYNC_EVENTS.SESSION_JOINED,
       handler: sessionJoinedHandler,
     });
 
     const showPanelHandler = () => {
       this.ui.showPanel();
     };
-    window.addEventListener(SyncEvents.SHOW_PANEL, showPanelHandler);
+    window.addEventListener(SYNC_EVENTS.SHOW_PANEL, showPanelHandler);
     this.eventListeners.push({
       target: window,
-      event: SyncEvents.SHOW_PANEL,
+      event: SYNC_EVENTS.SHOW_PANEL,
       handler: showPanelHandler,
     });
 
@@ -402,7 +407,7 @@ class SyncManager {
 
       // 觸發事件通知其他模組同步已清除
       window.dispatchEvent(
-        new CustomEvent(SyncEvents.DATA_CLEARED, {
+        new CustomEvent(SYNC_EVENTS.DATA_CLEARED, {
           detail: { reason, message, timestamp: Date.now() },
         }),
       );
@@ -457,9 +462,17 @@ class SyncManager {
       handler: disconnectedHandler,
     });
 
-    // 監聽 WebSocket 重新連線，嘗試還原工作階段
+    // 監聯 WebSocket 重新連線，嘗試還原工作階段
+    // 注意：sync_connected 在首次認證成功時也會觸發，
+    // 此時已經處於連線狀態，不需要再次還原。
     const connectedHandler = (event) => {
+      // 如果已在同步模式或正在還原中，跳過避免重複 connect 造成迴圈
+      if (this.isSyncMode || this._isRestoring) {
+        Logger.debug("收到 sync_connected，但已在同步模式或正在還原中，跳過");
+        return;
+      }
       Logger.debug("收到 sync_connected，嘗試還原工作階段");
+      this._isRestoring = true;
       this.attemptSessionRestore()
         .then((isSync) => {
           if (isSync) {
@@ -467,7 +480,7 @@ class SyncManager {
             Logger.info("連線恢復且工作階段還原成功，回到同步模式");
             if (this.ui && this.ui.updateIndicator) this.ui.updateIndicator();
             window.dispatchEvent(
-              new CustomEvent(SyncEvents.SESSION_RESTORED, {
+              new CustomEvent(SYNC_EVENTS.SESSION_RESTORED, {
                 detail: { restored: true },
               }),
             );
@@ -477,6 +490,9 @@ class SyncManager {
         })
         .catch((err) => {
           Logger.error("嘗試還原工作階段失敗:", err);
+        })
+        .finally(() => {
+          this._isRestoring = false;
         });
     };
 
@@ -573,6 +589,4 @@ window.SyncManager = SyncManager;
 window.syncManager = new SyncManager();
 // 暴露 syncClient 到全局，供其他模組使用（如實驗日誌管理器）
 window.syncClient = window.syncManager.core.syncClient;
-// 暴露 SyncEvents 到全局
-window.SyncEvents = SyncEvents;
 export { SyncManager }; // 使用命名匯出以維持一致性

@@ -3,7 +3,7 @@
  * 負責初始化、URL偵測、狀態管理、與sync-client通訊
  */
 
-import { SyncEvents } from "../core/sync-events-constants.js";
+import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
 
 export class SyncManagerCore {
   constructor() {
@@ -96,7 +96,7 @@ export class SyncManagerCore {
       this.currentShareCode = null;
 
       window.dispatchEvent(
-        new CustomEvent(SyncEvents.SESSION_JOINED, {
+        new CustomEvent(SYNC_EVENTS.SESSION_JOINED, {
           detail: {
             sessionId: result.sessionId,
             role: this.currentRole,
@@ -127,7 +127,7 @@ export class SyncManagerCore {
       this.currentShareCode = result.shareCode;
 
       window.dispatchEvent(
-        new CustomEvent(SyncEvents.SHARE_CODE_GENERATED, {
+        new CustomEvent(SYNC_EVENTS.SHARE_CODE_GENERATED, {
           detail: {
             shareCode: result.shareCode,
             expiresAt: result.expiresAt,
@@ -156,7 +156,7 @@ export class SyncManagerCore {
       );
 
       window.dispatchEvent(
-        new CustomEvent(SyncEvents.SESSION_JOINED, {
+        new CustomEvent(SYNC_EVENTS.SESSION_JOINED, {
           detail: {
             sessionId: this.syncClient.sessionId,
             shareCode: shareCode,
@@ -192,7 +192,7 @@ export class SyncManagerCore {
       }
 
       window.dispatchEvent(
-        new CustomEvent(SyncEvents.SESSION_RESTORED, {
+        new CustomEvent(SYNC_EVENTS.SESSION_RESTORED, {
           detail: {
             sessionId: sessionId,
             clientId: clientId,
@@ -479,7 +479,7 @@ export class SyncManagerCore {
   syncCurrentStateToHub() {
     try {
       const stateData = {
-        type: window.SyncDataTypes.SESSION_STATE_UPDATE,
+        type: SYNC_DATA_TYPES.SESSION_STATE_UPDATE,
         experimentId: document.getElementById("experimentIdInput")?.value || "",
         participantName:
           (
@@ -504,7 +504,7 @@ export class SyncManagerCore {
       Logger.debug("需要初始化的項目: 實驗ID、受試者名稱、實驗組合、實驗狀態");
 
       window.dispatchEvent(
-        new CustomEvent(SyncEvents.SESSION_JOINED, {
+        new CustomEvent(SYNC_EVENTS.SESSION_JOINED, {
           detail: {
             sessionId: this.currentSessionId || this.syncClient.sessionId,
             shouldSyncFromHub: true,

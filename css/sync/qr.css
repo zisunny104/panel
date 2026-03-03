@@ -326,6 +326,48 @@
 /* QR 按鈕群使用現有的 .sync-share-code-buttons / .sync-btn-base 樣式，並確保垂直置中 */
 .sync-qr-code-text .sync-share-code-buttons {
     align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* QR 下方角色/頁面按鈕的樣式 */
+.sync-qr-code-text #qrDefaultModeBtn,
+.sync-qr-code-text #qrEnterPageBtn {
+    border: 2px solid rgba(0, 0, 0, 0.15) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    flex: 1;
+    min-width: 0;
+    padding: 8px 14px !important;
+}
+
+.sync-qr-code-text #qrDefaultModeBtn {
+    background: #17a2b8 !important;
+    color: white !important;
+}
+
+.sync-qr-code-text #qrDefaultModeBtn:hover {
+    background: #138496 !important;
+    border-color: #0f6674 !important;
+}
+
+.sync-qr-code-text #qrDefaultModeBtn[data-role="operator"] {
+    background: #28a745 !important;
+}
+
+.sync-qr-code-text #qrDefaultModeBtn[data-role="operator"]:hover {
+    background: #218838 !important;
+    border-color: #1e7e34 !important;
+}
+
+.sync-qr-code-text #qrEnterPageBtn {
+    background: linear-gradient(135deg, #667eea 0%, #5568d3 100%) !important;
+    color: white !important;
+}
+
+.sync-qr-code-text #qrEnterPageBtn:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #4555bd 100%) !important;
+    border-color: #4555bd !important;
 }
 
 @media (max-width: 480px) {

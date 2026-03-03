@@ -122,7 +122,7 @@ class ButtonManager {
       `.button-overlay[data-label="${buttonId}"]`,
     );
     const shiftButtonOverlay = document.querySelector(
-      '.button-overlay[data-label="B1"]',
+      ".button-overlay[data-label=\"B1\"]",
     );
     if (!button) {
       if (typeof Logger !== "undefined") {
@@ -146,14 +146,14 @@ class ButtonManager {
         button.classList.toggle("shift-active", this.isShiftPressed);
 
         // 同步更新按鈕覆蓋層的狀態
-        const shiftOverlay = document.querySelector('[data-button="B1"]');
+        const shiftOverlay = document.querySelector("[data-button=\"B1\"]");
         if (shiftOverlay) {
           shiftOverlay.classList.toggle("shift-active", this.isShiftPressed);
         }
 
         actionMessage = this.isShiftPressed
-          ? '模擬按鈕 "B1" (Shift) 按下'
-          : '模擬按鈕 "B1" (Shift) 放開';
+          ? "模擬按鈕 \"B1\" (Shift) 按下"
+          : "模擬按鈕 \"B1\" (Shift) 放開";
         functionName = "shift";
 
         Logger.debug(`Shift 狀態: ${this.isShiftPressed ? "按下" : "放開"}`);
@@ -275,7 +275,7 @@ class ButtonManager {
       window.syncClient.role === window.SyncManager?.ROLE?.OPERATOR
     ) {
       const syncResult = window.syncClient.syncState({
-        type: window.SyncDataTypes.BUTTON_PRESSED,
+        type: window.SYNC_DATA_TYPES.BUTTON_PRESSED,
         clientId: window.syncClient?.clientId || "button_manager",
         button: buttonId,
         function: functionName,
@@ -683,16 +683,16 @@ class ButtonManager {
     // 清除所有按鈕的高亮效果
     this.clearAllButtonHighlights();
 
-    // 管理按鈕禁用狀態
+    // 管理按鈕停用狀態
     document.querySelectorAll(".button-overlay").forEach((btn) => {
-      // 在等待電源開啟時，新增禁用視覺反饋
+      // 在等待電源開啟時，新增停用視覺反饋
       if (isWaitingForPowerOn) {
         btn.classList.add("temporarily-disabled");
       } else {
         btn.classList.remove("temporarily-disabled");
       }
 
-      // 機器未開機時，禁用按鈕但不顯示視覺效果
+      // 機器未開機時，停用按鈕但不顯示視覺效果
       if (!isPowerOn) {
         btn.classList.add("power-off-disabled");
       } else {
@@ -700,7 +700,7 @@ class ButtonManager {
       }
     });
 
-    // 如果還在等待電源開啟，不需要載入動作信息
+    // 如果還在等待電源開啟，不需要載入動作資訊
     if (isWaitingForPowerOn || !window.experimentActionHandler) {
       return;
     }
@@ -756,7 +756,7 @@ class ButtonManager {
           );
 
           if (hasMatchingFunction) {
-            // 找出匹配的功能名稱
+            // 找出符合的功能名稱
             const matchedFunction = buttonFunctions.find((func) =>
               actionButtons.includes(func),
             );
@@ -777,7 +777,7 @@ class ButtonManager {
         });
 
         Logger.debug(
-          `找到 ${matchedButtons.length} 個匹配按鈕，需要 Shift: ${requiresShiftFunctions.length}`,
+          `找到 ${matchedButtons.length} 個符合按鈕，需要 Shift: ${requiresShiftFunctions.length}`,
         );
 
         // 按照 interactions 中的順序排序 matchedButtons
@@ -809,7 +809,7 @@ class ButtonManager {
 
         // 檢查是否需要 B1 (Shift) - 根據 buttons.json 判斷
         const shiftButton = document.querySelector(
-          '.button-overlay[data-label="B1"]',
+          ".button-overlay[data-label=\"B1\"]",
         );
 
         if (requiresShiftFunctions.length > 0 && shiftButton) {
@@ -1092,7 +1092,7 @@ class ButtonManager {
       if (event.key === "Shift" && this.isShiftPressed) {
         this.isShiftPressed = false;
         document
-          .querySelector('.button-overlay[data-label="B1"]')
+          .querySelector(".button-overlay[data-label=\"B1\"]")
           ?.classList.remove("shift-active");
         window.logger?.logAction("鍵盤 Shift 放開");
       }
@@ -1234,12 +1234,12 @@ class ButtonManager {
    * 觸控 shift 的特殊處理
    */
   executeTouchShift() {
-    const button = document.querySelector('.button-overlay[data-label="B1"]');
+    const button = document.querySelector(".button-overlay[data-label=\"B1\"]");
     if (!button) return;
 
     // 基本 Shift 按鈕記錄
     window.logger?.logAction(
-      '觸控模擬按鈕 "B1" (Shift)，功能為 "shift"',
+      "觸控模擬按鈕 \"B1\" (Shift)，功能為 \"shift\"",
       "B1",
       "shift",
       false,
@@ -1378,7 +1378,7 @@ class ButtonManager {
       return;
     }
 
-    // 添加回饋CSS類別
+    // 新增回饋CSS類別
     const feedbackClass =
       type === "correct" ? "action-correct" : "action-incorrect";
     buttonElement.classList.add(feedbackClass);
@@ -1458,3 +1458,4 @@ class ButtonManager {
 
 // 匯出單例
 window.buttonManager = new ButtonManager();
+

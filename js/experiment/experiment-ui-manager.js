@@ -1,12 +1,10 @@
 /**
- * ExperimentUIManager - 實驗UI管理器
+ * ExperimentUIManager - 管理實驗面板的 UI 控件與狀態同步
  *
- * 核心職責：
- * 1. 按鈕狀態管理（啟用/禁用/鎖定）
- * 2. 視覺高亮管理（按鈕高亮、電源按鈕高亮）
- * 3. UI 元件更新（進度條、計時器、狀態指示器）
- * 4. 樣式管理（CSS class 增刪改）
- * 5. 視覺提示控制（實驗模式視覺回饋）
+ * 負責快取常用 DOM 元素、綁定與觸發 UI 事件，並回應
+ * ExperimentFlowManager 的狀態變更以更新畫面與互動。
+ *
+ * 此檔案聚焦於現行行為與公開 API，說明反映目前實作與責任範圍。
  */
 
 class ExperimentUIManager {
@@ -45,7 +43,7 @@ class ExperimentUIManager {
     // 初始化標記
     this.initialized = false;
 
-    this._log("ExperimentUIManager 已建立");
+    Logger.debug("ExperimentUIManager 已建立");
   }
 
   // ==========================================
@@ -57,18 +55,15 @@ class ExperimentUIManager {
    */
   initialize() {
     if (this.initialized) {
-      this._warn("UI 管理器已經初始化");
+      Logger.warn("UI 管理器已經初始化");
       return;
     }
 
     // 快取常用的 DOM 元素
     this._cacheCommonElements();
 
-    // 設定事件監聽器
-    this._setupEventListeners();
-
     this.initialized = true;
-    this._log("UI 管理器初始化完成");
+    Logger.debug("UI 管理器初始化完成");
 
     this._emit("ui-manager-initialized");
   }
@@ -95,47 +90,43 @@ class ExperimentUIManager {
   }
 
   /**
-   * 設定事件監聽器
-   */
-  _setupEventListeners() {
-    // minimal placeholder: panel-level listeners can be added here
-    this._log("設定事件監聽器: (placeholder)");
-  }
-  /**
    * 依賴注入：FlowManager
    */
   injectFlowManager(flowManager) {
     if (!flowManager) {
-      this._warn("注入的 FlowManager 無效");
+      Logger.warn("注入的 FlowManager 無效");
       return;
     }
 
     this.dependencies.flowManager = flowManager;
-    this._log("已注入 FlowManager");
+    Logger.debug("已注入 FlowManager");
 
     try {
-      // 鎖定事件：當實驗正在 RUNNING 或 PAUSED 時，禁用 experimentId 與 組合選擇
+      // 鎖定事件：當實驗正在 RUNNING 或 PAUSED 時，停用 experimentId 與 組合選擇
       flowManager.on(ExperimentFlowManager.EVENT.LOCKED, () => {
-        this._log("收到 flow:locked，鎖定實驗相關輸入");
+        Logger.debug("收到 flow:locked，鎖定實驗相關輸入");
         this._handleFlowLocked(true);
       });
 
       // 解鎖事件：實驗結束或重置時恢復
       flowManager.on(ExperimentFlowManager.EVENT.UNLOCKED, () => {
-        this._log("收到 flow:unlocked，解除鎖定");
+        Logger.debug("收到 flow:unlocked，解除鎖定");
         this._handleFlowLocked(false);
       });
 
       // 受試者名稱允許編輯事件（PAUSED 時為 true）
       flowManager.on(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, (data) => {
         const allowed = !!data?.allowed;
-        this._log("收到 flow:participant_edit，允許編輯受試者名稱:", allowed);
+        Logger.debug(
+          "收到 flow:participant_edit，允許編輯受試者名稱:",
+          allowed,
+        );
         this._handleParticipantEditAllowed(allowed);
       });
 
-      this._log("已綁定 FlowManager 事件: locked/unlocked/participant_edit");
+      Logger.debug("已綁定 FlowManager 事件: locked/unlocked/participant_edit");
     } catch (e) {
-      this._warn("綁定 FlowManager 事件失敗", e);
+      Logger.warn("綁定 FlowManager 事件失敗", e);
     }
   }
 
@@ -159,9 +150,9 @@ class ExperimentUIManager {
   }
 
   /**
-   * 禁用按鈕
+   * 停用按鈕
    * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   * @param {string} reason - 禁用原因（顯示在 title）
+   * @param {string} reason - 停用原因（顯示在 title）
    */
   disableButton(buttonOrSelector, reason = "") {
     const button = this._getElement(buttonOrSelector);
@@ -275,9 +266,9 @@ class ExperimentUIManager {
   }
 
   /**
-   * 批次禁用按鈕
+   * 批次停用按鈕
    * @param {Array<string|HTMLElement>} buttons - 按鈕列表
-   * @param {string} reason - 禁用原因
+   * @param {string} reason - 停用原因
    */
   disableButtons(buttons, reason = "") {
     buttons.forEach((btn) => this.disableButton(btn, reason));
@@ -356,7 +347,7 @@ class ExperimentUIManager {
   highlightPowerButton(enable) {
     const powerSwitchArea = this.elements.get("powerSwitchArea");
     if (!powerSwitchArea) {
-      this._warn("找不到電源開關區域");
+      Logger.warn("找不到電源開關區域");
       return;
     }
 
@@ -411,7 +402,7 @@ class ExperimentUIManager {
   // ==========================================
 
   /**
-   * 啟用/禁用視覺提示
+   * 啟用/停用視覺提示
    * @param {boolean} enabled - 是否啟用
    */
   setVisualHintsEnabled(enabled) {
@@ -426,7 +417,7 @@ class ExperimentUIManager {
       this._emit("visual-hints-disabled");
     }
 
-    this._log(`視覺提示已${enabled ? "啟用" : "禁用"}`);
+    Logger.debug(`視覺提示已${enabled ? "啟用" : "停用"}`);
   }
 
   /**
@@ -782,7 +773,7 @@ class ExperimentUIManager {
       return document.querySelector(elementOrSelector);
     }
 
-    this._warn("無效的元素或選擇器:", elementOrSelector);
+    Logger.warn("無效的元素或選擇器:", elementOrSelector);
     return null;
   }
 
@@ -798,30 +789,6 @@ class ExperimentUIManager {
       bubbles: true,
     });
     window.dispatchEvent(event);
-  }
-
-  /**
-   * 日誌輸出
-   * @param {...any} args - 日誌參數
-   * @private
-   */
-  _log(...args) {
-    if (typeof Logger !== "undefined" && Logger.debug) {
-      Logger.debug("[ExperimentUIManager]", ...args);
-    }
-  }
-
-  /**
-   * 錯誤輸出
-   * @param {...any} args - 錯誤參數
-   * @private
-   */
-  _error(...args) {
-    if (typeof Logger !== "undefined" && Logger.error) {
-      Logger.error("[ExperimentUIManager]", ...args);
-    } else {
-      console.error("[ExperimentUIManager]", ...args);
-    }
   }
 
   // ==========================================
@@ -878,7 +845,7 @@ class ExperimentUIManager {
     this.state.hiddenElements.clear();
 
     this._emit("ui-manager-reset");
-    this._log("UI 管理器已重置");
+    Logger.debug("UI 管理器已重置");
   }
 
   /**
@@ -904,7 +871,7 @@ class ExperimentUIManager {
 
     this.initialized = false;
     this._emit("ui-manager-destroyed");
-    this._log("UI 管理器已銷毀");
+    Logger.debug("UI 管理器已銷毀");
   }
 
   // ==========================================
@@ -924,7 +891,7 @@ class ExperimentUIManager {
         ? document.querySelector(container)
         : container;
     if (!containerEl) {
-      this._error("找不到容器元素:", container);
+      Logger.error("找不到容器元素:", container);
       return null;
     }
     const renderNow = () => {
@@ -936,7 +903,7 @@ class ExperimentUIManager {
         ...options,
       };
 
-      // 如果容器是 ul 元素，直接在其中添加項目
+      // 如果容器是 ul 元素，直接在其中新增項目
       if (containerEl.tagName === "UL") {
         containerEl.innerHTML = combinations
           .map(
@@ -961,7 +928,7 @@ class ExperimentUIManager {
             titleEl.textContent = config.title;
             containerEl.parentNode &&
               containerEl.parentNode.insertBefore(titleEl, containerEl);
-            this._log("組合選擇器: 已插入 fallback 標題", {
+            Logger.debug("組合選擇器: 已插入 fallback 標題", {
               title: config.title,
             });
           }
@@ -969,7 +936,7 @@ class ExperimentUIManager {
       } else {
         // 否則產生完整的 HTML
         const html = `
-        <div class="combination-selector-section">
+        <div class="combination-selector-section experiment-ui-card">
           ${config.showTitle ? `<h3>${config.title}</h3>` : ""}
           <ul class="experiment-default-list">
             ${combinations
@@ -990,7 +957,7 @@ class ExperimentUIManager {
       }
 
       // 記錄容器與標題使用情況，便於偵錯
-      this._log("renderCombinationSelector: containerTag", {
+      Logger.debug("renderCombinationSelector: containerTag", {
         tag: containerEl.tagName,
         showTitle: config.showTitle,
         title: config.title,
@@ -1012,7 +979,7 @@ class ExperimentUIManager {
         });
       }
 
-      this._log("組合選擇器已渲染", { count: combinations.length });
+      Logger.debug("組合選擇器已渲染", { count: combinations.length });
       return containerEl;
     };
 
@@ -1049,7 +1016,7 @@ class ExperimentUIManager {
         ? document.querySelector(container)
         : container;
     if (!containerEl) {
-      this._warn("找不到容器元素:", container);
+      Logger.warn("找不到容器元素:", container);
       return;
     }
 
@@ -1057,7 +1024,7 @@ class ExperimentUIManager {
     const items = containerEl.querySelectorAll(".combination-item");
     items.forEach((item) => item.classList.remove("active"));
 
-    // 為指定的組合添加 active class
+    // 為指定的組合新增 active class
     const activeItem = containerEl.querySelector(
       `[data-combination-id="${activeId}"]`,
     );
@@ -1065,7 +1032,7 @@ class ExperimentUIManager {
       activeItem.classList.add("active");
     }
 
-    this._log("組合選擇器選中狀態已更新", { activeId });
+    Logger.debug("組合選擇器選中狀態已更新", { activeId });
   }
 
   /**
@@ -1082,7 +1049,7 @@ class ExperimentUIManager {
         ? document.querySelector(container)
         : container;
     if (!containerEl) {
-      this._error("找不到容器元素:", container);
+      Logger.error("找不到容器元素:", container);
       return null;
     }
 
@@ -1107,7 +1074,7 @@ class ExperimentUIManager {
           ...unit,
           checked: unitIds.includes(unit.unit_id || unit.id),
         }));
-        this._log("設定單元勾選狀態:", {
+        Logger.debug("設定單元勾選狀態:", {
           total: units.length,
           preselected: unitIds.length,
           unitIds,
@@ -1120,7 +1087,7 @@ class ExperimentUIManager {
       }
 
       const html = `
-      <div class="experiment-panel-units">
+      <div class="experiment-panel-units experiment-ui-card">
         ${
           config.showHeader
             ? `
@@ -1213,7 +1180,7 @@ class ExperimentUIManager {
         if (selectAllCheckbox) {
           selectAllCheckbox.addEventListener("change", (e) => {
             const checkboxes = containerEl.querySelectorAll(
-              'input[name="unitCheckbox"]',
+              "input[name=\"unitCheckbox\"]",
             );
             checkboxes.forEach((cb) => (cb.checked = e.target.checked));
             if (config.onUnitToggle) {
@@ -1229,7 +1196,7 @@ class ExperimentUIManager {
       // 綁定單元切換事件
       if (config.onUnitToggle) {
         const checkboxes = containerEl.querySelectorAll(
-          'input[name="unitCheckbox"]',
+          "input[name=\"unitCheckbox\"]",
         );
         checkboxes.forEach((checkbox) => {
           checkbox.addEventListener("change", (e) => {
@@ -1308,7 +1275,7 @@ class ExperimentUIManager {
         this._setupUnitDragAndDrop(containerEl, config);
       }
 
-      this._log("單元面板已渲染", { count: displayUnits.length });
+      Logger.debug("單元面板已渲染", { count: displayUnits.length });
       return containerEl;
     };
 
@@ -1486,7 +1453,7 @@ class ExperimentUIManager {
       placeholder = null;
     };
 
-    this._log("單元拖曳功能已啟用");
+    Logger.debug("單元拖曳功能已啟用");
   }
 
   /**
@@ -1537,7 +1504,7 @@ class ExperimentUIManager {
         ? document.querySelector(container)
         : container;
     if (!containerEl) {
-      this._error("找不到容器元素:", container);
+      Logger.error("找不到容器元素:", container);
       return null;
     }
 
@@ -1596,7 +1563,7 @@ class ExperimentUIManager {
           <div class="form-group experiment-control-group">
             <div class="experiment-control-header">
               <label>實驗控制</label>
-              ${config.showTimer ? '<div id="experimentTimer" class="experiment-timer">00:00.000</div>' : ""}
+              ${config.showTimer ? "<div id=\"experimentTimer\" class=\"experiment-timer\">00:00.000</div>" : ""}
             </div>
 
             <div id="experimentIdRow" class="experiment-start-row">
@@ -1653,37 +1620,15 @@ class ExperimentUIManager {
       if (config.onPause) {
         const pauseBtn = containerEl.querySelector("#pauseExperimentBtn");
         if (pauseBtn) {
-          // 使用 data 屬性儲存暫停狀態，避免閉包問題
-          pauseBtn.dataset.isPaused = "false";
-
+          // 初始狀態由 _updateExperimentControlsForStarted 設定
+          // UI 與計時器狀態由 FlowManager 事件驅動（_updateExperimentControlsForPaused/Resumed）
           pauseBtn.addEventListener("click", (e) => {
             e.preventDefault();
             const isPaused = pauseBtn.dataset.isPaused === "true";
-
             if (!isPaused) {
-              // 切換到暫停狀態
-              if (this.pauseExperimentTimer()) {
-                pauseBtn.textContent = "⏯ 繼續";
-                pauseBtn.classList.remove("btn-primary");
-                pauseBtn.classList.add("btn-secondary");
-                pauseBtn.dataset.isPaused = "true";
-                if (config.onPause) {
-                  config.onPause();
-                }
-                this._log("暫停按鈕已切換到繼續狀態");
-              }
+              config.onPause();
             } else {
-              // 切換到繼續狀態
-              if (this.resumeExperimentTimer()) {
-                pauseBtn.textContent = "⏸ 暫停";
-                pauseBtn.classList.remove("btn-secondary");
-                pauseBtn.classList.add("btn-primary");
-                pauseBtn.dataset.isPaused = "false";
-                if (config.onResume) {
-                  config.onResume();
-                }
-                this._log("暫停按鈕已切換到暫停狀態");
-              }
+              config.onResume?.();
             }
           });
         }
@@ -1693,8 +1638,7 @@ class ExperimentUIManager {
         const stopBtn = containerEl.querySelector("#stopExperimentBtn");
         if (stopBtn) {
           stopBtn.addEventListener("click", () => {
-            // 停止計時器
-            this.stopExperimentTimer();
+            // 計時器停止由 FlowManager STOPPED 事件驅動（_handleFlowStopped → stopExperimentTimer）
 
             // 重置暫停按鈕狀態
             const pauseBtn = containerEl.querySelector("#pauseExperimentBtn");
@@ -1736,7 +1680,7 @@ class ExperimentUIManager {
         }
       }
 
-      this._log("實驗控制面板已渲染");
+      Logger.debug("實驗控制面板已渲染");
       return containerEl;
     };
 
@@ -1762,225 +1706,65 @@ class ExperimentUIManager {
   }
 
   /**
-   * 計時器狀態（內部）
-   * @private
+   * 啟動實驗計時器（委派給 experimentTimerManager）
    */
-  _timerState = {
-    running: false,
-    paused: false,
-    startTime: 0,
-    pausedTime: 0,
-    totalPausedDuration: 0,
-    intervalId: null,
-    timerElement: null,
-  };
-
-  /**
-   * 啟動實驗計時器
-   * @param {HTMLElement} timerElement - 計時器顯示元素
-   */
-  startExperimentTimer(timerElement) {
-    if (!timerElement) {
-      this._warn("計時器元素不存在");
-      return;
-    }
-
-    // 避免重複啟動
-    if (this._timerState.running) {
-      this._warn("計時器已在執行中");
-      return;
-    }
-
-    this._timerState.running = true;
-    this._timerState.paused = false;
-    this._timerState.startTime = Date.now();
-    this._timerState.totalPausedDuration = 0;
-    this._timerState.timerElement = timerElement;
-
-    // 每 10ms 更新一次（毫秒級精度）
-    this._timerState.intervalId = setInterval(() => {
-      const now = Date.now();
-      const elapsed =
-        now - this._timerState.startTime - this._timerState.totalPausedDuration;
-
-      const minutes = Math.floor(elapsed / 60000);
-      const seconds = Math.floor((elapsed % 60000) / 1000);
-      const milliseconds = Math.floor(elapsed % 1000);
-
-      const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${milliseconds.toString().padStart(3, "0")}`;
-      timerElement.textContent = timeStr;
-    }, 10);
-
-    this._log("實驗計時器已啟動");
+  startExperimentTimer() {
+    window.experimentTimerManager.startExperimentTimer();
+    Logger.debug("實驗計時器已啟動");
   }
 
   /**
-   * 暫停實驗計時器
+   * 暫停實驗計時器（委派給 experimentTimerManager）
    * @returns {boolean} 是否成功暫停
    */
   pauseExperimentTimer() {
-    if (!this._timerState.running) {
-      this._warn("計時器未在執行中");
+    const etm = window.experimentTimerManager;
+    if (!etm.experimentStartTime) {
+      Logger.warn("計時器未在執行中");
       return false;
     }
-
-    if (this._timerState.paused) {
-      this._warn("計時器已處於暫停狀態");
+    if (etm.experimentPaused) {
+      Logger.warn("計時器已處於暫停狀態");
       return false;
     }
-
-    this._timerState.paused = true;
-    this._timerState.pausedTime = Date.now();
-
-    if (this._timerState.intervalId) {
-      clearInterval(this._timerState.intervalId);
-      this._timerState.intervalId = null;
-    }
-
-    this._log("實驗計時器已暫停");
+    etm.pauseExperimentTimer();
+    Logger.debug("實驗計時器已暫停");
     return true;
   }
 
   /**
-   * 恢復實驗計時器
+   * 恢復實驗計時器（委派給 experimentTimerManager）
    * @returns {boolean} 是否成功恢復
    */
   resumeExperimentTimer() {
-    if (!this._timerState.running) {
-      this._warn("計時器未在執行中");
+    const etm = window.experimentTimerManager;
+    if (!etm.experimentStartTime) {
+      Logger.warn("計時器未在執行中");
       return false;
     }
-
-    if (!this._timerState.paused) {
-      this._warn("計時器未在暫停狀態");
+    if (!etm.experimentPaused) {
+      Logger.warn("計時器未在暫停狀態");
       return false;
     }
-
-    const pauseDuration = Date.now() - this._timerState.pausedTime;
-    this._timerState.totalPausedDuration += pauseDuration;
-    this._timerState.paused = false;
-
-    this._timerState.intervalId = setInterval(() => {
-      const now = Date.now();
-      const elapsed =
-        now - this._timerState.startTime - this._timerState.totalPausedDuration;
-
-      const minutes = Math.floor(elapsed / 60000);
-      const seconds = Math.floor((elapsed % 60000) / 1000);
-      const milliseconds = Math.floor(elapsed % 1000);
-
-      const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${milliseconds.toString().padStart(3, "0")}`;
-      if (this._timerState.timerElement) {
-        this._timerState.timerElement.textContent = timeStr;
-      }
-    }, 10);
-
-    this._log("實驗計時器已恢復");
+    etm.resumeExperimentTimer();
+    Logger.debug("實驗計時器已恢復");
     return true;
   }
 
   /**
-   * 停止實驗計時器
+   * 停止實驗計時器（委派給 experimentTimerManager）
    */
   stopExperimentTimer() {
-    if (!this._timerState.running) {
-      this._warn("計時器未在執行中");
-      return;
-    }
-
-    if (this._timerState.intervalId) {
-      clearInterval(this._timerState.intervalId);
-      this._timerState.intervalId = null;
-    }
-
-    this._timerState.running = false;
-    this._timerState.paused = false;
-    this._timerState.startTime = 0;
-    this._timerState.pausedTime = 0;
-    this._timerState.totalPausedDuration = 0;
-
-    this._log("實驗計時器已停止");
+    window.experimentTimerManager.stopExperimentTimer();
+    Logger.debug("實驗計時器已停止");
   }
 
   /**
-   * 取得計時器目前時間（毫秒）
+   * 取得計時器目前時間（毫秒，委派給 experimentTimerManager）
    * @returns {number} 經過的毫秒數
    */
   getElapsedTime() {
-    if (!this._timerState.running) {
-      return 0;
-    }
-
-    const now = Date.now();
-    let elapsed =
-      now - this._timerState.startTime - this._timerState.totalPausedDuration;
-
-    if (this._timerState.paused) {
-      elapsed =
-        this._timerState.pausedTime -
-        this._timerState.startTime -
-        this._timerState.totalPausedDuration;
-    }
-
-    return Math.max(0, elapsed);
-  }
-
-  /**
-   * 渲染實驗日誌面板（Board 專用）
-   * @param {HTMLElement|string} container - 容器元素或選擇器
-   * @param {Object} options - 可選配置
-   * @returns {HTMLElement} 渲染後的容器元素
-   */
-  renderExperimentLog(container, options = {}) {
-    const containerEl =
-      typeof container === "string"
-        ? document.querySelector(container)
-        : container;
-    if (!containerEl) {
-      this._error("找不到容器元素:", container);
-      return null;
-    }
-
-    const config = {
-      showDownloadButton: options.showDownloadButton !== false,
-      title: options.title || "實驗日誌",
-      emptyMessage: options.emptyMessage || "等待實驗開始...",
-      onDownload: options.onDownload || null,
-      ...options,
-    };
-
-    const html = `
-      <div class="form-group experiment-log-panel">
-        <div class="log-header">
-          <label>${config.title}</label>
-          ${
-            config.showDownloadButton
-              ? `
-            <span id="logDownloadBtns" class="log-download-buttons">
-              <button class="btn-secondary" id="downloadLogBtn">下載 JSONL</button>
-            </span>
-          `
-              : ""
-          }
-        </div>
-        <div id="experimentLogDisplay" class="log-display">
-          <div class="log-display-empty">${config.emptyMessage}</div>
-        </div>
-      </div>
-    `;
-
-    containerEl.innerHTML = html;
-
-    // 綁定下載事件
-    if (config.showDownloadButton && config.onDownload) {
-      const downloadBtn = containerEl.querySelector("#downloadLogBtn");
-      if (downloadBtn) {
-        downloadBtn.addEventListener("click", config.onDownload);
-      }
-    }
-
-    this._log("實驗日誌面板已渲染");
-    return containerEl;
+    return window.experimentTimerManager.getExperimentElapsedMs();
   }
 
   /**
@@ -1991,34 +1775,21 @@ class ExperimentUIManager {
     try {
       // 防止重複初始化
       if (this.state.panelUIInitialized) {
-        this._log("Panel UI 已經初始化，跳過重複初始化");
+        Logger.debug("Panel UI 已經初始化，跳過重複初始化");
         return;
       }
 
-      this._log("開始初始化 Panel UI 組件");
+      Logger.debug("開始初始化 Panel UI 組件");
 
       // 注意：組合選擇器、單元面板和實驗控制由 ExperimentSystemManager.initializeUI() 處理
-      // 此處只處理額外的UI組件，如實驗日誌面板
+      // 實驗日誌面板由 board-log-ui.js 的 ExperimentLogUI 負責初始化
 
-      // 渲染實驗日誌面板（如果容器存在）
-      const experimentLogContainer = document.getElementById(
-        "experimentLogContainer",
-      );
-      if (experimentLogContainer) {
-        this.renderExperimentLog("#experimentLogContainer", {
-          showDownloadButton: true,
-          onDownload: () => {
-            this._handleExperimentLogDownload();
-          },
-        });
-      }
-
-      this._log("Panel UI 組件初始化完成");
+      Logger.debug("Panel UI 組件初始化完成");
 
       // 標記為已初始化
       this.state.panelUIInitialized = true;
     } catch (error) {
-      this._error("初始化 Panel UI 失敗:", error);
+      Logger.error("初始化 Panel UI 失敗:", error);
     }
   }
 
@@ -2032,7 +1803,7 @@ class ExperimentUIManager {
       if (!response.ok) throw new Error("Failed to load scenarios.json");
       return await response.json();
     } catch (error) {
-      this._error("載入 scenarios.json 失敗:", error);
+      Logger.error("載入 scenarios.json 失敗:", error);
       return null;
     }
   }
@@ -2066,7 +1837,7 @@ class ExperimentUIManager {
    * @private
    */
   _handleCombinationSelect(combinationId) {
-    this._log("選擇組合:", combinationId);
+    Logger.debug("選擇組合:", combinationId);
 
     if (window.experimentCombinationManager) {
       const combination =
@@ -2079,10 +1850,10 @@ class ExperimentUIManager {
           experimentId,
         );
       } else {
-        this._error("找不到組合:", combinationId);
+        Logger.error("找不到組合:", combinationId);
       }
     } else {
-      this._error("experimentCombinationManager 不可用");
+      Logger.error("experimentCombinationManager 不可用");
     }
   }
 
@@ -2091,8 +1862,8 @@ class ExperimentUIManager {
    * @private
    */
   _handleUnitToggle(unitId, checked) {
-    this._log("單元切換:", unitId, checked);
-    // TODO: 實現單元切換邏輯
+    Logger.debug("單元切換:", unitId, checked);
+    // 未實作：單元切換邏輯（保留作為未完成提示）
   }
 
   /**
@@ -2100,8 +1871,8 @@ class ExperimentUIManager {
    * @private
    */
   _handleUnitReorder(newOrder) {
-    this._log("單元重新排序:", newOrder);
-    // TODO: 實現單元排序邏輯
+    Logger.debug("單元重新排序:", newOrder);
+    // 未實作：單元排序邏輯
   }
 
   /**
@@ -2109,20 +1880,20 @@ class ExperimentUIManager {
    * @private
    */
   _handleExperimentStart() {
-    this._log("開始實驗");
+    Logger.debug("開始實驗");
 
     // 關閉所有面板（實驗、日誌、設定）
     if (window.panelUIManager) {
       window.panelUIManager.closePanel("experiment");
       window.panelUIManager.closePanel("logger");
       window.panelUIManager.closePanel("settings");
-      this._log("實驗開始：已關閉所有面板");
+      Logger.debug("實驗開始：已關閉所有面板");
     }
 
     // 如果視覺提示已啟用，確保高亮顯示
     if (this.isVisualHintsEnabled()) {
       this.updateHighlightVisibility();
-      this._log("實驗開始：視覺提示已啟用並更新高亮");
+      Logger.debug("實驗開始：視覺提示已啟用並更新高亮");
     }
   }
 
@@ -2131,8 +1902,8 @@ class ExperimentUIManager {
    * @private
    */
   _handleExperimentPause() {
-    this._log("暫停/繼續實驗");
-    // TODO: 實現暫停邏輯
+    Logger.debug("暫停/繼續實驗");
+    // 未實作：暫停處理（由 FlowManager 驅動為主要實現點）
   }
 
   /**
@@ -2140,8 +1911,8 @@ class ExperimentUIManager {
    * @private
    */
   _handleExperimentStop() {
-    this._log("停止實驗");
-    // TODO: 實現停止邏輯
+    Logger.debug("停止實驗");
+    // 未實作：停止處理（由 FlowManager 驅動為主要實現點）
   }
 
   /**
@@ -2149,7 +1920,7 @@ class ExperimentUIManager {
    * @private
    */
   async _handleRegenerateId() {
-    this._log("重新產生實驗ID");
+    Logger.debug("重新產生實驗ID");
 
     try {
       // 檢查是否在同步模式，並選擇適當的產生方法
@@ -2158,31 +1929,31 @@ class ExperimentUIManager {
       // 即使 hubManager 不存在，也允許在本機產生 ID（離線模式）
       if (hubManager && hubManager.isInSyncMode && hubManager.isInSyncMode()) {
         // 同步模式：使用中樞註冊邏輯
-        this._log("同步模式：產生新ID並註冊到中樞");
+        Logger.debug("同步模式：產生新ID並註冊到中樞");
         newId = await this._generateExperimentIdWithHub();
       } else {
         // 獨立模式：直接產生新ID
-        this._log("獨立/離線模式：直接產生新ID");
+        Logger.debug("獨立/離線模式：直接產生新ID");
         newId = this._generateExperimentId();
       }
 
       // 檢查產生的ID是否有效
       if (!newId || typeof newId !== "string" || newId.trim().length === 0) {
-        this._error("重新產生實驗ID失敗：產生的ID無效或為空", {
+        Logger.error("重新產生實驗ID失敗：產生的ID無效或為空", {
           generatedId: newId,
         });
         return;
       }
 
-      this._log("已成功重新產生實驗ID:", newId);
+      Logger.debug("已成功重新產生實驗ID:", newId);
 
       // 更新UI中的輸入框
       const idInput = document.querySelector("#experimentIdInput");
       if (idInput) {
         idInput.value = newId;
-        this._log("已更新UI中的實驗ID輸入框為:", newId);
+        Logger.debug("已更新UI中的實驗ID輸入框為:", newId);
       } else {
-        this._warn("找不到實驗ID輸入框元素");
+        Logger.warn("找不到實驗ID輸入框元素");
       }
 
       // 廣播ID更新到其他連線裝置
@@ -2194,7 +1965,7 @@ class ExperimentUIManager {
         window.experimentCombinationManager.handleExperimentIdChanged(newId);
       }
     } catch (error) {
-      this._error("重新產生實驗ID失敗:", error);
+      Logger.error("重新產生實驗ID失敗:", error);
     }
   }
 
@@ -2235,7 +2006,7 @@ class ExperimentUIManager {
    */
   async _generateExperimentIdWithHub() {
     try {
-      this._log("產生新的實驗ID...");
+      Logger.debug("產生新的實驗ID...");
 
       // 產生新的實驗ID
       const newId = this._generateExperimentId();
@@ -2243,15 +2014,15 @@ class ExperimentUIManager {
       // 檢查是否在同步模式
       const hubManager = window.experimentHubManager;
       if (hubManager?.isInSyncMode?.()) {
-        this._log(`同步模式: 註冊新ID到中樞: ${newId}`);
+        Logger.debug(`同步模式: 註冊新ID到中樞: ${newId}`);
         // 在同步模式下，experimentHubManager.generateExperimentId() 應該已經處理了註冊
       } else {
-        this._log(`獨立模式: 新ID僅存本機: ${newId}`);
+        Logger.debug(`獨立模式: 新ID僅存本機: ${newId}`);
       }
 
       return newId;
     } catch (error) {
-      this._error("產生新實驗ID失敗:", error);
+      Logger.error("產生新實驗ID失敗:", error);
       throw error;
     }
   }
@@ -2277,7 +2048,7 @@ class ExperimentUIManager {
 
     // 使用統一的同步機制
     window.syncManager.core.syncState(updateData).catch((error) => {
-      this._warn("廣播實驗ID更新失敗:", error);
+      Logger.warn("廣播實驗ID更新失敗:", error);
     });
 
     // 分派事件供本機同步管理器捕獲
@@ -2287,52 +2058,7 @@ class ExperimentUIManager {
       }),
     );
 
-    this._log("已廣播實驗ID更新:", experimentId);
-  }
-
-  /**
-   * 處理實驗日誌下載
-   * @private
-   */
-  _handleExperimentLogDownload() {
-    this._log("下載實驗日誌");
-    // TODO: 實現日誌下載邏輯
-  }
-
-  /**
-   * 更新實驗日誌顯示
-   * @param {Array} logs - 日誌項目陣列
-   */
-  updateExperimentLog(logs) {
-    const logDisplay = document.querySelector("#experimentLogDisplay");
-    if (!logDisplay) {
-      this._warn("找不到日誌顯示區域");
-      return;
-    }
-
-    if (!logs || logs.length === 0) {
-      logDisplay.innerHTML =
-        '<div class="log-display-empty">等待實驗開始...</div>';
-      return;
-    }
-
-    const html = logs
-      .map(
-        (log) => `
-      <div class="log-entry" data-log-id="${log.id || ""}">
-        <div class="log-timestamp">${log.timestamp || ""}</div>
-        <div class="log-content">${log.message || log.action || ""}</div>
-        ${log.details ? `<div class="log-details">${JSON.stringify(log.details)}</div>` : ""}
-      </div>
-    `,
-      )
-      .join("");
-
-    logDisplay.innerHTML = html;
-    // 自動捲動到底部
-    logDisplay.scrollTop = logDisplay.scrollHeight;
-
-    this._log("實驗日誌已更新", { count: logs.length });
+    Logger.debug("已廣播實驗ID更新:", experimentId);
   }
 }
 

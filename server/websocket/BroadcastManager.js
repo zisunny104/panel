@@ -9,6 +9,7 @@
  */
 
 import { Logger } from "../utils/logger.js";
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 
 const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
 
@@ -153,7 +154,7 @@ export class BroadcastManager {
    */
   broadcastSessionState(sessionId, state, options = {}) {
     const message = {
-      type: "session_state_update",
+      type: WS_PROTOCOL.S2C.SESSION_STATE_UPDATE,
       data: {
         sessionId,
         state,
@@ -172,7 +173,7 @@ export class BroadcastManager {
    */
   broadcastClientJoined(sessionId, clientId, metadata = {}) {
     const message = {
-      type: "client_joined",
+      type: WS_PROTOCOL.S2C.CLIENT_JOINED,
       data: {
         clientId,
         ...metadata,
@@ -191,7 +192,7 @@ export class BroadcastManager {
    */
   broadcastClientLeft(sessionId, clientId) {
     const message = {
-      type: "client_left",
+      type: WS_PROTOCOL.S2C.CLIENT_LEFT,
       data: {
         clientId,
       },
@@ -228,7 +229,7 @@ export class BroadcastManager {
    */
   broadcastExperimentIdUpdate(sessionId, experimentId, metadata = {}) {
     const message = {
-      type: "experiment_id_changed",
+      type: WS_PROTOCOL.S2C.EXPERIMENT_ID_CHANGED,
       data: {
         experimentId,
         ...metadata,
@@ -247,7 +248,7 @@ export class BroadcastManager {
    */
   sendError(clientId, code, errorMessage) {
     const message = {
-      type: "error",
+      type: WS_PROTOCOL.S2C.ERROR,
       data: {
         code,
         message: errorMessage,

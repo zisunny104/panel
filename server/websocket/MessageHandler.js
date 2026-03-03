@@ -11,6 +11,7 @@
 import SessionService from "../services/SessionService.js";
 import ShareCodeService from "../services/ShareCodeService.js";
 import Logger from "../utils/logger.js";
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 
 // 本檔使用的角色常數，避免硬編碼字串
 const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
@@ -27,11 +28,12 @@ export class MessageHandler {
 
     // 訊息處理器映射
     this.handlers = {
-      auth: this.handleAuth.bind(this),
-      heartbeat: this.handleHeartbeat.bind(this),
-      state_update: this.handleStateUpdate.bind(this),
-      get_session_state: this.handleGetSessionState.bind(this),
-      ping: this.handlePing.bind(this),
+      [WS_PROTOCOL.C2S.AUTH]: this.handleAuth.bind(this),
+      [WS_PROTOCOL.C2S.HEARTBEAT]: this.handleHeartbeat.bind(this),
+      [WS_PROTOCOL.C2S.STATE_UPDATE]: this.handleStateUpdate.bind(this),
+      [WS_PROTOCOL.C2S.GET_SESSION_STATE]:
+        this.handleGetSessionState.bind(this),
+      [WS_PROTOCOL.C2S.PING]: this.handlePing.bind(this),
     };
   }
 
@@ -89,7 +91,7 @@ export class MessageHandler {
         Logger.warn(
           `工作階段不存在 [${sessionId}]，通知客戶端 [${wsConnectionId}] 清除本機數據`,
         );
-        this.sendResponse(ws, "clear_sync_data", {
+        this.sendResponse(ws, WS_PROTOCOL.S2C.CLEAR_SYNC_DATA, {
           reason: "SESSION_NOT_FOUND",
           message: `工作階段不存在: ${sessionId}`,
         });
@@ -121,7 +123,7 @@ export class MessageHandler {
       this.sessionService.updateLastActive(sessionId);
 
       // 發送認證成功回應
-      this.sendResponse(ws, "auth_success", {
+      this.sendResponse(ws, WS_PROTOCOL.S2C.AUTH_SUCCESS, {
         sessionId,
         clientId,
         role,
@@ -139,7 +141,7 @@ export class MessageHandler {
         this.broadcastManager.broadcastToRoom(
           sessionId,
           {
-            type: "client_reconnected",
+            type: WS_PROTOCOL.S2C.CLIENT_RECONNECTED,
             data: { clientId, role },
           },
           { excludeClientId: clientId },
@@ -149,7 +151,7 @@ export class MessageHandler {
       // 發送目前工作階段狀態給客戶端
       const currentState = this.getSessionState(sessionId);
       this.broadcastManager.sendToClient(clientId, {
-        type: "session_state",
+        type: WS_PROTOCOL.S2C.SESSION_STATE,
         data: currentState,
       });
 
@@ -178,7 +180,7 @@ export class MessageHandler {
     this.connectionManager.updateHeartbeat(wsConnectionId);
 
     // 發送 Pong 回應
-    this.sendResponse(ws, "heartbeat_ack", {
+    this.sendResponse(ws, WS_PROTOCOL.S2C.HEARTBEAT_ACK, {
       serverTime: Math.floor(Date.now() / 1000),
     });
   }
@@ -225,7 +227,7 @@ export class MessageHandler {
       });
 
       // 發送確認回應
-      this.sendResponse(ws, "state_update_ack", {
+      this.sendResponse(ws, WS_PROTOCOL.S2C.STATE_UPDATE_ACK, {
         sessionId,
         timestamp: Date.now(),
       });
@@ -302,7 +304,7 @@ export class MessageHandler {
     try {
       const state = this.getSessionState(sessionId);
 
-      this.sendResponse(ws, "session_state", state);
+      this.sendResponse(ws, WS_PROTOCOL.S2C.SESSION_STATE, state);
     } catch (error) {
       throw new Error(`取得狀態失敗: ${error.message}`);
     }
@@ -315,7 +317,7 @@ export class MessageHandler {
    * @param {WebSocket} ws - WebSocket 連線
    */
   async handlePing(wsConnectionId, data, ws) {
-    this.sendResponse(ws, "pong", {
+    this.sendResponse(ws, WS_PROTOCOL.S2C.PONG, {
       timestamp: Date.now(),
     });
   }
@@ -400,8 +402,7 @@ export class MessageHandler {
           `工作階段不存在，斷開連線: ${wsConnectionId} (session: ${sessionId})`,
         );
         this.connectionManager.unregister(wsConnectionId);
-        this.sendResponse(ws, "error", {
-          type: "session_expired",
+        this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
           message: "工作階段已過期，請重新加入",
         });
         return null;
@@ -412,7 +413,7 @@ export class MessageHandler {
           `工作階段已失效，斷開連線: ${wsConnectionId} (session: ${sessionId})`,
         );
         this.connectionManager.unregister(wsConnectionId);
-        this.sendResponse(ws, "error", {
+        this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
           type: "session_inactive",
           message: "工作階段已失效",
         });
@@ -452,7 +453,7 @@ export class MessageHandler {
    * @param {string} message - 錯誤訊息
    */
   sendErrorResponse(ws, code, message) {
-    this.sendResponse(ws, "error", {
+    this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
       code,
       message,
     });

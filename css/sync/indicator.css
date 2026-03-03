@@ -251,21 +251,20 @@
 
 
 
-/* 建立/加入工作階段內部區塊 - 各自有邊框 */
+/* 建立/加入工作階段內部區塊 */
 .sync-join-section {
     box-sizing: border-box;
-    padding: 12px;
+    padding: 20px;
     margin-bottom: 0;
-
     border: 2px solid #999;
-    border-radius: 6px;
-    background: transparent;
+    border-radius: 15px;
+    background: #f8f9fa;
 }
 
 .sync-join-section h3 {
-    margin: 0 0 10px 0;
-    font-size: 14px;
-    color: #333;
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    color: #495057;
     font-weight: 600;
 }
 
@@ -525,7 +524,7 @@
 }
 
 .sync-qr-countdown {
-    font-size: 13px;
+    font-size: 20px;
     font-weight: bold;
     color: #28a745;
 }
@@ -566,26 +565,7 @@
     transform: none;
 }
 
-.sync-qr-display {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-}
-
-/* 加入工作階段區塊 */
-.sync-join-section {
-    margin-bottom: 0;
-    padding: 20px;
-    background: #f8f9fa;
-    border-radius: 15px;
-}
-
-.sync-join-section h3 {
-    margin: 0 0 15px 0;
-    color: #495057;
-    font-size: 18px;
-}
+/* 加入工作階段區塊 - 樣式已合併至上方 .sync-join-section */
 
 .sync-role-selector {
     display: flex;
@@ -702,6 +682,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 10px;
     text-align: center;
     padding: 20px;
@@ -754,7 +735,6 @@
 .sync-qr-expired {
     padding: 20px;
     text-align: center;
-    color: #999;
 }
 
 /* 狀態訊息 */
@@ -797,13 +777,8 @@
     border: 2px solid #bee5eb;
 }
 
-.sync-session-info strong {
-    color: #212529;
-}
-
-.sync-btn-cancel:hover {
-    background: #5a6268;
-}
+/* .sync-session-info strong → 已移至 sessions.css */
+/* .sync-btn-cancel:hover → 已移至 qr.css */
 
 /* ===== 代碼顯示與複製 ===== */
 .sync-join-code-display {
@@ -985,36 +960,7 @@
     display: none !important;
 }
 
-/* 新的按鈕佈局容器 */
-.sync-session-buttons-container {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #e0e0e0;
-}
-
-/* 分享按鈕獨立行 */
-.sync-session-share-row {
-    margin-bottom: 10px;
-}
-
-.sync-session-share-row .sync-share-toggle-btn {
-    width: 100%;
-    background: #17a2b8;
-    color: white;
-    border: none;
-    padding: 12px 16px;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s;
-}
-
-.sync-session-share-row .sync-share-toggle-btn:hover {
-    background: #138496;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
-}
+/* .sync-session-buttons-container / .sync-session-share-row → 已移至 sessions.css */
 
 /* 其他按鈕行 */
 .sync-session-action-row {
@@ -1377,7 +1323,8 @@
         flex: 1;
     }
 
-    .sync-page-toggle-group {
+    .sync-page-toggle-group,
+    .sync-control-panel .modal-header>.sync-page-toggle-group {
         flex: 1;
         margin-right: 8px;
     }
@@ -1471,7 +1418,8 @@
         flex: 1;
     }
 
-    .sync-page-toggle-group {
+    .sync-page-toggle-group,
+    .sync-control-panel .modal-header>.sync-page-toggle-group {
         flex: 1;
         min-width: 0;
         margin-right: 8px;
@@ -1600,13 +1548,7 @@
         min-height: 120px;
     }
 
-    .sync-qr-display canvas,
-    .sync-qr-display img {
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-    }
+    /* QR canvas 尺寸由 qr.css 控制 */
 
     .sync-qr-code-text {
         font-size: 14px;
@@ -1736,414 +1678,7 @@
     }
 }
 
-/* 工作階段管理樣式 */
-.sync-sessions-panel {
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-}
-
-.sync-sessions-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.sync-sessions-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #2c3e50;
-    margin: 0;
-}
-
-.sync-sessions-controls {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.sync-sessions-list {
-    flex: 1;
-    overflow-y: auto;
-    max-height: 60vh;
-}
-
-.sync-sessions-empty {
-    text-align: center;
-    color: #6c757d;
-    padding: 2rem;
-    font-style: italic;
-}
-
-/* 工作階段卡片樣式 */
-.sync-session-card {
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 0.5rem;
-    margin-bottom: 0.75rem;
-    overflow: hidden;
-    transition: all 0.2s ease;
-}
-
-.sync-session-card:hover {
-    border-color: #007bff;
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
-}
-
-.sync-session-card.expanded {
-    border-color: #007bff;
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
-}
-
-.sync-session-header {
-    padding: 1rem;
-    background: #f8f9fa;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.sync-session-header:hover {
-    background: #e9ecef;
-}
-
-.sync-session-card .sync-card-label {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin: 0;
-}
-
-.sync-card-hint {
-    font-size: 0.875rem;
-    color: #6c757d;
-    margin: 0.25rem 0 0 0;
-}
-
-.sync-session-card-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.sync-session-status {
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.85rem;
-    font-weight: 500;
-}
-
-.sync-session-status.active {
-    background: #28a745;
-    color: #ffffff;
-    font-size: 0.85rem;
-}
-
-.sync-session-status.inactive {
-    background: #ffe6e6;
-    color: #8b2d2d;
-}
-
-.sync-session-expand-icon {
-    font-size: 0.875rem;
-    color: #6c757d;
-    transition: transform 0.2s ease;
-}
-
-.sync-session-card.expanded .sync-session-expand-icon {
-    transform: rotate(90deg);
-}
-
-/* 工作階段詳細資訊 */
-.sync-session-details {
-    padding: 0;
-    max-height: 0;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.sync-session-card.expanded .sync-session-details {
-    padding: 1rem;
-    max-height: 500px;
-}
-
-.sync-session-info {
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-    background: #f8f9fa;
-    border-radius: 0.375rem;
-}
-
-.sync-session-info-no-code,
-.sync-session-info-no-state {
-    background: #fff3cd;
-    border-left-color: #ffc107;
-    color: #856404;
-}
-
-.sync-session-share-info {
-    background: #d1ecf1;
-    border-left-color: #17a2b8;
-    color: #0c5460;
-}
-
-/* 同步狀態展開/收合 */
-.sync-session-state-toggle {
-    margin-bottom: 1rem;
-}
-
-.sync-session-state-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem;
-    background: #f8f9fa;
-    border: 2px solid #e0e0e0;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.sync-session-state-header:hover {
-    background: #e9ecef;
-    border-color: #007bff;
-}
-
-.sync-state-expand-icon {
-    font-size: 0.875rem;
-    color: #6c757d;
-    transition: transform 0.2s ease;
-}
-
-.sync-session-state-details {
-    margin-top: 0.5rem;
-    padding: 0.75rem;
-    background: #f8f9fa;
-    border: 2px solid #e0e0e0;
-    border-radius: 0.375rem;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.sync-state-json {
-    background: #ffffff;
-    border: 2px solid #dee2e6;
-    border-radius: 0.25rem;
-    padding: 0.75rem;
-    font-family: 'Courier New', monospace;
-    font-size: 0.875rem;
-    line-height: 1.4;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-height: 300px;
-    overflow-y: auto;
-    color: #495057;
-}
-
-/* 裝置列表 */
-.sync-session-clients {
-    margin-top: 0.5rem;
-}
-
-.sync-session-client {
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
-    background: #f8f9fa;
-    border-radius: 0.25rem;
-    border: 2px solid #28a745;
-    font-size: 0.875rem;
-}
-
-.sync-session-client.operator {
-    border-color: #007bff;
-}
-
-.sync-session-client.viewer {
-    border-color: #6c757d;
-}
-
-.sync-session-client div {
-    margin-bottom: 0.25rem;
-}
-
-.sync-session-client div:last-child {
-    margin-bottom: 0;
-}
-
-.sync-session-no-clients {
-    text-align: center;
-    color: #6c757d;
-    font-style: italic;
-    padding: 1rem;
-}
-
-/* 刪除按鈕 */
-.sync-delete-session-btn {
-    background: #dc3545;
-    color: white;
-    border: none;
-    padding: 0.375rem 0.75rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.sync-delete-session-btn:hover {
-    background: #c82333;
-}
-
-.sync-delete-session-btn:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-}
-
-/* 格式化同步狀態樣式 */
-.sync-state-formatted {
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    background: #f8f9fa;
-    border: 2px solid #e9ecef;
-    border-radius: 0.375rem;
-    padding: 1rem;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-.sync-state-null {
-    color: #6c757d;
-    font-style: italic;
-}
-
-.sync-state-boolean {
-    color: #007bff;
-    font-weight: bold;
-}
-
-.sync-state-number {
-    color: #28a745;
-    font-weight: bold;
-}
-
-.sync-state-string {
-    color: #dc3545;
-}
-
-.sync-state-key {
-    color: #495057;
-    font-weight: bold;
-}
-
-.sync-state-array {
-    color: #6f42c1;
-}
-
-.sync-state-object {
-    color: #fd7e14;
-}
-
-.sync-state-empty {
-    color: #6c757d;
-    font-style: italic;
-}
-
-.sync-state-unknown {
-    color: #6c757d;
-    font-style: italic;
-    background: #fff3cd;
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.125rem;
-}
-
-/* 響應式設計 */
-@media (max-width: 768px) {
-    .sync-sessions-panel {
-        max-height: 90vh;
-    }
-
-    .sync-sessions-list {
-        max-height: 70vh;
-    }
-
-    .sync-session-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-
-    .sync-session-card-status {
-        align-self: flex-end;
-    }
-
-    .sync-session-state-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-
-    .sync-state-formatted {
-        font-size: 0.75rem;
-        padding: 0.75rem;
-    }
-
-    /* 優化按鈕在小螢幕上的佈局 */
-    .sync-session-action-row {
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .sync-session-action-row button {
-        flex: 1;
-        min-width: 120px;
-        font-size: 14px;
-        padding: 8px 10px;
-    }
-}
-
-/* 極小螢幕的額外優化 */
-@media (max-width: 480px) {
-    .sync-session-action-row {
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .sync-session-action-row button {
-        width: 100%;
-        min-width: auto;
-        font-size: 14px;
-        padding: 10px 12px;
-    }
-
-    /* 優化工作階段資訊容器的間距 */
-    .sync-session-info-container {
-        padding: 12px;
-        margin-bottom: 8px;
-    }
-
-    /* 優化 QR 顯示在小螢幕上的樣式 */
-    .sync-qr-display {
-        padding: 12px;
-        gap: 6px;
-    }
-
-    .sync-qr-code-text {
-        font-size: 13px;
-        margin-top: 8px;
-    }
-
-    .sync-qr-code-text strong {
-        font-size: 16px;
-        letter-spacing: 1px;
-    }
-}
+/* 工作階段管理樣式 → 已統一移至 sessions.css */
 
 /* 分享代碼歷史樣式 */
 .sync-session-share-codes {
@@ -2213,4 +1748,77 @@
 .sync-share-code-details {
     color: #666;
     line-height: 1.4;
+}
+
+/* ===== Toast 狀態訊息容器 ===== */
+/* indicator-status-container 掂載在 .sync-panel-content 內，
+   只在 modal 開啟時可見，不干擾實驗進行。 */
+.indicator-status-container {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+}
+
+/* 單則 toast 訊息 */
+.indicator-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.4;
+    animation: indicatorSlideIn 0.25s ease;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.indicator-status-time {
+    opacity: 0.7;
+    font-size: 0.72rem;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+}
+
+.indicator-status.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.indicator-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.indicator-status.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.indicator-status.warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.indicator-status.fade-out {
+    opacity: 0;
+    transform: scale(0.9);
+}
+
+@keyframes indicatorSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }

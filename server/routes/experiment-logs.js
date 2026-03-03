@@ -154,6 +154,60 @@ router.get("/read/:filename", async (req, res) => {
 });
 
 /**
+ * PATCH /api/experiment-logs/update-participant/:filename
+ * 更新日誌檔案中所有 exp_start / exp_end 的 participant 欄位
+ */
+router.patch("/update-participant/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const { participant } = req.body;
+
+    if (!filename || !participant) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing filename or participant",
+      });
+    }
+
+    const safeFilename = path.basename(filename);
+    const filepath = path.join(LOGS_DIR, safeFilename);
+
+    try {
+      await fs.access(filepath);
+    } catch {
+      return res.status(404).json({
+        success: false,
+        error: `File not found: ${safeFilename}`,
+      });
+    }
+
+    const content = await fs.readFile(filepath, "utf8");
+    const updatedLines = content
+      .trim()
+      .split("\n")
+      .map((line) => {
+        if (!line.trim()) return line;
+        try {
+          const entry = JSON.parse(line);
+          if (entry.type === "exp_start" || entry.type === "exp_end") {
+            entry.participant = participant;
+          }
+          return JSON.stringify(entry);
+        } catch {
+          return line;
+        }
+      });
+
+    await fs.writeFile(filepath, updatedLines.join("\n") + "\n", "utf8");
+
+    res.json({ success: true, filename: safeFilename, participant });
+  } catch (error) {
+    console.error("[ExperimentLogs] UpdateParticipant error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * DELETE /api/experiment-logs/delete/:filename
  * 刪除日誌檔案
  */

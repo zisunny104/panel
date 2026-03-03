@@ -3,7 +3,7 @@
  * 統一定義所有同步事件名稱，確保發送端和接收端使用相同的事件名稱
  */
 
-export const SyncEvents = {
+export const SYNC_EVENTS = {
   // 工作階段事件
   SESSION_CREATED: "sync_session_created",
   SESSION_JOINED: "sync_session_joined",
@@ -13,6 +13,10 @@ export const SyncEvents = {
 
   // 分享代碼事件
   SHARE_CODE_GENERATED: "sync_share_code_generated",
+
+  // WebSocket 連線事件
+  CONNECTED: "sync_connected",
+  DISCONNECTED: "sync_disconnected",
 
   // 伺服器狀態事件
   SERVER_STATUS_CHANGED: "sync_server_status_changed",
@@ -67,11 +71,11 @@ export const SyncEvents = {
   EXPERIMENT_HUB_CONNECTION_LOST: "experiment_hub_connection_lost",
 
   // WebSocket 事件（非同步）
-  WEBSOCKET_SESSION_INVALID: "websocket_session_invalid"
+  WEBSOCKET_SESSION_INVALID: "websocket_session_invalid",
 };
 
 // 同步資料類型常數
-export const SyncDataTypes = {
+export const SYNC_DATA_TYPES = {
   // 實驗管理
   EXPERIMENT_INITIALIZE: "experimentInitialize",
   EXPERIMENT_STARTED: "experiment_started",
@@ -98,6 +102,10 @@ export const SyncDataTypes = {
   // 日誌更新
   LOG_UPDATE: "log_update",
 
+  // 動作廣播類型
+  EXPERIMENT_ACTION: "experiment_action",
+  BUTTON_ACTION: "button_action",
+
   // 手勢操作
   GESTURE_MARKED: "gesture_marked",
   GESTURE_STEP_COMPLETED: "gesture_step_completed",
@@ -109,32 +117,33 @@ export const SyncDataTypes = {
   REQUEST_EXPERIMENT_STATE: "request_experiment_state",
 
   // 實驗狀態變化
-  EXPERIMENT_STATE_CHANGE: "experiment_state_change"
+  EXPERIMENT_STATE_CHANGE: "experiment_state_change",
+
+  // 內部中繼事件（由 ExperimentSyncCore 派發，Board 端接收）
+  REMOTE_STATE: "experiment:sync:remote_state",
 };
 
 // 暴露至全域以供非 module 腳本使用（例如直接載入的 panel 腳本）
-if (typeof window !== "undefined") {
-  window.SyncEvents = SyncEvents;
-  window.SyncDataTypes = SyncDataTypes;
-}
+window.SYNC_EVENTS = SYNC_EVENTS;
+window.SYNC_DATA_TYPES = SYNC_DATA_TYPES;
 
 /**
  * 取得事件名稱（用於動態事件分發）
  */
 export function getEventName(eventKey) {
-  return SyncEvents[eventKey] || eventKey;
+  return SYNC_EVENTS[eventKey] || eventKey;
 }
 
 /**
  * 檢查事件是否為同步事件
  */
 export function isSyncEvent(eventName) {
-  return Object.values(SyncEvents).includes(eventName);
+  return Object.values(SYNC_EVENTS).includes(eventName);
 }
 
 /**
  * 取得所有同步事件列表
  */
 export function getAllSyncEvents() {
-  return Object.values(SyncEvents);
+  return Object.values(SYNC_EVENTS);
 }

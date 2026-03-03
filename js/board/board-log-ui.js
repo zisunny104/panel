@@ -4,12 +4,21 @@
  * 使用 IndexedDB 作為資料來源
  */
 
+import {
+  LOG_TYPES,
+  GESTURE_ATTEMPT_TYPES,
+  GESTURE_ATTEMPT_TYPE_LABELS,
+} from "../constants/index.js";
+
 class ExperimentLogUI {
   constructor() {
     this.syncEnabled = false;
     this.currentExperiments = []; // 快取已載入的實驗列表
     this.selectedLogs = new Set();
     this.logManager = null; // 將在初始化時設定
+
+    // 初始化 BroadcastChannel 以監聽日誌更新
+    this._initBroadcastChannel();
   }
 
   /**
@@ -19,7 +28,85 @@ class ExperimentLogUI {
     // 取得全域的 experimentLogManager 實例
     this.logManager = window.experimentLogManager;
     if (!this.logManager) {
-      Logger.warn("experimentLogManager 未初始化");
+      Logger.debug("experimentLogManager 尚未載入，將稍後初始化");
+      // 設定一個標記，表示需要稍後重新初始化
+      this.needsReInitialization = true;
+      return;
+    }
+
+    Logger.debug("experimentLogManager 已初始化，日誌UI管理器準備就緒");
+
+    // 初始化目前實驗日誌容器
+    this.initializeExperimentLogContainer();
+  }
+
+  /**
+   * 初始化目前實驗日誌容器
+   */
+  initializeExperimentLogContainer() {
+    const container = document.getElementById("experimentLogContainer");
+    if (!container) {
+      Logger.debug("experimentLogContainer 元素不存在，跳過初始化");
+      return;
+    }
+
+    // 新增統一UI卡片樣式
+    container.className = "experiment-ui-card";
+
+    // 設置初始狀態
+    container.innerHTML = `
+      <div class="logs-header">
+        <h3>實驗日誌</h3>
+        <div class="logs-status">
+          <span class="status-indicator idle">等待開始</span>
+        </div>
+      </div>
+      <div class="logs-content">
+        <div class="no-current-logs">
+          <div class="no-logs-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-4"></path>
+              <path d="M9 11V9a3 3 0 0 1 6 0v2"></path>
+              <circle cx="12" cy="16" r="1"></circle>
+            </svg>
+          </div>
+          <div class="no-logs-text">尚未開始實驗</div>
+          <div class="no-logs-hint">實驗開始後，此處將顯示即時日誌</div>
+        </div>
+      </div>
+    `;
+
+    Logger.debug(
+      "[ExperimentLogUI::initializeExperimentLogContainer] 容器 HTML 統一初始化完成",
+    );
+  }
+
+  /**
+   * 重新初始化（當 experimentLogManager 載入後較程）
+   */
+  reInitialize() {
+    Logger.debug(
+      `[ExperimentLogUI::reInitialize] 棄是需要重新初始化: ${this.needsReInitialization}, experimentLogManager: ${!!window.experimentLogManager}`,
+    );
+
+    if (this.needsReInitialization && window.experimentLogManager) {
+      Logger.debug("[ExperimentLogUI::reInitialize] 鋲起重新初始化");
+
+      this.logManager = window.experimentLogManager;
+      this.needsReInitialization = false;
+
+      Logger.debug(
+        "[ExperimentLogUI::reInitialize] experimentLogManager 載入完成，日誌 UI 管理器重新初始化",
+      );
+
+      // 初始化目前實驗日誌容器
+      this.initializeExperimentLogContainer();
+
+      Logger.debug("[ExperimentLogUI::reInitialize] 重新初始化完成");
+    } else {
+      Logger.debug(
+        "[ExperimentLogUI::reInitialize] 敵不需要重新初始化 或 experimentLogManager 仍未載入",
+      );
     }
   }
 
@@ -75,6 +162,20 @@ class ExperimentLogUI {
    * 載入實驗日誌列表（從 runtime/experiment-data/ 資料夾）
    */
   async loadExperimentLogs() {
+    const container = document.getElementById("experimentLogsContainer");
+    if (!container) {
+      Logger.warn("experimentLogsContainer 元素不存在，無法載入日誌");
+      return;
+    }
+
+    // 顯示載入狀態
+    container.innerHTML = `
+      <div class="logs-loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">載入實驗日誌中...</div>
+      </div>
+    `;
+
     try {
       // 從 config.json 讀取日誌目錄路徑
       const logsDir = await this.getLogsDirectory();
@@ -125,7 +226,7 @@ class ExperimentLogUI {
           // 透過 API 讀取檔案內容
           const apiUrl = this._getApiUrl();
           const response = await fetch(
-            `${apiUrl}/experiment-logs/read/${filename}`
+            `${apiUrl}/experiment-logs/read/${filename}`,
           );
 
           if (!response.ok) {
@@ -154,10 +255,9 @@ class ExperimentLogUI {
 
           // 從日誌中找受試者名稱和實驗組合（容錯處理）
           const expStartLog = logs.find(
-            (log) =>
-              log.type === "exp_start" || log.type === "experiment_start"
+            (log) => log.type === LOG_TYPES.EXP_START,
           );
-          const subjectName = expStartLog?.subject_name || "n/a";
+          const subjectName = expStartLog?.participant || "n/a";
           const combinationName = expStartLog?.combination || "n/a";
 
           experiments.push({
@@ -171,7 +271,7 @@ class ExperimentLogUI {
             endTime: logs[logs.length - 1]?.ts || Date.now(),
             logs,
             // 用於實際操作的 ID
-            actualExperimentId: experimentId
+            actualExperimentId: experimentId,
           });
 
           Logger.debug(`成功載入: ${filename} (${logs.length} 條記錄)`);
@@ -194,7 +294,7 @@ class ExperimentLogUI {
             endTime: Date.now(),
             logs: [],
             actualExperimentId: experimentId,
-            error: error.message
+            error: error.message,
           });
         }
       }
@@ -301,12 +401,35 @@ class ExperimentLogUI {
     this.currentExperiments = experiments;
 
     const container = document.getElementById("experimentLogsContainer");
-    if (!container) return;
-
-    if (experiments.length === 0) {
-      container.innerHTML = "<div class=\"no-logs\">目前沒有任何實驗日誌</div>";
+    if (!container) {
+      Logger.warn("experimentLogsContainer 元素不存在，無法顯示日誌列表");
       return;
     }
+
+    // 清空載入狀態
+    container.innerHTML = "";
+
+    if (experiments.length === 0) {
+      container.innerHTML = `
+        <div class="no-logs">
+          <div class="no-logs-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+              <polyline points="14,2 14,8 20,8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10,9 9,9 8,9"></polyline>
+            </svg>
+          </div>
+          <div class="no-logs-text">目前沒有任何實驗日誌</div>
+          <div class="no-logs-hint">請確保已啟動伺服器並有進行過實驗</div>
+        </div>
+      `;
+      Logger.debug("顯示空日誌列表提示");
+      return;
+    }
+
+    Logger.debug(`顯示 ${experiments.length} 個實驗日誌`);
 
     container.innerHTML = experiments
       .map(
@@ -315,14 +438,8 @@ class ExperimentLogUI {
         exp.actualExperimentId || exp.experimentId
       }">
         <div class="log-checkbox">
-          <input type="checkbox" id="log-${
-            exp.actualExperimentId || exp.experimentId
-          }" onchange="experimentLogUI.toggleLogSelection('${
-            exp.actualExperimentId || exp.experimentId
-          }')">
-          <label for="log-${
-            exp.actualExperimentId || exp.experimentId
-          }"></label>
+          <input type="checkbox" id="log-${exp.filename}" onchange="experimentLogUI.toggleLogSelection('${exp.filename}')">
+          <label for="log-${exp.filename}"></label>
         </div>
         <div class="log-details">
           <div class="log-filename">${
@@ -334,33 +451,27 @@ class ExperimentLogUI {
               ${
                 exp.startTime
                   ? `<span class="log-date">${this.formatDate(
-                      exp.startTime
+                      exp.startTime,
                     )}</span>`
                   : ""
               }
             </div>
         </div>
         <div class="log-actions">
-          <button class="btn btn-info btn-icon-only" onclick="experimentLogUI.viewLogDetails('${
-            exp.actualExperimentId || exp.experimentId
-          }')" title="檢視">
+          <button class="btn btn-info btn-icon-only" onclick="experimentLogUI.viewLogDetails('${exp.filename}')" title="檢視">
             <svg class="icon-view" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
           </button>
-          <button class="btn btn-primary btn-icon-only" onclick="experimentLogUI.downloadLogById('${
-            exp.actualExperimentId || exp.experimentId
-          }')" title="下載">
+          <button class="btn btn-primary btn-icon-only" onclick="experimentLogUI.downloadLogById('${exp.filename}')" title="下載">
             <svg class="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 17V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V17"></path>
               <path d="M8 12L12 16L16 12"></path>
               <path d="M12 3V16"></path>
             </svg>
           </button>
-          <button class="btn btn-danger btn-icon-only" onclick="experimentLogUI.deleteLogById('${
-            exp.actualExperimentId || exp.experimentId
-          }')" title="刪除">
+          <button class="btn btn-danger btn-icon-only" onclick="experimentLogUI.deleteLogById('${exp.filename}')" title="刪除">
             <svg class="icon-delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3,6 5,6 21,6"></polyline>
               <path d="m19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"></path>
@@ -370,7 +481,7 @@ class ExperimentLogUI {
           </button>
         </div>
       </div>
-    `
+    `,
       )
       .join("");
 
@@ -399,7 +510,7 @@ class ExperimentLogUI {
     return window.timeSyncManager
       ? window.timeSyncManager.formatDateTime(dateString)
       : new Date(dateString).toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei"
+          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
         });
   }
 
@@ -422,7 +533,7 @@ class ExperimentLogUI {
   updateDeleteButton() {
     const deleteSelectedBtn = document.getElementById("deleteSelectedLogsBtn");
     const downloadSelectedBtn = document.getElementById(
-      "downloadSelectedLogsBtn"
+      "downloadSelectedLogsBtn",
     );
     const count = this.selectedLogs.size;
 
@@ -444,14 +555,19 @@ class ExperimentLogUI {
     try {
       Logger.debug(`正在查看實驗日誌: ${logId}`);
 
-      // 從已載入的列表中找到對應的實驗
+      // 從已載入的列表中找到對應的實驗（優先用 filename 比對，對應按鈕傳入的唯一檔名）
       const experiment = this.currentExperiments.find(
-        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId
+        (exp) =>
+          exp.filename === logId ||
+          exp.actualExperimentId === logId ||
+          exp.experimentId === logId,
       );
 
       if (!experiment || !experiment.logs || experiment.logs.length === 0) {
-        Logger.warn(`找不到實驗 ${logId} 的日誌資料`);
-        alert(`找不到該實驗的日誌資料\n實驗ID: ${logId}`);
+        Logger.warn(
+          `找不到實驗 ${logId} 的日誌資料，currentExperiments 長度: ${this.currentExperiments.length}`,
+        );
+        alert(`找不到該實驗的日誌資料\n檔名: ${logId}`);
         return;
       }
 
@@ -496,7 +612,7 @@ class ExperimentLogUI {
       totalActionsRecorded: 0,
       gestureStats: {},
       overallAccuracy: 0,
-      overallConcordance: 0
+      overallConcordance: 0,
     };
 
     if (entries.length === 0) return stats;
@@ -525,7 +641,7 @@ class ExperimentLogUI {
       // 從實驗開始事件取得基本資料
       if (entry.type === "exp_start") {
         stats.experimentId = entry.exp_id || "";
-        stats.subjectName = entry.subject_name || "";
+        stats.subjectName = entry.participant || "";
         // 嘗試從組合名稱欄位取得
         stats.experimentCombination =
           entry.combination_name || entry.combo_name || "";
@@ -571,7 +687,7 @@ class ExperimentLogUI {
         } else {
           gesturesPlanned.set(
             gestureName,
-            gesturesPlanned.get(gestureName) + 1
+            gesturesPlanned.get(gestureName) + 1,
           );
         }
         stats.totalGesturesPlanned++;
@@ -580,9 +696,9 @@ class ExperimentLogUI {
       }
 
       // 手勢嘗試（用於統計正確性）
-      if (entry.type === "gesture_attempt") {
+      if (entry.type === LOG_TYPES.GESTURE_ATTEMPT) {
         const gestureIndex = entry.g_idx || 0;
-        const gestureType = entry.g_type || "n"; // t=正確, f=錯誤, n=未分類
+        const gestureType = entry.g_type || GESTURE_ATTEMPT_TYPES.UNKNOWN; // t=成功, f=失敗, n=未判斷
 
         // 優先使用日誌中的名稱，其次使用映射表，最後使用索引
         let gestureName = entry.g_name;
@@ -601,18 +717,18 @@ class ExperimentLogUI {
             uncertain: 0,
             incorrect: 0,
             accuracy: 0,
-            concordance: 0
+            concordance: 0,
           };
         }
 
         stats.gestureStats[gestureName].recorded++;
 
         // 判斷正確性
-        if (gestureType === "t") {
+        if (gestureType === GESTURE_ATTEMPT_TYPES.TRUE) {
           stats.gestureStats[gestureName].correct++;
-        } else if (gestureType === "u") {
+        } else if (gestureType === GESTURE_ATTEMPT_TYPES.UNKNOWN) {
           stats.gestureStats[gestureName].uncertain++;
-        } else if (gestureType === "f") {
+        } else if (gestureType === GESTURE_ATTEMPT_TYPES.FALSE) {
           stats.gestureStats[gestureName].incorrect++;
         }
       }
@@ -638,7 +754,7 @@ class ExperimentLogUI {
           uncertain: 0,
           incorrect: 0,
           accuracy: 0,
-          concordance: 0
+          concordance: 0,
         };
       }
     }
@@ -646,7 +762,7 @@ class ExperimentLogUI {
     // 計算總持續時間（秒）
     if (stats.startTime && stats.endTime) {
       stats.totalDuration = Math.round(
-        (stats.endTime - stats.startTime) / 1000
+        (stats.endTime - stats.startTime) / 1000,
       );
     }
 
@@ -656,12 +772,12 @@ class ExperimentLogUI {
     let totalGestureCount = 0;
 
     for (const [_gestureName, gestureStat] of Object.entries(
-      stats.gestureStats
+      stats.gestureStats,
     )) {
       const total = gestureStat.recorded || 1;
       gestureStat.accuracy = Math.round((gestureStat.correct / total) * 100);
       gestureStat.concordance = Math.round(
-        ((gestureStat.correct + gestureStat.uncertain) / total) * 100
+        ((gestureStat.correct + gestureStat.uncertain) / total) * 100,
       );
 
       totalCorrect += gestureStat.correct;
@@ -672,11 +788,11 @@ class ExperimentLogUI {
     // 計算整體正確率
     if (totalGestureCount > 0) {
       stats.overallAccuracy = Math.round(
-        (totalCorrect / totalGestureCount) * 100
+        (totalCorrect / totalGestureCount) * 100,
       );
       // 計算整體一致性（包含 uncertain）
       stats.overallConcordance = Math.round(
-        (_totalConcordance / totalGestureCount) * 100
+        (_totalConcordance / totalGestureCount) * 100,
       );
     }
 
@@ -701,10 +817,10 @@ class ExperimentLogUI {
     const startTimeStr = stats.startTime
       ? window.timeSyncManager
         ? window.timeSyncManager.formatDateTime(
-            new Date(stats.startTime).getTime()
+            new Date(stats.startTime).getTime(),
           )
         : stats.startTime.toLocaleString("zh-TW", {
-            timeZone: window.CONFIG?.timezone || "Asia/Taipei"
+            timeZone: window.CONFIG?.timezone || "Asia/Taipei",
           })
       : "未知";
 
@@ -722,7 +838,7 @@ class ExperimentLogUI {
           <span class="stat-accuracy">${gestureStat.accuracy}%</span>
           <span class="stat-concordance">${gestureStat.concordance}%</span>
         </div>
-      `
+      `,
         )
         .join("");
     }
@@ -748,19 +864,38 @@ class ExperimentLogUI {
                   <div class="metadata-item">
                     <span class="metadata-label">實驗ID：</span>
                     <span class="metadata-value">${this.escapeHtml(
-                      stats.experimentId || "N/A"
+                      stats.experimentId || "N/A",
                     )}</span>
                   </div>
                   <div class="metadata-item">
                     <span class="metadata-label">受試者名稱：</span>
-                    <span class="metadata-value">${this.escapeHtml(
-                      stats.subjectName || "N/A"
+                    <span class="metadata-value" id="modal-subject-display">${this.escapeHtml(
+                      stats.subjectName || "",
                     )}</span>
+                    <input type="text" id="modal-subject-input" class="metadata-edit-input"
+                      value="${this.escapeHtml(stats.subjectName || "")}"
+                      placeholder="輸入受試者名稱"
+                      style="display:none;">
+                    <button class="btn btn-sm btn-secondary" id="modal-subject-edit-btn" style="margin-left:8px;"
+                      onclick="document.getElementById('modal-subject-input').style.display='inline-block';
+                               document.getElementById('modal-subject-display').style.display='none';
+                               this.style.display='none';
+                               document.getElementById('modal-subject-save-btn').style.display='inline-block';
+                               document.getElementById('modal-subject-cancel-btn').style.display='inline-block';">✏️ 編輯</button>
+                    <button class="btn btn-sm btn-primary" id="modal-subject-save-btn" style="margin-left:8px;display:none;"
+                      onclick="experimentLogUI.updateParticipantName('${this.escapeHtml(logId)}', document.getElementById('modal-subject-input').value)">儲存</button>
+                    <button class="btn btn-sm btn-secondary" id="modal-subject-cancel-btn" style="margin-left:4px;display:none;"
+                      onclick="document.getElementById('modal-subject-input').style.display='none';
+                               document.getElementById('modal-subject-display').style.display='';
+                               document.getElementById('modal-subject-edit-btn').style.display='';
+                               document.getElementById('modal-subject-save-btn').style.display='none';
+                               document.getElementById('modal-subject-cancel-btn').style.display='none';
+                               document.getElementById('modal-subject-input').value=document.getElementById('modal-subject-display').textContent;">取消</button>
                   </div>
                   <div class="metadata-item">
                     <span class="metadata-label">實驗組合：</span>
                     <span class="metadata-value">${this.escapeHtml(
-                      stats.experimentCombination || "N/A"
+                      stats.experimentCombination || "N/A",
                     )}</span>
                   </div>
                   <div class="metadata-item">
@@ -810,8 +945,8 @@ class ExperimentLogUI {
                     <div class="gesture-stats-header">
                       <span class="header-label">手勢名稱</span>
                       <span class="header-record">記錄/計畫</span>
-                      <span class="header-accuracy">正確率</span>
-                      <span class="header-concordance">一致性</span>
+                      <span class="header-accuracy" title="${GESTURE_ATTEMPT_TYPE_LABELS[GESTURE_ATTEMPT_TYPES.TRUE]} 比率">正確率</span>
+                      <span class="header-concordance" title="${GESTURE_ATTEMPT_TYPE_LABELS[GESTURE_ATTEMPT_TYPES.TRUE]} + ${GESTURE_ATTEMPT_TYPE_LABELS[GESTURE_ATTEMPT_TYPES.UNKNOWN]} 比率">一致性</span>
                     </div>
                     ${gestureStatsHtml}
                   </div>
@@ -822,8 +957,17 @@ class ExperimentLogUI {
 
               <!-- JSONL 原始碼區 -->
               <div class="jsonl-section">
-                <h3>JSONL 原始碼</h3>
-                <div class="jsonl-content">
+                <div class="jsonl-header">
+                  <h3>JSONL 原始碼</h3>
+                  <button class="btn-copy-jsonl" id="jsonl-copy-btn-${logId}" title="複製 JSONL 內容">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="11" y="11" width="10" height="10" rx="1" ry="1"></rect>
+                      <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    複製
+                  </button>
+                </div>
+                <div class="jsonl-content" id="jsonl-content-${logId}">
                   <pre>${this.escapeHtml(formattedJsonl)}</pre>
                 </div>
               </div>
@@ -849,6 +993,84 @@ class ExperimentLogUI {
     const modal = document.getElementById("logViewModal");
     if (modal) {
       modal.style.display = "flex";
+    }
+
+    // 為複製按鈕添加事件監聽器
+    const copyButton = document.getElementById(`jsonl-copy-btn-${logId}`);
+    if (copyButton) {
+      copyButton.addEventListener("click", () => {
+        this.copyJsonlContent(logId);
+      });
+    }
+  }
+
+  /**
+   * 更新日誌檔案的受試者名稱（PATCH 到 server）
+   * @param {string} filename - 檔案名稱（作為 logId）
+   * @param {string} newName - 新的受試者名稱
+   */
+  async updateParticipantName(filename, newName) {
+    newName = (newName || "").trim();
+    if (!newName) {
+      alert("受試者名稱不可為空");
+      return;
+    }
+
+    try {
+      const apiUrl = this._getApiUrl();
+      const safeFilename = filename.endsWith(".jsonl")
+        ? filename
+        : `${filename}.jsonl`;
+
+      const resp = await fetch(
+        `${apiUrl}/experiment-logs/update-participant/${encodeURIComponent(safeFilename)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ participant: newName }),
+        },
+      );
+
+      const result = await resp.json();
+      if (!result.success) {
+        throw new Error(result.error || "更新失敗");
+      }
+
+      // 更新 modal 顯示
+      const displayEl = document.getElementById("modal-subject-display");
+      const inputEl = document.getElementById("modal-subject-input");
+      const editBtn = document.getElementById("modal-subject-edit-btn");
+      const saveBtn = document.getElementById("modal-subject-save-btn");
+      const cancelBtn = document.getElementById("modal-subject-cancel-btn");
+
+      if (displayEl) displayEl.textContent = newName;
+      if (inputEl) {
+        inputEl.style.display = "none";
+      }
+      if (displayEl) displayEl.style.display = "";
+      if (editBtn) editBtn.style.display = "";
+      if (saveBtn) saveBtn.style.display = "none";
+      if (cancelBtn) cancelBtn.style.display = "none";
+
+      // 更新 currentExperiments 快取
+      const cached = this.currentExperiments.find(
+        (e) => e.filename === filename || e.filename === safeFilename,
+      );
+      if (cached) {
+        cached.subjectName = newName;
+        if (cached.logs) {
+          cached.logs.forEach((entry) => {
+            if (entry.type === "exp_start" || entry.type === "exp_end") {
+              entry.participant = newName;
+            }
+          });
+        }
+      }
+
+      Logger.debug(`受試者名稱已更新: ${filename} → ${newName}`);
+    } catch (error) {
+      Logger.error("更新受試者名稱失敗:", error);
+      alert("更新失敗: " + error.message);
     }
   }
 
@@ -878,6 +1100,86 @@ class ExperimentLogUI {
         }
       })
       .join("\n\n");
+  }
+
+  /**
+   * 複製 JSONL 內容到剪貼板
+   * @param {string} logId - 日誌 ID
+   */
+  async copyJsonlContent(logId) {
+    try {
+      const contentElement = document.getElementById(`jsonl-content-${logId}`);
+      const copyButton = document.getElementById(`jsonl-copy-btn-${logId}`);
+
+      if (!contentElement) {
+        Logger.warn("無法找到 JSONL 內容元素");
+        return;
+      }
+
+      if (!copyButton) {
+        Logger.warn("無法找到複製按鈕");
+        return;
+      }
+
+      const preElement = contentElement.querySelector("pre");
+      if (!preElement) {
+        Logger.warn("無法找到 pre 元素");
+        return;
+      }
+
+      // 取得純文字內容（不含 HTML）
+      const text = preElement.textContent || preElement.innerText;
+
+      // 複製到剪貼板
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        Logger.debug("JSONL 內容已複製到剪貼板");
+
+        // 顯示成功狀態（類似複製序列的方式）
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = "✓ 已複製";
+        copyButton.classList.add("btn-copy-success");
+        setTimeout(() => {
+          copyButton.classList.remove("btn-copy-success");
+          copyButton.innerHTML = originalHTML;
+        }, 2000);
+      } else {
+        // 備用方案：使用舊的複製方法
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        Logger.debug("JSONL 內容已用備用方法複製到剪貼板");
+
+        // 顯示成功狀態（類似複製序列的方式）
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = "✓ 已複製";
+        copyButton.classList.add("btn-copy-success");
+        setTimeout(() => {
+          copyButton.classList.remove("btn-copy-success");
+          copyButton.innerHTML = originalHTML;
+        }, 2000);
+      }
+    } catch (error) {
+      Logger.error("複製 JSONL 內容失敗:", error);
+
+      // 顯示錯誤狀態
+      const copyButton = document.getElementById(`jsonl-copy-btn-${logId}`);
+      if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = "✕ 複製失敗";
+        copyButton.classList.add("btn-copy-error");
+        setTimeout(() => {
+          copyButton.classList.remove("btn-copy-error");
+          copyButton.innerHTML = originalHTML;
+        }, 2000);
+      }
+    }
   }
 
   /**
@@ -918,21 +1220,26 @@ class ExperimentLogUI {
     try {
       Logger.debug(`正在下載實驗日誌: ${logId}`);
 
-      // 從已載入的列表中找到對應的實驗
+      // 從已載入的列表中找到對應的實驗（優先用 filename 比對）
       const experiment = this.currentExperiments.find(
-        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId
+        (exp) =>
+          exp.filename === logId ||
+          exp.actualExperimentId === logId ||
+          exp.experimentId === logId,
       );
 
       if (!experiment || !experiment.filename) {
-        Logger.warn(`找不到實驗 ${logId} 的檔案`);
-        alert(`找不到該實驗的日誌檔案\n實驗ID: ${logId}`);
+        Logger.warn(
+          `找不到實驗 ${logId} 的檔案，currentExperiments 長度: ${this.currentExperiments.length}`,
+        );
+        alert(`找不到該實驗的日誌檔案\n檔名: ${logId}`);
         return;
       }
 
       // 透過 API 讀取檔案內容
       const apiUrl = this._getApiUrl();
       const response = await fetch(
-        `${apiUrl}/experiment-logs/read/${experiment.filename}`
+        `${apiUrl}/experiment-logs/read/${experiment.filename}`,
       );
 
       if (!response.ok) {
@@ -976,14 +1283,19 @@ class ExperimentLogUI {
     try {
       Logger.debug(`正在刪除實驗日誌: ${logId}`);
 
-      // 從已載入的列表中找到對應的實驗
+      // 從已載入的列表中找到對應的實驗（優先用 filename 比對）
       const experiment = this.currentExperiments.find(
-        (exp) => exp.actualExperimentId === logId || exp.experimentId === logId
+        (exp) =>
+          exp.filename === logId ||
+          exp.actualExperimentId === logId ||
+          exp.experimentId === logId,
       );
 
       if (!experiment || !experiment.filename) {
-        Logger.warn(`找不到實驗 ${logId} 的檔案`);
-        alert(`找不到該實驗的日誌檔案\n實驗ID: ${logId}`);
+        Logger.warn(
+          `找不到實驗 ${logId} 的檔案，currentExperiments 長度: ${this.currentExperiments.length}`,
+        );
+        alert(`找不到該實驗的日誌檔案\n檔名: ${logId}`);
         return;
       }
 
@@ -992,8 +1304,8 @@ class ExperimentLogUI {
       const response = await fetch(
         `${apiUrl}/experiment-logs/delete/${experiment.filename}`,
         {
-          method: "DELETE"
-        }
+          method: "DELETE",
+        },
       );
 
       if (!response.ok) {
@@ -1034,10 +1346,12 @@ class ExperimentLogUI {
       // 逐個下載並合併
       for (const logId of logIds) {
         try {
-          // 從已載入的列表中找到對應的實驗
+          // 從已載入的列表中找到對應的實驗（優先用 filename 比對）
           const experiment = this.currentExperiments.find(
             (exp) =>
-              exp.actualExperimentId === logId || exp.experimentId === logId
+              exp.filename === logId ||
+              exp.actualExperimentId === logId ||
+              exp.experimentId === logId,
           );
 
           if (!experiment || !experiment.filename) {
@@ -1047,7 +1361,7 @@ class ExperimentLogUI {
 
           // 透過 API 讀取檔案內容
           const response = await fetch(
-            `${apiUrl}/api/experiment-logs/read/${experiment.filename}`
+            `${apiUrl}/experiment-logs/read/${experiment.filename}`,
           );
 
           if (response.ok) {
@@ -1100,7 +1414,7 @@ class ExperimentLogUI {
 
     if (
       !confirm(
-        `確定要刪除選取的 ${this.selectedLogs.size} 個日誌檔案嗎？此操作無法還原。`
+        `確定要刪除選取的 ${this.selectedLogs.size} 個日誌檔案嗎？此操作無法還原。`,
       )
     ) {
       return;
@@ -1114,10 +1428,12 @@ class ExperimentLogUI {
       // 逐個刪除
       for (const logId of logIds) {
         try {
-          // 從已載入的列表中找到對應的實驗
+          // 從已載入的列表中找到對應的實驗（優先用 filename 比對）
           const experiment = this.currentExperiments.find(
             (exp) =>
-              exp.actualExperimentId === logId || exp.experimentId === logId
+              exp.filename === logId ||
+              exp.actualExperimentId === logId ||
+              exp.experimentId === logId,
           );
 
           if (!experiment || !experiment.filename) {
@@ -1127,10 +1443,10 @@ class ExperimentLogUI {
 
           // 透過 API 刪除檔案
           const response = await fetch(
-            `${apiUrl}/api/experiment-logs/delete/${experiment.filename}`,
+            `${apiUrl}/experiment-logs/delete/${experiment.filename}`,
             {
-              method: "DELETE"
-            }
+              method: "DELETE",
+            },
           );
 
           if (response.ok) {
@@ -1152,6 +1468,54 @@ class ExperimentLogUI {
     } catch (error) {
       Logger.error("批次刪除失敗:", error);
       alert("批次刪除日誌時發生錯誤: " + error.message);
+    }
+  }
+
+  /**
+   * 初始化 BroadcastChannel 監聽日誌更新事件
+   * 當其他分頁或目前分頁有新的日誌儲存時，自動更新列表
+   * @private
+   */
+  _initBroadcastChannel() {
+    try {
+      this.broadcastChannel = new BroadcastChannel("ExperimentLogsChannel");
+
+      this.broadcastChannel.onmessage = (event) => {
+        const { type, data: _data, senderTabId } = event.data;
+
+        switch (type) {
+          case "logsSynced":
+            Logger.debug(
+              `[ExperimentLogUI] 偵測到日誌已儲存 (分頁 ${senderTabId})，自動更新日誌列表`,
+            );
+            // 自動更新日誌列表
+            this.loadExperimentLogs();
+            break;
+          case "experimentDeleted":
+            Logger.debug(
+              `[ExperimentLogUI] 偵測到實驗被刪除 (分頁 ${senderTabId})，重新載入列表`,
+            );
+            // 自動重新載入列表
+            this.loadExperimentLogs();
+            break;
+          case "logsCleared":
+            Logger.debug(
+              `[ExperimentLogUI] 偵測到日誌被清空 (分頁 ${senderTabId})，重新載入列表`,
+            );
+            // 自動重新載入列表
+            this.loadExperimentLogs();
+            break;
+        }
+      };
+
+      Logger.debug(
+        "[ExperimentLogUI] BroadcastChannel 初始化完成，已啟動日誌自動更新監聽",
+      );
+    } catch (error) {
+      Logger.warn(
+        "[ExperimentLogUI] BroadcastChannel 不支援，日誌列表需要手動刷新:",
+        error,
+      );
     }
   }
 }
@@ -1176,15 +1540,19 @@ window.updateDeleteButton = () => experimentLogUI.updateDeleteButton();
 function _initExperimentLogUI() {
   try {
     if (window.experimentLogUI && !window.experimentLogUI._initialized) {
-      // 初始化（使用可選鏈以避免意外錯誤）
+      // 呼叫 initialize()，由它自己判斷 manager 是否就緒
+      // 若 manager 尚未載入，initialize() 會設定 needsReInitialization = true
+      // 待 board-log-manager.js 就緒後會再次呼叫 initialize()
       typeof window.experimentLogUI.initialize === "function" &&
         window.experimentLogUI.initialize();
 
-      if (typeof window.experimentLogUI.loadExperimentLogs === "function") {
+      if (
+        window.experimentLogManager &&
+        typeof window.experimentLogUI.loadExperimentLogs === "function"
+      ) {
         window.experimentLogUI.loadExperimentLogs();
+        window.experimentLogUI._initialized = true;
       }
-
-      window.experimentLogUI._initialized = true;
     }
   } catch (e) {
     // 若 Logger 可用則記錄，否則靜默失敗
@@ -1199,3 +1567,5 @@ if (document.readyState === "loading") {
 } else {
   _initExperimentLogUI();
 }
+
+// 注意：全域實例已在上方建立 (experimentLogUI)，此處不重複建立

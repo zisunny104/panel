@@ -31,7 +31,7 @@ class PanelPageManager {
   }
 
   /**
-   * 結束當前初始化階段
+   * 結束目前初始化階段
    */
   endStage() {
     if (this.currentStage && this.stageStartTime) {
@@ -180,6 +180,10 @@ class PanelPageManager {
    */
   async loadExperimentScripts() {
     const experimentScripts = [
+      // === 實驗狀態與計時 ===
+      "js/experiment/experiment-state-manager.js",
+      "js/experiment/experiment-timer.js",
+
       // === 實驗系統管理器 ===
       "js/experiment/experiment-system-manager.js",
 
@@ -366,6 +370,10 @@ class PanelPageManager {
         enableVisualHints: true,
         debug: false,
       });
+      // 初始化 UI 管理器
+      if (typeof window.uiManager.initialize === "function") {
+        window.uiManager.initialize();
+      }
       if (typeof Logger !== "undefined") {
         Logger.debug("ExperimentUIManager 已初始化");
       }
@@ -385,10 +393,8 @@ class PanelPageManager {
         return;
       }
 
-      // 確保組合管理器完全初始化並準備好
-      if (window.experimentCombinationManager) {
-        await window.experimentCombinationManager.ready();
-      }
+      // 不在這裡呼叫 ready()，讓 ExperimentSystemManager.initialize() 統一處理
+      // 這樣事件監聽器才能在初始化前設置好
 
       // 初始化系統管理器實例（共用全域實例）
       if (!window.experimentSystemManager) {
@@ -462,17 +468,24 @@ class PanelPageManager {
 
     // 監聽實驗開始事件，載入動作序列並通知按鈕管理器
     flowManager.on(ExperimentFlowManager.EVENT.STARTED, async (data) => {
-      Logger.debug("收到實驗開始事件，開始載入動作序列");
+      Logger.debug("Panel: 收到實驗開始事件，開始載入動作序列");
       await this._handleExperimentStarted(data);
     });
 
     // 監聽實驗停止事件，清理按鈕狀態
     flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
-      Logger.debug("收到實驗停止事件，清理按鈕狀態");
+      Logger.debug("Panel: 收到實驗停止事件，清理按鈕狀態");
       this._handleExperimentStopped();
     });
 
-    Logger.debug("已設置頁面特定的實驗事件監聽器");
+    // 監聽 ExperimentSystemManager 的流程停止通知事件
+    // 用於處理日誌和同步等後處理邏輯
+    window.addEventListener("experimentSystem:flowStopped", async (event) => {
+      Logger.debug("Panel: 收到實驗系統停止通知，準備後處理");
+      await this._handleExperimentSystemFlowStopped(event.detail);
+    });
+
+    Logger.debug("Panel: 已設置頁面特定的實驗事件監聽器");
   }
 
   /**
@@ -481,15 +494,32 @@ class PanelPageManager {
    */
   async _handleExperimentStarted(data) {
     try {
-      const { units } = data;
+      const { units: unitIds } = data;
 
-      if (!units || units.length === 0) {
-        Logger.warn("沒有可用的單元，無法載入動作序列");
+      if (!unitIds || unitIds.length === 0) {
+        Logger.warn("沒有可用的單元 ID，無法載入動作序列");
         return;
       }
 
-      // 取得第一個單元
-      const firstUnit = units[0];
+      // 從 ExperimentSystemManager 取得完整的單元資料
+      const systemManager = window.experimentSystemManager;
+      if (!systemManager || !systemManager.state.scriptData) {
+        Logger.warn(
+          "ExperimentSystemManager 或 scriptData 不可用，無法載入動作序列",
+        );
+        return;
+      }
+
+      const allUnits = systemManager.state.scriptData.units || [];
+
+      // 根據單元 ID 查找對應的單元對象
+      const firstUnitId = unitIds[0];
+      const firstUnit = allUnits.find((unit) => unit.unit_id === firstUnitId);
+
+      if (!firstUnit) {
+        Logger.warn(`找不到單元 ID: ${firstUnitId} 的對應單元資料`);
+        return;
+      }
 
       // 載入動作序列到 ActionHandler
       await this._loadUnitActionsToActionHandler(firstUnit);
@@ -639,15 +669,62 @@ class PanelPageManager {
   /**
    * 處理實驗停止事件
    * @private
+   * 由 ExperimentFlowManager 發出
    */
   _handleExperimentStopped() {
+    Logger.debug("Panel: 清理實驗停止時的按鈕和動作狀態");
+
     // 清理 ButtonManager 中的實驗動作數據
     if (window.buttonManager) {
       window.buttonManager.experimentActions.clear();
       window.buttonManager.removeActionListeners();
     }
 
-    Logger.debug("已清理實驗動作狀態");
+    Logger.debug("Panel: 已清理實驗動作狀態");
+  }
+
+  /**
+   * 處理 ExperimentSystemManager 的實驗系統停止通知
+   * @private
+   * 用於後處理邏輯（日誌保存、同步通知等）
+   */
+  async _handleExperimentSystemFlowStopped(data) {
+    Logger.info("Panel: 處理實驗系統停止後續邏輯", data);
+
+    try {
+      // 通知 PanelSyncManager 實驗已停止（用於同步模式）
+      if (window.panelSyncManager) {
+        try {
+          const isSyncMode =
+            window.experimentHubManager?.isInSyncMode?.() || false;
+
+          if (isSyncMode) {
+            window.panelSyncManager.onExperimentStop?.({
+              reason: data.reason,
+              completedUnits: data.completedUnits,
+              timestamp: data.timestamp,
+            });
+            Logger.debug("Panel: 已通知同步管理器實驗停止");
+          }
+        } catch (error) {
+          Logger.error("Panel: PanelSyncManager 通知失敗:", error);
+        }
+      }
+
+      // 音頻或通知反饋
+      if (window.panelMediaManager) {
+        try {
+          window.panelMediaManager.playSound?.("experimentEnd");
+          Logger.debug("Panel: 已播放實驗結束音效");
+        } catch (error) {
+          Logger.error("Panel: 播放結束音效失敗:", error);
+        }
+      }
+
+      Logger.debug("Panel: 實驗系統停止後續邏輯已完成");
+    } catch (error) {
+      Logger.error("Panel: 處理實驗系統停止後續邏輯失敗:", error);
+    }
   }
 
   // 根據實驗狀態切換 experimentPanelButton 底色
@@ -673,6 +750,29 @@ class PanelPageManager {
       btn.style.setProperty("background", "#888", "important"); // 灰色，使用 !important
       btn.style.setProperty("color", "#fff", "important");
     }
+  }
+
+  /**
+   * 更新全選複選框的狀態
+   */
+  updateSelectAllState() {
+    const selectAllCheckbox = document.querySelector("#selectAllUnits");
+    if (!selectAllCheckbox) return;
+
+    const unitList = document.querySelector(
+      "#unitsPanelContainer .experiment-units-list",
+    );
+    if (!unitList) return;
+
+    const checkboxes = Array.from(
+      unitList.querySelectorAll("input[name=\"unitCheckbox\"]"),
+    );
+    const checkedCount = checkboxes.filter((cb) => cb.checked).length;
+
+    selectAllCheckbox.checked =
+      checkedCount === checkboxes.length && checkboxes.length > 0;
+    selectAllCheckbox.indeterminate =
+      checkedCount > 0 && checkedCount < checkboxes.length;
   }
 }
 

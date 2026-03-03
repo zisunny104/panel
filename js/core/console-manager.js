@@ -150,7 +150,7 @@ class Logger {
     parts.push("");
     styles.push(`color: ${baseColor};`);
 
-    // 匹配 <color>text</color> 標籤
+    // 符合 <color>text</color> 標籤
     const tagRegex = /<(\w+)>(.*?)<\/\1>/g;
     let match;
 

@@ -6,6 +6,48 @@
     margin: 15px 0;
 }
 
+.stats-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0;
+}
+
+.stats-header h2 {
+    margin: 0;
+    flex: 1;
+}
+
+.btn-export-gesture {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-export-gesture:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-export-gesture:active {
+    transform: translateY(0);
+}
+
+.btn-export-gesture .icon-sm {
+    width: 14px;
+    height: 14px;
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

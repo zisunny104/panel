@@ -390,7 +390,8 @@
 }
 
 .sync-session-status.inactive {
-    background: #6c757d;
+    background: #e9ecef;
+    color: #c0392b;
 }
 
 /* 工作階段卡片狀態區域 */
@@ -460,7 +461,9 @@
 }
 
 .sync-session-info-no-state {
-    color: #666;
+    color: #856404;
+    background: #fff3cd;
+    border-left: 3px solid #ffc107;
 }
 
 .sync-session-status-active {
@@ -480,4 +483,203 @@
 .sync-session-no-clients {
     color: #666;
     font-style: italic;
+}
+
+/* ===== 工作階段卡片過渡動畫（從 indicator.css 合併） ===== */
+.sync-session-card {
+    transition: all 0.2s ease;
+}
+
+.sync-session-card:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+}
+
+.sync-session-card.expanded {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+}
+
+.sync-session-expand-icon {
+    transition: transform 0.2s ease;
+}
+
+.sync-session-card.expanded .sync-session-expand-icon {
+    transform: rotate(90deg);
+}
+
+/* 同步狀態展開/收合 */
+.sync-session-state-toggle {
+    margin-bottom: 1rem;
+}
+
+.sync-session-state-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sync-session-state-header:hover {
+    background: #e9ecef;
+    border-color: #007bff;
+}
+
+.sync-state-expand-icon {
+    font-size: 0.875rem;
+    color: #6c757d;
+    transition: transform 0.2s ease;
+}
+
+.sync-session-state-details {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.sync-state-json {
+    background: #ffffff;
+    border: 2px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 300px;
+    overflow-y: auto;
+    color: #495057;
+}
+
+/* 刚除按鈕 */
+.sync-delete-session-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+/* 格式化同步狀態樣式 */
+.sync-state-formatted {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.sync-state-null {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.sync-state-boolean {
+    color: #007bff;
+    font-weight: bold;
+}
+
+.sync-state-number {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.sync-state-string {
+    color: #dc3545;
+}
+
+.sync-state-key {
+    color: #495057;
+    font-weight: bold;
+}
+
+.sync-state-array {
+    color: #6f42c1;
+}
+
+.sync-state-object {
+    color: #fd7e14;
+}
+
+.sync-state-empty {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.sync-state-unknown {
+    color: #6c757d;
+    font-style: italic;
+    background: #fff3cd;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.125rem;
+}
+
+/* ===== 工作階段響應式設計 ===== */
+@media (max-width: 768px) {
+    .sync-sessions-panel {
+        max-height: 90vh;
+    }
+
+    .sync-sessions-list {
+        max-height: 70vh;
+    }
+
+    .sync-session-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .sync-session-card-status {
+        align-self: flex-end;
+    }
+
+    .sync-session-state-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .sync-state-formatted {
+        font-size: 0.75rem;
+        padding: 0.75rem;
+    }
+
+    .sync-session-action-row {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .sync-session-action-row button {
+        flex: 1;
+        min-width: 120px;
+        font-size: 14px;
+        padding: 8px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sync-session-action-row {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .sync-session-action-row button {
+        width: 100%;
+        min-width: auto;
+        font-size: 14px;
+        padding: 10px 12px;
+    }
 }

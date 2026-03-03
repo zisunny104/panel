@@ -51,6 +51,9 @@ class PanelUIManager {
     this.powerLightArea = null;
     this.panelBottomRow = null;
 
+    // 待處理的設定（用於處理模組載入順序問題）
+    this.pendingMediaVolume = null;
+
     // 初始化所有功能
     this.initialize();
   }
@@ -182,20 +185,14 @@ class PanelUIManager {
       }
     });
 
+    // 統一使用 is-hidden 控制所有面板的顯示/隱藏
+    this.showElement(panel.element);
+
+    // 面板專屬的額外處理
     if (panelName === "settings") {
-      if (panel.element.classList.contains("hidden")) {
-        panel.element.classList.remove("hidden");
-      }
-      if (panel.element.classList.contains("is-hidden"))
-        panel.element.classList.remove("is-hidden");
-      this.showElement(panel.element);
       // 對齊到設定切換按鈕，避免 UI 縮放時垂直位置偏移
       this.alignPanelToButton("settings");
     } else if (panelName === "experiment") {
-      if (panel.element.classList.contains("is-hidden")) {
-        panel.element.classList.remove("is-hidden");
-      }
-      this.showElement(panel.element);
       // 初始化實驗面板UI組件
       if (
         window.uiManager &&
@@ -205,10 +202,6 @@ class PanelUIManager {
           Logger.error("初始化實驗面板UI失敗:", error);
         });
       }
-    } else if (panelName === "logger") {
-      if (panel.element.classList.contains("is-hidden"))
-        panel.element.classList.remove("is-hidden");
-      this.showElement(panel.element);
     }
 
     this.currentOpenPanel = panelName;
@@ -229,23 +222,17 @@ class PanelUIManager {
       return;
     }
 
-    if (panelName === "settings") {
-      panel.element.classList.add("hidden");
-      panel.element.classList.add("is-hidden");
-      this.hideElement(panel.element);
+    // 統一使用 is-hidden 控制所有面板的隱藏
+    this.hideElement(panel.element);
 
+    // 面板專屬的額外處理
+    if (panelName === "settings") {
       // 關閉設定面板後，保留視覺提示狀態
       const showTouchVisuals =
         localStorage.getItem("showTouchVisuals") !== "false";
       if (showTouchVisuals) {
         document.body.classList.add("visual-hints-enabled");
       }
-    } else if (panelName === "experiment") {
-      panel.element.classList.add("is-hidden");
-      this.hideElement(panel.element);
-    } else if (panelName === "logger") {
-      panel.element.classList.add("is-hidden");
-      this.hideElement(panel.element);
     }
 
     // 如果關閉的是目前開啟的面板，清除記錄
@@ -299,7 +286,7 @@ class PanelUIManager {
       this.showElement(this.powerLightArea);
       Logger.debug("電源燈號區域已顯示 (initializeDOMReferences)");
     }
-    if (this.settingsPanel) this.settingsPanel.classList.add("hidden");
+    if (this.settingsPanel) this.hideElement(this.settingsPanel);
 
     // 初始化媒體區塊視覺提示
     this.initializeMediaAreaVisuals();
@@ -443,7 +430,7 @@ class PanelUIManager {
   updateTouchVisuals(visible) {
     const buttonOverlays = document.querySelectorAll(".button-overlay");
     const shiftButtonOverlay = document.querySelector(
-      '.button-overlay[data-label="B1"]',
+      ".button-overlay[data-label=\"B1\"]",
     );
     const mediaArea = document.getElementById("mediaArea");
     localStorage.setItem("showTouchVisuals", visible ? "true" : "false");
@@ -545,38 +532,27 @@ class PanelUIManager {
       window.mediaManager.setMediaVolume(normalizedVolume);
       Logger.debug(`媒體音量已設定為: ${normalizedVolume} (${volume})`);
     } else {
-      Logger.warn(
-        "mediaManager 或 setMediaVolume 方法不存在，無法設定媒體音量",
+      // mediaManager 還沒有載入，儲存設定以便稍後應用
+      this.pendingMediaVolume = volume;
+      Logger.debug(
+        `mediaManager 尚未載入，媒體音量設定已排程: ${volume} (將在 mediaManager 載入後應用)`,
       );
     }
   }
 
   /**
-   * 顯示設定面板
+   * 應用待處理的媒體音量設定（當 mediaManager 載入後調用）
    */
-  showSettingsPanel() {
-    if (this.settingsPanel) this.settingsPanel.classList.remove("hidden");
-    if (this.refCard) {
-      this.showElement(this.refCard);
+  applyPendingMediaVolume() {
+    if (this.pendingMediaVolume !== null && window.mediaManager) {
+      Logger.debug(`應用待處理的媒體音量設定: ${this.pendingMediaVolume}`);
+      this.updateMediaVolume(this.pendingMediaVolume);
+      this.pendingMediaVolume = null;
     }
-    // keep power switch visible so user can preview scaling
   }
 
-  /**
-   * 隱藏設定面板
-   */
-  hideSettingsPanel() {
-    if (this.settingsPanel) this.settingsPanel.classList.add("hidden");
-    if (this.refCard) {
-      this.hideElement(this.refCard);
-    }
-    if (this.powerSwitchArea) {
-      this.showElement(this.powerSwitchArea);
-    }
-    if (this.powerLightArea) {
-      this.showElement(this.powerLightArea);
-    }
-  }
+  // showSettingsPanel / hideSettingsPanel 已移除
+  // 所有面板開關統一透過 openPanel / closePanel 處理
 
   /**
    * 更新全螢幕按鈕圖標
@@ -782,12 +758,7 @@ class PanelUIManager {
         this.updatePowerScale(e.target.value),
       );
 
-    // 關閉設定面板按鈕
-    const closeSettingsPanel = document.getElementById("closeSettingsPanel");
-    if (closeSettingsPanel)
-      closeSettingsPanel.addEventListener("click", () =>
-        this.hideSettingsPanel(),
-      );
+    // 關閉設定面板按鈕（已由 setupPanelEventListeners 統一處理）
 
     // 顯示/隱藏控制項
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
@@ -913,25 +884,16 @@ class PanelUIManager {
    * 載入初始設定
    */
   loadInitialSettings() {
-    // Logger 顯示狀態
-    const showLogger = localStorage.getItem("showLogger");
-    const loggerMinimized = localStorage.getItem("loggerMinimized");
-    if (window.logger) {
-      if (showLogger === "true") {
-        loggerMinimized === "true"
-          ? window.logger.minimizeLogger()
-          : window.logger.showLoggerPanel();
-      } else {
-        window.logger.hideLoggerPanel();
-      }
-    }
+    // 所有面板預設隱藏（由 is-hidden 控制），不再直接操作 logger 顯示狀態
+    // Logger / 設定 / 實驗面板皆透過 PanelUIManager.togglePanel 開關
+
     // 隱藏參考卡片與設定面板
     const refCard = document.getElementById("refCard");
     const settingsPanel = document.getElementById("settingsPanel");
     if (refCard) {
       this.hideElement(refCard);
     }
-    if (settingsPanel) settingsPanel.classList.add("hidden");
+    if (settingsPanel) this.hideElement(settingsPanel);
   }
 
   /**
