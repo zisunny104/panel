@@ -234,7 +234,7 @@ class ExperimentLogManager {
 
       // 分發事件供其他組件使用
       document.dispatchEvent(
-        new CustomEvent("experiment_id_changed", {
+        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED, {
           detail: { experimentId, source },
         }),
       );
@@ -342,12 +342,11 @@ class ExperimentLogManager {
       logEntry.d_id = clientId;
     }
 
-    if (combinationInfo.combination_id) {
-      logEntry.combo_id = combinationInfo.combination_id;
+    if (combinationInfo.combinationId) {
+      logEntry.combo_id = combinationInfo.combinationId;
     }
-    if (combinationInfo.combination_name || combinationInfo.name) {
-      logEntry.combo_name =
-        combinationInfo.combination_name || combinationInfo.name;
+    if (combinationInfo.combinationName) {
+      logEntry.combo_name = combinationInfo.combinationName;
     }
 
     this._addLog(logEntry);

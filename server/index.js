@@ -213,6 +213,8 @@ setInterval(() => {
     let removed = 0;
     for (const s of sessions) {
       const { sessionId } = s;
+      // 公開頻道（__CH_*）不存在 DB，跳過驗證以免誤斷線
+      if (sessionId.startsWith("__CH_")) continue;
       const session = SessionService.getSession(sessionId);
       if (!session || !session.is_active) {
         Logger.warn(`發現失效 session，正在清理: ${sessionId}`);
@@ -238,21 +240,16 @@ setInterval(() => {
 }, sessionValidationInterval);
 
 // 404處理（在所有路由與 middleware 註冊後）
+// 只回傳狀態碼，由 Nginx error_page 處理頁面跳轉
 app.use((req, res) => {
-  res.status(404).json({
-    error: "NOT_FOUND",
-    message: `路徑不存在: ${req.path}`,
-  });
+  res.status(404).end();
 });
 
 // 錯誤處理（放在所有路由與 404 之後）
+// 只回傳狀態碼，由 Nginx error_page 處理頁面跳轉
 app.use((err, req, res, next) => {
   Logger.error("伺服器錯誤:", err.message || err);
-  res.status(500).json({
-    error: "INTERNAL_ERROR",
-    message: "伺服器內部錯誤",
-    details: SERVER_CONFIG.nodeEnv === "development" ? err.message : undefined,
-  });
+  res.status(500).end();
 });
 
 // ===== 啟動伺服器 =====

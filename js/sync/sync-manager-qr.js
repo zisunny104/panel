@@ -57,7 +57,7 @@ export class SyncManagerQR {
     }
 
     // 監聽 QR Code 產生事件
-    window.addEventListener("sync_generate_qr", async (event) => {
+    window.addEventListener(SYNC_EVENTS.GENERATE_QR, async (event) => {
       const {
         shareCode,
         role,
@@ -81,7 +81,7 @@ export class SyncManagerQR {
     });
 
     // 監聽 QR Code 掃描事件
-    window.addEventListener("sync_start_qr_scan", () => {
+    window.addEventListener(SYNC_EVENTS.START_QR_SCAN, () => {
       this.startQRScanner();
     });
 
@@ -237,7 +237,7 @@ export class SyncManagerQR {
           );
 
           // 更新UI
-          window.dispatchEvent(new Event(SYNC_EVENTS.SESSION_JOINED));
+          window.dispatchEvent(new CustomEvent(SYNC_EVENTS.SESSION_JOINED));
         } catch (error) {
           Logger.error("加入工作階段失敗:", error);
 
@@ -546,7 +546,7 @@ export class SyncManagerQR {
         const qrSection = document.getElementById("qrCodeSection");
         if (qrSection) {
           qrSection.innerHTML =
-            "<div class=\"sync-qr-expired\"> QR Code 已過期，請重新建立工作階段</div>";
+            '<div class="sync-qr-expired"> QR Code 已過期，請重新建立工作階段</div>';
         }
         return;
       }
@@ -739,7 +739,7 @@ export class SyncManagerQR {
           }
           const originalHTML = copyBtn.innerHTML;
           copyBtn.innerHTML =
-            "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
+            '<svg class="sync-icon sync-icon-checkmark" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
           copyBtn.classList.add("copied");
           Logger.info("已複製偵錯資訊到剪貼簿", debug);
           setTimeout(() => {
@@ -1134,7 +1134,7 @@ export class SyncManagerQR {
         if (sessionCodeInput) {
           sessionCodeInput.value = codeToUse;
         }
-        window.dispatchEvent(new Event("show_sync_panel"));
+        window.dispatchEvent(new CustomEvent(SYNC_EVENTS.SHOW_SYNC_PANEL));
       } else {
         // 未在工作階段中，顯示確認對話框
         this.showJoinConfirmation(codeToUse, role);

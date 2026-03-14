@@ -37,17 +37,17 @@ export class SyncManagerSessions {
   }
 
   initialize() {
-    window.addEventListener("sync_show_sessions", () => {
+    window.addEventListener(window.SYNC_EVENTS.SHOW_SESSIONS, () => {
       this.showSessionsPanel();
     });
 
-    window.addEventListener("sync_session_created", () => {
+    window.addEventListener(window.SYNC_EVENTS.SESSION_CREATED, () => {
       if (this.sessionsPanel && document.body.contains(this.sessionsPanel)) {
         this.refreshSessionsList();
       }
     });
 
-    window.addEventListener("sync_session_invalid", (event) => {
+    window.addEventListener(window.SYNC_EVENTS.SESSION_INVALID, (event) => {
       const { reason, originalError } = event.detail;
 
       Logger.info("工作階段失效，重新載入列表", {
@@ -211,19 +211,19 @@ export class SyncManagerSessions {
         state = JSON.parse(state);
       } catch (error) {
         Logger.debug("解析同步狀態失敗:", error);
-        return "<span class=\"sync-state-empty\">資料格式錯誤</span>";
+        return '<span class="sync-state-empty">資料格式錯誤</span>';
       }
     }
 
     if (!state || typeof state !== "object") {
-      return "<span class=\"sync-state-empty\">無資料</span>";
+      return '<span class="sync-state-empty">無資料</span>';
     }
 
     const formatValue = (value, indent = 0) => {
       const indentStr = "  ".repeat(indent);
 
       if (value === null) {
-        return "<span class=\"sync-state-null\">null</span>";
+        return '<span class="sync-state-null">null</span>';
       }
 
       if (typeof value === "boolean") {
@@ -246,7 +246,7 @@ export class SyncManagerSessions {
 
       if (Array.isArray(value)) {
         if (value.length === 0) {
-          return "<span class=\"sync-state-array\">[]</span>";
+          return '<span class="sync-state-array">[]</span>';
         }
 
         const items = value
@@ -263,7 +263,7 @@ ${indentStr}]</span>`;
       if (typeof value === "object") {
         const entries = Object.entries(value);
         if (entries.length === 0) {
-          return "<span class=\"sync-state-object\">{}</span>";
+          return '<span class="sync-state-object">{}</span>';
         }
 
         const formattedEntries = entries
@@ -295,7 +295,7 @@ ${indentStr}}</span>`;
   renderSessionDetails(session) {
     const shareCodeInfo = (() => {
       if (!session.shareCodes || session.shareCodes.length === 0) {
-        return "<div class=\"sync-session-info sync-session-info-no-code\">無分享代碼</div>";
+        return '<div class="sync-session-info sync-session-info-no-code">無分享代碼</div>';
       }
 
       const sortedCodes = [...session.shareCodes].sort(
@@ -398,7 +398,7 @@ ${indentStr}}</span>`;
       `;
             })
             .join("")
-        : "<div class=\"sync-session-no-clients\">無裝置</div>";
+        : '<div class="sync-session-no-clients">無裝置</div>';
 
     const stateInfo = session.state
       ? (() => {
@@ -429,7 +429,7 @@ ${indentStr}}</span>`;
         </div>
       </div>`;
         })()
-      : "<div class=\"sync-session-info sync-session-info-no-state\">無同步資料</div>";
+      : '<div class="sync-session-info sync-session-info-no-state">無同步資料</div>';
 
     return `
       ${shareCodeInfo}

@@ -297,22 +297,25 @@ class SyncManager {
             clientId,
           });
 
-          // 從伺服器取得工作階段的完整客戶端資訊
-          try {
-            const sessionInfo =
-              await this.core.syncClient.getSessionClients(sessionId);
-            if (sessionInfo && sessionInfo.clients) {
-              const clientList = sessionInfo.clients
-                .map((c) => `${c.id}(${c.role})`)
-                .join(", ");
-              Logger.debug("工作階段客戶端列表", {
-                count: sessionInfo.clientCount,
-                clients: clientList,
-                state: sessionInfo.state ? "有狀態" : "無狀態",
-              });
+          // 從伺服器取得工作階段的完整客戶端資訊（公開頻道無 DB session，跳過）
+          const isPublicChannel = sessionId.startsWith("__CH_");
+          if (!isPublicChannel) {
+            try {
+              const sessionInfo =
+                await this.core.syncClient.getSessionClients(sessionId);
+              if (sessionInfo && sessionInfo.clients) {
+                const clientList = sessionInfo.clients
+                  .map((c) => `${c.id}(${c.role})`)
+                  .join(", ");
+                Logger.debug("工作階段客戶端列表", {
+                  count: sessionInfo.clientCount,
+                  clients: clientList,
+                  state: sessionInfo.state ? "有狀態" : "無狀態",
+                });
+              }
+            } catch (error) {
+              Logger.warn("無法取得工作階段客戶端資訊:", error.message);
             }
-          } catch (error) {
-            Logger.warn("無法取得工作階段客戶端資訊:", error.message);
           }
 
           // 觸發工作階段還原事件
@@ -364,10 +367,10 @@ class SyncManager {
     const showPanelHandler = () => {
       this.ui.showPanel();
     };
-    window.addEventListener(SYNC_EVENTS.SHOW_PANEL, showPanelHandler);
+    window.addEventListener(SYNC_EVENTS.SHOW_SYNC_PANEL, showPanelHandler);
     this.eventListeners.push({
       target: window,
-      event: SYNC_EVENTS.SHOW_PANEL,
+      event: SYNC_EVENTS.SHOW_SYNC_PANEL,
       handler: showPanelHandler,
     });
 
@@ -375,10 +378,13 @@ class SyncManager {
     const stateChangeHandler = (event) => {
       this.syncState(event.detail);
     };
-    document.addEventListener("experimentStateChange", stateChangeHandler);
+    document.addEventListener(
+      SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL,
+      stateChangeHandler,
+    );
     this.eventListeners.push({
       target: document,
-      event: "experimentStateChange",
+      event: SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL,
       handler: stateChangeHandler,
     });
 
@@ -414,12 +420,12 @@ class SyncManager {
       Logger.info("已派發 SYNC_DATA_CLEARED 事件");
     };
 
-    window.addEventListener("sync_data_cleared", syncDataClearedHandler);
+    window.addEventListener(SYNC_EVENTS.DATA_CLEARED, syncDataClearedHandler);
     Logger.debug("已監聽 sync_data_cleared 事件");
 
     this.eventListeners.push({
       target: window,
-      event: "sync_data_cleared",
+      event: SYNC_EVENTS.DATA_CLEARED,
       handler: syncDataClearedHandler,
     });
 
@@ -448,17 +454,17 @@ class SyncManager {
 
       // 通知其他模組：連線中斷（保留 session 以便還原）
       window.dispatchEvent(
-        new CustomEvent("sync_connection_lost", {
+        new CustomEvent(SYNC_EVENTS.CONNECTION_LOST, {
           detail: event.detail || { reason: "disconnected" },
         }),
       );
       Logger.info("已派發 sync_connection_lost 事件");
     };
 
-    window.addEventListener("sync_disconnected", disconnectedHandler);
+    window.addEventListener(SYNC_EVENTS.DISCONNECTED, disconnectedHandler);
     this.eventListeners.push({
       target: window,
-      event: "sync_disconnected",
+      event: SYNC_EVENTS.DISCONNECTED,
       handler: disconnectedHandler,
     });
 
@@ -496,10 +502,10 @@ class SyncManager {
         });
     };
 
-    window.addEventListener("sync_connected", connectedHandler);
+    window.addEventListener(SYNC_EVENTS.CONNECTED, connectedHandler);
     this.eventListeners.push({
       target: window,
-      event: "sync_connected",
+      event: SYNC_EVENTS.CONNECTED,
       handler: connectedHandler,
     });
   }

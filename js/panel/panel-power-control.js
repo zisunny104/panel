@@ -52,10 +52,6 @@ class PowerControl {
       window.buttonManager.updateMediaForCurrentAction();
     }
 
-    if (window.panelExperiment && window.panelExperiment.isExperimentRunning) {
-      window.panelPageManager._showCurrentStepMediaOrHome();
-    }
-
     this.dispatchPowerStateChanged();
   }
 
@@ -66,8 +62,12 @@ class PowerControl {
    */
   setPowerState(nextState, trigger) {
     // 立即取消電源開關的高亮效果（按鈕被按下時）
-    if (window.panelExperiment) {
-      window.panelExperiment.highlightPowerSwitch(false);
+    document.querySelectorAll(".media-power-btn").forEach((btn) => {
+      btn.classList.remove("next-step-highlight");
+    });
+    const powerSwitchArea = document.getElementById("powerSwitchArea");
+    if (powerSwitchArea) {
+      powerSwitchArea.classList.remove("next-step-highlight");
     }
 
     // 如果要關機，無論目前狀態如何都應該執行（包括開機動畫進行中）
@@ -106,9 +106,9 @@ class PowerControl {
         );
       }
 
-      // 通知實驗管理器電源狀態變化
-      if (window.panelExperiment) {
-        window.panelExperiment.power.onPowerStateChanged(false);
+      // 通知實驗管理器電源由開轉關
+      if (window.experimentFlowManager?.isRunning) {
+        window.experimentFlowManager.stopExperiment();
       }
       return;
     }
@@ -157,22 +157,18 @@ class PowerControl {
             window.mediaManager.playHomePageLoop();
           }
 
-          // 通知實驗管理器電源狀態變化
-          if (window.panelExperiment) {
-            window.panelExperiment.power.onPowerStateChanged(true);
-          }
-
-          // 開機完成後立即更新實驗模式按鈕高亮效果
-          if (
-            window.buttonManager &&
-            window.panelExperiment &&
-            window.panelExperiment.isExperimentRunning
-          ) {
+          // 開機後更新按鈕高亮狀態
+          if (window.buttonManager) {
             window.buttonManager.updateExperimentButtonStyles();
-
-            // 實驗模式開機後，自動開始第一個action
-            this.handleExperimentPowerOnAutoStart();
+            window.buttonManager.updateMediaForCurrentAction();
           }
+
+          // 【待驗證】實驗模式開機後，自動開始第一個action
+          // 注意：此函數會重複呼叫 updateMediaForCurrentAction()（已在上方呼叫過）
+          // 若無其他作用，待確認後可移除
+          // if (window.buttonManager && window.experimentFlowManager?.isRunning) {
+          //   this.handleExperimentPowerOnAutoStart();
+          // }
         },
         onError: () => {
           this.isPowerVideoPlaying = false;
@@ -196,11 +192,7 @@ class PowerControl {
     this.updateMediaControlButtons();
 
     // 如果實驗正在進行中，重新更新按鈕高亮效果
-    if (
-      window.buttonManager &&
-      window.panelExperiment &&
-      window.panelExperiment.isExperimentRunning
-    ) {
+    if (window.buttonManager && window.experimentFlowManager?.isRunning) {
       // 使用 setTimeout 確保 DOM 更新完成後再執行
       setTimeout(() => {
         window.buttonManager.updateExperimentButtonStyles();
@@ -213,8 +205,7 @@ class PowerControl {
    */
   disableAllButtons() {
     // 如果正在等待開機，不要新增 disabled 類，讓 temporarily-disabled 樣式生效
-    const isWaitingForPowerOn =
-      window.panelExperiment?.waitingForPowerOn || false;
+    const isWaitingForPowerOn = false; // 新架構不使用 waitingForPowerOn 機制
     if (!isWaitingForPowerOn) {
       const buttonOverlays = document.querySelectorAll(".button-overlay");
       buttonOverlays.forEach((btn) => btn.classList.add("disabled"));
@@ -404,8 +395,12 @@ class PowerControl {
     });
 
     // 監聽來自輪詢機制的全域狀態更新（從 sync-client.js 的 triggerStateUpdate 觸發）
-    window.addEventListener("sync_state_update", (e) => {
-      if (e.detail && e.detail.powerState !== undefined) {
+    window.addEventListener(window.SYNC_EVENTS.STATE_UPDATE, (e) => {
+      if (!e.detail) return;
+      // 防止自我回聲
+      const myId = window.syncClient?.clientId;
+      if (myId && e.detail.clientId === myId) return;
+      if (e.detail.powerState !== undefined) {
         this.applyRemotePowerState(e.detail);
       }
     });
@@ -468,8 +463,8 @@ class PowerControl {
     this.enableAllButtons();
 
     // 停止實驗
-    if (window.panelExperiment && window.panelExperiment.isExperimentRunning) {
-      window.panelExperiment.stopExperiment();
+    if (window.experimentFlowManager?.isRunning) {
+      window.experimentFlowManager.stopExperiment();
     }
 
     // 記錄日誌
@@ -530,13 +525,13 @@ class PowerControl {
 
     this.enableAllButtons();
 
-    // 通知實驗管理器電源狀態變化
-    if (window.panelExperiment) {
-      window.panelExperiment.power.onPowerStateChanged(true);
+    // 通知實驗管理器電源狀態變化（如有需要）
+    if (window.buttonManager && window.experimentFlowManager?.isRunning) {
+      window.buttonManager.updateMediaForCurrentAction();
     }
 
     // 如果在實驗中，讓實驗管理器處理媒體播放
-    if (window.panelExperiment && window.panelExperiment.isExperimentRunning) {
+    if (window.experimentFlowManager?.isRunning) {
       // 實驗中的媒體播放由實驗管理器控制
       return;
     }
@@ -549,8 +544,7 @@ class PowerControl {
         if (
           this.isPowerOn &&
           !this.isPowerVideoPlaying &&
-          (!window.panelExperiment ||
-            !window.panelExperiment.isExperimentRunning)
+          !window.experimentFlowManager?.isRunning
         ) {
           window.mediaManager.playHomePageLoop();
         }
@@ -699,10 +693,6 @@ class PowerControl {
       window.buttonManager.updateExperimentButtonStyles();
       window.buttonManager.updateMediaForCurrentAction();
     }
-
-    if (window.panelExperiment && window.panelExperiment.isExperimentRunning) {
-      window.panelPageManager._showCurrentStepMediaOrHome();
-    }
   }
 
   /** 套用遠端電源狀態（來自 sync_state_update 事件） */
@@ -740,8 +730,8 @@ class PowerControl {
       }
 
       // 通知實驗管理器電源狀態變化
-      if (window.panelExperiment) {
-        window.panelExperiment.power.onPowerStateChanged(this.isPowerOn);
+      if (window.buttonManager) {
+        window.buttonManager.updateMediaForCurrentAction();
       }
 
       // 記錄同步事件
@@ -763,53 +753,16 @@ class PowerControl {
   // 處理實驗模式開機後的自動開始邏輯
   handleExperimentPowerOnAutoStart() {
     // 確保在實驗模式且電源已開啟
-    if (
-      !window.panelExperiment ||
-      !window.panelExperiment.isExperimentRunning ||
-      !this.isPowerOn
-    ) {
+    if (!window.experimentFlowManager?.isRunning || !this.isPowerOn) {
       return;
     }
 
-    // 檢查目前步驟是否有可執行的action
-    const unitId =
-      window.panelExperiment.loadedUnits?.[
-        window.panelExperiment.currentUnitIndex
-      ];
-    if (!unitId) return;
-
-    const unit = window._allUnits?.find((u) => u.unit_id === unitId);
-    const step = unit?.steps?.[window.panelExperiment.currentStepIndex];
-
-    if (step && step.actions && Array.isArray(step.actions)) {
-      // 取得第一個動作
-      const firstAction = step.actions[0];
-      if (firstAction && firstAction.interactions) {
-        // 找到第一個可用的操作
-        const firstInteractionKey = Object.keys(firstAction.interactions)[0];
-        if (firstInteractionKey) {
-          // 延遲執行，確保開機流程完成
-          setTimeout(() => {
-            if (window.logger) {
-              window.logger.logAction(
-                `實驗模式自動開始第一個操作: ${firstInteractionKey}`,
-                "experiment_auto_start",
-              );
-            }
-
-            // 使用實驗管理器的 handleStepTransition 方法
-            const interaction = firstAction.interactions[firstInteractionKey];
-            window.panelExperiment.handleStepTransition(
-              interaction,
-              firstInteractionKey,
-            );
-          }, 500);
-        }
-      }
+    // 更新按鈕高亮狀態以反映目前動作
+    if (window.buttonManager) {
+      window.buttonManager.updateMediaForCurrentAction();
     }
   }
 }
 
 // 匯出單例
 window.powerControl = new PowerControl();
-

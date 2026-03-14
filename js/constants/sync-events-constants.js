@@ -72,6 +72,36 @@ export const SYNC_EVENTS = {
 
   // WebSocket 事件（非同步）
   WEBSOCKET_SESSION_INVALID: "websocket_session_invalid",
+
+  // 工作階段失效與狀態事件
+  SESSION_INVALID: "sync_session_invalid",
+  SESSION_STATE: "sync_session_state",
+
+  // 連線輔助事件
+  RECONNECTED: "sync_reconnected",
+  CLIENT_JOINED: "sync_client_joined",
+  CLIENT_LEFT: "sync_client_left",
+  CLIENT_RECONNECTED: "sync_client_reconnected",
+  SERVER_ERROR: "sync_server_error",
+
+  // 面板顯示事件
+  SHOW_SESSIONS: "sync_show_sessions",
+  GENERATE_QR: "sync_generate_qr",
+  START_QR_SCAN: "sync_start_qr_scan",
+  CONNECTION_LOST: "sync_connection_lost",
+
+  // 本地 DOM 事件（dispatched on document，僅限頁面內部使用，非 WebSocket 同步）
+  EXPERIMENT_STATE_CHANGE_LOCAL: "experimentStateChange",
+
+  // 遠端實驗橋接事件（board-sync-manager ↔ board-page-manager）
+  REMOTE_EXPERIMENT_STARTED: "remote_experiment_started",
+  REMOTE_EXPERIMENT_PAUSED: "remote_experiment_paused",
+  REMOTE_EXPERIMENT_RESUMED: "remote_experiment_resumed",
+  REMOTE_EXPERIMENT_STOPPED: "remote_experiment_stopped",
+  REMOTE_EXPERIMENT_ACTION: "remote_experiment_action",
+  REMOTE_BUTTON_ACTION: "remote_button_action",
+  REMOTE_PANEL_STATE_UPDATE: "remote_panel_state_update",
+  REMOTE_SYNC_EVENT: "remote_sync_event",
 };
 
 // 同步資料類型常數
@@ -84,7 +114,7 @@ export const SYNC_DATA_TYPES = {
   EXPERIMENT_STOPPED: "experiment_stopped",
 
   // 實驗資訊更新
-  PARTICIPANT_NAME_UPDATE: "participantNameUpdate",
+  SUBJECT_NAME_UPDATE: "subjectNameUpdate",
   EXPERIMENT_ID_UPDATE: "experimentIdUpdate",
   COMBINATION_SELECTED: "combination_selected",
 

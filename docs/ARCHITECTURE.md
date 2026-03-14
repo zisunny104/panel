@@ -1199,31 +1199,156 @@ async handleAuth(wsConnectionId, data, ws) {
 
 ### WebSocket 事件
 
-事件型別定義請參考上方核心概念章節的 `WS_MESSAGE_TYPES`。
+完整訊息類型定義請參閱下方 **[WebSocket 訊息類型與同步事件參考](#websocket-訊息類型與同步事件參考)** 章節。
 
-#### 客戶端發送
+---
 
-| 事件                | 說明         | 資料格式                        |
-| ------------------- | ------------ | ------------------------------- |
-| `auth`              | 認證連線     | `{ sessionId, clientId, role }` |
-| `heartbeat`         | 心跳保持連線 | `{ clientId, timestamp }`       |
-| `state_update`      | 狀態更新     | `{ type, data }`                |
-| `experiment_action` | 實驗操作     | `{ action, experimentId, ... }` |
+## WebSocket 訊息類型與同步事件參考
 
-#### 伺服器廣播
+### 1. WS_PROTOCOL — WebSocket 傳輸層訊息類型
 
-| 事件                   | 說明         | 資料格式                              |
-| ---------------------- | ------------ | ------------------------------------- |
-| `connected`            | 連線成功     | `{ wsConnectionId, serverTime }`      |
-| `session_state`        | 工作階段狀態 | `{ sessionId, state, clients }`       |
-| `experiment_started`   | 實驗開始     | `{ experimentId, source, timestamp }` |
-| `experiment_paused`    | 實驗暫停     | `{ experimentId, source }`            |
-| `experiment_resumed`   | 實驗繼續     | `{ experimentId, source }`            |
-| `experiment_stopped`   | 實驗停止     | `{ experimentId, source }`            |
-| `experiment_id_update` | 實驗 ID 更新 | `{ experimentId, timestamp }`         |
-| `client_joined`        | 客戶端加入   | `{ clientId, role }`                  |
-| `client_left`          | 客戶端退出   | `{ clientId }`                        |
-| `error`                | 錯誤訊息     | `{ code, message }`                   |
+定義檔：`shared/ws-protocol-constants.js`
+
+#### C2S（客戶端 → 伺服器）
+
+| `type` 值                | 說明                                       | 伺服器處理器                 |
+| ------------------------ | ------------------------------------------ | ---------------------------- |
+| `auth`                   | 認證連線，建立工作階段綁定                 | `handleAuth`                 |
+| `heartbeat`              | 心跳，維持連線活躍                         | `handleHeartbeat`            |
+| `state_update`           | 狀態廣播（承載所有業務事件的主通道）       | `handleStateUpdate`          |
+| `get_session_state`      | 取得目前工作階段完整狀態快照               | `handleGetSessionState`      |
+| `ping`                   | Ping                                       | `handlePing`                 |
+| `experiment_id_register` | 任一端重新產生實驗 ID 後廣播給同頻道所有人 | `handleExperimentIdRegister` |
+
+#### S2C（伺服器 → 客戶端）
+
+| `type` 值               | 說明                         | 主要 payload 欄位                     |
+| ----------------------- | ---------------------------- | ------------------------------------- |
+| `connected`             | 連線成功                     | `wsConnectionId`, `serverTime`        |
+| `auth_success`          | 認證成功                     | `sessionId`, `clientId`, `role`       |
+| `clear_sync_data`       | 要求客戶端清除本機同步狀態   | —                                     |
+| `heartbeat_ack`         | 心跳確認                     | `timestamp`                           |
+| `pong`                  | Ping 回應                    | `timestamp`                           |
+| `session_state`         | 完整工作階段狀態快照         | `sessionId`, `state`, `clients`       |
+| `session_state_update`  | 工作階段狀態增量更新         | `sessionId`, `state`                  |
+| `state_update_ack`      | 狀態更新確認                 | `timestamp`                           |
+| `client_joined`         | 有客戶端加入工作階段         | `clientId`, `role`                    |
+| `client_left`           | 有客戶端離開工作階段         | `clientId`                            |
+| `client_reconnected`    | 客戶端重新連線               | `clientId`                            |
+| `experiment_started`    | 實驗開始                     | `experimentId`, `source`, `timestamp` |
+| `experiment_paused`     | 實驗暫停                     | `experimentId`, `source`              |
+| `experiment_resumed`    | 實驗繼續                     | `experimentId`, `source`              |
+| `experiment_stopped`    | 實驗停止                     | `experimentId`, `source`              |
+| `experiment_id_changed` | 實驗 ID 已變更（伺服器推播） | `experimentId`, `timestamp`           |
+| `error`                 | 錯誤訊息                     | `code`, `message`                     |
+
+---
+
+### 2. SYNC_DATA_TYPES — `state_update` 內部 `type` 欄位
+
+所有透過 `state_update` C2S 訊息傳送的業務廣播，其 payload 中的 `type` 欄位對應如下。
+定義檔：`js/constants/sync-events-constants.js`（`SYNC_DATA_TYPES`）
+
+#### 實驗生命週期
+
+| `type` 值              | 常數                    | 發送端              | 主要 payload 欄位                     |
+| ---------------------- | ----------------------- | ------------------- | ------------------------------------- |
+| `experimentInitialize` | `EXPERIMENT_INITIALIZE` | board（實驗管理頁） | `experimentId`, `units`               |
+| `experiment_started`   | `EXPERIMENT_STARTED`    | board               | `experimentId`, `source`, `timestamp` |
+| `experiment_paused`    | `EXPERIMENT_PAUSED`     | board               | `experimentId`, `source`              |
+| `experiment_resumed`   | `EXPERIMENT_RESUMED`    | board               | `experimentId`, `source`              |
+| `experiment_stopped`   | `EXPERIMENT_STOPPED`    | board               | `experimentId`, `source`              |
+
+#### 實驗資訊更新
+
+| `type` 值               | 常數                      | 發送端                   | 主要 payload 欄位                        |
+| ----------------------- | ------------------------- | ------------------------ | ---------------------------------------- |
+| `experimentIdUpdate`    | `EXPERIMENT_ID_UPDATE`    | board / 面板（備援路徑） | `experimentId`, `client_id`, `timestamp` |
+| `participantNameUpdate` | `PARTICIPANT_NAME_UPDATE` | board                    | `participantName`, `timestamp`           |
+| `combination_selected`  | `COMBINATION_SELECTED`    | board / 面板             | `combination`, `timestamp`               |
+
+#### 動作與手勢（board 頁）
+
+| `type` 值                | 常數                     | 主要 payload 欄位                                                          |
+| ------------------------ | ------------------------ | -------------------------------------------------------------------------- |
+| `action_completed`       | `ACTION_COMPLETED`       | `action_id`, `step_id`, `unit_id`, `client_id`, `duration_ms`, `timestamp` |
+| `action_cancelled`       | `ACTION_CANCELLED`       | `action_id`, `gesture_index`, `client_id`, `timestamp`                     |
+| `gesture_marked`         | `GESTURE_MARKED`         | `step_index`, `gesture_name`, `mark_status`, `timer_value`, `timestamp`    |
+| `gesture_step_completed` | `GESTURE_STEP_COMPLETED` | `step_index`, `gesture_name`, `timer_value`, `timestamp`                   |
+
+#### 面板頁（index.html）
+
+| `type` 值        | 常數                 | 主要 payload 欄位                                            |
+| ---------------- | -------------------- | ------------------------------------------------------------ |
+| `powerState`     | `POWER_STATE_UPDATE` | `powerState`, `isPowerVideoPlaying`, `clientId`, `timestamp` |
+| `button_pressed` | `BUTTON_PRESSED`     | `button`, `function`, `beepEnabled`, `clientId`, `timestamp` |
+
+---
+
+### 3. SYNC_EVENTS — 前端 DOM / Window 事件
+
+這些事件透過 `document.dispatchEvent()` 或 `window.dispatchEvent()` 在**同一頁面內**傳遞，不經過 WebSocket。
+定義檔：`js/constants/sync-events-constants.js`（`SYNC_EVENTS`）
+
+#### 工作階段事件（SyncManager 派發）
+
+| 事件名稱                      | 常數                     | 說明               |
+| ----------------------------- | ------------------------ | ------------------ |
+| `sync_session_created`        | `SESSION_CREATED`        | 成功建立工作階段   |
+| `sync_session_joined`         | `SESSION_JOINED`         | 成功加入工作階段   |
+| `sync_session_left`           | `SESSION_LEFT`           | 離開工作階段       |
+| `sync_session_restored`       | `SESSION_RESTORED`       | 從快取恢復工作階段 |
+| `sync_session_joined_by_code` | `SESSION_JOINED_BY_CODE` | 透過分享代碼加入   |
+| `sync_share_code_generated`   | `SHARE_CODE_GENERATED`   | 分享代碼已產生     |
+
+#### WebSocket 連線事件
+
+| 事件名稱                     | 常數                    | 說明                 |
+| ---------------------------- | ----------------------- | -------------------- |
+| `sync_connected`             | `CONNECTED`             | WebSocket 連線成功   |
+| `sync_disconnected`          | `DISCONNECTED`          | WebSocket 中斷       |
+| `sync_server_status_changed` | `SERVER_STATUS_CHANGED` | 伺服器狀態改變       |
+| `sync_server_online`         | `SERVER_ONLINE`         | 伺服器上線           |
+| `sync_server_offline`        | `SERVER_OFFLINE`        | 伺服器離線           |
+| `sync_client_initialized`    | `CLIENT_INITIALIZED`    | 同步客戶端完成初始化 |
+
+#### 狀態同步事件
+
+| 事件名稱                       | 常數           | 說明                                              |
+| ------------------------------ | -------------- | ------------------------------------------------- |
+| `sync_state_update`            | `STATE_UPDATE` | 收到遠端狀態更新（承載所有 SYNC_DATA_TYPES 類型） |
+| `experiment:sync:remote_state` | `REMOTE_STATE` | ExperimentSyncCore 中繼事件（board 端接收）       |
+
+#### 實驗生命週期事件（前端本機派發）
+
+| 事件名稱                | 常數                              | 說明           |
+| ----------------------- | --------------------------------- | -------------- |
+| `experiment_started`    | `EXPERIMENT_STARTED`              | 實驗開始       |
+| `experiment_paused`     | `EXPERIMENT_PAUSED`               | 實驗暫停       |
+| `experiment_resumed`    | `EXPERIMENT_RESUMED`              | 實驗繼續       |
+| `experiment_stopped`    | `EXPERIMENT_STOPPED`              | 實驗停止       |
+| `experiment_id_changed` | `EXPERIMENT_ID_CHANGED`           | 實驗 ID 已變更 |
+| `combination_selected`  | `EXPERIMENT_COMBINATION_SELECTED` | 組合選擇記錄   |
+
+#### 實驗中心事件（ExperimentHubManager 派發）
+
+| 事件名稱                         | 常數                             | 說明         |
+| -------------------------------- | -------------------------------- | ------------ |
+| `experiment_hub_state_update`    | `EXPERIMENT_HUB_STATE_UPDATE`    | 中樞狀態更新 |
+| `experiment_hub_id_update`       | `EXPERIMENT_HUB_ID_UPDATE`       | 中樞 ID 更新 |
+| `experiment_hub_state_change`    | `EXPERIMENT_HUB_STATE_CHANGE`    | 中樞狀態改變 |
+| `experiment_hub_connection_lost` | `EXPERIMENT_HUB_CONNECTION_LOST` | 中樞連線中斷 |
+
+#### 其他 UI / 本地事件
+
+| 事件名稱                    | 常數                        | 說明                                    |
+| --------------------------- | --------------------------- | --------------------------------------- |
+| `power_state_changed`       | `POWER_STATE_CHANGED`       | 電源狀態改變（本機 UI，不經 WebSocket） |
+| `user_settings_reset`       | `USER_SETTINGS_RESET`       | 使用者設定已重設                        |
+| `data_cleared`              | `DATA_CLEARED`              | WebSocket 斷線後清除同步資料            |
+| `websocket_session_invalid` | `WEBSOCKET_SESSION_INVALID` | 工作階段無效（伺服器通知）              |
+| `show_sync_panel`           | `SHOW_SYNC_PANEL`           | 開啟同步指示器面板                      |
+| `sync_panel_updated`        | `PANEL_UPDATED`             | 同步面板 UI 已更新                      |
 
 ---
 

@@ -1054,6 +1054,13 @@ class ExperimentUIManager {
     }
 
     const renderNow = () => {
+      Logger.debug(
+        `【排序追蹤】renderNow capturedIds=[${unitIds ? unitIds.join("→") : "null"}]`,
+        {
+          unitIds: unitIds ? [...unitIds] : null,
+          totalUnits: units.length,
+        },
+      );
       const config = {
         showHeader: options.showHeader !== false,
         headerTitle: options.headerTitle || "實驗單元",
@@ -1067,13 +1074,23 @@ class ExperimentUIManager {
         ...options,
       };
 
-      // 顯示所有單元，但根據 unitIds 設定預設勾選狀態
+      // 顯示所有單元，根據 unitIds 設定勾選狀態並套用組合排序
       let displayUnits = units;
       if (unitIds && Array.isArray(unitIds)) {
-        displayUnits = units.map((unit) => ({
+        const allUnits = units.map((unit) => ({
           ...unit,
           checked: unitIds.includes(unit.unit_id || unit.id),
         }));
+
+        // 依 unitIds 順序排列已選單元，未選的排在後面
+        const selectedInOrder = unitIds
+          .map((id) => allUnits.find((u) => (u.unit_id || u.id) === id))
+          .filter(Boolean);
+        const unselected = allUnits.filter(
+          (u) => !unitIds.includes(u.unit_id || u.id),
+        );
+        displayUnits = [...selectedInOrder, ...unselected];
+
         Logger.debug("設定單元勾選狀態:", {
           total: units.length,
           preselected: unitIds.length,
@@ -1180,7 +1197,7 @@ class ExperimentUIManager {
         if (selectAllCheckbox) {
           selectAllCheckbox.addEventListener("change", (e) => {
             const checkboxes = containerEl.querySelectorAll(
-              "input[name=\"unitCheckbox\"]",
+              'input[name="unitCheckbox"]',
             );
             checkboxes.forEach((cb) => (cb.checked = e.target.checked));
             if (config.onUnitToggle) {
@@ -1196,7 +1213,7 @@ class ExperimentUIManager {
       // 綁定單元切換事件
       if (config.onUnitToggle) {
         const checkboxes = containerEl.querySelectorAll(
-          "input[name=\"unitCheckbox\"]",
+          'input[name="unitCheckbox"]',
         );
         checkboxes.forEach((checkbox) => {
           checkbox.addEventListener("change", (e) => {
@@ -1275,7 +1292,13 @@ class ExperimentUIManager {
         this._setupUnitDragAndDrop(containerEl, config);
       }
 
-      Logger.debug("單元面板已渲染", { count: displayUnits.length });
+      Logger.debug(
+        `【排序追蹤】渲染完成 HTML順序[${displayUnits.map((u) => u.unit_id || u.id).join("→")}]`,
+        {
+          count: displayUnits.length,
+          displayOrder: displayUnits.map((u) => u.unit_id || u.id),
+        },
+      );
       return containerEl;
     };
 
@@ -1287,6 +1310,12 @@ class ExperimentUIManager {
       const mo = new MutationObserver((mutations, obs) => {
         if (window.getComputedStyle(panelAncestor).display !== "none") {
           obs.disconnect();
+          Logger.debug(
+            `【排序追蹤】renderNow MO觸發 capturedIds=[${unitIds ? unitIds.join("→") : "null"}]`,
+            {
+              capturedUnitIds: unitIds ? [...unitIds] : null,
+            },
+          );
           renderNow();
         }
       });
@@ -1563,7 +1592,7 @@ class ExperimentUIManager {
           <div class="form-group experiment-control-group">
             <div class="experiment-control-header">
               <label>實驗控制</label>
-              ${config.showTimer ? "<div id=\"experimentTimer\" class=\"experiment-timer\">00:00.000</div>" : ""}
+              ${config.showTimer ? '<div id="experimentTimer" class="experiment-timer">00:00.000</div>' : ""}
             </div>
 
             <div id="experimentIdRow" class="experiment-start-row">
@@ -1890,8 +1919,9 @@ class ExperimentUIManager {
       Logger.debug("實驗開始：已關閉所有面板");
     }
 
-    // 如果視覺提示已啟用，確保高亮顯示
-    if (this.isVisualHintsEnabled()) {
+    // 按鈕高亮為 Panel 專屬功能：僅在有 visualHintsToggle 元素時才執行
+    const toggle = this.elements.get("visualHintsToggle");
+    if (toggle && this.isVisualHintsEnabled()) {
       this.updateHighlightVisibility();
       Logger.debug("實驗開始：視覺提示已啟用並更新高亮");
     }
@@ -2039,8 +2069,8 @@ class ExperimentUIManager {
     }
 
     const updateData = {
-      type: "experimentIdUpdate",
-      client_id:
+      type: window.SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
+      clientId:
         window.syncManager?.core?.syncClient?.clientId || "experiment_panel",
       experimentId: experimentId,
       timestamp: new Date().toISOString(),
@@ -2053,7 +2083,7 @@ class ExperimentUIManager {
 
     // 分派事件供本機同步管理器捕獲
     document.dispatchEvent(
-      new CustomEvent("experimentStateChange", {
+      new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
         detail: updateData,
       }),
     );

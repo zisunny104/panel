@@ -82,7 +82,13 @@ class IndicatorManager {
       document.body.appendChild(this.statusContainer);
     }
 
-    ":" + String(now.getSeconds()).padStart(2, "0");
+    const now = new Date();
+    const ts =
+      String(now.getHours()).padStart(2, "0") +
+      ":" +
+      String(now.getMinutes()).padStart(2, "0") +
+      ":" +
+      String(now.getSeconds()).padStart(2, "0");
 
     const msg = document.createElement("div");
     msg.className = `indicator-status ${type || "info"}`;

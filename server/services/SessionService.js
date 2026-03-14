@@ -123,6 +123,50 @@ class SessionService {
   }
 
   /**
+   * 合併式更新工作階段狀態（保留實驗狀態子物件，避免被後續更新覆蓋）
+   * @param {string} sessionId - 工作階段ID
+   * @param {Object} update - 新的狀態物件
+   * @returns {boolean} 是否成功
+   */
+  mergeState(sessionId, update) {
+    const timestamp = getCurrentTimestamp();
+    try {
+      const session = queryOne(
+        `SELECT data FROM sessions WHERE session_id = ?`,
+        [sessionId],
+      );
+      if (!session) return false;
+
+      let data = {};
+      try {
+        data = session.data ? JSON.parse(session.data) : {};
+      } catch (e) {}
+
+      // 持久化實驗相關狀態至子物件，避免被後續更新覆蓋
+      const experimentTypes = [
+        "experiment_started",
+        "experiment_stopped",
+        "experiment_paused",
+        "experiment_resumed",
+      ];
+      if (experimentTypes.includes(update.type)) {
+        data.experimentState = { ...update };
+      }
+      // 保存最近一筆狀態
+      data.lastState = { ...update };
+
+      execute(
+        `UPDATE sessions SET data = ?, updated_at = ?, last_active_at = ? WHERE session_id = ?`,
+        [JSON.stringify(data), timestamp, timestamp, sessionId],
+      );
+      return true;
+    } catch (error) {
+      console.error("合併工作階段狀態失敗:", error.message);
+      return false;
+    }
+  }
+
+  /**
    * 刪除工作階段
    * @param {string} sessionId - 工作階段ID
    * @returns {boolean} 是否刪除成功

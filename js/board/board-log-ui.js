@@ -120,7 +120,7 @@ class ExperimentLogUI {
     }
 
     const experimentId = document.getElementById("experimentIdInput")?.value;
-    const subjectName = document.getElementById("subjectName")?.value;
+    const subjectName = document.getElementById("participantNameInput")?.value;
 
     if (!experimentId || !subjectName) {
       alert("請先設定實驗ID和受試者名稱");
@@ -643,8 +643,7 @@ class ExperimentLogUI {
         stats.experimentId = entry.exp_id || "";
         stats.subjectName = entry.participant || "";
         // 嘗試從組合名稱欄位取得
-        stats.experimentCombination =
-          entry.combination_name || entry.combo_name || "";
+        stats.experimentCombination = entry.combo_name || "";
 
         // 轉換時間戳（ts 可能是毫秒）
         if (entry.ts) {

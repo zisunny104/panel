@@ -273,8 +273,10 @@ class ExperimentHubManager {
       if (this.connection.wsClient && this.connection.connected) {
         const message = {
           type: "experiment_id_register",
-          experimentId: experimentId,
-          timestamp: Date.now(),
+          data: {
+            experimentId: experimentId,
+            timestamp: Date.now(),
+          },
         };
 
         this.connection.wsClient.send(message);
@@ -286,6 +288,50 @@ class ExperimentHubManager {
       }
     } catch (error) {
       Logger.error("註冊實驗ID失敗:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 註冊實驗狀態到伺服器（同步模式）
+   * @param {Object} state - 實驗狀態資料
+   * @returns {Promise<boolean>} 是否成功
+   */
+  async registerExperimentState(state) {
+    try {
+      if (!this.isSyncMode()) {
+        Logger.debug("非同步模式，跳過實驗狀態註冊", state);
+        return false;
+      }
+
+      if (!state || typeof state !== "object") {
+        Logger.warn("無效的實驗狀態，跳過註冊");
+        return false;
+      }
+
+      if (!this.connection.wsClient || !this.connection.connected) {
+        Logger.warn("WebSocket 未連接，無法註冊實驗狀態");
+        return false;
+      }
+
+      const message = {
+        type:
+          window.WS_PROTOCOL?.C2S?.EXPERIMENT_STATE_REGISTER ||
+          "experiment_state_register",
+        data: {
+          state: {
+            ...state,
+            clientId: state.clientId || this.getClientId(),
+            timestamp: state.timestamp || new Date().toISOString(),
+          },
+        },
+      };
+
+      this.connection.wsClient.send(message);
+      Logger.debug("實驗狀態註冊訊息已發送", message);
+      return true;
+    } catch (error) {
+      Logger.error("註冊實驗狀態失敗:", error);
       return false;
     }
   }
@@ -572,12 +618,12 @@ class ExperimentHubManager {
     });
 
     // 實驗 ID 更新事件
-    ws.on("experiment_id_changed", (data) => {
+    ws.on(window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
       Logger.debug("收到實驗 ID 更新", data);
       if (data.clientId !== this.getClientId()) {
         this.setExperimentId(data.experimentId, "remote", { silent: false });
         this.emit(ExperimentHubManager.EVENT.MESSAGE_RECEIVED, {
-          type: "experiment_id_changed",
+          type: window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
           data,
         });
       }
@@ -585,16 +631,16 @@ class ExperimentHubManager {
 
     // 其他實驗狀態事件
     [
-      "experiment_started",
-      "experiment_paused",
-      "experiment_resumed",
-      "experiment_stopped",
+      window.SYNC_EVENTS.EXPERIMENT_STARTED,
+      window.SYNC_EVENTS.EXPERIMENT_PAUSED,
+      window.SYNC_EVENTS.EXPERIMENT_RESUMED,
+      window.SYNC_EVENTS.EXPERIMENT_STOPPED,
     ].forEach((eventName) => {
       ws.on(eventName, (data) => {
         Logger.debug(`收到 ${eventName}`, data);
 
         // 特別處理實驗開始事件：廣播轉發
-        if (eventName === "experiment_started") {
+        if (eventName === window.SYNC_EVENTS.EXPERIMENT_STARTED) {
           this.handleExperimentStartedBroadcast(data);
         }
 

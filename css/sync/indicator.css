@@ -358,6 +358,7 @@
     margin-bottom: 0;
 
     background: #f8f9fa;
+    border: 2px solid #999;
     border-radius: 15px;
 }
 
@@ -1283,6 +1284,33 @@
     word-break: break-all;
 }
 
+/* 客戶端 ID 顯示列 */
+.sync-client-id-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: -8px;
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: #888;
+}
+
+.sync-client-id-label {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.sync-client-id-value {
+    font-family: monospace;
+    font-size: 11px;
+    color: #555;
+    word-break: break-all;
+    text-align: center;
+}
+
 /* 角色卡片特殊樣式 */
 .sync-role-card {
     cursor: pointer;
@@ -1821,4 +1849,209 @@
         opacity: 1;
         transform: scale(1);
     }
+}
+
+/* ===== 公開頻道快速加入卡片 ===== */
+
+.sync-quick-channel-card {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 680px;
+
+    background: linear-gradient(135deg, #f0f4ff 0%, #f8faff 100%);
+    border: 2px solid #c5d3f5;
+    border-radius: 10px;
+
+    padding: 14px 16px;
+    margin: 0 0 4px 0;
+}
+
+.sync-quick-channel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 12px;
+}
+
+.sync-quick-channel-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #4a5568;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+/* 角色切換按鈕組（與標頭頁面切換相同規格） */
+.sync-ch-role-group {
+    display: inline-flex;
+    gap: 0;
+    background: white;
+    border: 1.5px solid #c5d3f5;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.sync-ch-role-btn {
+    background: white;
+    border: none;
+    color: #6c757d;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.sync-ch-role-btn:not(:last-child) {
+    border-right: 1px solid #c5d3f5;
+}
+
+.sync-ch-role-btn:hover:not(.active) {
+    background: #f0f4ff;
+    color: #4a5568;
+}
+
+.sync-ch-role-btn[data-role="operator"].active {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.sync-ch-role-btn[data-role="viewer"].active {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+}
+
+/* 頻道按鈕排列 */
+.sync-quick-channel-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+/* 頻道按鈕基礎樣式 */
+.sync-channel-btn {
+    padding: 10px 0;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sync-channel-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
+}
+
+.sync-channel-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.sync-channel-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 頻道 A - 藍色調 */
+.sync-channel-btn[data-channel="A"] {
+    background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
+    color: white;
+}
+
+.sync-channel-btn[data-channel="A"]:hover:not(:disabled) {
+    background: linear-gradient(135deg, #5568d3 0%, #4455c0 100%);
+    box-shadow: 0 5px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 頻道 B - 青綠色調 */
+.sync-channel-btn[data-channel="B"] {
+    background: linear-gradient(135deg, #20c997 0%, #17a589 100%);
+    color: white;
+}
+
+.sync-channel-btn[data-channel="B"]:hover:not(:disabled) {
+    background: linear-gradient(135deg, #17a589 0%, #148f75 100%);
+    box-shadow: 0 5px 12px rgba(32, 201, 151, 0.4);
+}
+
+/* 頻道 C - 橘色調 */
+.sync-channel-btn[data-channel="C"] {
+    background: linear-gradient(135deg, #fd7e14 0%, #e8650a 100%);
+    color: white;
+}
+
+.sync-channel-btn[data-channel="C"]:hover:not(:disabled) {
+    background: linear-gradient(135deg, #e8650a 0%, #d45500 100%);
+    box-shadow: 0 5px 12px rgba(253, 126, 20, 0.4);
+}
+
+/* 私人工作階段區隔線（與原有的 sync-ui-divider 共用基礎，略微區別） */
+.sync-private-divider {
+    text-align: center;
+    margin: 12px 0 8px 0;
+    color: #6c757d;
+    font-size: 12px;
+    position: relative;
+}
+
+.sync-private-divider::before,
+.sync-private-divider::after {
+    content: "";
+    display: inline-block;
+    width: 60px;
+    height: 1px;
+    background: #d0d0d0;
+    vertical-align: middle;
+    margin: 0 8px;
+}
+
+/* 加入區內部方式分隔線 */
+.sync-join-method-divider {
+    display: flex;
+    align-items: center;
+    margin: 10px 0;
+}
+
+.sync-join-method-divider::before,
+.sync-join-method-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+}
+
+/* ===== 加入區塊內部標題列 ===== */
+
+.sync-join-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 10px;
+}
+
+.sync-join-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #495057;
+    white-space: nowrap;
+}
+
+/* 內嵌在加入區段的題道按鈕（比威卡較筊潊） */
+.sync-quick-channel-buttons--inline {
+    margin-bottom: 10px;
+}
+
+.sync-quick-channel-buttons--inline .sync-channel-btn {
+    padding: 8px 0;
+    font-size: 13px;
 }

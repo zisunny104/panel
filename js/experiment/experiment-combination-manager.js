@@ -319,6 +319,7 @@ class ExperimentCombinationManager {
     if (window.syncClient?.syncState) {
       window.syncClient.syncState({
         type: "combination_selected",
+        clientId: window.syncClient?.clientId,
         combination: targetCombination,
         timestamp: new Date().toISOString(),
       });
@@ -384,7 +385,10 @@ class ExperimentCombinationManager {
 
     // 從快取恢復時不再使用 silent: true
     // 統一透過 setCombination 發送事件，確保 UI 正確初始化
-    return this.setCombination(combination, null, {
+    // 恢復時同樣使用當前實驗ID作為種子，確保隨機排序與手動選擇一致
+    const experimentId =
+      window.experimentHubManager?.getExperimentId?.() || null;
+    return this.setCombination(combination, experimentId, {
       skipCache: true, // 避免重複寫入快取
     });
   }

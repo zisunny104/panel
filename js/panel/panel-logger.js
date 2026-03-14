@@ -92,7 +92,7 @@ class PanelLogger {
     };
 
     const isRunning =
-      (window.panelExperiment && window.panelExperiment.isExperimentRunning) ||
+      window.experimentFlowManager?.isRunning ||
       (window.experiment && window.experiment.isExperimentRunning) ||
       false;
 
@@ -163,7 +163,7 @@ class PanelLogger {
     // 取得裝置ID
     const clientId =
       window.syncManager?.core?.syncClient?.clientId ||
-      window.panelExperiment?.clientId ||
+      window.syncClient?.clientId ||
       "panel_device";
 
     const logEntry = {

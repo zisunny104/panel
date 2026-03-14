@@ -187,11 +187,11 @@ class WebSocketClient {
           break;
 
         case window.WS_PROTOCOL.S2C.SESSION_STATE:
-          this.emit("session_state", data);
+          this.emit(window.WS_PROTOCOL.S2C.SESSION_STATE, data);
           break;
 
         case window.WS_PROTOCOL.S2C.SESSION_STATE_UPDATE:
-          this.emit("state_update", data);
+          this.emit(window.WS_PROTOCOL.S2C.SESSION_STATE_UPDATE, data);
           break;
 
         case window.WS_PROTOCOL.S2C.CLIENT_JOINED:
@@ -216,7 +216,8 @@ class WebSocketClient {
         case window.WS_PROTOCOL.S2C.EXPERIMENT_RESUMED:
         case window.WS_PROTOCOL.S2C.EXPERIMENT_STOPPED:
         case window.WS_PROTOCOL.S2C.EXPERIMENT_ID_CHANGED:
-          this.emit(`experiment_${type.split("_")[1]}`, data);
+          // 直接以 type 作為事件名發出，WS_PROTOCOL.S2C 與 SYNC_EVENTS 的字串對時就能符合
+          this.emit(type, data);
           break;
 
         case "error":
@@ -322,7 +323,7 @@ class WebSocketClient {
     this.clearLocalSyncData();
 
     // 派發 window 事件，讓 SyncManager 進行後續處理
-    const clearEvent = new CustomEvent("data_cleared", {
+    const clearEvent = new CustomEvent(window.SYNC_EVENTS.DATA_CLEARED, {
       detail: {
         reason,
         message,
@@ -416,7 +417,7 @@ class WebSocketClient {
     if (data && data.message && data.message.includes("工作階段不存在")) {
       Logger.warn("[WebSocketClient] 偵測到工作階段不存在錯誤，發送清理事件");
       window.dispatchEvent(
-        new CustomEvent("websocket_session_invalid", {
+        new CustomEvent(window.SYNC_EVENTS.WEBSOCKET_SESSION_INVALID, {
           detail: {
             reason: "session_not_found",
             originalError: data,

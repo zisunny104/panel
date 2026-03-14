@@ -98,10 +98,25 @@ class ExperimentSystemManager {
         } else {
           Logger.debug("ActionHandler 已建立，但 FlowManager 不可用");
         }
+        // 反向注入：將 FlowManager 注入 ActionHandler，使步驟轉換得以執行
+        if (
+          this.flowManager &&
+          window.experimentActionHandler.injectFlowManager
+        ) {
+          window.experimentActionHandler.injectFlowManager(this.flowManager);
+          Logger.debug("FlowManager 已注入到 ActionHandler");
+        }
       } else {
         Logger.debug("ActionHandler 已存在，使用現有實例");
         if (this.flowManager && this.flowManager.injectActionHandler) {
           this.flowManager.injectActionHandler(window.experimentActionHandler);
+        }
+        // 確保反向注入也更新
+        if (
+          this.flowManager &&
+          window.experimentActionHandler.injectFlowManager
+        ) {
+          window.experimentActionHandler.injectFlowManager(this.flowManager);
         }
       }
     } catch (error) {
@@ -142,6 +157,15 @@ class ExperimentSystemManager {
         this.state.currentCombination &&
         this.state.currentUnitIds.length > 0
       ) {
+        Logger.debug(
+          `【排序追蹤】initializeUI 自動初始化 [組合: ${this.state.currentCombination.combinationName}] [順序: ${this.state.currentUnitIds.join("→")}]`,
+          {
+            來源: "initializeUI",
+            combinationId: this.state.currentCombination.combinationId,
+            combinationName: this.state.currentCombination.combinationName,
+            unitIds: [...this.state.currentUnitIds],
+          },
+        );
         this._updateUIForCombination(
           this.state.currentCombination,
           this.state.currentUnitIds,
@@ -180,7 +204,7 @@ class ExperimentSystemManager {
     }));
 
     const currentCombo = this.combinationManager.getCurrentCombination();
-    const activeId = currentCombo?.combinationId || currentCombo?.id || null;
+    const activeId = currentCombo?.combinationId ?? null;
 
     Logger.debug("初始化組合選擇器", {
       currentCombo: currentCombo?.combinationName,
@@ -404,6 +428,16 @@ class ExperimentSystemManager {
     this.state.currentCombination = combination;
     this.state.currentUnitIds = unitIds || [];
 
+    Logger.debug(
+      `【排序追蹤】組合選擇 [組合: ${combination?.combinationName}] [順序: ${(unitIds || []).join("→")}]`,
+      {
+        來源: "combination:selected 事件",
+        combinationId: combination?.combinationId,
+        combinationName: combination?.combinationName,
+        unitIds: [...(unitIds || [])],
+      },
+    );
+
     // 更新UI
     this._updateUIForCombination(combination, unitIds);
 
@@ -435,6 +469,15 @@ class ExperimentSystemManager {
         this.state.currentUnitIds =
           this.combinationManager.getCombinationUnitIds(currentCombo) || [];
         Logger.debug("預設組合已應用:", currentCombo?.combinationName);
+        Logger.debug(
+          `【排序追蹤】預設組合自動套用 [組合: ${currentCombo?.combinationName}] [順序: ${this.state.currentUnitIds.join("→")}]`,
+          {
+            來源: "_applyDefaultCombination",
+            combinationId: currentCombo?.combinationId,
+            combinationName: currentCombo?.combinationName,
+            unitIds: [...this.state.currentUnitIds],
+          },
+        );
         if (this.state.containers?.combinationSelector) {
           this._updateUIForCombination(currentCombo, this.state.currentUnitIds);
         }
@@ -452,6 +495,14 @@ class ExperimentSystemManager {
    * @private
    */
   _updateUIForCombination(combination, unitIds) {
+    Logger.debug(
+      `【排序追蹤】_updateUIForCombination [組合: ${combination?.combinationName}] [順序: ${(unitIds || []).join("→")}]`,
+      {
+        combinationId: combination?.combinationId,
+        combinationName: combination?.combinationName,
+        unitIds: [...(unitIds || [])],
+      },
+    );
     if (this.state.containers.combinationSelector) {
       this.uiManager.updateCombinationSelection(
         this.state.containers.combinationSelector,
@@ -477,10 +528,40 @@ class ExperimentSystemManager {
 
         if (isPanel) {
           // Panel 頁面的實驗組件是延遲渲染，元素不存在是正常的
-          Logger.debug("單元列表元素尚未渲染（Panel 延遲載入）", {
-            container: this.state.containers.unitPanel,
-            combination: combination?.combinationName,
-          });
+          // 設置 MO 等待面板可見後，再套用組合排序（確保在 renderNow() 之後執行）
+          Logger.debug(
+            `【排序追蹤】DOM未渲染登記MO [組合: ${combination?.combinationName}] [待套用: ${(unitIds || []).join("→")}]`,
+            {
+              container: this.state.containers.unitPanel,
+              combinationName: combination?.combinationName,
+              combinationId: combination?.combinationId,
+              pendingUnitIds: [...(unitIds || [])],
+            },
+          );
+          const panelAncestor = document
+            .querySelector(this.state.containers.unitPanel)
+            ?.closest(".experiment-panel");
+          if (panelAncestor) {
+            const mo = new MutationObserver((mutations, obs) => {
+              if (window.getComputedStyle(panelAncestor).display !== "none") {
+                obs.disconnect();
+                Logger.debug(
+                  `【排序追蹤】MO觸發面板展開 [組合: ${combination?.combinationName}] [即將套用: ${(unitIds || []).join("→")}]`,
+                  {
+                    combinationName: combination?.combinationName,
+                    combinationId: combination?.combinationId,
+                    unitIds: [...(unitIds || [])],
+                  },
+                );
+                // setTimeout(0) 確保在 renderNow() 之後執行
+                setTimeout(() => updateUI(), 0);
+              }
+            });
+            mo.observe(panelAncestor, {
+              attributes: true,
+              attributeFilter: ["style", "class"],
+            });
+          }
         } else {
           // Board 頁面應該要有元素，視為警告
           Logger.warn("找不到單元列表元素，無法更新單元面板", {
@@ -507,7 +588,28 @@ class ExperimentSystemManager {
       });
 
       // 重新排序
+      const domOrderBefore = Array.from(
+        unitList.querySelectorAll("li[data-unit-id]"),
+      ).map((li) => li.dataset.unitId);
+      const needsReorder =
+        JSON.stringify(domOrderBefore) !== JSON.stringify(unitIds);
+      Logger.debug(
+        `【排序追蹤】排序前 DOM[${domOrderBefore.join("→")}] 目標[${unitIds.join("→")}] ${needsReorder ? "⚠需調整" : "✓相同"}`,
+        {
+          combinationName: combination?.combinationName,
+          combinationId: combination?.combinationId,
+          目標unitIds: [...unitIds],
+          目前DOM順序: domOrderBefore,
+          需要調整: needsReorder,
+        },
+      );
       this._reorderUnitsForCombination(unitList, unitIds);
+      const domOrderAfter = Array.from(
+        unitList.querySelectorAll("li[data-unit-id]"),
+      ).map((li) => li.dataset.unitId);
+      Logger.debug(`【排序追蹤】排序完成 DOM[${domOrderAfter.join("→")}]`, {
+        排序後DOM順序: domOrderAfter,
+      });
 
       // 更新全選狀態（嘗試呼叫頁面管理器，若不存在則靜默跳過）
       this._tryCallPageManager("updateSelectAllState");
@@ -587,10 +689,16 @@ class ExperimentSystemManager {
     unitList.innerHTML = "";
     unitList.appendChild(fragment);
 
-    Logger.debug("單元已重新排序並保留所有項目", {
-      selected: unitIds,
-      unselected: unselectedItems.map((item) => item.dataset.unitId),
-    });
+    const sortedOrder = sortedSelectedItems.map((li) => li.dataset.unitId);
+    const unselectOrder = unselectedItems.map((li) => li.dataset.unitId);
+    Logger.debug(
+      `【排序追蹤】reorder完成 選中[${sortedOrder.join("→")}]${unselectOrder.length ? ` 未選[${unselectOrder.join(",")}]` : ""}`,
+      {
+        選中並排序: sortedOrder,
+        "未選中（排後面）": unselectOrder,
+        目標順序: [...unitIds],
+      },
+    );
 
     // 重新排序後更新按鈕禁用狀態，確保第一個項目的▲被禁用、最後一個的▼被禁用
     setTimeout(() => this._tryCallPageManager("updateUnitButtonStates"), 0);
@@ -814,6 +922,14 @@ class ExperimentSystemManager {
       window.experimentSyncManager?.broadcastExperimentIdUpdate
     ) {
       window.experimentSyncManager.broadcastExperimentIdUpdate(newId);
+    } else if (broadcast && window.experimentHubManager?.isInSyncMode?.()) {
+      // 備援：面板頁面無 experimentSyncManager，直接透過 syncManager 廣播
+      window.syncManager.core?.syncState({
+        type: window.SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
+        clientId: window.syncClient?.clientId,
+        experimentId: newId,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // 通知日誌管理器

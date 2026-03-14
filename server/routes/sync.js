@@ -622,4 +622,53 @@ router.get("/share-code/:code", (req, res) => {
   }
 });
 
+/**
+ * POST /api/sync/channel
+ * 快速加入公開頻道（無需分享代碼，直接以頻道名稱連線）
+ *
+ * Request body: { channelName: "A"|"B"|"C", role?, clientId? }
+ * Response: { sessionId, clientId, role, channelName }
+ */
+router.post("/channel", (req, res) => {
+  const {
+    channelName,
+    role = ROLE.OPERATOR,
+    clientId: existingClientId,
+  } = req.body;
+
+  const VALID_CHANNELS = ["A", "B", "C"];
+
+  if (!channelName || !VALID_CHANNELS.includes(channelName.toUpperCase())) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      error: "INVALID_CHANNEL",
+      message: `頻道名稱無效，可用頻道: ${VALID_CHANNELS.join(", ")}`,
+    });
+  }
+
+  const validRole = [ROLE.OPERATOR, ROLE.VIEWER].includes(role)
+    ? role
+    : ROLE.OPERATOR;
+
+  // 公開頻道的 sessionId 使用固定前綴，不存入 DB（純記憶體工作階段）
+  const sessionId = `__CH_${channelName.toUpperCase()}__`;
+  const clientId = existingClientId || generateClientId();
+
+  Logger.event(
+    "cyan",
+    "~",
+    `公開頻道 | 頻道 ${channelName.toUpperCase()} | ${clientId} | ${validRole}`,
+  );
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: {
+      sessionId,
+      clientId,
+      role: validRole,
+      channelName: channelName.toUpperCase(),
+    },
+  });
+});
+
 export default router;

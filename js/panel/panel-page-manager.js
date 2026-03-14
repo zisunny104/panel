@@ -472,6 +472,11 @@ class PanelPageManager {
       await this._handleExperimentStarted(data);
     });
 
+    // 綁定實驗廣播到 SyncManager（panel 本地發起時廣播到其他裝置）
+    if (window.panelSyncManager?.bindExperimentBroadcast) {
+      window.panelSyncManager.bindExperimentBroadcast(flowManager);
+    }
+
     // 監聽實驗停止事件，清理按鈕狀態
     flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
       Logger.debug("Panel: 收到實驗停止事件，清理按鈕狀態");
@@ -495,6 +500,22 @@ class PanelPageManager {
   async _handleExperimentStarted(data) {
     try {
       const { units: unitIds } = data;
+
+      // 【電源狀態檢查】記錄實驗開始時的電源狀態
+      const isPowerOn = window.powerControl
+        ? window.powerControl.isPowerOn
+        : false;
+      Logger.info(
+        `[實驗開始] 電源狀態: ${isPowerOn ? "已開啟" : "未開啟"} | 單元: ${unitIds?.join(", ") || "無"}`,
+      );
+
+      // 電源未開啟時：高亮電源開關，提示用戶需要先開機
+      if (!isPowerOn) {
+        const powerSwitchArea = document.getElementById("powerSwitchArea");
+        if (powerSwitchArea) {
+          powerSwitchArea.classList.add("next-step-highlight");
+        }
+      }
 
       if (!unitIds || unitIds.length === 0) {
         Logger.warn("沒有可用的單元 ID，無法載入動作序列");
@@ -527,6 +548,11 @@ class PanelPageManager {
       // 通知按鈕管理器更新動作狀態
       this._notifyButtonManagerForActions(firstUnit);
 
+      // 【改變圓形按鈕顏色】實驗開始時，將 experimentPanelButton 改為綠色
+      if (window.panelPageManager?.setExperimentPanelButtonColor) {
+        window.panelPageManager.setExperimentPanelButtonColor("running");
+      }
+
       Logger.debug("實驗開始處理完成，已載入動作序列並通知管理器");
     } catch (error) {
       Logger.error("處理實驗開始事件失敗:", error);
@@ -545,8 +571,8 @@ class PanelPageManager {
       return false;
     }
 
-    // 從單元中提取步驟/動作
-    const actions = unit.steps || unit.actions || [];
+    // 從單元的步驟中提取所有 action（每個 step 內含 actions 陣列）
+    const actions = (unit.steps || []).flatMap((step) => step.actions || []);
 
     if (actions.length === 0) {
       Logger.warn(`單元 ${unit.unit_id} 沒有動作序列`);
@@ -596,17 +622,18 @@ class PanelPageManager {
       return;
     }
 
-    const actions = unit.steps || unit.actions || [];
+    // 從步驟中提取所有 action 物件（與 _loadUnitActionsToActionHandler 保持一致）
+    const allActions = (unit.steps || []).flatMap((step) => step.actions || []);
 
-    if (actions.length === 0) {
+    if (allActions.length === 0) {
       Logger.warn("沒有動作需要通知按鈕管理器");
       return;
     }
 
     // 準備動作數據
-    const actionData = actions.map((action, index) => ({
-      actionId: action.action_id || action.id || `action_${index}`,
-      buttonId: action.expected_button || action.button_id || `B${index + 1}`,
+    const actionData = allActions.map((action, index) => ({
+      actionId: action.action_id || action.actionId || `action_${index}`,
+      buttonId: action.action_buttons || `B${index + 1}`,
       action: action,
     }));
 
@@ -616,7 +643,7 @@ class PanelPageManager {
       unit: unit,
     });
 
-    Logger.debug(`已通知 ButtonManager 加載 ${actions.length} 個動作`);
+    Logger.debug(`已通知 ButtonManager 載入 ${allActions.length} 個動作`);
   }
 
   /**
@@ -673,6 +700,11 @@ class PanelPageManager {
    */
   _handleExperimentStopped() {
     Logger.debug("Panel: 清理實驗停止時的按鈕和動作狀態");
+
+    // 【重置圓形按鈕顏色】實驗停止時，將 experimentPanelButton 恢復為灰色
+    if (window.panelPageManager?.setExperimentPanelButtonColor) {
+      window.panelPageManager.setExperimentPanelButtonColor("default");
+    }
 
     // 清理 ButtonManager 中的實驗動作數據
     if (window.buttonManager) {
@@ -765,7 +797,7 @@ class PanelPageManager {
     if (!unitList) return;
 
     const checkboxes = Array.from(
-      unitList.querySelectorAll("input[name=\"unitCheckbox\"]"),
+      unitList.querySelectorAll('input[name="unitCheckbox"]'),
     );
     const checkedCount = checkboxes.filter((cb) => cb.checked).length;
 

@@ -16,6 +16,9 @@ import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 // 本檔使用的角色常數，避免硬編碼字串
 const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
 
+// 公開頻道 sessionId 前綴（不需 DB ，純記憶體內存在）
+const PUBLIC_CHANNEL_PREFIX = "__CH_";
+
 export class MessageHandler {
   constructor(connectionManager, sessionManager, broadcastManager) {
     this.connectionManager = connectionManager;
@@ -31,9 +34,12 @@ export class MessageHandler {
       [WS_PROTOCOL.C2S.AUTH]: this.handleAuth.bind(this),
       [WS_PROTOCOL.C2S.HEARTBEAT]: this.handleHeartbeat.bind(this),
       [WS_PROTOCOL.C2S.STATE_UPDATE]: this.handleStateUpdate.bind(this),
+      [WS_PROTOCOL.C2S.EXPERIMENT_STATE_REGISTER]:
+        this.handleExperimentStateRegister.bind(this),
       [WS_PROTOCOL.C2S.GET_SESSION_STATE]:
         this.handleGetSessionState.bind(this),
       [WS_PROTOCOL.C2S.PING]: this.handlePing.bind(this),
+      experiment_id_register: this.handleExperimentIdRegister.bind(this),
     };
   }
 
@@ -83,27 +89,29 @@ export class MessageHandler {
       throw new Error("認證失敗: 缺少 sessionId 或 clientId");
     }
 
-    try {
-      // 驗證工作階段存在
-      const session = this.sessionService.getSession(sessionId);
-      if (!session) {
-        // 工作階段不存在，通知客戶端清除本機同步資訊
-        Logger.warn(
-          `工作階段不存在 [${sessionId}]，通知客戶端 [${wsConnectionId}] 清除本機數據`,
-        );
-        this.sendResponse(ws, WS_PROTOCOL.S2C.CLEAR_SYNC_DATA, {
-          reason: "SESSION_NOT_FOUND",
-          message: `工作階段不存在: ${sessionId}`,
-        });
-        Logger.debug(
-          `[${wsConnectionId}] clear_sync_data 訊息已發送，準備拋出錯誤`,
-        );
-        throw new Error(`認證失敗: 工作階段不存在: ${sessionId}`);
-      }
+    // 判斷是否為公開頻道
+    const isPublicChannel = sessionId.startsWith(PUBLIC_CHANNEL_PREFIX);
 
-      // 驗證工作階段活動中
-      if (!session.is_active) {
-        throw new Error(`工作階段已失效: ${sessionId}`);
+    try {
+      if (isPublicChannel) {
+        // 公開頻道：跳過 DB 驗證，直接進入記憶體工作階段
+        Logger.event("cyan", "~", `公開頻道加入 | ${clientId} → ${sessionId}`);
+      } else {
+        // 私人工作階段：驗證 DB 記錄存在
+        const session = this.sessionService.getSession(sessionId);
+        if (!session) {
+          Logger.warn(
+            `工作階段不存在 [${sessionId}]，通知客戶端 [${wsConnectionId}] 清除本機數據`,
+          );
+          this.sendResponse(ws, WS_PROTOCOL.S2C.CLEAR_SYNC_DATA, {
+            reason: "SESSION_NOT_FOUND",
+            message: `工作階段不存在: ${sessionId}`,
+          });
+          throw new Error(`認證失敗: 工作階段不存在: ${sessionId}`);
+        }
+        if (!session.is_active) {
+          throw new Error(`工作階段已失效: ${sessionId}`);
+        }
       }
 
       // 在 ConnectionManager 中認證連線（會自動處理重新連線）
@@ -119,8 +127,10 @@ export class MessageHandler {
         isReconnect,
       });
 
-      // 更新工作階段最後活動時間
-      this.sessionService.updateLastActive(sessionId);
+      // 凁有私人工作階段才更新 DB 活動時間
+      if (!isPublicChannel) {
+        this.sessionService.updateLastActive(sessionId);
+      }
 
       // 發送認證成功回應
       this.sendResponse(ws, WS_PROTOCOL.S2C.AUTH_SUCCESS, {
@@ -128,7 +138,8 @@ export class MessageHandler {
         clientId,
         role,
         sessionInfo,
-        isReconnect, // 告知前端是否為重新連線
+        isReconnect,
+        isPublicChannel,
       });
 
       // 只在首次加入時廣播（重新連線不廣播，避免重複通知）
@@ -137,7 +148,6 @@ export class MessageHandler {
           role,
         });
       } else {
-        // 重新連線時，廣播 client_reconnected 事件
         this.broadcastManager.broadcastToRoom(
           sessionId,
           {
@@ -215,11 +225,31 @@ export class MessageHandler {
         throw new Error("客戶端不在工作階段中");
       }
 
-      // 更新工作階段狀態
-      this.sessionService.updateState(sessionId, state);
+      // 驗證角色：viewer 不可發送狀態更新
+      const clientRole = this.sessionManager.getClientRole(sessionId, clientId);
+      if (clientRole === ROLE.VIEWER) {
+        Logger.warn(
+          `拒絕 viewer 發送狀態更新 | clientId=${clientId} sessionId=${sessionId}`,
+        );
+        this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
+          code: "PERMISSION_DENIED",
+          message: "檢視者無法發送狀態更新",
+        });
+        return;
+      }
 
-      // 更新最後活動時間
-      this.sessionService.updateLastActive(sessionId);
+      // 更新工作階段狀態（記憶體層：公開頻道與私人階段皆適用）
+      this.sessionManager.setExperimentState(sessionId, state);
+
+      // 更新持久層（私人工作階段）
+      if (!sessionId.startsWith(PUBLIC_CHANNEL_PREFIX)) {
+        try {
+          this.sessionService.mergeState(sessionId, state);
+          this.sessionService.updateLastActive(sessionId);
+        } catch (e) {
+          Logger.warn(`持久化狀態失敗，已略過: ${e.message}`);
+        }
+      }
 
       // 廣播狀態更新給房間內其他客戶端
       this.broadcastManager.broadcastSessionState(sessionId, state, {
@@ -328,7 +358,24 @@ export class MessageHandler {
    * @returns {Object}
    */
   getSessionState(sessionId) {
-    // 取得工作階段資料
+    // 公開頻道：返回純記憶體狀態，無 DB 記錄
+    if (sessionId.startsWith(PUBLIC_CHANNEL_PREFIX)) {
+      const channelName = sessionId
+        .replace(PUBLIC_CHANNEL_PREFIX, "")
+        .replace("__", "");
+      const sessionInfo = this.sessionManager.getSessionInfo(sessionId);
+      const experimentState = this.sessionManager.getExperimentState(sessionId);
+      return {
+        sessionId,
+        isPublicChannel: true,
+        channelName,
+        clients: sessionInfo ? sessionInfo.clients : [],
+        state: experimentState || {},
+        experimentState,
+      };
+    }
+
+    // 私人工作階段：取得 DB 資料
     const session = this.sessionService.getSession(sessionId);
     if (!session) {
       throw new Error(`工作階段不存在: ${sessionId}`);
@@ -342,11 +389,20 @@ export class MessageHandler {
     // 取得工作階段資訊
     const sessionInfo = this.sessionManager.getSessionInfo(sessionId);
 
-    // 解析 session.data
-    const sessionData =
-      typeof session.data === "string"
-        ? JSON.parse(session.data)
-        : session.data;
+    // 解析 session.data（支援舊格式直存 / 新格式 { lastState, experimentState }）
+    let sessionData = {};
+    try {
+      sessionData =
+        typeof session.data === "string"
+          ? JSON.parse(session.data)
+          : session.data || {};
+    } catch (e) {}
+
+    // 優先從記憶體取得 experimentState（準確），fallback 到 DB
+    const experimentState =
+      this.sessionManager.getExperimentState(sessionId) ||
+      sessionData.experimentState ||
+      null;
 
     return {
       sessionId,
@@ -355,7 +411,8 @@ export class MessageHandler {
       lastActiveAt: session.last_active_at,
       isActive: session.is_active,
       clients: sessionInfo ? sessionInfo.clients : [],
-      state: sessionData.state || {},
+      state: sessionData.lastState || sessionData.state || {},
+      experimentState,
     };
   }
 
@@ -387,6 +444,152 @@ export class MessageHandler {
   }
 
   /**
+   * 處理實驗 ID 登錄並廣播給同頻道所有人
+   * @param {string} wsConnectionId - WebSocket 連線 ID
+   * @param {Object} data - 訊息資料，包含 experimentId
+   * @param {WebSocket} ws - WebSocket 連線
+   */
+  async handleExperimentIdRegister(wsConnectionId, data, ws) {
+    const { experimentId } = data || {};
+    if (!experimentId) {
+      this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
+        code: "INVALID_PARAMS",
+        message: "缺少 experimentId",
+      });
+      return;
+    }
+    const conn = this.connectionManager.connections.get(wsConnectionId);
+    const sessionId = conn?.sessionId;
+    const clientId = conn?.clientId;
+    if (!sessionId) return;
+    this.broadcastManager.broadcastExperimentIdUpdate(sessionId, experimentId, {
+      excludeClientId: clientId,
+    });
+
+    // 同時持久化 experimentId 至工作階段狀態
+    const currentExpState =
+      this.sessionManager.getExperimentState(sessionId) || {};
+    this.sessionManager.setExperimentState(sessionId, {
+      ...currentExpState,
+      registeredExperimentId: experimentId,
+    });
+    if (sessionId && !sessionId.startsWith(PUBLIC_CHANNEL_PREFIX)) {
+      try {
+        this.sessionService.mergeState(sessionId, {
+          ...currentExpState,
+          registeredExperimentId: experimentId,
+        });
+      } catch (e) {}
+    }
+
+    Logger.debug(
+      `實驗ID已廣播並持久化 | experimentId=${experimentId} session=${sessionId}`,
+    );
+  }
+
+  /**
+   * 註冊實驗狀態到中樞並廣播
+   * @param {string} wsConnectionId - WebSocket 連線 ID
+   * @param {Object} data - { state }
+   * @param {WebSocket} ws - WebSocket 連線
+   */
+  async handleExperimentStateRegister(wsConnectionId, data, ws) {
+    const { state } = data || {};
+    if (!state) {
+      this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
+        code: "INVALID_PARAMS",
+        message: "缺少 state",
+      });
+      return;
+    }
+
+    const conn = this.connectionManager.connections.get(wsConnectionId);
+    const sessionId = conn?.sessionId;
+    const clientId = conn?.clientId;
+
+    if (!sessionId || !clientId) {
+      this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
+        code: "INVALID_SESSION",
+        message: "工作階段不存在",
+      });
+      return;
+    }
+
+    // 驗證工作階段有效性
+    const session = this._validateSessionAndCleanup(
+      wsConnectionId,
+      sessionId,
+      ws,
+    );
+    if (!session) {
+      return; // 連線已被清理
+    }
+
+    // 驗證客戶端角色：viewer 不可發送狀態
+    const clientRole = this.sessionManager.getClientRole(sessionId, clientId);
+    if (clientRole === ROLE.VIEWER) {
+      this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
+        code: "PERMISSION_DENIED",
+        message: "檢視者無法註冊實驗狀態",
+      });
+      return;
+    }
+
+    // 記憶體層更新
+    this.sessionManager.setExperimentState(sessionId, state);
+
+    // 持久層更新（私人工作階段）
+    if (!sessionId.startsWith(PUBLIC_CHANNEL_PREFIX)) {
+      try {
+        this.sessionService.mergeState(sessionId, state);
+      } catch (e) {
+        Logger.warn(`持久化實驗狀態失敗，已略過: ${e.message}`);
+      }
+    }
+
+    // 廣播狀態更新（session_state_update）
+    this.broadcastManager.broadcastSessionState(sessionId, state, {
+      excludeClientId: clientId,
+    });
+
+    // 根據狀態類型轉發實驗事件（experiment_*）
+    const eventType = this._resolveExperimentEventType(state);
+    if (eventType) {
+      this.broadcastManager.broadcastExperimentEvent(sessionId, eventType, {
+        ...state,
+        sessionId,
+      });
+    }
+  }
+
+  _resolveExperimentEventType(state) {
+    if (!state) return null;
+    if (state.type === "experiment_started") return "started";
+    if (state.type === "experiment_paused") return "paused";
+    if (state.type === "experiment_resumed") return "resumed";
+    if (state.type === "experiment_stopped") return "stopped";
+    if (
+      state.type === "experiment_state_change" &&
+      state.event === "experiment_paused"
+    ) {
+      return "paused";
+    }
+    if (
+      state.type === "experiment_state_change" &&
+      state.event === "experiment_resumed"
+    ) {
+      return "resumed";
+    }
+    if (
+      state.type === "experiment_state_change" &&
+      state.event === "experiment_stopped"
+    ) {
+      return "stopped";
+    }
+    return null;
+  }
+
+  /**
    * 驗證工作階段並在無效時斷開連線
    * @private
    * @param {string} wsConnectionId - WebSocket 連線 ID
@@ -395,6 +598,10 @@ export class MessageHandler {
    * @returns {Object|null} 工作階段資料或 null（如果無效）
    */
   _validateSessionAndCleanup(wsConnectionId, sessionId, ws) {
+    // 公開頻道：不需 DB 驗證，直接通過
+    if (sessionId.startsWith(PUBLIC_CHANNEL_PREFIX)) {
+      return { is_active: true, isPublicChannel: true };
+    }
     try {
       const session = this.sessionService.getSession(sessionId);
       if (!session) {

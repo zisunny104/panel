@@ -69,7 +69,9 @@ class ExperimentStateManager {
       }
     }
 
-    const participantNameInput = document.getElementById("participantName");
+    const participantNameInput = document.getElementById(
+      "participantNameInput",
+    );
     if (participantNameInput) {
       participantNameInput.addEventListener("input", (e) => {
         const newName = e.target.value.trim();
@@ -97,10 +99,13 @@ class ExperimentStateManager {
       this.applyHubState && this.applyHubState(state);
     });
 
-    document.addEventListener("experiment_id_changed", (event) => {
-      const { experimentId } = event.detail;
-      this.setExperimentId && this.setExperimentId(experimentId, "hub");
-    });
+    document.addEventListener(
+      window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
+      (event) => {
+        const { experimentId } = event.detail;
+        this.setExperimentId && this.setExperimentId(experimentId, "hub");
+      },
+    );
 
     document.addEventListener("participant_name_updated", (event) => {
       const { participantName } = event.detail;
@@ -209,7 +214,9 @@ class ExperimentStateManager {
         Logger.info &&
         Logger.info(`受試者名稱已更新 (${source}): ${participantName}`);
 
-      const participantNameInput = document.getElementById("participantName");
+      const participantNameInput = document.getElementById(
+        "participantNameInput",
+      );
       if (
         participantNameInput &&
         participantNameInput.value.trim() !== participantName

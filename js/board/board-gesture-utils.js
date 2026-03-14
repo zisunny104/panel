@@ -33,11 +33,12 @@ const markGesture = function (idx, status, gestureName) {
   if (window.syncManager?.core?.isConnected?.()) {
     window.syncManager.core
       .syncState({
-        type: "gesture_marked",
-        step_index: idx,
-        gesture_name: gestureName,
-        mark_status: status,
-        timer_value: timerValue,
+        type: window.SYNC_DATA_TYPES.GESTURE_MARKED,
+        clientId: window.syncManager?.clientId,
+        stepIndex: idx,
+        gestureName: gestureName,
+        markStatus: status,
+        timerValue: timerValue,
         timestamp: timestamp,
       })
       .catch((error) => {
@@ -118,10 +119,11 @@ const goToNextStep = function (idx, gestureName) {
   if (window.syncManager?.core?.isConnected?.()) {
     window.syncManager.core
       .syncState({
-        type: "gesture_step_completed",
-        step_index: idx,
-        gesture_name: gestureName,
-        timer_value: timerValue,
+        type: window.SYNC_DATA_TYPES.GESTURE_STEP_COMPLETED,
+        clientId: window.syncManager?.clientId,
+        stepIndex: idx,
+        gestureName: gestureName,
+        timerValue: timerValue,
         timestamp: new Date().toISOString(),
       })
       .catch((error) => {

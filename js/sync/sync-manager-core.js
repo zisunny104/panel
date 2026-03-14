@@ -175,6 +175,39 @@ export class SyncManagerCore {
     }
   }
 
+  /**
+   * 加入公開頻道
+   * @param {string} channelName - 頻道名稱 "A" | "B" | "C"
+   * @param {string} role - 角色
+   */
+  async joinPublicChannel(
+    channelName,
+    role = window.SyncManager?.ROLE?.OPERATOR,
+  ) {
+    try {
+      await this.syncClient.joinPublicChannel(channelName, role);
+      this.currentRole = role;
+
+      Logger.info(`[公開頻道] 加入成功 | 頻道: ${channelName} | 角色: ${role}`);
+
+      window.dispatchEvent(
+        new CustomEvent(SYNC_EVENTS.SESSION_JOINED, {
+          detail: {
+            sessionId: this.syncClient.sessionId,
+            channelName,
+            role,
+            isPublicChannel: true,
+          },
+        }),
+      );
+
+      return true;
+    } catch (error) {
+      Logger.error("加入公開頻道失敗", error);
+      throw error;
+    }
+  }
+
   async restoreSession(
     sessionId,
     clientId,
@@ -273,10 +306,10 @@ export class SyncManagerCore {
 
   isDuplicateState(newState) {
     const strictDeduplicationTypes = [
-      "experiment_started",
-      "experiment_stopped",
-      "experiment_paused",
-      "experiment_resumed",
+      SYNC_DATA_TYPES.EXPERIMENT_STARTED,
+      SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
+      SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
+      SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
     ];
 
     if (!strictDeduplicationTypes.includes(newState.type)) {
@@ -482,10 +515,7 @@ export class SyncManagerCore {
         type: SYNC_DATA_TYPES.SESSION_STATE_UPDATE,
         experimentId: document.getElementById("experimentIdInput")?.value || "",
         participantName:
-          (
-            document.getElementById("participantName") ||
-            document.getElementById("participantNameInput")
-          )?.value || "",
+          document.getElementById("participantNameInput")?.value || "",
         timestamp: new Date().toISOString(),
       };
 

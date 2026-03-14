@@ -192,6 +192,19 @@ export class SessionManager {
   }
 
   /**
+   * 取得客戶端在工作階段中的角色
+   * @param {string} sessionId - 工作階段 ID
+   * @param {string} clientId - 客戶端 ID
+   * @returns {string|null} 角色 ('operator' | 'viewer') 或 null（不在工作階段中）
+   */
+  getClientRole(sessionId, clientId) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return null;
+    const clientMeta = session.clients.get(clientId);
+    return clientMeta ? (clientMeta.role ?? null) : null;
+  }
+
+  /**
    * 取得客戶端所在的工作階段
    * @param {string} clientId - 客戶端 ID
    * @returns {string|null} sessionId
@@ -258,5 +271,38 @@ export class SessionManager {
       }
     }
     this.activeSessions.clear();
+  }
+
+  // ==================== 實驗狀態追蹤（含公開頻道）====================
+
+  /**
+   * 設定工作階段的實驗狀態（記憶體，適用公開頻道與私人工作階段）
+   * @param {string} sessionId
+   * @param {Object} state - 實驗狀態物件
+   */
+  setExperimentState(sessionId, state) {
+    if (!this.activeSessions.has(sessionId)) return;
+    const session = this.activeSessions.get(sessionId);
+    // 合併現有狀態，以免覆蓋無關欄位
+    session.experimentState = { ...(session.experimentState || {}), ...state };
+  }
+
+  /**
+   * 取得工作階段的實驗狀態
+   * @param {string} sessionId
+   * @returns {Object|null}
+   */
+  getExperimentState(sessionId) {
+    const session = this.activeSessions.get(sessionId);
+    return session?.experimentState || null;
+  }
+
+  /**
+   * 清除工作階段的實驗狀態（實驗結束時呼叫）
+   * @param {string} sessionId
+   */
+  clearExperimentState(sessionId) {
+    const session = this.activeSessions.get(sessionId);
+    if (session) session.experimentState = null;
   }
 }

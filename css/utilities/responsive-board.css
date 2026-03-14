@@ -12,10 +12,6 @@
         max-width: 95vw;
     }
 
-    .experiment-panel-header {
-        flex-direction: column;
-    }
-
     .experiment-panel-defaults {
         min-height: auto;
     }
@@ -29,10 +25,6 @@
     .experiment-panel {
         max-width: 100vw;
         border-radius: 0;
-    }
-
-    .experiment-panel-header {
-        padding: 12px;
     }
 
     .experiment-panel-defaults {

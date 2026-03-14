@@ -26,6 +26,20 @@
     justify-content: space-between;
     font-weight: bold;
     flex-shrink: 0;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+}
+
+.experiment-panel-header>strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.experiment-panel-header>.circle-close-btn {
+    flex-shrink: 0;
 }
 
 /* Close button (shared with settings control-panel) */

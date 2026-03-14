@@ -227,7 +227,8 @@ export class BroadcastManager {
    * @param {Object} metadata - 元資料
    * @returns {Object} 發送結果
    */
-  broadcastExperimentIdUpdate(sessionId, experimentId, metadata = {}) {
+  broadcastExperimentIdUpdate(sessionId, experimentId, options = {}) {
+    const { excludeClientId, ...metadata } = options;
     const message = {
       type: WS_PROTOCOL.S2C.EXPERIMENT_ID_CHANGED,
       data: {
@@ -236,7 +237,11 @@ export class BroadcastManager {
       },
     };
 
-    return this.broadcastToRoom(sessionId, message);
+    return this.broadcastToRoom(
+      sessionId,
+      message,
+      excludeClientId ? { excludeClientId } : {},
+    );
   }
 
   /**

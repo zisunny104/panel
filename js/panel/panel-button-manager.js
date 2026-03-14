@@ -122,7 +122,7 @@ class ButtonManager {
       `.button-overlay[data-label="${buttonId}"]`,
     );
     const shiftButtonOverlay = document.querySelector(
-      ".button-overlay[data-label=\"B1\"]",
+      '.button-overlay[data-label="B1"]',
     );
     if (!button) {
       if (typeof Logger !== "undefined") {
@@ -146,14 +146,14 @@ class ButtonManager {
         button.classList.toggle("shift-active", this.isShiftPressed);
 
         // 同步更新按鈕覆蓋層的狀態
-        const shiftOverlay = document.querySelector("[data-button=\"B1\"]");
+        const shiftOverlay = document.querySelector('[data-button="B1"]');
         if (shiftOverlay) {
           shiftOverlay.classList.toggle("shift-active", this.isShiftPressed);
         }
 
         actionMessage = this.isShiftPressed
-          ? "模擬按鈕 \"B1\" (Shift) 按下"
-          : "模擬按鈕 \"B1\" (Shift) 放開";
+          ? '模擬按鈕 "B1" (Shift) 按下'
+          : '模擬按鈕 "B1" (Shift) 放開';
         functionName = "shift";
 
         Logger.debug(`Shift 狀態: ${this.isShiftPressed ? "按下" : "放開"}`);
@@ -214,7 +214,7 @@ class ButtonManager {
     }
 
     // 實驗模式下檢查是否有對應的動作
-    if (window.panelExperiment?.isExperimentRunning) {
+    if (window.experimentFlowManager?.isRunning) {
       if (this.checkAndExecuteExperimentAction(buttonId, functionName)) {
         // 注意：按鈕動作廣播已移至 completeCurrentAction() 中進行
         // 確保包含 actionId，避免重複廣播
@@ -305,7 +305,7 @@ class ButtonManager {
     }
 
     // 檢查實驗是否在執行中
-    if (!window.panelExperiment?.isExperimentRunning) {
+    if (!window.experimentFlowManager?.isRunning) {
       Logger.debug(`實驗未執行，跳過按鈕動作: ${buttonId}`);
       return false;
     }
@@ -392,8 +392,7 @@ class ButtonManager {
         currentAction.interactions[functionName]
       ) {
         const interaction = currentAction.interactions[functionName];
-        const nextActionId =
-          interaction.next_actionId || interaction.next_action_id;
+        const nextActionId = interaction.next_action_id;
         Logger.debug(
           `找到互動定義: ${functionName} -> ${nextActionId || "無下一個動作"}`,
         );
@@ -444,8 +443,8 @@ class ButtonManager {
 
           // 取得目前 unit 的所有 step
           const currentUnitId =
-            window.panelExperiment?.loadedUnits?.[
-              window.panelExperiment?.currentUnitIndex
+            window.experimentFlowManager?.loadedUnits?.[
+              window.experimentFlowManager?.currentUnitIndex
             ];
           const allStepsInUnit = new Set();
           if (currentUnitId && window.experimentActionHandler.actionToStepMap) {
@@ -522,8 +521,8 @@ class ButtonManager {
 
         // 取得目前 unit 的所有 step
         const currentUnitId =
-          window.panelExperiment?.loadedUnits?.[
-            window.panelExperiment?.currentUnitIndex
+          window.experimentFlowManager?.loadedUnits?.[
+            window.experimentFlowManager?.currentUnitIndex
           ];
         const allStepsInUnit = new Set();
         if (currentUnitId && window.experimentActionHandler.actionToStepMap) {
@@ -627,8 +626,8 @@ class ButtonManager {
       });
 
       // 冷卻結束後，進入下一步
-      if (window.panelExperiment?.flow?.nextStep) {
-        window.panelExperiment.flow.nextStep();
+      if (window.experimentFlowManager?.nextStep) {
+        window.experimentFlowManager.nextStep();
       }
     }, 3000);
   }
@@ -667,18 +666,20 @@ class ButtonManager {
       localStorage.getItem("showTouchVisuals") !== "false";
     if (
       showTouchVisuals &&
-      window.panelExperiment?.isExperimentRunning &&
+      window.experimentFlowManager?.isRunning &&
       !document.body.classList.contains("visual-hints-enabled")
     ) {
       document.body.classList.add("visual-hints-enabled");
     }
 
-    // 檢查是否在等待電源開啟
-    const isWaitingForPowerOn =
-      window.panelExperiment?.waitingForPowerOn || false;
+    // 檢查是否在等待電源開啟（新架構不使用此機制）
+    const isWaitingForPowerOn = false;
 
     // 檢查機器是否已開機
     const isPowerOn = this.isPowerOn();
+    // 開機動畫播放中時不顯示按鈕高亮（等動畫結束後再顯示）
+    const isPowerVideoPlaying =
+      window.powerControl?.isPowerVideoPlaying || false;
 
     // 清除所有按鈕的高亮效果
     this.clearAllButtonHighlights();
@@ -723,16 +724,26 @@ class ButtonManager {
         `目前動作: ${currentAction.actionId}, 按鈕: ${currentAction.action_buttons}`,
       );
 
-      // 顯示媒體
-      if (currentAction.media_file && window.mediaManager) {
-        window.mediaManager.displayMedia(currentAction.media_file);
-      } else if (window.mediaManager) {
-        // 如果沒有設定媒體，強制播放首頁循環影片（即使在實驗模式）
-        window.mediaManager.playHomePageLoop(true);
+      // 【檢查電源狀態】電源關閉時，不顯示實驗媒體，只保持首頁循環
+      if (isPowerOn) {
+        // 顯示媒體
+        if (currentAction.media_file && window.mediaManager) {
+          window.mediaManager.displayMedia(currentAction.media_file);
+        } else if (window.mediaManager) {
+          // 如果沒有設定媒體，強制播放首頁循環影片（即使在實驗模式）
+          window.mediaManager.playHomePageLoop(true);
+        }
+      } else {
+        // 電源關閉時，不顯示媒體區內容
+        Logger.debug(`電源未開啟，不載入媒體: ${currentAction.actionId}`);
+        if (window.mediaManager) {
+          // 清空媒體區，保持首頁狀態
+          window.mediaManager.mediaArea.innerHTML = "";
+        }
       }
 
-      // 高亮下一個有效的按鈕
-      if (currentAction.action_buttons) {
+      // 高亮下一個有效的按鈕（電源開啟且開機動畫完成後才顯示）
+      if (isPowerOn && !isPowerVideoPlaying && currentAction.action_buttons) {
         const actionButtons = Array.isArray(currentAction.action_buttons)
           ? currentAction.action_buttons
           : currentAction.action_buttons.split(",").map((s) => s.trim());
@@ -809,7 +820,7 @@ class ButtonManager {
 
         // 檢查是否需要 B1 (Shift) - 根據 buttons.json 判斷
         const shiftButton = document.querySelector(
-          ".button-overlay[data-label=\"B1\"]",
+          '.button-overlay[data-label="B1"]',
         );
 
         if (requiresShiftFunctions.length > 0 && shiftButton) {
@@ -893,8 +904,12 @@ class ButtonManager {
     });
 
     // 監聽來自輪詢機制的全域狀態更新（從 sync-client.js 的 triggerStateUpdate 觸發）
-    window.addEventListener("sync_state_update", (e) => {
-      if (e.detail && e.detail.type === "buttonPress") {
+    window.addEventListener(window.SYNC_EVENTS.STATE_UPDATE, (e) => {
+      if (!e.detail) return;
+      // 防止自我回聲
+      const myId = window.syncClient?.clientId;
+      if (myId && e.detail.clientId === myId) return;
+      if (e.detail.type === "buttonPress") {
         this.handleRemoteButtonPress(e.detail);
       }
     });
@@ -1092,7 +1107,7 @@ class ButtonManager {
       if (event.key === "Shift" && this.isShiftPressed) {
         this.isShiftPressed = false;
         document
-          .querySelector(".button-overlay[data-label=\"B1\"]")
+          .querySelector('.button-overlay[data-label="B1"]')
           ?.classList.remove("shift-active");
         window.logger?.logAction("鍵盤 Shift 放開");
       }
@@ -1234,12 +1249,12 @@ class ButtonManager {
    * 觸控 shift 的特殊處理
    */
   executeTouchShift() {
-    const button = document.querySelector(".button-overlay[data-label=\"B1\"]");
+    const button = document.querySelector('.button-overlay[data-label="B1"]');
     if (!button) return;
 
     // 基本 Shift 按鈕記錄
     window.logger?.logAction(
-      "觸控模擬按鈕 \"B1\" (Shift)，功能為 \"shift\"",
+      '觸控模擬按鈕 "B1" (Shift)，功能為 "shift"',
       "B1",
       "shift",
       false,
@@ -1321,6 +1336,9 @@ class ButtonManager {
     });
 
     Logger.debug(`已載入 ${actions.length} 個實驗動作`);
+
+    // 立即高亮第一個動作對應的按鈕
+    this.updateMediaForCurrentAction();
   }
 
   /**
@@ -1458,4 +1476,3 @@ class ButtonManager {
 
 // 匯出單例
 window.buttonManager = new ButtonManager();
-

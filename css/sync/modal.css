@@ -76,10 +76,10 @@
     justify-content: space-between;
 }
 
-/* 在同步控制面板中，讓 body 的內容置中（水平與垂直置中） */
+/* 在同步控制面板中，讓 body 的內容置中（水平置中，垂直從頂部開始以確保可捲動） */
 .sync-control-panel .modal-body {
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
 }
 
 .sync-control-panel .modal-header>.modal-title {

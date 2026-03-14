@@ -22,59 +22,65 @@ class ExperimentSyncAdapter {
       // 依 type 對應到本地頁面事件
       if (detail.type === window.SYNC_DATA_TYPES.EXPERIMENT_STARTED) {
         window.dispatchEvent(
-          new CustomEvent("remote_experiment_started", { detail }),
+          new CustomEvent(window.SYNC_EVENTS.REMOTE_EXPERIMENT_STARTED, {
+            detail,
+          }),
         );
       } else if (
         detail.type === window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE
       ) {
         const map = {
           [window.SYNC_DATA_TYPES.EXPERIMENT_PAUSED]:
-            "remote_experiment_paused",
+            window.SYNC_EVENTS.REMOTE_EXPERIMENT_PAUSED,
           [window.SYNC_DATA_TYPES.EXPERIMENT_RESUMED]:
-            "remote_experiment_resumed",
+            window.SYNC_EVENTS.REMOTE_EXPERIMENT_RESUMED,
           [window.SYNC_DATA_TYPES.EXPERIMENT_STOPPED]:
-            "remote_experiment_stopped",
+            window.SYNC_EVENTS.REMOTE_EXPERIMENT_STOPPED,
         };
         if (detail.event && map[detail.event]) {
           window.dispatchEvent(new CustomEvent(map[detail.event], { detail }));
         }
       } else if (detail.type === window.SYNC_DATA_TYPES.EXPERIMENT_ACTION) {
         window.dispatchEvent(
-          new CustomEvent("remote_experiment_action", { detail }),
+          new CustomEvent(window.SYNC_EVENTS.REMOTE_EXPERIMENT_ACTION, {
+            detail,
+          }),
         );
       } else if (detail.type === window.SYNC_DATA_TYPES.BUTTON_ACTION) {
         window.dispatchEvent(
-          new CustomEvent("remote_button_action", { detail }),
+          new CustomEvent(window.SYNC_EVENTS.REMOTE_BUTTON_ACTION, { detail }),
         );
       } else {
         // fallback: re-dispatch generic
-        window.dispatchEvent(new CustomEvent("remote_sync_event", { detail }));
+        window.dispatchEvent(
+          new CustomEvent(window.SYNC_EVENTS.REMOTE_SYNC_EVENT, { detail }),
+        );
       }
     });
   }
 
   _bindDomEvents() {
-    // Listen to local experiment events and forward to core
-    document.addEventListener("experiment_started", (e) => {
+    // 監聽本地實驗 DOM 事件並轉送至 ExperimentSyncCore 廣播
+    document.addEventListener(window.SYNC_EVENTS.EXPERIMENT_STARTED, (e) => {
       this.core?.broadcastExperimentStart(e.detail);
     });
-    document.addEventListener("experiment_paused", (e) => {
+    document.addEventListener(window.SYNC_EVENTS.EXPERIMENT_PAUSED, (e) => {
       this.core?.broadcastExperimentPause(e.detail);
     });
-    document.addEventListener("experiment_resumed", (e) => {
+    document.addEventListener(window.SYNC_EVENTS.EXPERIMENT_RESUMED, (e) => {
       this.core?.broadcastExperimentResume(e.detail);
     });
-    document.addEventListener("experiment_stopped", (e) => {
+    document.addEventListener(window.SYNC_EVENTS.EXPERIMENT_STOPPED, (e) => {
       this.core?.broadcastExperimentStop(e.detail);
     });
-    document.addEventListener("experiment_action_recorded", (e) => {
-      this.core?.broadcastExperimentAction(e.detail);
-    });
-    document.addEventListener("experimentStateChange", (e) => {
-      if (e.detail?.type === "button_action") {
-        this.core?.broadcastButtonAction(e.detail);
-      }
-    });
+    document.addEventListener(
+      window.SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL,
+      (e) => {
+        if (e.detail?.type === window.SYNC_DATA_TYPES.BUTTON_ACTION) {
+          this.core?.broadcastButtonAction(e.detail);
+        }
+      },
+    );
   }
 
   // adapter status
@@ -107,24 +113,33 @@ class ExperimentSyncAdapter {
   /** 註冊實驗狀態到中樞 */
   async registerExperimentStateToHub(stateData) {
     try {
-      const _params = new URLSearchParams({
-        action: "register",
-        experiment_id: stateData.experiment_id || "",
-        subject_name: stateData.subject_name || "",
-        combination_name: stateData.combination_name || "",
-        combination_id: stateData.combination_id || "",
-        gesture_count: stateData.gesture_count || 0,
-        gesture_sequence: JSON.stringify(stateData.gesture_sequence || []),
-        current_step: stateData.current_step || 0,
-        is_running: stateData.is_running ? "true" : "false",
-        source: "experiment_manager",
-      });
+      const hubManager = window.experimentHubManager;
+      if (!hubManager?.registerExperimentState) {
+        Logger.debug("ExperimentHubManager 不可用，跳過實驗狀態註冊");
+        return false;
+      }
 
-      // 移除 PHP 調用
-      // 狀態管理由 ExperimentStateManager 和 WebSocket 處理
-      Logger.debug("跳過 PHP API 調用");
+      const payload = {
+        type: stateData.type || window.SYNC_DATA_TYPES.EXPERIMENT_STARTED,
+        event: stateData.event,
+        experimentId: stateData.experiment_id || stateData.experimentId || "",
+        subjectName: stateData.subject_name || stateData.subjectName || "",
+        combinationId:
+          stateData.combination_id || stateData.combinationId || "",
+        combinationName:
+          stateData.combination_name || stateData.combinationName || "",
+        gestureCount: stateData.gesture_count || stateData.gestureCount || 0,
+        gestureSequence:
+          stateData.gesture_sequence || stateData.gestureSequence || [],
+        currentStep: stateData.current_step || stateData.currentStep || 0,
+        isRunning: stateData.is_running || stateData.isRunning || false,
+        source: "experiment_manager",
+      };
+
+      return await hubManager.registerExperimentState(payload);
     } catch (error) {
       Logger.warn("註冊實驗狀態失敗:", error);
+      return false;
     }
   }
 
@@ -135,8 +150,8 @@ class ExperimentSyncAdapter {
     }
 
     const updateData = {
-      type: "experimentIdUpdate",
-      client_id: this.core?.syncClient?.clientId || "experiment_panel",
+      type: window.SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
+      clientId: this.core?.syncClient?.clientId || "experiment_panel",
       experimentId: experimentId,
       timestamp: new Date().toISOString(),
     };
@@ -146,7 +161,7 @@ class ExperimentSyncAdapter {
     });
 
     document.dispatchEvent(
-      new CustomEvent("experimentStateChange", {
+      new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
         detail: updateData,
       }),
     );

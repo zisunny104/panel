@@ -54,7 +54,9 @@ class BoardUIManager {
    * 設定受試者名稱輸入框事件
    */
   setupParticipantNameInput() {
-    const participantNameInput = document.getElementById("participantName");
+    const participantNameInput = document.getElementById(
+      "participantNameInput",
+    );
     if (participantNameInput) {
       participantNameInput.addEventListener("input", (e) => {
         this.core.participantName = e.target.value;
