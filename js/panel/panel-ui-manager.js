@@ -430,7 +430,7 @@ class PanelUIManager {
   updateTouchVisuals(visible) {
     const buttonOverlays = document.querySelectorAll(".button-overlay");
     const shiftButtonOverlay = document.querySelector(
-      ".button-overlay[data-label=\"B1\"]",
+      '.button-overlay[data-label="B1"]',
     );
     const mediaArea = document.getElementById("mediaArea");
     localStorage.setItem("showTouchVisuals", visible ? "true" : "false");
@@ -929,21 +929,37 @@ class PanelUIManager {
     );
 
     // 套用切換設定
-    this.updateButtonLabelVisibility(
-      localStorage.getItem("showButtonLabels") !== "false",
+    const showButtonLabels =
+      localStorage.getItem("showButtonLabels") !== "false";
+    const showButtonColors =
+      localStorage.getItem("showButtonColors") !== "false";
+    const showTouchVisuals =
+      localStorage.getItem("showTouchVisuals") !== "false";
+    const showMediaAreaMarker =
+      localStorage.getItem("showMediaAreaMarker") === "true";
+    const showMediaContent =
+      localStorage.getItem("showMediaContent") !== "false";
+
+    this.updateButtonLabelVisibility(showButtonLabels);
+    this.updateButtonColorVisibility(showButtonColors);
+    this.updateTouchVisuals(showTouchVisuals);
+    this.updateMediaAreaMarkerVisibility(showMediaAreaMarker);
+    this.updateMediaContentVisibility(showMediaContent);
+
+    // 同步設定面板的開鱗狀態（確保開鱗的沈視每為實際狀態）
+    const toggleButtonLabels = document.getElementById("toggleButtonLabels");
+    if (toggleButtonLabels) toggleButtonLabels.checked = showButtonLabels;
+    const toggleButtonColors = document.getElementById("toggleButtonColors");
+    if (toggleButtonColors) toggleButtonColors.checked = showButtonColors;
+    const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
+    if (toggleTouchVisuals) toggleTouchVisuals.checked = showTouchVisuals;
+    const toggleMediaAreaMarker = document.getElementById(
+      "toggleMediaAreaMarker",
     );
-    this.updateButtonColorVisibility(
-      localStorage.getItem("showButtonColors") !== "false",
-    );
-    this.updateTouchVisuals(
-      localStorage.getItem("showTouchVisuals") !== "false",
-    );
-    this.updateMediaAreaMarkerVisibility(
-      localStorage.getItem("showMediaAreaMarker") === "true",
-    );
-    this.updateMediaContentVisibility(
-      localStorage.getItem("showMediaContent") !== "false",
-    );
+    if (toggleMediaAreaMarker)
+      toggleMediaAreaMarker.checked = showMediaAreaMarker;
+    const toggleMediaContent = document.getElementById("toggleMediaContent");
+    if (toggleMediaContent) toggleMediaContent.checked = showMediaContent;
 
     // 套用音量設定
     const beepVolume =

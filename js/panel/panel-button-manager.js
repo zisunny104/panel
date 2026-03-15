@@ -591,7 +591,15 @@ class ButtonManager {
     // 檢查是否還有下一個動作（實驗是否已完成）
     const nextAction = window.experimentActionHandler?.getCurrentAction();
     if (!nextAction) {
-      // 實驗已完成，不執行冷卻效果
+      // 實驗已完成，檢查是否為最後單元完成
+      const flowManager = window.experimentFlowManager;
+      if (
+        flowManager &&
+        flowManager.currentUnitIndex === flowManager.loadedUnits.length - 1
+      ) {
+        Logger.debug("最後單元完成，即將顯示電源開關高亮");
+        // 最後單元完成時的電源高亮由 nextUnit() 處理
+      }
       return;
     }
 
@@ -742,8 +750,15 @@ class ButtonManager {
         }
       }
 
-      // 高亮下一個有效的按鈕（電源開啟且開機動畫完成後才顯示）
-      if (isPowerOn && !isPowerVideoPlaying && currentAction.action_buttons) {
+      // 高亮下一個有效的按鈕（電源開啟、開機動畫完成、且實驗正在運行時才顯示）
+      const isExperimentRunning =
+        window.experimentFlowManager?.isRunning || false;
+      if (
+        isPowerOn &&
+        !isPowerVideoPlaying &&
+        isExperimentRunning &&
+        currentAction.action_buttons
+      ) {
         const actionButtons = Array.isArray(currentAction.action_buttons)
           ? currentAction.action_buttons
           : currentAction.action_buttons.split(",").map((s) => s.trim());
@@ -800,6 +815,12 @@ class ButtonManager {
 
         // 第一個按鈕用綠色高亮，其餘用橘色高亮
         matchedButtons.forEach((item, index) => {
+          // 檢查按鈕是否被鎖定（實驗中無法操作）
+          if (item.btn.classList.contains("experiment-disabled")) {
+            Logger.debug(`按鈕 ${item.buttonId} 已被鎖定，不顯示高亮`);
+            return; // 跳過這個按鈕
+          }
+
           if (index === 0) {
             // 綠色（主按鈕）
             item.btn.classList.add("next-step-highlight");
@@ -824,11 +845,16 @@ class ButtonManager {
         );
 
         if (requiresShiftFunctions.length > 0 && shiftButton) {
-          // Shift 也用綠色高亮（和主按鈕同色）
-          shiftButton.classList.add("next-step-highlight");
-          Logger.debug(
-            `Shift 按鈕高亮: 需要的功能 [${requiresShiftFunctions.join(", ")}]`,
-          );
+          // 檢查 Shift 按鈕是否被鎖定
+          if (!shiftButton.classList.contains("experiment-disabled")) {
+            // Shift 也用綠色高亮（和主按鈕同色）
+            shiftButton.classList.add("next-step-highlight");
+            Logger.debug(
+              `Shift 按鈕高亮: 需要的功能 [${requiresShiftFunctions.join(", ")}]`,
+            );
+          } else {
+            Logger.debug("Shift 按鈕已被鎖定，不顯示高亮");
+          }
         } else if (shiftButton) {
           // 只在真正有高亮時才記錄移除日志
           const hadHighlight =

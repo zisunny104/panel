@@ -533,20 +533,44 @@ class PanelPageManager {
 
       const allUnits = systemManager.state.scriptData.units || [];
 
-      // 根據單元 ID 查找對應的單元對象
-      const firstUnitId = unitIds[0];
-      const firstUnit = allUnits.find((unit) => unit.unit_id === firstUnitId);
+      // 【電源已開啟時的優化流程】
+      // 若電源已開啟，檢查第一個單元是否為開機相關單元，如是則跳過
+      let unitIdToLoad = unitIds[0];
+      let adjustedUnitIds = [...unitIds];
 
-      if (!firstUnit) {
-        Logger.warn(`找不到單元 ID: ${firstUnitId} 的對應單元資料`);
+      if (isPowerOn && unitIds.length > 0) {
+        const firstUnit = allUnits.find((unit) => unit.unit_id === unitIds[0]);
+        // 判斷第一個單元是否涉及開機流程（如單元名稱包含"開機"）
+        if (firstUnit && firstUnit.title && firstUnit.title.includes("開機")) {
+          Logger.debug(
+            `電源已開啟，自動跳過開機單元: ${unitIds[0]}，進入下一個單元`,
+          );
+          if (unitIds.length > 1) {
+            unitIdToLoad = unitIds[1];
+            adjustedUnitIds = unitIds.slice(1);
+            // 更新FlowManager的loadedUnits（跳過第一個單元）
+            if (window.experimentFlowManager) {
+              window.experimentFlowManager.loadedUnits = adjustedUnitIds;
+            }
+          }
+        }
+      }
+
+      // 根據單元 ID 查找對應的單元對象
+      const firstUnitToLoad = allUnits.find(
+        (unit) => unit.unit_id === unitIdToLoad,
+      );
+
+      if (!firstUnitToLoad) {
+        Logger.warn(`找不到單元 ID: ${unitIdToLoad} 的對應單元資料`);
         return;
       }
 
       // 載入動作序列到 ActionHandler
-      await this._loadUnitActionsToActionHandler(firstUnit);
+      await this._loadUnitActionsToActionHandler(firstUnitToLoad);
 
       // 通知按鈕管理器更新動作狀態
-      this._notifyButtonManagerForActions(firstUnit);
+      this._notifyButtonManagerForActions(firstUnitToLoad);
 
       // 【改變圓形按鈕顏色】實驗開始時，將 experimentPanelButton 改為綠色
       if (window.panelPageManager?.setExperimentPanelButtonColor) {
@@ -706,8 +730,22 @@ class PanelPageManager {
       window.panelPageManager.setExperimentPanelButtonColor("default");
     }
 
-    // 清理 ButtonManager 中的實驗動作數據
+    // 【重置按鈕狀態】清除所有按鈕高亮和禁用狀態
     if (window.buttonManager) {
+      window.buttonManager.clearAllButtonHighlights();
+      document.querySelectorAll(".button-overlay").forEach((btn) => {
+        btn.classList.remove("temporarily-disabled");
+        btn.classList.remove("power-off-disabled");
+        btn.style.pointerEvents = "";
+      });
+
+      // 清除電源開關高亮
+      const powerSwitchArea = document.getElementById("powerSwitchArea");
+      if (powerSwitchArea) {
+        powerSwitchArea.classList.remove("next-step-highlight");
+      }
+
+      // 清理 ButtonManager 中的實驗動作數據
       window.buttonManager.experimentActions.clear();
       window.buttonManager.removeActionListeners();
     }

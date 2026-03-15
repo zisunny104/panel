@@ -122,6 +122,9 @@ class PowerControl {
     }
 
     this.isPowerOn = nextState;
+    // 【重要】先設置 isPowerVideoPlaying，然後再調用 updatePowerUI()
+    // 這樣 updatePowerUI() 中的 updateMediaForCurrentAction() 才能正確抑制按鈕高亮
+    this.isPowerVideoPlaying = true;
     this.updatePowerUI();
 
     // 開機處理（nextState 必定為 true，因為關機已在上面處理）
@@ -129,7 +132,6 @@ class PowerControl {
     const toggleBeepSound = document.getElementById("toggleBeepSound");
     const beepOn = toggleBeepSound && toggleBeepSound.checked;
 
-    this.isPowerVideoPlaying = true;
     this.disableAllButtons();
 
     if (window.logger) {
@@ -145,7 +147,6 @@ class PowerControl {
         controls: false,
         muted: !beepOn,
         onEnded: () => {
-          this.isPowerVideoPlaying = false;
           this.enableAllButtons();
           if (window.mediaManager && window.mediaManager.mediaArea) {
             window.mediaManager.mediaArea.innerHTML = "";
@@ -162,6 +163,10 @@ class PowerControl {
             window.buttonManager.updateExperimentButtonStyles();
             window.buttonManager.updateMediaForCurrentAction();
           }
+
+          // 【重要】在 updateMediaForCurrentAction() 執行完成後，才重置 isPowerVideoPlaying
+          // 這樣抑制邏輯才能正常生效（updateMediaForCurrentAction 中的 !isPowerVideoPlaying 檢查）
+          this.isPowerVideoPlaying = false;
 
           // 【待驗證】實驗模式開機後，自動開始第一個action
           // 注意：此函數會重複呼叫 updateMediaForCurrentAction()（已在上方呼叫過）

@@ -539,6 +539,20 @@ class ExperimentFlowManager {
     } else {
       // 所有單元已完成
       Logger.info("所有單元已完成");
+
+      // 【最後單元完成時的電源高亮】
+      // 高亮電源開關，提示用戶進行關機流程
+      if (
+        typeof Logger !== "undefined" &&
+        document.getElementById("powerSwitchArea")
+      ) {
+        const powerSwitchArea = document.getElementById("powerSwitchArea");
+        if (powerSwitchArea) {
+          powerSwitchArea.classList.add("next-step-highlight");
+        }
+        Logger.debug("最後單元已完成，高亮電源開關提示關機");
+      }
+
       this.completeExperiment();
       return false;
     }

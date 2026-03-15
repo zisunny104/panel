@@ -511,7 +511,20 @@ class ExperimentActionHandler {
 
     // 檢查是否需要自動轉換到下一步
     if (this.checkTransitionCondition()) {
-      this.executeStepTransition();
+      // 檢查是否還有下一個單元，避免"沒有目前單元"警告
+      const flowManager = this.flowManager;
+      if (flowManager) {
+        const currentUnitIndex = flowManager.currentUnitIndex;
+        const totalUnits = flowManager.loadedUnits.length;
+
+        // 只有當還有下一個單元時，才嘗試轉換
+        if (currentUnitIndex < totalUnits - 1) {
+          this.executeStepTransition();
+        } else {
+          Logger.debug("所有單元已完成，不執行步驟轉換");
+          // 實驗會由 nextUnit() 中的 completeExperiment() 處理停止
+        }
+      }
     }
   }
 
