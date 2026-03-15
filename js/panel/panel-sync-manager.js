@@ -281,12 +281,13 @@ class PanelSyncManager {
 
   /**
    * 綁定 ExperimentFlowManager 的廣播（由 PanelPageManager 初始化後呼叫）
-   * 當 panel 本地發起實驗開始時，廣播到其他裝置
+   * 當 panel 本地發起任何實驗狀態變化時，廣播到其他裝置
    * @param {ExperimentFlowManager} flowManager
    */
   bindExperimentBroadcast(flowManager) {
     if (!flowManager) return;
 
+    // 廣播實驗開始
     flowManager.on(ExperimentFlowManager.EVENT.STARTED, () => {
       if (this._remoteStartInProgress) return; // 防止回聲
       if (!window.syncManager?.core?.isConnected()) return;
@@ -311,7 +312,49 @@ class PanelSyncManager {
         .catch((err) => Logger.warn("廣播實驗開始失敗:", err));
     });
 
-    Logger.debug("PanelSyncManager: 已綁定實驗開始廣播");
+    // 廣播實驗暫停
+    flowManager.on(ExperimentFlowManager.EVENT.PAUSED, (data) => {
+      if (this._remoteStartInProgress) return;
+      if (!window.syncManager?.core?.isConnected()) return;
+      window.syncManager.core
+        .syncState({
+          type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
+          event: window.SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
+          clientId: window.syncClient?.clientId,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((err) => Logger.warn("廣播實驗暫停失敗:", err));
+    });
+
+    // 廣播實驗繼續
+    flowManager.on(ExperimentFlowManager.EVENT.RESUMED, (data) => {
+      if (this._remoteStartInProgress) return;
+      if (!window.syncManager?.core?.isConnected()) return;
+      window.syncManager.core
+        .syncState({
+          type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
+          event: window.SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
+          clientId: window.syncClient?.clientId,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((err) => Logger.warn("廣播實驗繼續失敗:", err));
+    });
+
+    // 廣播實驗停止
+    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
+      if (this._remoteStartInProgress) return;
+      if (!window.syncManager?.core?.isConnected()) return;
+      window.syncManager.core
+        .syncState({
+          type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
+          event: window.SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
+          clientId: window.syncClient?.clientId,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((err) => Logger.warn("廣播實驗停止失敗:", err));
+    });
+
+    Logger.debug("PanelSyncManager: 已綁定所有實驗狀態廣播");
   }
 
   /**
