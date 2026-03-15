@@ -444,9 +444,7 @@ class BoardPageManager {
    * 分發 DOM 事件供 _bindDomEvents 廣播兩端
    */
   _handleFlowPaused(data) {
-    document.dispatchEvent(
-      new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_PAUSED, { detail: data }),
-    );
+    // FlowManager 已自動發出 EXPERIMENT_PAUSED DOM 事件，此處只進行特化 board 操作
     window.experimentSyncManager?.registerExperimentStateToHub({
       type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
       event: window.SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
@@ -468,12 +466,10 @@ class BoardPageManager {
 
   /**
    * 處理 FlowManager RESUMED 事件（board 端）
-   * 分發 DOM 事件供 _bindDomEvents 廣播兩端
+   * FlowManager 已自動發出 EXPERIMENT_RESUMED DOM 事件
    */
   _handleFlowResumed(data) {
-    document.dispatchEvent(
-      new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_RESUMED, { detail: data }),
-    );
+    // FlowManager 已自動發出 EXPERIMENT_RESUMED DOM 事件，此處只進行特化 board 操作
     window.experimentSyncManager?.registerExperimentStateToHub({
       type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
       event: window.SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
@@ -1948,16 +1944,6 @@ class BoardPageManager {
       // 參見 experiment-timer-utils.js 的 toggleTimer 函數
     }
 
-    // 分發事件供同步管理器使用（_bindDomEvents 捕獲後廣播到其他裝置）
-    document.dispatchEvent(
-      new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STARTED, {
-        detail: {
-          ...experimentData,
-          gestureSequence: this.currentCombination.gestures,
-        },
-      }),
-    );
-
     // 註冊實驗狀態到中樞
     window.experimentSyncManager.registerExperimentStateToHub({
       experiment_id: experimentData.experimentId,
@@ -1968,7 +1954,8 @@ class BoardPageManager {
       is_running: true,
     });
 
-    // 通知 FlowManager 實驗開始（統一驅動鎖定/計時器/UI 更新/experimentRunning 旗標）
+    // 通知 FlowManager 實驗開始
+    // FlowManager 會自動發出 EXPERIMENT_STARTED DOM 事件供同步使用
     await window.experimentFlowManager.startExperiment();
 
     // 初始化受試者名稱狀態
@@ -2017,18 +2004,8 @@ class BoardPageManager {
       this.pendingCombinationUpdate = null;
     }
 
-    // 分發事件供同步管理器使用（_bindDomEvents 捕獲後廣播到其他裝置）
-    document.dispatchEvent(
-      new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STOPPED, {
-        detail: {
-          experimentId:
-            document.getElementById("experimentIdInput")?.value || "",
-          subjectName:
-            document.getElementById("participantNameInput")?.value || "",
-          combinationName: this.currentCombination?.combinationName || "",
-        },
-      }),
-    );
+    // FlowManager 已自動發出 EXPERIMENT_STOPPED DOM 事件
+    // 此處只進行頁面特化操作
 
     // 記錄實驗結束
     const experimentData = {

@@ -140,14 +140,14 @@ class PanelSyncManager {
         }
       }
     }
-    // 檢查是否在 index.html（使用 experimentFlowManager）
+    // 在 index.html（panel）端或其他環境，直接使用 FlowManager
     else if (window.experimentFlowManager) {
       const isRunning = window.experimentFlowManager.isRunning || false;
 
       if (!isRunning) {
         this._remoteStartInProgress = true;
         try {
-          // 檢查遠端組合是否與本機相同（A3a）
+          // 檢查遠端組合是否與本機相同
           const currentCombo =
             window.experimentSystemManager?.combinationManager?.getCurrentCombination?.();
           const remoteComboId = syncData.combinationId;
@@ -180,6 +180,8 @@ class PanelSyncManager {
               Logger.debug("[PanelSync] 組合已匹配，無需同步");
             }
           }
+          // 呼叫 FlowManager 啟動實驗
+          // FlowManager 會自動發出所有必要的事件和廣播
           window.experimentFlowManager.startExperiment();
         } catch (error) {
           Logger.error("experimentFlowManager.startExperiment() 失敗:", error);
@@ -192,7 +194,7 @@ class PanelSyncManager {
         Logger.debug("[PanelSync] 實驗已在進行中，忽略遠端開始請求");
       }
     } else {
-      Logger.warn("找不到有效的實驗管理器（experimentFlowManager 不可用）");
+      Logger.warn("找不到有效的實驗管理器");
     }
 
     // 記錄這個同步事件到日誌

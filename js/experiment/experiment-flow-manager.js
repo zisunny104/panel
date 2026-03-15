@@ -163,16 +163,26 @@ class ExperimentFlowManager {
         allowed: false,
       });
 
-      // 觸發事件
-      this.emit(ExperimentFlowManager.EVENT.STARTED, {
+      // 觸發內部事件
+      const startData = {
         units: [...this.loadedUnits],
         timestamp: new Date().toISOString(),
-      });
+      };
+      this.emit(ExperimentFlowManager.EVENT.STARTED, startData);
 
       this.emit(ExperimentFlowManager.EVENT.STATE_CHANGED, {
         oldState: ExperimentFlowManager.STATE.IDLE,
         newState: this.state,
       });
+
+      // 廣播 DOM 事件供同步橋接器使用
+      if (typeof window !== "undefined" && window.SYNC_EVENTS) {
+        document.dispatchEvent(
+          new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STARTED, {
+            detail: startData,
+          }),
+        );
+      }
 
       Logger.debug("實驗已開始", {
         unitCount: this.loadedUnits.length,
@@ -215,16 +225,26 @@ class ExperimentFlowManager {
     // 清除自動推進計時器
     this.clearAutoProgress();
 
-    this.emit(ExperimentFlowManager.EVENT.PAUSED, {
+    const pauseData = {
       currentUnit: this.currentUnitIndex,
       currentStep: this.currentStepIndex,
       timestamp: new Date().toISOString(),
-    });
+    };
+    this.emit(ExperimentFlowManager.EVENT.PAUSED, pauseData);
 
     this.emit(ExperimentFlowManager.EVENT.STATE_CHANGED, {
       oldState: ExperimentFlowManager.STATE.RUNNING,
       newState: this.state,
     });
+
+    // 廣播 DOM 事件供同步橋接器使用
+    if (typeof window !== "undefined" && window.SYNC_EVENTS) {
+      document.dispatchEvent(
+        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_PAUSED, {
+          detail: pauseData,
+        }),
+      );
+    }
 
     return true;
   }
@@ -252,16 +272,26 @@ class ExperimentFlowManager {
     this.emit(ExperimentFlowManager.EVENT.LOCKED, { locked: true });
     this.emit(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, { allowed: false });
 
-    this.emit(ExperimentFlowManager.EVENT.RESUMED, {
+    const resumeData = {
       currentUnit: this.currentUnitIndex,
       currentStep: this.currentStepIndex,
       timestamp: new Date().toISOString(),
-    });
+    };
+    this.emit(ExperimentFlowManager.EVENT.RESUMED, resumeData);
 
     this.emit(ExperimentFlowManager.EVENT.STATE_CHANGED, {
       oldState: ExperimentFlowManager.STATE.PAUSED,
       newState: this.state,
     });
+
+    // 廣播 DOM 事件供同步橋接器使用
+    if (typeof window !== "undefined" && window.SYNC_EVENTS) {
+      document.dispatchEvent(
+        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_RESUMED, {
+          detail: resumeData,
+        }),
+      );
+    }
 
     return true;
   }
@@ -289,18 +319,28 @@ class ExperimentFlowManager {
     // 清除自動推進計時器
     this.clearAutoProgress();
 
-    this.emit(ExperimentFlowManager.EVENT.STOPPED, {
+    const stopData = {
       reason,
       currentUnit: this.currentUnitIndex,
       currentStep: this.currentStepIndex,
       completedUnits: this.completedUnits.size,
       timestamp: new Date().toISOString(),
-    });
+    };
+    this.emit(ExperimentFlowManager.EVENT.STOPPED, stopData);
 
     this.emit(ExperimentFlowManager.EVENT.STATE_CHANGED, {
       oldState,
       newState: this.state,
     });
+
+    // 廣播 DOM 事件供同步橋接器使用
+    if (typeof window !== "undefined" && window.SYNC_EVENTS) {
+      document.dispatchEvent(
+        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STOPPED, {
+          detail: stopData,
+        }),
+      );
+    }
 
     return true;
   }
