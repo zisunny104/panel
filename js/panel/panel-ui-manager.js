@@ -18,10 +18,9 @@ class PanelUIManager {
   };
 
   /**
-   * 建構子 - 初始化面板UI管理器
+   * 建構子
    */
   constructor() {
-    // 面板管理相關屬性
     this.currentOpenPanel = null;
     this.panels = {
       settings: {
@@ -41,7 +40,6 @@ class PanelUIManager {
       },
     };
 
-    // UI控制項相關屬性
     this.settingsPanel = null;
     this.scalable = null;
     this.mediaArea = null;
@@ -50,41 +48,28 @@ class PanelUIManager {
     this.powerSwitchArea = null;
     this.powerLightArea = null;
     this.panelBottomRow = null;
-
-    // 待處理的設定（用於處理模組載入順序問題）
     this.pendingMediaVolume = null;
 
-    // 初始化所有功能
     this.initialize();
   }
 
   /**
-   * 初始化所有功能
+   * 初始化
    */
   initialize() {
-    // 初始化 DOM 元素引用
     this.initializeDOMReferences();
-
-    // 初始化面板引用
     this.initializePanels();
-
-    // 設定事件監聽器
     this.setupEventListeners();
-
-    // 初始化 UI 控制項狀態
     this.initializeUIState();
-
-    // 載入初始設定
     this.loadInitialSettings();
 
-    // 視窗大小改變時重新定位設定面板
     window.addEventListener("resize", () => {
       if (this.currentOpenPanel === "settings")
         this.alignPanelToButton("settings");
     });
   }
 
-  // ============ 面板管理功能 (來自 PanelManager) ============
+  // ============ 面板管理 ============
 
   /**
    * 初始化面板引用
@@ -185,7 +170,6 @@ class PanelUIManager {
       }
     });
 
-    // 統一使用 is-hidden 控制所有面板的顯示/隱藏
     this.showElement(panel.element);
 
     // 面板專屬的額外處理
@@ -263,7 +247,7 @@ class PanelUIManager {
     }
   }
 
-  // ============ UI控制項功能 (來自 UIControlsManager) ============
+  // ============ UI 控制項功能============
 
   /**
    * 初始化 DOM 元素引用
@@ -314,17 +298,18 @@ class PanelUIManager {
    * @param {number} value - 縮放比例 (0.5-2.0)
    */
   updateScale(value) {
+    value = Math.max(0.5, Math.min(2, parseFloat(value)));
+
+    this.scalable && (this.scalable.style.transform = `scale(${value})`);
+
     const scaleRange = document.getElementById("scaleRange");
     const scaleNumberInput = document.getElementById("scaleNumberInput");
+    scaleRange && (scaleRange.value = value);
+    scaleNumberInput && (scaleNumberInput.value = value.toFixed(2));
 
-    value = Math.max(0.5, Math.min(2, parseFloat(value)));
-    if (this.scalable) this.scalable.style.transform = `scale(${value})`;
-    if (scaleRange) scaleRange.value = value;
-    if (scaleNumberInput) scaleNumberInput.value = value.toFixed(2);
     localStorage.setItem("mainScale", value);
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("mainScale", value);
-    }
+    window.configManager?.updateUserSetting?.("mainScale", value);
+
     this.alignPanelToButton("settings");
   }
 
@@ -333,20 +318,21 @@ class PanelUIManager {
    * @param {number} value - 間隔高度 vh 值 (0-50)
    */
   updateTopSpacer(value) {
+    value = Math.max(0, Math.min(50, parseFloat(value)));
+
+    this.topSpacerPlaceholder &&
+      (this.topSpacerPlaceholder.style.height = `${value}vh`);
+
     const topSpacerRange = document.getElementById("topSpacerRange");
     const topSpacerNumberInput = document.getElementById(
       "topSpacerNumberInput",
     );
+    topSpacerRange && (topSpacerRange.value = value);
+    topSpacerNumberInput && (topSpacerNumberInput.value = value);
 
-    value = Math.max(0, Math.min(50, parseFloat(value)));
-    if (this.topSpacerPlaceholder)
-      this.topSpacerPlaceholder.style.height = `${value}vh`;
-    if (topSpacerRange) topSpacerRange.value = value;
-    if (topSpacerNumberInput) topSpacerNumberInput.value = value;
     localStorage.setItem("topSpacerHeight", value);
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("topSpacerHeight", value);
-    }
+    window.configManager?.updateUserSetting?.("topSpacerHeight", value);
+
     this.alignPanelToButton("settings");
   }
 
@@ -355,19 +341,19 @@ class PanelUIManager {
    * @param {number} value - 間距高度 vh 值 (0-50)
    */
   updateBottomSpacer(value) {
+    value = Math.max(0, Math.min(50, parseFloat(value)));
+
+    this.panelBottomRow && (this.panelBottomRow.style.marginTop = `${value}vh`);
+
     const bottomSpacerRange = document.getElementById("bottomSpacerRange");
     const bottomSpacerNumberInput = document.getElementById(
       "bottomSpacerNumberInput",
     );
+    bottomSpacerRange && (bottomSpacerRange.value = value);
+    bottomSpacerNumberInput && (bottomSpacerNumberInput.value = value);
 
-    value = Math.max(0, Math.min(50, parseFloat(value)));
-    if (this.panelBottomRow) this.panelBottomRow.style.marginTop = `${value}vh`;
-    if (bottomSpacerRange) bottomSpacerRange.value = value;
-    if (bottomSpacerNumberInput) bottomSpacerNumberInput.value = value;
     localStorage.setItem("bottomSpacerHeight", value);
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("bottomSpacerHeight", value);
-    }
+    window.configManager?.updateUserSetting?.("bottomSpacerHeight", value);
     this.alignPanelToButton("settings");
   }
 
@@ -376,21 +362,20 @@ class PanelUIManager {
    * @param {number} value - 縮放比例 (0.5-2.0)
    */
   updatePowerScale(value) {
+    value = Math.max(0.5, Math.min(2, parseFloat(value)));
+
+    this.powerSwitchArea &&
+      (this.powerSwitchArea.style.transform = `scale(${value})`);
+
     const powerScaleRange = document.getElementById("powerScaleRange");
     const powerScaleNumberInput = document.getElementById(
       "powerScaleNumberInput",
     );
+    powerScaleRange && (powerScaleRange.value = value);
+    powerScaleNumberInput && (powerScaleNumberInput.value = value.toFixed(2));
 
-    value = Math.max(0.5, Math.min(2, parseFloat(value)));
-    // apply transform on container so all internal images scale uniformly
-    if (this.powerSwitchArea)
-      this.powerSwitchArea.style.transform = `scale(${value})`;
-    if (powerScaleRange) powerScaleRange.value = value;
-    if (powerScaleNumberInput) powerScaleNumberInput.value = value.toFixed(2);
     localStorage.setItem("powerSwitchScale", value);
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("powerSwitchScale", value);
-    }
+    window.configManager?.updateUserSetting?.("powerSwitchScale", value);
   }
 
   /**
@@ -402,9 +387,7 @@ class PanelUIManager {
       label.classList.toggle("hidden", !visible);
     });
     localStorage.setItem("showButtonLabels", visible ? "true" : "false");
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("showButtonLabels", visible);
-    }
+    window.configManager?.updateUserSetting?.("showButtonLabels", visible);
   }
 
   /**
@@ -416,11 +399,8 @@ class PanelUIManager {
       button.classList.toggle("no-color", !visible);
     });
     localStorage.setItem("showButtonColors", visible ? "true" : "false");
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("showButtonColors", visible);
-    }
-    if (window.buttonManager)
-      window.buttonManager.updateExperimentButtonStyles();
+    window.configManager?.updateUserSetting?.("showButtonColors", visible);
+    window.buttonManager?.updateExperimentButtonStyles?.();
   }
 
   /**
@@ -433,57 +413,38 @@ class PanelUIManager {
       '.button-overlay[data-label="B1"]',
     );
     const mediaArea = document.getElementById("mediaArea");
+    const powerSwitchArea = document.getElementById("powerSwitchArea");
+
     localStorage.setItem("showTouchVisuals", visible ? "true" : "false");
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("showTouchVisuals", visible);
-    }
+    window.configManager?.updateUserSetting?.("showTouchVisuals", visible);
 
     // 控制 body 上的視覺提示類別
-    if (visible) {
-      document.body.classList.add("visual-hints-enabled");
-    } else {
-      document.body.classList.remove("visual-hints-enabled");
-    }
+    document.body.classList.toggle("visual-hints-enabled", visible);
 
     if (!visible) {
       buttonOverlays.forEach((button) =>
         button.classList.remove("touch-active"),
       );
-      if (shiftButtonOverlay)
-        shiftButtonOverlay.classList.remove("shift-active");
-      const powerSwitchArea = document.getElementById("powerSwitchArea");
-      if (powerSwitchArea) {
-        powerSwitchArea.classList.remove("next-step-highlight");
-      }
+      shiftButtonOverlay?.classList.remove("shift-active");
+      powerSwitchArea?.classList.remove("next-step-highlight");
       document.querySelectorAll(".button-overlay").forEach((btn) => {
         btn.classList.remove("next-step-highlight");
       });
-      // 隱藏媒體區塊的提示外框
-      if (mediaArea) {
-        mediaArea.classList.add("hidden-indicator");
-      }
+      mediaArea?.classList.add("hidden-indicator");
     } else {
-      // 顯示媒體區塊的提示外框
-      if (mediaArea) {
-        mediaArea.classList.remove("hidden-indicator");
-      }
-      if (window.experiment) {
-        window.experiment.updateHighlightVisibility();
-      }
+      mediaArea?.classList.remove("hidden-indicator");
+      window.experiment?.updateHighlightVisibility?.();
     }
   }
 
   /**
-   * 切換媒體區域標記顯示
+   * 切換媒體區域標記
    * @param {boolean} visible - 是否顯示媒體區域標記
    */
   updateMediaAreaMarkerVisibility(visible) {
-    if (this.mediaArea)
-      this.mediaArea.classList.toggle("hide-area-marker", !visible);
+    this.mediaArea?.classList.toggle("hide-area-marker", !visible);
     localStorage.setItem("showMediaAreaMarker", visible ? "true" : "false");
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("showMediaAreaMarker", visible);
-    }
+    window.configManager?.updateUserSetting?.("showMediaAreaMarker", visible);
   }
 
   /**
@@ -492,15 +453,12 @@ class PanelUIManager {
    */
   updateMediaContentVisibility(visible) {
     const mediaFiles = window.mediaManager?.mediaFiles || [];
-    if (this.mediaArea)
-      this.mediaArea.classList.toggle(
-        "hide-media-content",
-        !(visible && mediaFiles.length > 0),
-      );
+    this.mediaArea?.classList.toggle(
+      "hide-media-content",
+      !(visible && mediaFiles.length > 0),
+    );
     localStorage.setItem("showMediaContent", visible ? "true" : "false");
-    if (window.configManager?.updateUserSetting) {
-      window.configManager.updateUserSetting("showMediaContent", visible);
-    }
+    window.configManager?.updateUserSetting?.("showMediaContent", visible);
   }
 
   /**
@@ -512,9 +470,6 @@ class PanelUIManager {
     if (beepAudio) {
       const normalizedVolume = parseInt(volume) / 100;
       beepAudio.volume = normalizedVolume;
-      Logger.debug(`Beep音量已設定為: ${normalizedVolume} (${volume})`);
-    } else {
-      Logger.warn("beepSound 元素不存在，無法設定音量");
     }
   }
 
@@ -523,36 +478,9 @@ class PanelUIManager {
    * @param {string|number} volume - 音量值 (0-100)
    */
   updateMediaVolume(volume) {
-    // 將音量設定儲存到 window.mediaManager 或全域變數
-    if (
-      window.mediaManager &&
-      typeof window.mediaManager.setMediaVolume === "function"
-    ) {
-      const normalizedVolume = parseInt(volume) / 100;
-      window.mediaManager.setMediaVolume(normalizedVolume);
-      Logger.debug(`媒體音量已設定為: ${normalizedVolume} (${volume})`);
-    } else {
-      // mediaManager 還沒有載入，儲存設定以便稍後應用
-      this.pendingMediaVolume = volume;
-      Logger.debug(
-        `mediaManager 尚未載入，媒體音量設定已排程: ${volume} (將在 mediaManager 載入後應用)`,
-      );
-    }
+    const normalizedVolume = parseInt(volume) / 100;
+    window.mediaManager?.setMediaVolume?.(normalizedVolume);
   }
-
-  /**
-   * 應用待處理的媒體音量設定（當 mediaManager 載入後調用）
-   */
-  applyPendingMediaVolume() {
-    if (this.pendingMediaVolume !== null && window.mediaManager) {
-      Logger.debug(`應用待處理的媒體音量設定: ${this.pendingMediaVolume}`);
-      this.updateMediaVolume(this.pendingMediaVolume);
-      this.pendingMediaVolume = null;
-    }
-  }
-
-  // showSettingsPanel / hideSettingsPanel 已移除
-  // 所有面板開關統一透過 openPanel / closePanel 處理
 
   /**
    * 更新全螢幕按鈕圖標
@@ -563,24 +491,16 @@ class PanelUIManager {
 
     const enterSvg = fullscreenButton.querySelector(".fullscreen-enter");
     const exitSvg = fullscreenButton.querySelector(".fullscreen-exit");
-
     if (!enterSvg || !exitSvg) return;
 
-    if (document.fullscreenElement) {
-      // 全螢幕狀態：顯示退出圖標
-      enterSvg.classList.add("is-hidden");
-      exitSvg.classList.remove("is-hidden");
-      this.hideElement(enterSvg);
-      this.showElement(exitSvg);
-      fullscreenButton.title = "退出全螢幕";
-    } else {
-      // 正常狀態：顯示進入圖標
-      enterSvg.classList.remove("is-hidden");
-      exitSvg.classList.add("is-hidden");
-      this.showElement(enterSvg);
-      this.hideElement(exitSvg);
-      fullscreenButton.title = "切換全螢幕";
-    }
+    const isFullscreen = !!document.fullscreenElement;
+
+    enterSvg.classList.toggle("is-hidden", isFullscreen);
+    exitSvg.classList.toggle("is-hidden", !isFullscreen);
+
+    this.hideElement(enterSvg);
+    this.showElement(exitSvg);
+    fullscreenButton.title = isFullscreen ? "退出全螢幕" : "切換全螢幕";
   }
 
   /**
@@ -589,19 +509,17 @@ class PanelUIManager {
   toggleFullscreen() {
     if (document.fullscreenElement) {
       document.exitFullscreen();
-      if (window.logger) window.logger.logAction("退出全螢幕模式");
+      window.logger?.logAction?.("退出全螢幕模式");
     } else {
       try {
         document.documentElement.requestFullscreen().catch((err) => {
           alert(`無法啟用全螢幕模式: ${err.message}`);
-          if (window.logger)
-            window.logger.logAction(`無法啟用全螢幕模式: ${err.message}`);
+          window.logger?.logAction?.(`無法啟用全螢幕模式: ${err.message}`);
         });
-        if (window.logger) window.logger.logAction("進入全螢幕模式");
+        window.logger?.logAction?.("進入全螢幕模式");
       } catch (err) {
         Logger.warn("requestFullscreen failed synchronously:", err);
-        if (window.logger)
-          window.logger.logAction(`同步啟用全螢幕失敗: ${err && err.message}`);
+        window.logger?.logAction?.(`同步啟用全螢幕失敗: ${err?.message}`);
       }
     }
   }
@@ -623,53 +541,22 @@ class PanelUIManager {
    * 設定面板相關事件監聽器
    */
   setupPanelEventListeners() {
-    if (this.panels.settings.button) {
-      this.panels.settings.button.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.togglePanel("settings");
-      });
-    }
+    const preventDefault = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
 
-    if (this.panels.settings.closeButton) {
-      this.panels.settings.closeButton.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.closePanel("settings");
+    Object.entries(this.panels).forEach(([panelName, panel]) => {
+      panel.button?.addEventListener("click", (e) => {
+        preventDefault(e);
+        this.togglePanel(panelName);
       });
-    }
 
-    if (this.panels.experiment.button) {
-      this.panels.experiment.button.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.togglePanel("experiment");
+      panel.closeButton?.addEventListener("click", (e) => {
+        preventDefault(e);
+        this.closePanel(panelName);
       });
-    }
-
-    if (this.panels.experiment.closeButton) {
-      this.panels.experiment.closeButton.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.closePanel("experiment");
-      });
-    }
-
-    if (this.panels.logger.button) {
-      this.panels.logger.button.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.togglePanel("logger");
-      });
-    }
-
-    if (this.panels.logger.closeButton) {
-      this.panels.logger.closeButton.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.closePanel("logger");
-      });
-    }
+    });
 
     // 點擊外部關閉面板
     this.setupOutsideClickListener();
@@ -680,20 +567,14 @@ class PanelUIManager {
    */
   setupOutsideClickListener() {
     document.addEventListener("click", (e) => {
-      if (!this.hasOpenPanel()) {
-        return;
-      }
+      if (!this.hasOpenPanel()) return;
 
       const currentPanel = this.panels[this.currentOpenPanel];
-      if (!currentPanel || !currentPanel.element) {
-        return;
-      }
+      if (!currentPanel?.element) return;
 
       const isClickInsidePanel = currentPanel.element.contains(e.target);
-      const isClickOnButton =
-        currentPanel.button && currentPanel.button.contains(e.target);
+      const isClickOnButton = currentPanel.button?.contains?.(e.target);
 
-      // 如果點擊在面板外部且不是開啟按鈕，關閉面板
       if (!isClickInsidePanel && !isClickOnButton) {
         this.closePanel(this.currentOpenPanel);
       }
@@ -704,170 +585,108 @@ class PanelUIManager {
    * 設定UI控制項相關事件監聽器
    */
   setupUIControlEventListeners() {
-    // 縮放控制
-    const scaleRange = document.getElementById("scaleRange");
-    const scaleNumberInput = document.getElementById("scaleNumberInput");
-    if (scaleRange)
-      scaleRange.addEventListener("input", (e) =>
-        this.updateScale(e.target.value),
-      );
-    if (scaleNumberInput)
-      scaleNumberInput.addEventListener("change", (e) =>
-        this.updateScale(e.target.value),
-      );
+    const controlConfigs = [
+      {
+        rangeId: "scaleRange",
+        inputId: "scaleNumberInput",
+        handler: (v) => this.updateScale(v),
+      },
+      {
+        rangeId: "topSpacerRange",
+        inputId: "topSpacerNumberInput",
+        handler: (v) => this.updateTopSpacer(v),
+      },
+      {
+        rangeId: "bottomSpacerRange",
+        inputId: "bottomSpacerNumberInput",
+        handler: (v) => this.updateBottomSpacer(v),
+      },
+      {
+        rangeId: "powerScaleRange",
+        inputId: "powerScaleNumberInput",
+        handler: (v) => this.updatePowerScale(v),
+      },
+    ];
 
-    // 頂部間隔控制
-    const topSpacerRange = document.getElementById("topSpacerRange");
-    const topSpacerNumberInput = document.getElementById(
-      "topSpacerNumberInput",
-    );
-    if (topSpacerRange)
-      topSpacerRange.addEventListener("input", (e) =>
-        this.updateTopSpacer(e.target.value),
-      );
-    if (topSpacerNumberInput)
-      topSpacerNumberInput.addEventListener("change", (e) =>
-        this.updateTopSpacer(e.target.value),
-      );
+    controlConfigs.forEach(({ rangeId, inputId, handler }) => {
+      const range = document.getElementById(rangeId);
+      const input = document.getElementById(inputId);
+      range?.addEventListener("input", (e) => handler(e.target.value));
+      input?.addEventListener("change", (e) => handler(e.target.value));
+    });
 
-    // 底部間距控制
-    const bottomSpacerRange = document.getElementById("bottomSpacerRange");
-    const bottomSpacerNumberInput = document.getElementById(
-      "bottomSpacerNumberInput",
-    );
-    if (bottomSpacerRange)
-      bottomSpacerRange.addEventListener("input", (e) =>
-        this.updateBottomSpacer(e.target.value),
-      );
-    if (bottomSpacerNumberInput)
-      bottomSpacerNumberInput.addEventListener("change", (e) =>
-        this.updateBottomSpacer(e.target.value),
-      );
+    // 顯示/隱藏控制項 - 每個都對應到更新方法
+    const toggleConfigs = [
+      {
+        id: "toggleButtonLabels",
+        handler: (v) => this.updateButtonLabelVisibility(v),
+      },
+      {
+        id: "toggleButtonColors",
+        handler: (v) => this.updateButtonColorVisibility(v),
+      },
+      { id: "toggleTouchVisuals", handler: (v) => this.updateTouchVisuals(v) },
+      {
+        id: "toggleMediaAreaMarker",
+        handler: (v) => this.updateMediaAreaMarkerVisibility(v),
+      },
+      {
+        id: "toggleMediaContent",
+        handler: (v) => this.updateMediaContentVisibility(v),
+      },
+    ];
 
-    // 電源按鈕縮放控制
-    const powerScaleRange = document.getElementById("powerScaleRange");
-    const powerScaleNumberInput = document.getElementById(
-      "powerScaleNumberInput",
-    );
-    if (powerScaleRange)
-      powerScaleRange.addEventListener("input", (e) =>
-        this.updatePowerScale(e.target.value),
-      );
-    if (powerScaleNumberInput)
-      powerScaleNumberInput.addEventListener("change", (e) =>
-        this.updatePowerScale(e.target.value),
-      );
+    toggleConfigs.forEach(({ id, handler }) => {
+      const element = document.getElementById(id);
+      element?.addEventListener("change", (e) => handler(e.target.checked));
+    });
 
-    // 關閉設定面板按鈕（已由 setupPanelEventListeners 統一處理）
-
-    // 顯示/隱藏控制項
-    const toggleButtonLabels = document.getElementById("toggleButtonLabels");
-    const toggleButtonColors = document.getElementById("toggleButtonColors");
-    const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
-    const toggleMediaAreaMarker = document.getElementById(
-      "toggleMediaAreaMarker",
-    );
-    const toggleMediaContent = document.getElementById("toggleMediaContent");
+    // 提示音效開關
     const toggleBeepSound = document.getElementById("toggleBeepSound");
+    toggleBeepSound?.addEventListener("change", (e) => {
+      const checked = e.target.checked;
+      localStorage.setItem("playBeepSound", checked ? "true" : "false");
+      window.configManager?.updateUserSetting?.("playBeepSound", checked);
+      window.logger?.logAction?.(`提示音效已 ${checked ? "開啟" : "關閉"}`);
+    });
 
-    if (toggleButtonLabels)
-      toggleButtonLabels.addEventListener("change", (e) =>
-        this.updateButtonLabelVisibility(e.target.checked),
-      );
-    if (toggleButtonColors)
-      toggleButtonColors.addEventListener("change", (e) =>
-        this.updateButtonColorVisibility(e.target.checked),
-      );
-    if (toggleTouchVisuals)
-      toggleTouchVisuals.addEventListener("change", (e) =>
-        this.updateTouchVisuals(e.target.checked),
-      );
-    if (toggleMediaAreaMarker)
-      toggleMediaAreaMarker.addEventListener("change", (e) =>
-        this.updateMediaAreaMarkerVisibility(e.target.checked),
-      );
-    if (toggleMediaContent)
-      toggleMediaContent.addEventListener("change", (e) =>
-        this.updateMediaContentVisibility(e.target.checked),
-      );
-    if (toggleBeepSound) {
-      toggleBeepSound.addEventListener("change", (e) => {
-        const checked = e.target.checked;
-        localStorage.setItem("playBeepSound", checked ? "true" : "false");
-        if (window.configManager?.updateUserSetting) {
-          window.configManager.updateUserSetting("playBeepSound", checked);
-        }
-        if (window.logger)
-          window.logger.logAction(`提示音效已 ${checked ? "開啟" : "關閉"}`);
-      });
-    }
+    // 音量控制
+    const volumeConfigs = [
+      {
+        rangeId: "beepVolume",
+        inputId: "beepVolumeNumber",
+        key: "beepVolume",
+        handler: (v) => this.updateBeepVolume(v),
+      },
+      {
+        rangeId: "mediaVolume",
+        inputId: "mediaVolumeNumber",
+        key: "mediaVolume",
+        handler: (v) => this.updateMediaVolume(v),
+      },
+    ];
 
-    // 音量控制 - 滑桿
-    const beepVolume = document.getElementById("beepVolume");
-    const beepVolumeNumber = document.getElementById("beepVolumeNumber");
-    if (beepVolume) {
-      beepVolume.addEventListener("input", (e) => {
-        const volume = e.target.value;
-        localStorage.setItem("beepVolume", volume);
-        if (window.configManager?.updateUserSetting) {
-          window.configManager.updateUserSetting("beepVolume", volume);
-        }
-        if (beepVolumeNumber) beepVolumeNumber.value = volume;
-        this.updateBeepVolume(volume);
-      });
-    }
+    volumeConfigs.forEach(({ rangeId, inputId, key, handler }) => {
+      const range = document.getElementById(rangeId);
+      const input = document.getElementById(inputId);
 
-    // 音量控制 - 數字輸入框
-    if (beepVolumeNumber) {
-      beepVolumeNumber.addEventListener("input", (e) => {
-        const volume = e.target.value;
-        // 確保值在有效範圍內
-        const clampedVolume = Math.max(0, Math.min(100, volume));
-        e.target.value = clampedVolume;
-        localStorage.setItem("beepVolume", clampedVolume);
-        if (window.configManager?.updateUserSetting) {
-          window.configManager.updateUserSetting("beepVolume", clampedVolume);
-        }
-        if (beepVolume) beepVolume.value = clampedVolume;
-        this.updateBeepVolume(clampedVolume);
-      });
-    }
+      const syncValues = (value) => {
+        const clamped = Math.max(0, Math.min(100, value));
+        localStorage.setItem(key, clamped);
+        window.configManager?.updateUserSetting?.(key, clamped);
+        handler(clamped);
+        if (range && range.value !== clamped) range.value = clamped;
+        if (input && input.value !== clamped) input.value = clamped;
+      };
 
-    // 媒體音量控制 - 滑桿
-    const mediaVolume = document.getElementById("mediaVolume");
-    const mediaVolumeNumber = document.getElementById("mediaVolumeNumber");
-    if (mediaVolume) {
-      mediaVolume.addEventListener("input", (e) => {
-        const volume = e.target.value;
-        localStorage.setItem("mediaVolume", volume);
-        if (window.configManager?.updateUserSetting) {
-          window.configManager.updateUserSetting("mediaVolume", volume);
-        }
-        if (mediaVolumeNumber) mediaVolumeNumber.value = volume;
-        this.updateMediaVolume(volume);
-      });
-    }
-
-    // 媒體音量控制 - 數字輸入框
-    if (mediaVolumeNumber) {
-      mediaVolumeNumber.addEventListener("input", (e) => {
-        const volume = e.target.value;
-        // 確保值在有效範圍內
-        const clampedVolume = Math.max(0, Math.min(100, volume));
-        e.target.value = clampedVolume;
-        localStorage.setItem("mediaVolume", clampedVolume);
-        if (window.configManager?.updateUserSetting) {
-          window.configManager.updateUserSetting("mediaVolume", clampedVolume);
-        }
-        if (mediaVolume) mediaVolume.value = clampedVolume;
-        this.updateMediaVolume(clampedVolume);
-      });
-    }
+      range?.addEventListener("input", (e) => syncValues(e.target.value));
+      input?.addEventListener("input", (e) => syncValues(e.target.value));
+    });
 
     // 全螢幕按鈕
-    const fullscreenButton = document.getElementById("fullscreenButton");
-    if (fullscreenButton)
-      fullscreenButton.addEventListener("click", () => this.toggleFullscreen());
+    document
+      .getElementById("fullscreenButton")
+      ?.addEventListener("click", () => this.toggleFullscreen());
 
     // 全螢幕狀態變化監聽器
     document.addEventListener("fullscreenchange", () =>
@@ -878,35 +697,23 @@ class PanelUIManager {
     document.addEventListener("contextmenu", (e) => e.preventDefault());
   }
 
-  // ============ UI狀態初始化與設定載入 (來自 main.js) ============
+  // ============ UI 狀態初始化 ============
 
   /**
    * 載入初始設定
    */
   loadInitialSettings() {
-    // 所有面板預設隱藏（由 is-hidden 控制），不再直接操作 logger 顯示狀態
-    // Logger / 設定 / 實驗面板皆透過 PanelUIManager.togglePanel 開關
-
-    // 隱藏參考卡片與設定面板
-    const refCard = document.getElementById("refCard");
-    const settingsPanel = document.getElementById("settingsPanel");
-    if (refCard) {
-      this.hideElement(refCard);
-    }
-    if (settingsPanel) this.hideElement(settingsPanel);
+    document.getElementById("refCard")?.classList.add("is-hidden");
+    document.getElementById("settingsPanel")?.classList.add("is-hidden");
   }
 
   /**
    * 初始化 UI 狀態
    */
   initializeUIState() {
-    // 初始化全螢幕按鈕圖標
     this.updateFullscreenButtonIcon();
 
-    // 載入設定並套用
     const configSettings = window.configManager?.userSettings || {};
-
-    // 套用數值設定
     this.updateScale(
       configSettings.mainScale ??
         localStorage.getItem("mainScale") ??
@@ -946,7 +753,7 @@ class PanelUIManager {
     this.updateMediaAreaMarkerVisibility(showMediaAreaMarker);
     this.updateMediaContentVisibility(showMediaContent);
 
-    // 同步設定面板的開鱗狀態（確保開鱗的沈視每為實際狀態）
+    // 同步設定面板的開關狀態
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     if (toggleButtonLabels) toggleButtonLabels.checked = showButtonLabels;
     const toggleButtonColors = document.getElementById("toggleButtonColors");
@@ -973,17 +780,11 @@ class PanelUIManager {
 
     this.updateBeepVolume(beepVolume);
     this.updateMediaVolume(mediaVolume);
-
-    // 更新 UI 元素值
     this.syncUIElements(configSettings);
-
-    // 設定重置按鈕事件
     this.setupResetButton();
 
-    // 確保電源燈號區域總是可見（電源狀態指示器）
     if (this.powerLightArea) {
       this.showElement(this.powerLightArea);
-      Logger.debug("電源燈號區域已顯示 (initializeUIState)");
     }
   }
 
@@ -992,7 +793,6 @@ class PanelUIManager {
    * @param {Object} configSettings - 設定物件
    */
   syncUIElements(configSettings) {
-    // 縮放控制
     const scaleRange = document.getElementById("scaleRange");
     const scaleNumberInput = document.getElementById("scaleNumberInput");
     const scaleValue =
@@ -1003,7 +803,6 @@ class PanelUIManager {
     if (scaleNumberInput)
       scaleNumberInput.value = parseFloat(scaleValue).toFixed(2);
 
-    // 間距控制
     const topSpacerRange = document.getElementById("topSpacerRange");
     const topSpacerNumberInput = document.getElementById(
       "topSpacerNumberInput",
@@ -1026,7 +825,6 @@ class PanelUIManager {
     if (bottomSpacerRange) bottomSpacerRange.value = bottomValue;
     if (bottomSpacerNumberInput) bottomSpacerNumberInput.value = bottomValue;
 
-    // 電源縮放控制
     const powerScaleRange = document.getElementById("powerScaleRange");
     const powerScaleNumberInput = document.getElementById(
       "powerScaleNumberInput",
@@ -1039,7 +837,6 @@ class PanelUIManager {
     if (powerScaleNumberInput)
       powerScaleNumberInput.value = parseFloat(powerValue).toFixed(2);
 
-    // 切換控制
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
@@ -1074,7 +871,6 @@ class PanelUIManager {
         configSettings.playBeepSound ??
         localStorage.getItem("playBeepSound") !== "false";
 
-    // 音量控制
     const beepVolume = document.getElementById("beepVolume");
     const beepVolumeNumber = document.getElementById("beepVolumeNumber");
     const beepVolValue =
@@ -1095,7 +891,7 @@ class PanelUIManager {
   }
 
   /**
-   * 設定重置按鈕事件
+   * 設定重置按鈕
    */
   setupResetButton() {
     const resetSettingsBtn = document.getElementById("resetSettingsBtn");
@@ -1112,10 +908,9 @@ class PanelUIManager {
   }
 
   /**
-   * 從 DOM 控制項重新載入設定值
+   * 從 DOM 控制項載入設定值
    */
   loadControlsFromDOM() {
-    // 從範圍輸入框重新載入數值
     const scaleRange = document.getElementById("scaleRange");
     const topSpacerRange = document.getElementById("topSpacerRange");
     const bottomSpacerRange = document.getElementById("bottomSpacerRange");
@@ -1126,7 +921,6 @@ class PanelUIManager {
     if (bottomSpacerRange) this.updateBottomSpacer(bottomSpacerRange.value);
     if (powerScaleRange) this.updatePowerScale(powerScaleRange.value);
 
-    // 重新載入切換開關狀態
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
