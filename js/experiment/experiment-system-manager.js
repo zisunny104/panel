@@ -511,20 +511,25 @@ class ExperimentSystemManager {
 
   /**
    * 綁定實驗ID輸入框監聽器（可重入，避免重複綁定）
+   * 【重要】分離了「綁定事件監聽」和「同步 ID 值」
+   * 以確保每次面板打開時都能同步最新 ID
    * @private
    */
   _bindExperimentIdInputListener() {
     const idInput = document.getElementById("experimentIdInput");
-    if (idInput && !idInput._experimentSystemBound) {
-      // 同步目前實驗ID到 UI（延遲渲染場景）
-      const currentId = this.hubManager?.ids?.experiment;
-      if (currentId && (!idInput.value || idInput.value === "載入中...")) {
-        idInput.value = currentId;
-        Logger.debug(`延遲渲染後同步實驗ID到UI: ${currentId}`);
-      }
+    if (!idInput) return;
 
+    // 【第一步】始終同步最新 ID 到 DOM（即使已綁定過）
+    const currentId = this.hubManager?.ids?.experiment;
+    if (currentId) {
+      idInput.value = currentId;
+      Logger.debug("面板展開時同步實驗ID到UI:", currentId);
+    }
+
+    // 【第二步】若未綁定過事件監聽，則綁定（避免重複綁定）
+    if (!idInput._experimentSystemBound) {
       this._setupExperimentIdInputListener(idInput);
-      Logger.debug("實驗ID輸入框事件已綁定（延遲渲染後）");
+      Logger.debug("實驗ID輸入框事件監聽已綁定");
     }
   }
 
