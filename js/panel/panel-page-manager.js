@@ -483,6 +483,18 @@ class PanelPageManager {
       this._handleExperimentStopped();
     });
 
+    // 監聽動作序列完成事件，推進到下一個單元
+    const actionHandler = window.experimentActionHandler;
+    if (actionHandler) {
+      actionHandler.on(
+        ExperimentActionHandler.EVENT.SEQUENCE_COMPLETED,
+        async () => {
+          Logger.debug("Panel: ActionHandler 序列完成，檢查是否推進下一個單元");
+          await this._handleSequenceCompletedForUnitProgression();
+        },
+      );
+    }
+
     // 監聽 ExperimentSystemManager 的流程停止通知事件
     // 用於處理日誌和同步等後處理邏輯
     window.addEventListener("experimentSystem:flowStopped", async (event) => {
@@ -607,9 +619,30 @@ class PanelPageManager {
     const success = actionHandler.initializeSequence(actions);
 
     if (success) {
+      // 【重要】建立 actionToStepMap 映射，用於冷卻邏輯判斷
+      // 這個 map 對於正確的 step 邊界檢查至關重要
+      const actionToStepMap = new Map();
+      (unit.steps || []).forEach((step) => {
+        (step.actions || []).forEach((action, actionIndex) => {
+          const actionId = action.action_id || action.actionId;
+          if (actionId) {
+            actionToStepMap.set(actionId, {
+              unit_id: unit.unit_id,
+              step_id: step.step_id,
+              step_name: step.step_name,
+              isLastActionInStep: actionIndex === step.actions.length - 1,
+            });
+          }
+        });
+      });
+
+      // 將 map 附加到 actionHandler（供 panel-button-manager 的冷卻邏輯使用）
+      actionHandler.actionToStepMap = actionToStepMap;
+
       Logger.debug("動作序列已載入到 ActionHandler", {
         unitId: unit.unit_id,
         actionCount: actions.length,
+        stepMapSize: actionToStepMap.size,
       });
       return true;
     } else {
@@ -794,6 +827,63 @@ class PanelPageManager {
       Logger.debug("Panel: 實驗系統停止後續邏輯已完成");
     } catch (error) {
       Logger.error("Panel: 處理實驗系統停止後續邏輯失敗:", error);
+    }
+  }
+
+  /**
+   * 處理動作序列完成時的單元推進邏輯
+   * 當 ActionHandler 發出 SEQUENCE_COMPLETED 事件時調用
+   * @private
+   */
+  async _handleSequenceCompletedForUnitProgression() {
+    try {
+      const flowManager = window.experimentFlowManager;
+      if (!flowManager) {
+        Logger.warn("FlowManager 不可用，無法推進單元");
+        return;
+      }
+
+      // 檢查是否有更多的單元可推進
+      if (flowManager.currentUnitIndex >= flowManager.loadedUnits.length - 1) {
+        Logger.debug("Panel: 所有單元已完成");
+        return;
+      }
+
+      // 推進到下一個單元
+      Logger.debug("Panel: 推進到下一個單元");
+      flowManager.nextUnit();
+
+      // 取得新的單元 ID
+      const nextUnitId = flowManager.loadedUnits[flowManager.currentUnitIndex];
+      const systemManager = window.experimentSystemManager;
+
+      if (!systemManager || !systemManager.state.scriptData) {
+        Logger.warn("無法取得系統管理器或腳本資料");
+        return;
+      }
+
+      const allUnits = systemManager.state.scriptData.units || [];
+      const nextUnit = allUnits.find((unit) => unit.unit_id === nextUnitId);
+
+      if (!nextUnit) {
+        Logger.warn(`找不到單元 ID: ${nextUnitId} 的對應單元資料`);
+        return;
+      }
+
+      // 載入新單元的動作序列
+      await this._loadUnitActionsToActionHandler(nextUnit);
+
+      // 通知按鈕管理器更新動作狀態
+      this._notifyButtonManagerForActions(nextUnit);
+
+      Logger.debug("Panel: 已推進到下一個單元並載入動作序列", {
+        nextUnitId,
+        actionCount: (nextUnit.steps || []).flatMap(
+          (step) => step.actions || [],
+        ).length,
+      });
+    } catch (error) {
+      Logger.error("Panel: 處理序列完成推進單元失敗:", error);
     }
   }
 

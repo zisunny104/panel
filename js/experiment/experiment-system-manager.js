@@ -387,6 +387,14 @@ class ExperimentSystemManager {
       });
     }
 
+    // 監聽 Hub Manager 的實驗 ID 變化事件（來自其他客戶端）
+    // 當實驗 ID 改變時，重新加載該實驗所需的組合信息
+    if (this.hubManager) {
+      this.hubManager.on(ExperimentHubManager.EVENT.ID_CHANGED, (data) => {
+        this._handleHubIdChanged(data);
+      });
+    }
+
     // 監聽 UIManager 的實驗控制面板渲染完成事件（處理 Panel 延遲渲染）
     if (this.uiManager) {
       this.uiManager.on("experiment-controls-rendered", () => {
@@ -395,6 +403,109 @@ class ExperimentSystemManager {
       this.uiManager.on("experiment-controls-rendered-delayed", () => {
         this._bindExperimentIdInputListener();
       });
+    }
+  }
+
+  /**
+   * 處理 Hub Manager 實驗 ID 變化事件
+   * 當其他客戶端改變實驗 ID 時觸發
+   * @private
+   */
+  _handleHubIdChanged(data) {
+    const { type, newValue, source } = data;
+
+    if (type !== "experiment") {
+      Logger.debug("Hub ID 變化但不是實驗 ID，忽略:", type);
+      return;
+    }
+
+    // 檢查是否正在進行實驗
+    const isExperimentRunning = this.flowManager?.state?.status === "RUNNING";
+
+    if (isExperimentRunning) {
+      Logger.debug(
+        "實驗進行中，實驗 ID 變化被忽略 (來自:",
+        source,
+        ", 新 ID:",
+        newValue,
+        ")",
+      );
+      return;
+    }
+
+    Logger.debug("【ID 變化】實驗 ID 已從遠端改變，更新 UI 並等待面板打開", {
+      source,
+      newValue,
+    });
+
+    // 更新 UI 中的實驗 ID 顯示
+    this._updateExperimentIdUI(newValue);
+
+    // 如果實驗面板已經初始化（即組合選擇器已渲染），需要重新加載組合信息
+    if (this.state.containers.combinationSelector) {
+      const container = document.querySelector(
+        this.state.containers.combinationSelector,
+      );
+      if (container) {
+        Logger.debug("實驗面板已渲染，重新加載新實驗 ID 的組合信息");
+        // 重新初始化組合選擇器（使用新的實驗 ID）
+        this._reinitializeCombinationForNewExperimentId(newValue);
+      }
+    }
+
+    // 觸發組合刷新事件，讓 UI 更新（可選）
+    window.dispatchEvent(
+      new CustomEvent("experimentSystem:experimentIdChanged", {
+        detail: { experimentId: newValue, source },
+      }),
+    );
+  }
+
+  /**
+   * 當實驗 ID 變化時重新初始化組合信息
+   * @private
+   */
+  async _reinitializeCombinationForNewExperimentId(experimentId) {
+    try {
+      // 取消全選
+      const unitList = document.querySelector(this.state.containers.unitPanel);
+      if (unitList) {
+        unitList
+          .querySelectorAll('input[type="checkbox"]')
+          .forEach((checkbox) => {
+            checkbox.checked = false;
+          });
+        Logger.debug("已清除所有單元選擇");
+      }
+
+      // 這樣當用戶再次選擇組合時，會使用新的實驗 ID
+      // 如果需要自動應用預設組合，可以在這裡調用
+      Logger.debug("準備使用新實驗 ID 加載組合信息:", experimentId);
+
+      // 觸發面板重新刷新的事件
+      window.dispatchEvent(
+        new CustomEvent("experimentSystem:shouldRefreshPanel", {
+          detail: { experimentId },
+        }),
+      );
+    } catch (error) {
+      Logger.warn("重新初始化組合信息失敗:", error);
+    }
+  }
+
+  /**
+   * 更新 UI 中的實驗 ID 顯示
+   * @private
+   */
+  _updateExperimentIdUI(experimentId) {
+    try {
+      const idInput = document.getElementById("experimentIdInput");
+      if (idInput && idInput.value !== experimentId) {
+        idInput.value = experimentId;
+        Logger.debug("實驗 ID 已更新到 UI:", experimentId);
+      }
+    } catch (error) {
+      Logger.warn("更新實驗 ID UI 失敗:", error);
     }
   }
 

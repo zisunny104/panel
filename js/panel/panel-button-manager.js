@@ -566,6 +566,7 @@ class ButtonManager {
               `Step Actions: ${stepActions.length} | ` +
               `下一個Action: ${nextAction?.actionId || "無"}`,
           );
+          // 更新媒體顯示
           this.updateMediaForCurrentAction();
         }
         return true;
