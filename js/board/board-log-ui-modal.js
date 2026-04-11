@@ -266,27 +266,11 @@ export const logModalPanel = {
 
   copyToClipboard(text, triggerEl) {
     if (!text) return;
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).catch(() => {
-        this._fallbackCopy(text);
-      });
-      this._setCopyState(triggerEl);
-      return;
-    }
-    this._fallbackCopy(text);
-    this._setCopyState(triggerEl);
-  },
-
-  _fallbackCopy(text) {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "absolute";
-    textarea.style.left = "-9999px";
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    document.body.removeChild(textarea);
+    if (!navigator?.clipboard?.writeText) return;
+    navigator.clipboard
+      .writeText(text)
+      .then(() => this._setCopyState(triggerEl))
+      .catch(() => {});
   },
 
   _setCopyState(triggerEl) {

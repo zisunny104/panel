@@ -704,27 +704,6 @@
     letter-spacing: 3px;
 }
 
-/* QR Code 備援顯示 */
-.sync-qr-fallback {
-    padding: 20px;
-    text-align: center;
-}
-
-.sync-qr-fallback h3 {
-    color: #28a745;
-}
-
-.sync-qr-fallback p {
-    color: #6c757d;
-    font-size: 12px;
-    margin-top: 10px;
-    word-break: break-all;
-}
-
-.sync-qr-fallback a {
-    color: #007bff;
-}
-
 /* QR Code 角色文字 */
 .sync-qr-role-text {
     font-size: 11px;

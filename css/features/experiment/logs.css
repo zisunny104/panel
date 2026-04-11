@@ -316,6 +316,18 @@
     z-index: 3;
 }
 
+.log-filter-sliders .range-max {
+    pointer-events: none;
+}
+
+.log-filter-sliders .range-max::-webkit-slider-thumb {
+    pointer-events: auto;
+}
+
+.log-filter-sliders .range-max::-moz-range-thumb {
+    pointer-events: auto;
+}
+
 .log-filter-sliders input[type="range"]::-webkit-slider-thumb,
 .log-filter-sliders input[type="range"]::-moz-range-thumb {
     cursor: pointer;

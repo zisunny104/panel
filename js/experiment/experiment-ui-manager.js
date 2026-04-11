@@ -112,15 +112,6 @@ class ExperimentUIManager {
     }
 
     this.dependencies.flowManager = flowManager;
-    Logger.debug("已注入 FlowManager");
-
-    try {
-      Logger.debug(
-        "FlowManager 綁定完成（鎖定/解鎖由 ExperimentSystemManager 統一管理）",
-      );
-    } catch (e) {
-      Logger.warn("綁定 FlowManager 事件失敗", e);
-    }
   }
 
   updateDependencies(deps = {}) {
@@ -240,13 +231,13 @@ class ExperimentUIManager {
   }
 
   /**
-   * 處理受試者名稱編輯允許信號
+   * 處理受試者名稱編輯允許資訊
    * @private
    */
   _handleParticipantEditAllowed(allowed) {
     const pInput = document.querySelector("#participantNameInput");
     if (pInput) {
-      // 當 allowed 為 true 表示可編輯，否則只讀
+      // 當 allowed 為 true 表示可編輯，否則唯讀
       pInput.readOnly = !allowed;
       if (allowed) {
         pInput.classList.remove("experiment-disabled");
@@ -932,23 +923,6 @@ class ExperimentUIManager {
       `,
           )
           .join("");
-        // 如果目標是 UL 元素且要求顯示標題，則在 UL 之前插入一個 h3 作為 fallback
-        if (config.showTitle) {
-          const existingTitle = containerEl.previousElementSibling;
-          if (
-            !existingTitle ||
-            !existingTitle.classList.contains("combination-selector-title")
-          ) {
-            const titleEl = document.createElement("h3");
-            titleEl.className = "combination-selector-title";
-            titleEl.textContent = config.title;
-            containerEl.parentNode &&
-              containerEl.parentNode.insertBefore(titleEl, containerEl);
-            Logger.debug("組合選擇器: 已插入 fallback 標題", {
-              title: config.title,
-            });
-          }
-        }
       } else {
         // 否則產生完整的 HTML
         const html = `

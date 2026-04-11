@@ -280,7 +280,7 @@ const server = httpServer.listen(SERVER_CONFIG.port, () => {
 
 // ===== 優雅關閉 =====
 process.on("SIGINT", () => {
-  Logger.warn("收到SIGINT信號，正在關閉伺服器...");
+  Logger.warn("收到SIGINT資訊，正在關閉伺服器...");
 
   // 關閉 WebSocket 系統
   wsServer.close();
@@ -295,7 +295,7 @@ process.on("SIGINT", () => {
 });
 
 process.on("SIGTERM", () => {
-  Logger.warn("收到SIGTERM信號，正在關閉伺服器...");
+  Logger.warn("收到SIGTERM資訊，正在關閉伺服器...");
 
   // 關閉 WebSocket 系統
   wsServer.close();

@@ -21,6 +21,7 @@ import {
 import { LOG_SOURCES } from "./log-source-constants.js";
 
 import { ACTION_IDS, ACTION_BUTTONS, ACTION_CONSTANTS } from "./action-constants.js";
+import { POWER_BUTTON_STATES } from "./power-constants.js";
 
 export {
   LOG_TYPES,
@@ -36,4 +37,5 @@ export {
   ACTION_IDS,
   ACTION_BUTTONS,
   ACTION_CONSTANTS,
+  POWER_BUTTON_STATES,
 };

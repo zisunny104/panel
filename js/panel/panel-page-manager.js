@@ -326,6 +326,8 @@ class PanelPageManager {
       panelLogger: this.panelLogger,
       experimentActionHandler: this.experimentActionHandler,
       experimentFlowManager: this.experimentFlowManager,
+      experimentSystemManager: this.experimentSystemManager,
+      experimentCombinationManager: this.experimentCombinationManager,
       experimentSyncCore: this.experimentSyncCore,
       syncClient: this.syncManager.core?.syncClient,
       panelMediaManager: this.panelMediaManager,
@@ -428,6 +430,7 @@ class PanelPageManager {
 
     await this._loadUnitActionsToActionHandler(firstUnitToLoad);
     this._notifyButtonManagerForActions(firstUnitToLoad);
+    this.powerControl?.syncPowerActionWithState();
     this.panelUIManager.setExperimentPanelButtonColor("running");
 
     Logger.debug("實驗開始處理完成，已載入動作序列並通知管理器");
@@ -641,6 +644,7 @@ class PanelPageManager {
 
     await this._loadUnitActionsToActionHandler(nextUnit);
     this._notifyButtonManagerForActions(nextUnit);
+    this.powerControl?.syncPowerActionWithState();
 
     Logger.debug("Panel: 已推進到下一個單元並載入動作序列", {
       nextUnitId,
@@ -668,11 +672,10 @@ const initializePanel = async () => {
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initializePanel);
+  document.addEventListener("DOMContentLoaded", initializePanel);
+
 } else {
+
   initializePanel();
+
 }
-
-export { PanelPageManager, panelPageManager };
-
-
-

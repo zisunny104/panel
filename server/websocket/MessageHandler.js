@@ -398,7 +398,7 @@ export class MessageHandler {
           : session.data || {};
     } catch (e) {}
 
-    // 優先從記憶體取得 experimentState（準確），fallback 到 DB
+    // 優先從記憶體取得 experimentState（準確），必要時改用 DB
     const experimentState =
       this.sessionManager.getExperimentState(sessionId) ||
       sessionData.experimentState ||

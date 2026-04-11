@@ -733,6 +733,3 @@ class WebSocketClient {
 // ES6 模組匯出
 export default WebSocketClient;
 export { WebSocketClient };
-
-// 掛到全域 window 供其他模組使用
-window.WebSocketClient = WebSocketClient;

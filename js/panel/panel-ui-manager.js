@@ -214,6 +214,7 @@ class PanelUIManager {
           Logger.error("初始化實驗面板UI失敗:", error);
         });
       }
+      window.dispatchEvent(new CustomEvent("panel:experiment:opened"));
     }
 
     this.currentOpenPanel = panelName;

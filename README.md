@@ -52,6 +52,10 @@ panel/
 
 ## 版本
 
+#### v2.3.esm - Full ES6 Module Migration
+
+- All project code is now ES6 module based; no CommonJS remains in the app/server code.
+
 #### v2.3.f366c7b - 同步與模組化更新
 
 - **ES 模組化**：面板與同步模組全面轉為 ES module，明確注入依賴並收斂全域狀態

@@ -329,7 +329,7 @@ class SyncManager {
       // 等待伺服器心跳檢測
       const isOnline = await this.core.checkServerHealth();
       if (!isOnline) {
-        Logger.warn("伺服器離線，採用本機 fallback");
+        Logger.warn("伺服器離線，略過工作階段還原");
         return false; // 本機模式
       }
 
@@ -385,7 +385,7 @@ class SyncManager {
           return true; // 同步模式
         }
       } catch (error) {
-        Logger.warn("工作階段還原失敗，採用本機 fallback", error);
+        Logger.warn("工作階段還原失敗", error);
         // 清除無效的工作階段資訊
         localStorage.removeItem("sync_session_id");
         sessionStorage.removeItem("sync_sessionId");
@@ -394,7 +394,7 @@ class SyncManager {
         return false; // 本機模式
       }
     } catch (error) {
-      Logger.error("還原工作階段出錯，採用本機 fallback", error);
+      Logger.error("還原工作階段出錯", error);
       return false; // 本機模式
     }
   }

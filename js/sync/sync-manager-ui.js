@@ -1301,18 +1301,6 @@ export class SyncManagerUI {
       this.indicatorManager.showStatus(type, message || "", 5000);
       return;
     }
-
-    // fallback：indicatorManager 不存在
-    const statusElement = document.getElementById("syncStatusMessage");
-    if (!statusElement) return;
-    statusElement.className = `sync-status-message ${type}`;
-    statusElement.textContent = message || "";
-    statusElement.classList.remove("is-hidden");
-    if (type !== "success") {
-      setTimeout(() => {
-        statusElement.classList.add("is-hidden");
-      }, 5000);
-    }
   }
 
   showPanel() {

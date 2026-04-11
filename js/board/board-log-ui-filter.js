@@ -213,6 +213,14 @@ export const logFilterPanel = {
     const maxRange = document.getElementById(config.maxId);
     if (!minRange || !maxRange) return;
 
+    if (source === "min") {
+      minRange.style.zIndex = "3";
+      maxRange.style.zIndex = "2";
+    } else {
+      minRange.style.zIndex = "2";
+      maxRange.style.zIndex = "3";
+    }
+
     let min = parseInt(minRange.value, 10);
     let max = parseInt(maxRange.value, 10);
 

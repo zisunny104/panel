@@ -42,7 +42,7 @@ class ExperimentSimulator {
       experimentId: options.experimentId || "",
       combinationId: options.combinationId || "",
       participantName:
-        options.participantName || options.subjectName || "模擬測試",
+        options.participantName || "模擬測試",
       actionCount: options.actionCount || null, // null = 完成所有
       pauseAfterActions: options.pauseAfterActions || null,
       actionIntervalMs: options.actionIntervalMs || 800,

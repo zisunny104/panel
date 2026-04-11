@@ -112,7 +112,7 @@ export const SYNC_DATA_TYPES = {
   EXPERIMENT_STOPPED: "experiment_stopped",
 
   // 實驗資訊更新
-  SUBJECT_NAME_UPDATE: "subject_name_update",
+  PARTICIPANT_NAME_UPDATE: "participant_name_update",
   EXPERIMENT_ID_UPDATE: "experiment_id_update",
   COMBINATION_SELECTED: "combination_selected",
 

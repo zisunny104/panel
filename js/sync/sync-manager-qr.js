@@ -338,29 +338,6 @@ export class SyncManagerQR {
 
     // 檢查 QRCodeStyling 庫是否已載入
     if (typeof QRCodeStyling === "undefined") {
-      // QR庫未載入，顯示文字URL
-      const qrImageContainer = container.querySelector(
-        ".sync-qr-image-container",
-      );
-      if (qrImageContainer) {
-        qrImageContainer.innerHTML = `
-          <div class="sync-qr-fallback">
-              <h3>分享代碼: ${code}${statusText}</h3>
-              <p>
-                  URL: <a href="${qrUrl}" target="_blank">${qrUrl}</a>
-              </p>
-          </div>
-        `;
-      } else {
-        container.innerHTML = `
-          <div class="sync-qr-fallback">
-              <h3>分享代碼: ${code}${statusText}</h3>
-              <p>
-                  URL: <a href="${qrUrl}" target="_blank">${qrUrl}</a>
-              </p>
-          </div>
-        `;
-      }
       return;
     }
 

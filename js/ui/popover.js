@@ -32,14 +32,23 @@ export class UIPopover {
     if (!this.popoverEl || !this.anchorEl) return;
     this.popoverEl.classList.remove("is-hidden");
     this.popoverEl.setAttribute("aria-hidden", "false");
+    if ("inert" in this.popoverEl) {
+      this.popoverEl.inert = false;
+    }
     this.updatePosition();
     this._bindOutsideClick();
   }
 
   close() {
     if (!this.popoverEl) return;
+    if (this.popoverEl.contains(document.activeElement)) {
+      this.anchorEl?.focus?.();
+    }
     this.popoverEl.classList.add("is-hidden");
     this.popoverEl.setAttribute("aria-hidden", "true");
+    if ("inert" in this.popoverEl) {
+      this.popoverEl.inert = true;
+    }
     this._unbindOutsideClick();
   }
 

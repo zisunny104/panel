@@ -430,10 +430,10 @@ class BoardPageManager {
     this.sessionId = this.generateSessionId();
     this.experimentRunning = false;
     this.gestureStats = {};
-    this.subjectName = "";
-    this.lastSavedSubjectName = "";
+    this.participantName = "";
+    this.lastSavedParticipantName = "";
     this.pendingExperimentIdUpdate = null;
-    this.pendingSubjectNameUpdate = null;
+    this.pendingParticipantNameUpdate = null;
     this.actionsMap = new Map();
     this.actionToStepMap = new Map();
     this.currentActionSequence = [];
@@ -548,10 +548,11 @@ class BoardPageManager {
     if (this.experimentLogManager) {
       const experimentIdInput = document.getElementById("experimentIdInput");
       const experimentId = experimentIdInput?.value || data.experimentId || "";
-      const subjectNameInput = document.getElementById("participantNameInput");
-      const subjectName = subjectNameInput?.value?.trim() || this.subjectName || "";
+      const participantNameInput = document.getElementById("participantNameInput");
+      const participantName =
+        participantNameInput?.value?.trim() || this.participantName || "";
 
-      this.experimentLogManager.initialize(experimentId, subjectName);
+      this.experimentLogManager.initialize(experimentId, participantName);
       this.experimentLogManager.logExperimentStart();
       Logger.debug(`日誌管理器已初始化: ID=${experimentId}`);
     }
@@ -579,9 +580,9 @@ class BoardPageManager {
         document.getElementById("experimentIdInput")?.value?.trim() ||
         this.experimentId ||
         "",
-      subjectName:
+      participantName:
         document.getElementById("participantNameInput")?.value?.trim() ||
-        this.subjectName ||
+        this.participantName ||
         "",
       combinationId: this.currentCombination?.combinationId || "",
       combinationName: this.currentCombination?.combinationName || "",
@@ -603,9 +604,9 @@ class BoardPageManager {
         document.getElementById("experimentIdInput")?.value?.trim() ||
         this.experimentId ||
         "",
-      subjectName:
+      participantName:
         document.getElementById("participantNameInput")?.value?.trim() ||
-        this.subjectName ||
+        this.participantName ||
         "",
       combinationId: this.currentCombination?.combinationId || "",
       combinationName: this.currentCombination?.combinationName || "",
@@ -633,9 +634,9 @@ class BoardPageManager {
         document.getElementById("experimentIdInput")?.value?.trim() ||
         this.experimentId ||
         "",
-      subjectName:
+      participantName:
         document.getElementById("participantNameInput")?.value?.trim() ||
-        this.subjectName ||
+        this.participantName ||
         "",
       combinationId: this.currentCombination?.combinationId || "",
       combinationName: this.currentCombination?.combinationName || "",
@@ -725,7 +726,7 @@ class BoardPageManager {
   async init() {
     await this.boardUIManager.renderUnifiedUI();
     this.boardUIManager.renderGestureTypesReference();
-    this.setupSubjectNameListener();
+    this.setupParticipantNameListener();
     this.setupRemoteEventListeners();
     this._bindExportGestureButton();
   }
@@ -2181,13 +2182,13 @@ class BoardPageManager {
       return false;
     }
 
-    const subjectNameEl = document.getElementById("participantNameInput");
-    let subjectName = subjectNameEl
-      ? subjectNameEl.value.trim()
-      : this.subjectName || "";
+    const participantNameEl = document.getElementById("participantNameInput");
+    let participantName = participantNameEl
+      ? participantNameEl.value.trim()
+      : this.participantName || "";
 
-    if (!subjectName) {
-      subjectName = this.subjectName || "";
+    if (!participantName) {
+      participantName = this.participantName || "";
       Logger.debug("受試者名稱未填寫，使用空值繼續");
     }
 
@@ -2198,7 +2199,7 @@ class BoardPageManager {
 
     const experimentData = {
       experimentId: experimentId,
-      subjectName: subjectName,
+      participantName: participantName,
       combinationId: this.currentCombination.combinationId,
       combinationName: this.currentCombination.combinationName,
       unitCount: validUnits.length,
@@ -2225,7 +2226,7 @@ class BoardPageManager {
 
     experimentSyncManager.registerExperimentStateToHub({
       experiment_id: experimentData.experimentId,
-      subject_name: experimentData.subjectName,
+      participantName: experimentData.participantName,
       combination_name: experimentData.combinationName,
       combination_id: experimentData.combinationId,
       gesture_count: experimentData.gestureCount,
@@ -2238,10 +2239,10 @@ class BoardPageManager {
       return false;
     }
 
-    const subjectNameInput = document.getElementById("participantNameInput");
-    if (subjectNameInput) {
-      this.subjectName = subjectNameInput.value.trim();
-      this.lastSavedSubjectName = this.subjectName;
+    const participantNameInput = document.getElementById("participantNameInput");
+    if (participantNameInput) {
+      this.participantName = participantNameInput.value.trim();
+      this.lastSavedParticipantName = this.participantName;
     }
 
     return true;
@@ -2259,18 +2260,18 @@ class BoardPageManager {
       this.pendingExperimentIdUpdate = null;
     }
 
-    if (this.pendingSubjectNameUpdate) {
-      this.handleRemoteSubjectNameUpdate(this.pendingSubjectNameUpdate);
-      this.pendingSubjectNameUpdate = null;
+    if (this.pendingParticipantNameUpdate) {
+      this.handleRemoteParticipantNameUpdate(this.pendingParticipantNameUpdate);
+      this.pendingParticipantNameUpdate = null;
     }
 
     if (!isManualStop) {
-      const subjectNameInput = document.getElementById("participantNameInput");
-      if (subjectNameInput) {
-        subjectNameInput.value = "";
+      const participantNameInput = document.getElementById("participantNameInput");
+      if (participantNameInput) {
+        participantNameInput.value = "";
       }
-      this.subjectName = "";
-      this.lastSavedSubjectName = "";
+      this.participantName = "";
+      this.lastSavedParticipantName = "";
     }
 
     if (this.pendingCombinationUpdate) {
@@ -2287,7 +2288,7 @@ class BoardPageManager {
 
     const experimentData = {
       experiment_id: document.getElementById("experimentIdInput")?.value || "",
-      subject_name:
+      participant_name:
         document.getElementById("participantNameInput")?.value || "",
       combination: this.currentCombination?.combinationName || "",
       end_time: new Date().toISOString(),
@@ -2362,37 +2363,37 @@ class BoardPageManager {
   }
 
   /** 設定受試者名稱監聽器 */
-  setupSubjectNameListener() {
-    const subjectNameInput = document.getElementById("participantNameInput");
+  setupParticipantNameListener() {
+    const participantNameInput = document.getElementById("participantNameInput");
 
-    if (!subjectNameInput) return;
+    if (!participantNameInput) return;
 
     // 初始化受試者名稱
-    this.subjectName = subjectNameInput.value.trim();
-    this.lastSavedSubjectName = this.subjectName;
+    this.participantName = participantNameInput.value.trim();
+    this.lastSavedParticipantName = this.participantName;
 
     // 監聽輸入框變更並自動儲存
-    subjectNameInput.addEventListener("input", (e) => {
+    participantNameInput.addEventListener("input", (e) => {
       const newValue = e.target.value.trim();
 
       // 如果內容改變，立即更新內部狀態
-      if (newValue !== this.lastSavedSubjectName) {
-        this.subjectName = newValue;
-        this.lastSavedSubjectName = newValue;
+      if (newValue !== this.lastSavedParticipantName) {
+        this.participantName = newValue;
+        this.lastSavedParticipantName = newValue;
 
         // 如果在同步模式下，廣播變更
-        this.broadcastSubjectNameChange(newValue);
+        this.broadcastParticipantNameChange(newValue);
 
         // 記錄日誌
-        this.logAction("subject_name_updated", {
-          subject_name: newValue,
+        this.logAction("participant_name_updated", {
+          participant_name: newValue,
           timestamp: new Date().toISOString(),
         });
       }
     });
 
     // 監聽 Enter 鍵（可選，用於更好的使用者體驗）
-    subjectNameInput.addEventListener("keypress", (e) => {
+    participantNameInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
         // Enter 鍵可以觸發其他操作，如果需要的話
@@ -2418,7 +2419,7 @@ class BoardPageManager {
           case SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE:
             this.handleRemoteExperimentIdUpdate(data);
             break;
-          case SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE:
+          case SYNC_DATA_TYPES.PARTICIPANT_NAME_UPDATE:
             // 受試者名稱更新已由本機處理，此為同步管理器通知
             // 無需在此重複處理
             break;
@@ -2457,8 +2458,8 @@ class BoardPageManager {
         this.handleRemoteExperimentIdUpdate(state);
       }
       // 處理受試者名稱更新
-      else if (state.type === SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE) {
-        this.handleRemoteSubjectNameUpdate(state);
+      else if (state.type === SYNC_DATA_TYPES.PARTICIPANT_NAME_UPDATE) {
+        this.handleRemoteParticipantNameUpdate(state);
       }
     });
 
@@ -2652,7 +2653,7 @@ class BoardPageManager {
 
   /** 處理遠端實驗初始化 */
   handleRemoteExperimentInit(data) {
-    const { experimentId, currentCombination, subjectName, loadedUnits } = data;
+    const { experimentId, currentCombination, participantName, loadedUnits } = data;
 
     // 設定實驗ID
     if (experimentId) {
@@ -2670,12 +2671,12 @@ class BoardPageManager {
     }
 
     // 如果實驗正在執行，同步受試者名稱
-    if (subjectName) {
-      const subjectNameInput = document.getElementById("participantNameInput");
-      if (subjectNameInput && subjectNameInput.value.trim() !== subjectName) {
-        subjectNameInput.value = subjectName;
-        this.subjectName = subjectName;
-        this.lastSavedSubjectName = subjectName;
+    if (participantName) {
+      const participantNameInput = document.getElementById("participantNameInput");
+      if (participantNameInput && participantNameInput.value.trim() !== participantName) {
+        participantNameInput.value = participantName;
+        this.participantName = participantName;
+        this.lastSavedParticipantName = participantName;
       }
     }
 
@@ -2712,21 +2713,21 @@ class BoardPageManager {
   }
 
   /** 處理遠端受試者名稱更新 */
-  handleRemoteSubjectNameUpdate(data) {
+  handleRemoteParticipantNameUpdate(data) {
     // 如果目前實驗正在進行中，等待實驗結束後再同步新的受試者名稱
     if (this.experimentRunning) {
       // 將更新請求加入佇列，等待實驗結束
-      this.pendingSubjectNameUpdate = data;
+      this.pendingParticipantNameUpdate = data;
       return;
     }
 
-    const { subjectName } = data;
+    const { participantName } = data;
 
-    const subjectNameInput = document.getElementById("participantNameInput");
-    if (subjectNameInput && subjectNameInput.value.trim() !== subjectName) {
-      subjectNameInput.value = subjectName;
-      this.subjectName = subjectName;
-      this.lastSavedSubjectName = subjectName;
+    const participantNameInput = document.getElementById("participantNameInput");
+    if (participantNameInput && participantNameInput.value.trim() !== participantName) {
+      participantNameInput.value = participantName;
+      this.participantName = participantName;
+      this.lastSavedParticipantName = participantName;
     }
   }
 
@@ -2917,24 +2918,24 @@ class BoardPageManager {
   }
 
   /** 廣播受試者名稱變更 */
-  broadcastSubjectNameChange(subjectName) {
+  broadcastParticipantNameChange(participantName) {
     // 檢查是否存在同步工作階段
     if (!this.syncManager?.core?.isConnected()) {
       return;
     }
 
     // 如果受試者名稱為空，不進行同步（避免 null 污染）
-    if (!subjectName || !subjectName.trim()) {
+    if (!participantName || !participantName.trim()) {
       Logger.debug("受試者名稱為空，跳過同步");
       return;
     }
 
     const updateData = {
-      type: SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE,
+      type: SYNC_DATA_TYPES.PARTICIPANT_NAME_UPDATE,
       clientId: this.syncManager?.core?.syncClient?.clientId || "experiment_panel",
       timestamp: Date.now(),
       experimentId: document.getElementById("experimentIdInput")?.value || "",
-      subjectName: subjectName.trim(),
+      participantName: participantName.trim(),
     };
 
     // 同步到伺服器
@@ -2954,6 +2955,16 @@ class BoardPageManager {
 
   /** 處理遠端實驗開始 */
   async handleRemoteExperimentStarted(detail) {
+    const myId = this.syncManager?.core?.syncClient?.clientId;
+    if (myId && detail.clientId === myId) {
+      Logger.debug("Board: 收到本機實驗開始廣播，忽略");
+      return;
+    }
+
+    if (this.experimentFlowManager?.isRunning) {
+      Logger.debug("Board: Flow 已在進行中，忽略遠端啟動");
+      return;
+    }
     // 如果本機已在進行相同的實驗，忽略（避免重複啟動）
     if (this.experimentRunning) {
       const currentId =
@@ -2964,7 +2975,7 @@ class BoardPageManager {
         Logger.debug("Board: 收到遠端實驗開始，但本機已在進行相同實驗，忽略");
         return;
       }
-      // 不同實驗 ID → 接受此信號，FlowManager 的 isRunning 檢測會保護
+      // 不同實驗 ID → 接受此資訊，FlowManager 的 isRunning 檢測會保護
     }
 
     // 記錄日誌
@@ -2985,10 +2996,10 @@ class BoardPageManager {
     }
 
     // 檢查受試者名稱是否需要更新
-    if (detail.subjectName) {
-      const subjectNameInput = document.getElementById("participantNameInput");
-      if (subjectNameInput && !subjectNameInput.value.trim()) {
-        subjectNameInput.value = detail.subjectName;
+    if (detail.participantName) {
+      const participantNameInput = document.getElementById("participantNameInput");
+      if (participantNameInput && !participantNameInput.value.trim()) {
+        participantNameInput.value = detail.participantName;
       }
     }
 
@@ -3001,11 +3012,6 @@ class BoardPageManager {
         combinationSelect.value = detail.combinationId;
         // 觸發組合變更事件以重新載入手勢序列
         combinationSelect.dispatchEvent(new Event("change"));
-      } else if (this.experimentSystemManager?.selectCombination) {
-        // fallback: 直接呼叫 ExperimentSystemManager API，等待組合載入完成再啟動實驗
-        await this.experimentSystemManager
-          .selectCombination(detail.combinationId)
-          .catch((err) => Logger.warn("Board: 設定遠端組合失敗:", err));
       }
     }
 
@@ -3163,12 +3169,10 @@ class BoardPageManager {
         syncStatus.errors.push(msg);
       }
 
-      if (window.websocketClient || window.WebSocketClient) {
-        const wsClient = window.websocketClient || window.WebSocketClient;
-        const queueSize = wsClient?.messageQueue?.length || 0;
-        const isConnected =
-          wsClient?.isConnected?.() ??
-          (wsClient?.ws?.readyState === WebSocket.OPEN);
+      const wsClient = this.syncManager?.core?.syncClient?.wsClient;
+      if (wsClient) {
+        const queueSize = wsClient.messageQueue?.length || 0;
+        const isConnected = wsClient.ws?.readyState === WebSocket.OPEN;
 
         syncStatus.webSocketQueueStatus = {
           queueSize: queueSize,

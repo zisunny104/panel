@@ -3,7 +3,12 @@
  *
  * 負責處理面板頁面的同步狀態更新事件，包括實驗控制和UI同步
  */
-import { ACTION_IDS, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import {
+  ACTION_IDS,
+  LOG_SOURCES,
+  SYNC_EVENTS,
+  SYNC_DATA_TYPES,
+} from "../constants/index.js";
 import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
 
 class PanelSyncManager {
@@ -115,8 +120,8 @@ class PanelSyncManager {
         this.handleSyncExperimentStopped(state);
       } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE) {
         this.handleSyncExperimentIdUpdate(state);
-      } else if (state.type === SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE) {
-        this.handleSyncSubjectNameUpdate(state);
+      } else if (state.type === SYNC_DATA_TYPES.PARTICIPANT_NAME_UPDATE) {
+        this.handleSyncParticipantNameUpdate(state);
       } else if (state.type === SYNC_DATA_TYPES.ACTION_COMPLETED) {
         this.handleSyncActionCompleted(state);
       } else if (state.type === SYNC_DATA_TYPES.ACTION_CANCELLED) {
@@ -125,19 +130,19 @@ class PanelSyncManager {
     });
 
     // 監聽受試者名稱輸入，廣播變更到其他裝置（使用事件委派，支援動態 DOM）
-    let _subjectNameDebounce = null;
+    let _participantNameDebounce = null;
     document.addEventListener("input", (e) => {
       if (e.target.id !== "participantNameInput") return;
       const newName = e.target.value.trim();
       if (!newName) return;
-      if (_subjectNameDebounce) clearTimeout(_subjectNameDebounce);
-      _subjectNameDebounce = setTimeout(() => {
-        _subjectNameDebounce = null;
+      if (_participantNameDebounce) clearTimeout(_participantNameDebounce);
+      _participantNameDebounce = setTimeout(() => {
+        _participantNameDebounce = null;
         this.experimentSyncCore?.safeBroadcast?.({
-          type: SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE,
+          type: SYNC_DATA_TYPES.PARTICIPANT_NAME_UPDATE,
           clientId: this.syncClient?.clientId,
           timestamp: Date.now(),
-          subjectName: newName,
+          participantName: newName,
         }).catch((err) => Logger.warn("廣播受試者名稱失敗:", err));
       }, 300);
     });
@@ -160,8 +165,8 @@ class PanelSyncManager {
     if (expIdInput && syncData.experimentId) {
       expIdInput.value = syncData.experimentId;
     }
-    if (participantInput && syncData.subjectName) {
-      participantInput.value = syncData.subjectName;
+    if (participantInput && syncData.participantName) {
+      participantInput.value = syncData.participantName;
     }
 
     // 檢查是否在 board.html
@@ -330,14 +335,14 @@ class PanelSyncManager {
       const currentCombo = this._getExperimentCombo();
       const experimentId =
         this.experimentSystemManager?.getExperimentId?.() || "";
-      const subjectName =
+      const participantName =
         document.getElementById("participantNameInput")?.value?.trim() || "";
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_STARTED,
         clientId: this.syncClient?.clientId,
         timestamp: Date.now(),
         experimentId,
-        subjectName,
+        participantName,
         combinationId: currentCombo?.combinationId || "",
         combinationName: currentCombo?.combinationName || "",
         })
@@ -386,29 +391,37 @@ class PanelSyncManager {
 
     const currentId = this.experimentSystemManager?.getExperimentId?.();
     if (currentId !== experimentId) {
-      this.experimentSystemManager?.setExperimentId?.(experimentId, {
-        registerToHub: false,
-        broadcast: false,
-        reapplyCombination: true,
-      });
+      this.experimentSystemManager?.setExperimentId?.(
+        experimentId,
+        LOG_SOURCES.REMOTE_SYNC,
+        {
+          registerToHub: false,
+          broadcast: false,
+          reapplyCombination: true,
+        },
+      );
     }
   }
 
   /**
    * 處理同步的受試者名稱更新（從 board 端收到）
    */
-  handleSyncSubjectNameUpdate(syncData) {
-    const { subjectName } = syncData;
-    if (!subjectName) return;
+  handleSyncParticipantNameUpdate(syncData) {
+    const { participantName } = syncData;
+    if (!participantName) return;
+    if (this.experimentSystemManager?.updateParticipantNameUi) {
+      this.experimentSystemManager.updateParticipantNameUi(participantName);
+      return;
+    }
     const input = document.getElementById("participantNameInput");
-    if (input && input.value.trim() !== subjectName) {
-      input.value = subjectName;
+    if (input && input.value.trim() !== participantName) {
+      input.value = participantName;
     }
   }
 
   /**
    * 處理遠端 ACTION_COMPLETED 廣播
-   * 接收來自 Board 端的 action 完成信號
+   * 接收來自 Board 端的 action 完成資訊
    * 若 Panel 未開機，則強制開機並推進至該 action 的下一個
    */
   async handleSyncActionCompleted(syncData) {
@@ -434,21 +447,19 @@ class PanelSyncManager {
       // 若有 Board 端傳來的實驗資訊（experimentId, combinationId 等在廣播中）
       if (syncData.experimentId && syncData.combinationId) {
         try {
-          // 1. 設定實驗ID
+          // 同步實驗識別與組合，確保可載入單元
           const expIdInput = document.getElementById("experimentIdInput");
           if (expIdInput) {
             expIdInput.value = syncData.experimentId;
           }
 
-          // 2. 設定受試者名稱（若有的話）
-          if (syncData.subjectName) {
+          if (syncData.participantName) {
             const participantInput = document.getElementById("participantNameInput");
             if (participantInput) {
-              participantInput.value = syncData.subjectName;
+              participantInput.value = syncData.participantName;
             }
           }
 
-          // 3. 同步組合（若不一致）
           if (this.experimentSystemManager?.selectCombination) {
             const currentCombo = this.experimentCombinationManager?.getCurrentCombination?.();
             if (!currentCombo || currentCombo.combinationId !== syncData.combinationId) {
@@ -456,7 +467,7 @@ class PanelSyncManager {
             }
           }
 
-          // 4. 啟動實驗
+          // 啟動實驗流程
           if (this.experimentFlowManager?.startExperiment) {
             this.experimentFlowManager.startExperiment();
             Logger.info("[PanelSync] Panel 已啟動實驗");
@@ -471,10 +482,19 @@ class PanelSyncManager {
       }
     }
 
+    // 非電源 action 且尚未開機時，先強制開機再推進 action
+    if (
+      !this.powerControl?.isPowerOn &&
+      actionId !== ACTION_IDS.POWER_ON &&
+      actionId !== ACTION_IDS.POWER_OFF
+    ) {
+      this.powerControl?.setPowerState(true, "sync");
+    }
+
     const isPowerAction =
       actionId === ACTION_IDS.POWER_ON || actionId === ACTION_IDS.POWER_OFF;
     if (isPowerAction && this.powerControl) {
-      const desiredState = actionId === "POWER_ON";
+      const desiredState = actionId === ACTION_IDS.POWER_ON;
       if (this.powerControl.isPowerOn === desiredState) {
         this.experimentActionHandler?.handleRemoteAction?.({
           actionId,
@@ -504,7 +524,7 @@ class PanelSyncManager {
 
   /**
    * 處理遠端 ACTION_CANCELLED 廣播
-   * 接收來自 Board 端的 action 取消信號
+   * 接收來自 Board 端的 action 取消資訊
    */
   handleSyncActionCancelled(syncData) {
     const { actionId, clientId } = syncData;

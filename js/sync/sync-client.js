@@ -8,6 +8,7 @@
 import { SYNC_EVENTS } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
+import { WebSocketClient } from "../core/websocket-client.js";
 
 class SyncClient {
   /**

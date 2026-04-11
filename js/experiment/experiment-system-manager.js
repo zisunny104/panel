@@ -37,6 +37,15 @@ class ExperimentSystemManager {
       currentCombination: null,
       currentUnitIds: [],
       defaultCombinationApplied: false,
+      uiInitialized: {
+        combinationSelector: false,
+        unitPanel: false,
+        experimentControls: false,
+      },
+      pendingUi: {
+        experimentId: null,
+        participantName: null,
+      },
     };
 
     this.listeners = new Map();
@@ -194,7 +203,7 @@ class ExperimentSystemManager {
       combinations: combinations.length,
     });
 
-    this.uiManager.renderCombinationSelector(container, combosForUI, {
+    const rendered = this.uiManager.renderCombinationSelector(container, combosForUI, {
       activeId,
       showTitle: true,
       title: "單元組合",
@@ -208,6 +217,9 @@ class ExperimentSystemManager {
     });
 
     Logger.debug("組合選擇器已初始化");
+    if (rendered) {
+      this.state.uiInitialized.combinationSelector = true;
+    }
   }
 
   /**
@@ -247,7 +259,7 @@ class ExperimentSystemManager {
       return prepared;
     });
 
-    this.uiManager.renderUnitsPanel(
+    const rendered = this.uiManager.renderUnitsPanel(
       container,
       preparedUnits,
       this.state.currentUnitIds,
@@ -271,6 +283,9 @@ class ExperimentSystemManager {
     setTimeout(() => this._tryCallPageManager("updateSelectAllState"), 100);
 
     Logger.debug("單元面板已初始化");
+    if (rendered) {
+      this.state.uiInitialized.unitPanel = true;
+    }
   }
 
   /**
@@ -280,7 +295,7 @@ class ExperimentSystemManager {
   async _initializeExperimentControls(container) {
     const experimentId = this.hubManager.getExperimentId();
 
-    this.uiManager.renderExperimentControls(container, {
+    const rendered = this.uiManager.renderExperimentControls(container, {
       showExperimentId: true,
       showParticipantName: true,
       showTimer: true,
@@ -293,6 +308,9 @@ class ExperimentSystemManager {
     });
 
     Logger.debug("實驗控制面板已初始化");
+    if (rendered) {
+      this.state.uiInitialized.experimentControls = true;
+    }
   }
 
   /**
@@ -356,6 +374,10 @@ class ExperimentSystemManager {
 
     this.flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
       this._handleFlowStopped(data);
+    });
+
+    window.addEventListener("panel:experiment:opened", () => {
+      this.refreshPanelUi();
     });
 
     this.hubManager.on(ExperimentHubManager.EVENT.ID_CHANGED, (data) => {
@@ -576,10 +598,15 @@ class ExperimentSystemManager {
    */
   _updateUIForCombination(combination, unitIds) {
     if (this.state.containers.combinationSelector) {
-      this.uiManager.updateCombinationSelection(
+      const containerEl = document.querySelector(
         this.state.containers.combinationSelector,
-        combination.combinationId,
       );
+      if (containerEl) {
+        this.uiManager.updateCombinationSelection(
+          containerEl,
+          combination.combinationId,
+        );
+      }
     }
     if (this.state.containers.unitPanel) {
       this._updateUnitPanelForCombination(combination, unitIds);
@@ -949,11 +976,17 @@ class ExperimentSystemManager {
     const idInput = document.getElementById("experimentIdInput");
     if (idInput) {
       idInput.value = newId;
+    } else {
+      this.state.pendingUi.experimentId = newId;
     }
 
     // 同步模式下註冊到中樞
     const isSync = this.hubManager?.isInSyncMode?.() || false;
-    const shouldRegister = registerToHub ?? isSync;
+    const shouldRegister =
+      registerToHub === true &&
+      isSync &&
+      source !== LOG_SOURCES.REMOTE_SYNC &&
+      source !== LOG_SOURCES.HUB_SYNC;
     if (shouldRegister) {
       try {
         await experimentSyncManager.registerExperimentIdToHub(newId);
@@ -984,6 +1017,78 @@ class ExperimentSystemManager {
         detail: { experimentId: newId },
       }),
     );
+  }
+
+  updateParticipantNameUi(participantName) {
+    if (!participantName) return;
+    const input = document.getElementById("participantNameInput");
+    if (input) {
+      if (input.value.trim() !== participantName) {
+        input.value = participantName;
+      }
+    } else {
+      this.state.pendingUi.participantName = participantName;
+    }
+  }
+
+  refreshPanelUi() {
+    const { combinationSelector, unitPanel, experimentControls } =
+      this.state.containers || {};
+
+    if (combinationSelector && !this.state.uiInitialized.combinationSelector) {
+      this._initializeCombinationSelector(combinationSelector);
+    }
+
+    if (unitPanel && !this.state.uiInitialized.unitPanel) {
+      if (this.state.scriptData?.units) {
+        this._initializeUnitPanel(unitPanel, this.state.scriptData.units);
+      }
+    }
+
+    if (experimentControls && !this.state.uiInitialized.experimentControls) {
+      this._initializeExperimentControls(experimentControls);
+      const idInput = document.getElementById("experimentIdInput");
+      if (idInput) {
+        this._setupExperimentIdInputListener(idInput);
+      }
+    }
+
+    this._applyPendingUiUpdates();
+
+    if (this.pageManager?.experimentStateManager?.setupInputSync) {
+      this.pageManager.experimentStateManager.setupInputSync();
+    }
+  }
+
+  _applyPendingUiUpdates() {
+    const { experimentId, participantName } = this.state.pendingUi;
+
+    if (experimentId) {
+      const idInput = document.getElementById("experimentIdInput");
+      if (idInput) {
+        if (idInput.value.trim() !== experimentId) {
+          idInput.value = experimentId;
+        }
+        this.state.pendingUi.experimentId = null;
+      }
+    }
+
+    if (participantName) {
+      const participantInput = document.getElementById("participantNameInput");
+      if (participantInput) {
+        if (participantInput.value.trim() !== participantName) {
+          participantInput.value = participantName;
+        }
+        this.state.pendingUi.participantName = null;
+      }
+    }
+
+    if (this.state.currentCombination && this.state.currentUnitIds.length > 0) {
+      this._updateUIForCombination(
+        this.state.currentCombination,
+        this.state.currentUnitIds,
+      );
+    }
   }
 
   /**
@@ -1066,10 +1171,14 @@ class ExperimentSystemManager {
     }
 
     // 套用（不重複廣播，避免初始化時的雜訊）
-    await this.setExperimentId(experimentId, {
-      broadcast: isSync,
-      reapplyCombination: false, // initializeUI 已處理
-    });
+    await this.setExperimentId(
+      experimentId,
+      LOG_SOURCES.LOCAL_INITIALIZE,
+      {
+        broadcast: isSync,
+        reapplyCombination: false, // initializeUI 已處理
+      },
+    );
 
     // 綁定輸入框 change 事件（如果元素存在）
     if (idInput) {

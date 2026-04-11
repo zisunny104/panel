@@ -167,7 +167,7 @@ data/
 | **panel-media-manager.js**    | `MediaManager`         | 媒體預載入與快取。方法：setupEventListeners, playMedia, processMediaSrc, setupVideoElement, setupImageElement, playMediaInArea, preloadMedia, preloadCombinationMedia, stopHomePageLoop, playHomePageLoop              |
 | **panel-logger.js**           | `PanelLogger`          | 操作日誌記錄。方法：initializeDOMElements, setupDOMElements, isExperimentMode, formatDateTime, getExperimentInfo, logAction, toggleLogger, showLogger, hideLogger, clearLog, exportLog                                 |
 | **panel-experiment-power.js** | `PanelExperimentPower` | 電源管理與狀態監控。方法：handlePowerOn, handlePowerOff, highlightPowerSwitch, checkPowerState, setPowerState, handlePowerStateChange                                                                                  |
-| **panel-sync-manager.js**     | `PanelSyncManager`     | 面板同步管理。方法：setupModuleReferences, setupSyncEventListeners, handleSyncExperimentStart, handleSyncExperimentPaused, handleSyncExperimentResumed, handleSyncExperimentStopped, handleSyncExperimentIdUpdate, handleSyncSubjectNameUpdate, handleSyncActionCompleted, handleSyncActionCancelled                                                                                          |
+| **panel-sync-manager.js**     | `PanelSyncManager`     | 面板同步管理。方法：setupModuleReferences, setupSyncEventListeners, handleSyncExperimentStart, handleSyncExperimentPaused, handleSyncExperimentResumed, handleSyncExperimentStopped, handleSyncExperimentIdUpdate, handleSyncParticipantNameUpdate, handleSyncActionCompleted, handleSyncActionCancelled                                                                                          |
 
 #### js/sync/ - 同步模組
 
@@ -1329,14 +1329,14 @@ async handleAuth(wsConnectionId, data, ws) {
 | `type` 值               | 常數                      | 發送端                   | 主要 payload 欄位                        |
 | ----------------------- | ------------------------- | ------------------------ | ---------------------------------------- |
 | `experiment_id_update`    | `EXPERIMENT_ID_UPDATE`    | board / 面板（備援路徑） | `experimentId`, `client_id`, `timestamp` |
-| `subject_name_update` | `SUBJECT_NAME_UPDATE` | board                    | `subjectName`, `timestamp`           |
+| `participant_name_update` | `PARTICIPANT_NAME_UPDATE` | board                    | `participantName`, `timestamp`           |
 | `combination_selected`  | `COMBINATION_SELECTED`    | board / 面板             | `combination`, `timestamp`               |
 
 #### 動作與手勢（board 頁）
 
 | `type` 值                | 常數                     | 主要 payload 欄位                                                          |
 | ------------------------ | ------------------------ | -------------------------------------------------------------------------- |
-| `action_completed`       | `ACTION_COMPLETED`       | `action_id`, `step_id`, `unit_id`, `client_id`, `duration_ms`, `experiment_id`, `combination_id`, `subject_name`, `timestamp` |
+| `action_completed`       | `ACTION_COMPLETED`       | `action_id`, `step_id`, `unit_id`, `client_id`, `duration_ms`, `experiment_id`, `combination_id`, `participant_name`, `timestamp` |
 | `action_cancelled`       | `ACTION_CANCELLED`       | `action_id`, `gesture_index`, `client_id`, `timestamp`                     |
 | `gesture_marked`         | `GESTURE_MARKED`         | `step_index`, `gesture_name`, `mark_status`, `timer_value`, `timestamp`    |
 | `gesture_step_completed` | `GESTURE_STEP_COMPLETED` | `step_index`, `gesture_name`, `timer_value`, `timestamp`                   |

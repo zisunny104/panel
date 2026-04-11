@@ -56,32 +56,35 @@ class ExperimentStateManager {
   setupInputSync() {
     const experimentIdInput = document.getElementById("experimentIdInput");
     if (experimentIdInput) {
-      // 對 input 做去抖，避免高頻輸入導致 race 或大量同步
-      let _debounceTimer = null;
-      const DEBOUNCE_MS = 300;
+      if (!experimentIdInput._stateSyncBound) {
+        experimentIdInput._stateSyncBound = true;
+        // 對 input 做去抖，避免高頻輸入導致 race 或大量同步
+        let _debounceTimer = null;
+        const DEBOUNCE_MS = 300;
 
-      experimentIdInput.addEventListener("input", (e) => {
-        const newId = e.target.value.trim();
-        if (_debounceTimer) clearTimeout(_debounceTimer);
-        _debounceTimer = setTimeout(() => {
+        experimentIdInput.addEventListener("input", (e) => {
+          const newId = e.target.value.trim();
+          if (_debounceTimer) clearTimeout(_debounceTimer);
+          _debounceTimer = setTimeout(() => {
+            if (newId !== this.experimentId) {
+              this.setExperimentId(newId, LOG_SOURCES.LOCAL_INPUT);
+            }
+            _debounceTimer = null;
+          }, DEBOUNCE_MS);
+        });
+
+        // change 事件立即同步（例如離開欄位時）
+        experimentIdInput.addEventListener("change", (e) => {
+          const newId = e.target.value.trim();
+          if (_debounceTimer) {
+            clearTimeout(_debounceTimer);
+            _debounceTimer = null;
+          }
           if (newId !== this.experimentId) {
             this.setExperimentId(newId, LOG_SOURCES.LOCAL_INPUT);
           }
-          _debounceTimer = null;
-        }, DEBOUNCE_MS);
-      });
-
-      // change 事件立即同步（例如離開欄位時）
-      experimentIdInput.addEventListener("change", (e) => {
-        const newId = e.target.value.trim();
-        if (_debounceTimer) {
-          clearTimeout(_debounceTimer);
-          _debounceTimer = null;
-        }
-        if (newId !== this.experimentId) {
-          this.setExperimentId(newId, LOG_SOURCES.LOCAL_INPUT);
-        }
-      });
+        });
+      }
 
       if (experimentIdInput.value.trim() && !this.experimentId) {
         this.experimentId = experimentIdInput.value.trim();
@@ -92,19 +95,22 @@ class ExperimentStateManager {
       "participantNameInput",
     );
     if (participantNameInput) {
-      participantNameInput.addEventListener("input", (e) => {
-        const newName = e.target.value.trim();
-        if (newName !== this.participantName) {
-          this.setParticipantName(newName, "input");
-        }
-      });
+      if (!participantNameInput._stateSyncBound) {
+        participantNameInput._stateSyncBound = true;
+        participantNameInput.addEventListener("input", (e) => {
+          const newName = e.target.value.trim();
+          if (newName !== this.participantName) {
+            this.setParticipantName(newName, "input");
+          }
+        });
 
-      participantNameInput.addEventListener("change", (e) => {
-        const newName = e.target.value.trim();
-        if (newName !== this.participantName) {
-          this.setParticipantName(newName, "input");
-        }
-      });
+        participantNameInput.addEventListener("change", (e) => {
+          const newName = e.target.value.trim();
+          if (newName !== this.participantName) {
+            this.setParticipantName(newName, "input");
+          }
+        });
+      }
 
       if (participantNameInput.value.trim() && !this.participantName) {
         this.participantName = participantNameInput.value.trim();
@@ -113,6 +119,16 @@ class ExperimentStateManager {
   }
 
   setupHubSync() {
+    document.addEventListener(
+      "experimentSystem:experimentIdChanged",
+      (event) => {
+        const { experimentId } = event.detail || {};
+        if (!experimentId) return;
+        this.setExperimentId &&
+          this.setExperimentId(experimentId, LOG_SOURCES.LOCAL_INITIALIZE);
+      },
+    );
+
     document.addEventListener("hub_state_updated", (event) => {
       const { state } = event.detail;
       this.applyHubState && this.applyHubState(state);

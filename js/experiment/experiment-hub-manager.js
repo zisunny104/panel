@@ -195,8 +195,13 @@ class ExperimentHubManager {
         source: source,
       });
 
-      // 如果在 Hub 模式下，同步到伺服器
-      if (this.isHubMode() && this.connection.connected) {
+      // 如果在 Hub 模式下，同步到伺服器（避免遠端回聲）
+      if (
+        this.isHubMode() &&
+        this.connection.connected &&
+        source !== LOG_SOURCES.REMOTE_SYNC &&
+        source !== LOG_SOURCES.HUB_SYNC
+      ) {
         this.syncExperimentIdToHub(id, source);
       }
     }

@@ -116,7 +116,7 @@ class ExperimentSyncAdapter {
       const payload = {
         type: stateData.type || SYNC_DATA_TYPES.EXPERIMENT_STARTED,
         experimentId: stateData.experiment_id || stateData.experimentId || "",
-        subjectName: stateData.subject_name || stateData.subjectName || "",
+        participantName: stateData.participantName || "",
         combinationId:
           stateData.combination_id || stateData.combinationId || "",
         combinationName:
