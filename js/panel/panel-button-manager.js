@@ -4,8 +4,31 @@
  * 負責處理所有按鈕互動、實驗邏輯和同步功能
  * 專門用於主面板的按鈕操作管理
  */
+import {
+  ACTION_IDS,
+  ACTION_BUTTONS,
+  SYNC_DATA_TYPES,
+  SYNC_EVENTS,
+} from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
+
 class ButtonManager {
-  constructor() {
+  constructor({
+    logger = Logger,
+    experimentActionHandler = null,
+    experimentFlowManager = null,
+    experimentSyncCore = null,
+    syncClient = null,
+    powerControl = null,
+    panelMediaManager = null,
+  } = {}) {
+    this.logger = logger;
+    this.experimentActionHandler = experimentActionHandler;
+    this.experimentFlowManager = experimentFlowManager;
+    this.experimentSyncCore = experimentSyncCore;
+    this.syncClient = syncClient;
+    this.powerControl = powerControl;
+    this.panelMediaManager = panelMediaManager;
     // 按鈕功能對照表
     this.buttonFunctionsMap = {};
 
@@ -56,6 +79,38 @@ class ButtonManager {
     this.loadButtonFunctions();
   }
 
+  updateDependencies(deps = {}) {
+    Object.assign(this, deps);
+  }
+
+  _getLogger() {
+    return this.logger;
+  }
+
+  _getActionHandler() {
+    return this.experimentActionHandler;
+  }
+
+  _getFlowManager() {
+    return this.experimentFlowManager;
+  }
+
+  _getSyncCore() {
+    return this.experimentSyncCore;
+  }
+
+  _getSyncClient() {
+    return this.syncClient;
+  }
+
+  _getPowerControl() {
+    return this.powerControl;
+  }
+
+  _getMediaManager() {
+    return this.panelMediaManager;
+  }
+
   // ==========================================
   // 初始化和配置
   // ==========================================
@@ -104,10 +159,17 @@ class ButtonManager {
       btn.classList.remove("next-step-highlight-secondary");
       btn.classList.remove("next-step-highlight-shift");
     });
-
     if (typeof Logger !== "undefined") {
       Logger.debug("已清除所有按鈕高亮效果");
     }
+  }
+
+  resetActionButtonState() {
+    document.querySelectorAll(".button-overlay").forEach((btn) => {
+      btn.classList.remove("temporarily-disabled");
+      btn.classList.remove("power-off-disabled");
+      btn.style.pointerEvents = "";
+    });
   }
 
   // ==========================================
@@ -118,11 +180,14 @@ class ButtonManager {
    * 模擬按鈕點擊（鍵盤/觸控用）
    */
   simulateButtonClick(buttonId, isKeyboardTriggered = false) {
+    const logger = this._getLogger();
+    const flowManager = this._getFlowManager();
+    const actionHandler = this._getActionHandler();
     const button = document.querySelector(
       `.button-overlay[data-label="${buttonId}"]`,
     );
     const shiftButtonOverlay = document.querySelector(
-      '.button-overlay[data-label="B1"]',
+      ".button-overlay[data-label=\"B1\"]",
     );
     if (!button) {
       if (typeof Logger !== "undefined") {
@@ -146,14 +211,14 @@ class ButtonManager {
         button.classList.toggle("shift-active", this.isShiftPressed);
 
         // 同步更新按鈕覆蓋層的狀態
-        const shiftOverlay = document.querySelector('[data-button="B1"]');
+        const shiftOverlay = document.querySelector("[data-button=\"B1\"]");
         if (shiftOverlay) {
           shiftOverlay.classList.toggle("shift-active", this.isShiftPressed);
         }
 
         actionMessage = this.isShiftPressed
-          ? '模擬按鈕 "B1" (Shift) 按下'
-          : '模擬按鈕 "B1" (Shift) 放開';
+          ? "模擬按鈕 \"B1\" (Shift) 按下"
+          : "模擬按鈕 \"B1\" (Shift) 放開";
         functionName = "shift";
 
         Logger.debug(`Shift 狀態: ${this.isShiftPressed ? "按下" : "放開"}`);
@@ -175,7 +240,7 @@ class ButtonManager {
             comboFunction: buttonData.button_functions[1],
             modifierSource: this.isShiftPressed ? "keyboard" : "touch",
           };
-          window.logger?.logAction(
+          logger?.logAction(
             `${actionMessage}，功能為 "${functionName}" [組合: Shift + ${buttonId}]`,
             buttonId,
             functionName,
@@ -185,7 +250,7 @@ class ButtonManager {
             comboDetails,
           );
         } else {
-          window.logger?.logAction(
+          logger?.logAction(
             `${actionMessage}，功能為 "${functionName}"`,
             buttonId,
             functionName,
@@ -205,7 +270,7 @@ class ButtonManager {
       buttonId === "B1" ||
       (!this.isShiftPressed && !this.isTouchShiftActive)
     ) {
-      window.logger?.logAction(
+      logger?.logAction(
         `${actionMessage}，功能為 "${functionName}"`,
         buttonId,
         functionName,
@@ -214,28 +279,18 @@ class ButtonManager {
     }
 
     // 實驗模式下檢查是否有對應的動作
-    if (window.experimentFlowManager?.isRunning) {
+    if (flowManager?.isRunning) {
       if (this.checkAndExecuteExperimentAction(buttonId, functionName)) {
-        // 注意：按鈕動作廣播已移至 completeCurrentAction() 中進行
-        // 確保包含 actionId，避免重複廣播
-
-        // 記錄動作進度
-        if (
-          window.experimentActionHandler &&
-          window.experimentActionHandler.currentActionSequence?.length > 0
-        ) {
-          const currentActionIndex =
-            window.experimentActionHandler.currentActionIndex;
-          const totalActions =
-            window.experimentActionHandler.currentActionSequence.length;
-          const prevAction =
-            window.experimentActionHandler.currentActionSequence[
-              Math.max(0, currentActionIndex - 1)
-            ];
+        if (actionHandler && actionHandler.currentActionSequence?.length > 0) {
+          const currentActionIndex = actionHandler.currentActionIndex;
+          const totalActions = actionHandler.currentActionSequence.length;
+          const prevAction = actionHandler.currentActionSequence[
+            Math.max(0, currentActionIndex - 1)
+          ];
           const logMessage = `按鈕 "${buttonId}" → 功能 "${functionName}" | 動作: ${
             prevAction?.actionId || "未知"
           } [${currentActionIndex}/${totalActions}]`;
-          window.logger?.logAction(logMessage);
+          logger?.logAction(logMessage);
         }
       }
     }
@@ -248,45 +303,26 @@ class ButtonManager {
 
   /**
    * 廣播按鈕按下事件
+   * Schema: {type, clientId, timestamp, button, function, beepEnabled}
    */
   broadcastButtonPress(buttonId, functionName) {
     // 取得提示音狀態
     const toggleBeepSound = document.getElementById("toggleBeepSound");
     const beepEnabled = toggleBeepSound?.checked || false;
 
-    const buttonData = {
+    // 檢查同步連線狀態
+    const syncCore = this._getSyncCore();
+    const syncClient = this._getSyncClient();
+    syncCore?.safeBroadcast?.({
+      type: SYNC_DATA_TYPES.BUTTON_PRESSED,
+      clientId: syncClient?.clientId || "button_manager",
+      timestamp: Date.now(),
       button: buttonId,
       function: functionName,
       beepEnabled: beepEnabled,
-      timestamp: Date.now(),
-    };
-
-    // 本機廣播事件
-    document.dispatchEvent(
-      new CustomEvent("buttonPressed", {
-        detail: buttonData,
-      }),
-    );
-
-    // 向後端同步按鈕狀態（只有 operator 角色可以發送）
-    if (
-      window.syncClient &&
-      window.syncClient.connected &&
-      window.syncClient.role === window.SyncManager?.ROLE?.OPERATOR
-    ) {
-      const syncResult = window.syncClient.syncState({
-        type: window.SYNC_DATA_TYPES.BUTTON_PRESSED,
-        clientId: window.syncClient?.clientId || "button_manager",
-        button: buttonId,
-        function: functionName,
-        beepEnabled: beepEnabled,
-        timestamp: new Date().toISOString(),
-      });
-
-      if (!syncResult) {
-        Logger.debug("作為本機模式，按鈕事件僅儲存本機");
-      }
-    }
+    }).catch((error) => {
+      Logger.warn("同步按鈕按下事件失敗:", error);
+    });
   }
 
   // ==========================================
@@ -296,7 +332,9 @@ class ButtonManager {
   /**
    * 檢查並執行實驗模式下的對應動作
    */
-  checkAndExecuteExperimentAction(buttonId, functionName) {
+  checkAndExecuteExperimentAction(buttonId, functionName, isRemote = false) {
+    const flowManager = this._getFlowManager();
+    const actionHandler = this._getActionHandler();
     // 檢查是否為新的實驗動作按鈕（事件驅動）
     if (this.isExperimentActionButton(buttonId)) {
       Logger.debug(`檢測到新實驗動作按鈕: ${buttonId}`);
@@ -305,28 +343,28 @@ class ButtonManager {
     }
 
     // 檢查實驗是否在執行中
-    if (!window.experimentFlowManager?.isRunning) {
+    if (!flowManager?.isRunning) {
       Logger.debug(`實驗未執行，跳過按鈕動作: ${buttonId}`);
       return false;
     }
 
     // 確保動作管理員已初始化（當實驗開始時自動初始化）
-    if (!window.experimentActionHandler) {
+    if (!actionHandler) {
       Logger.warn("experimentActionHandler 不存在，無法處理動作");
       return false;
     }
 
     // 如果動作序列為空，記錄警告但繼續處理
-    if (window.experimentActionHandler.currentActionSequence.length === 0) {
+    if (actionHandler.currentActionSequence.length === 0) {
       Logger.warn("動作序列為空，無法處理動作");
       return false;
     }
 
     // 處理動作序列邏輯
     Logger.debug(
-      `處理按鈕動作: ${buttonId} -> ${functionName}, 序列長度: ${window.experimentActionHandler.currentActionSequence.length}`,
+      `處理按鈕動作: ${buttonId} -> ${functionName}, 序列長度: ${actionHandler.currentActionSequence.length}`,
     );
-    return this.handleActionBasedExperiment(buttonId, functionName);
+    return this.handleActionBasedExperiment(buttonId, functionName, isRemote);
 
     return false;
   }
@@ -334,7 +372,8 @@ class ButtonManager {
   /**
    * 處理動作序列實驗邏輯
    */
-  handleActionBasedExperiment(buttonId, functionName) {
+  handleActionBasedExperiment(buttonId, functionName, isRemote = false) {
+    const actionHandler = this._getActionHandler();
     // 防重複觸發檢查
     const now = Date.now();
     if (now - this.lastActionTime < this.actionCooldown) {
@@ -345,11 +384,11 @@ class ButtonManager {
     }
     this.lastActionTime = now;
 
-    if (!window.experimentActionHandler) {
+    if (!actionHandler) {
       return false;
     }
 
-    let currentAction = window.experimentActionHandler.getCurrentAction();
+    let currentAction = actionHandler.getCurrentAction();
     if (!currentAction) {
       return false;
     }
@@ -359,8 +398,8 @@ class ButtonManager {
       // 儲存目前 action，檢查是否為 step 最後一個
       const skippedAction = currentAction;
 
-      window.experimentActionHandler.completeCurrentAction();
-      currentAction = window.experimentActionHandler.getCurrentAction();
+      actionHandler.completeCurrentAction();
+      currentAction = actionHandler.getCurrentAction();
 
       // 如果被跳過的 action 是 step 的最後一個，觸發冷卻效果
       if (skippedAction.isLastActionInStep) {
@@ -382,6 +421,12 @@ class ButtonManager {
     );
 
     if (isValidButton) {
+      const actionData = isRemote
+        ? {}
+        : {
+            buttonId,
+            functionName,
+          };
       Logger.debug(
         `按鈕驗證通過: ${buttonId}/${functionName}, 動作: ${currentAction.actionId}`,
       );
@@ -402,92 +447,44 @@ class ButtonManager {
           const completedAction = currentAction;
 
           // 完成目前 action
-          window.experimentActionHandler.completeCurrentAction();
+          actionHandler.completeCurrentAction(actionData);
 
           // 查找下一個 action
           const nextActionIndex =
-            window.experimentActionHandler.currentActionSequence.findIndex(
+            actionHandler.currentActionSequence.findIndex(
               (action) => action.actionId === nextActionId,
             );
 
           // 取得下一個 action 物件
           const nextAction =
             nextActionIndex !== -1
-              ? window.experimentActionHandler.currentActionSequence[
+              ? actionHandler.currentActionSequence[
                   nextActionIndex
                 ]
               : null;
 
           if (nextActionIndex !== -1) {
-            window.experimentActionHandler.currentActionIndex = nextActionIndex;
+            actionHandler.currentActionIndex = nextActionIndex;
           }
 
-          // 冷卻邏輯分兩種情況：
-          // 情況1：如果 step 只有 1 個 action -> 完成時冷卻
-          // 情況2：如果 step 有多個 action -> 進入最後一個 action 時冷卻
+          // 使用統一的冷卻邏輯計算方法
+          const cooldownState = this._calculateCooldownState(completedAction, nextAction);
 
-          const stepInfo = window.experimentActionHandler.actionToStepMap?.get(
-            completedAction.actionId,
-          );
-          const stepActions = stepInfo
-            ? window.experimentActionHandler.currentActionSequence.filter(
-                (a) =>
-                  window.experimentActionHandler.actionToStepMap?.get(
-                    a.actionId,
-                  )?.step_id === stepInfo.step_id,
-              )
-            : [];
-
-          let shouldCooldown = false;
-          let cooldownReason = "";
-
-          // 取得目前 unit 的所有 step
-          const currentUnitId =
-            window.experimentFlowManager?.loadedUnits?.[
-              window.experimentFlowManager?.currentUnitIndex
-            ];
-          const allStepsInUnit = new Set();
-          if (currentUnitId && window.experimentActionHandler.actionToStepMap) {
-            for (const [_actionId, stepData] of window.experimentActionHandler
-              .actionToStepMap) {
-              if (stepData.unit_id === currentUnitId) {
-                allStepsInUnit.add(stepData.step_id);
-              }
-            }
-          }
-
-          const allStepsArray = Array.from(allStepsInUnit);
-          const isFirstStep = allStepsArray.indexOf(stepInfo?.step_id) === 0;
-          const isLastStep =
-            allStepsArray.indexOf(stepInfo?.step_id) ===
-            allStepsArray.length - 1;
-
-          if (stepActions.length === 1) {
-            // 單個 action 的 step，只有在首尾時才冷卻
-            shouldCooldown = isFirstStep || isLastStep;
-            cooldownReason = shouldCooldown
-              ? `單個 action 的 ${isFirstStep ? "首" : "尾"} step 完成`
-              : "單個 action 的中間 step，跳過冷卻";
-          } else if (stepActions.length > 1) {
-            shouldCooldown = nextAction && nextAction.isLastActionInStep;
-            cooldownReason = "進入 step 的最後一個 action";
-          }
-
-          if (shouldCooldown) {
+          if (cooldownState.shouldCooldown) {
             Logger.debug(
-              `觸發冷卻效果: ${cooldownReason} | ` +
+              `觸發冷卻效果: ${cooldownState.reason} | ` +
                 `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-                `Step: ${stepInfo?.step_id || "unknown"} | ` +
-                `Step Actions: ${stepActions.length} | ` +
+                `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
+                `Step Actions: ${cooldownState.stepActions.length} | ` +
                 `下一個Action: ${nextAction?.actionId || "無"}`,
             );
             this.triggerStepCompleteEffect();
           } else {
             Logger.debug(
-              `跳過冷卻效果: ${cooldownReason} | ` +
+              `跳過冷卻效果: ${cooldownState.reason} | ` +
                 `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-                `Step: ${stepInfo?.step_id || "unknown"} | ` +
-                `Step Actions: ${stepActions.length} | ` +
+                `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
+                `Step Actions: ${cooldownState.stepActions.length} | ` +
                 `下一個Action: ${nextAction?.actionId || "無"}`,
             );
             // 更新媒體顯示
@@ -499,71 +496,28 @@ class ButtonManager {
       } else {
         // 沒有定義互動，直接完成並移到下一個
         const completedAction = currentAction;
-        window.experimentActionHandler.completeCurrentAction();
+        actionHandler.completeCurrentAction(actionData);
 
-        // 冷卻邏輯：
-        // 情況1：step 只有 1 個 action -> 只有在首尾 step 時才冷卻
-        // 情況2：step 有多個 action -> 進入最後一個 action 時冷卻
-        const stepInfo = window.experimentActionHandler.actionToStepMap?.get(
-          completedAction.actionId,
-        );
-        const stepActions = stepInfo
-          ? window.experimentActionHandler.currentActionSequence.filter(
-              (a) =>
-                window.experimentActionHandler.actionToStepMap?.get(a.actionId)
-                  ?.step_id === stepInfo.step_id,
-            )
-          : [];
-        const nextAction = window.experimentActionHandler.getCurrentAction();
+        const nextAction = actionHandler.getCurrentAction();
 
-        let shouldCooldown = false;
-        let cooldownReason = "";
+        // 使用統一的冷卻邏輯計算方法
+        const cooldownState = this._calculateCooldownState(completedAction, nextAction);
 
-        // 取得目前 unit 的所有 step
-        const currentUnitId =
-          window.experimentFlowManager?.loadedUnits?.[
-            window.experimentFlowManager?.currentUnitIndex
-          ];
-        const allStepsInUnit = new Set();
-        if (currentUnitId && window.experimentActionHandler.actionToStepMap) {
-          for (const [_actionId, stepData] of window.experimentActionHandler
-            .actionToStepMap) {
-            if (stepData.unit_id === currentUnitId) {
-              allStepsInUnit.add(stepData.step_id);
-            }
-          }
-        }
-        const allStepsArray = Array.from(allStepsInUnit);
-        const isFirstStep = allStepsArray.indexOf(stepInfo?.step_id) === 0;
-        const isLastStep =
-          allStepsArray.indexOf(stepInfo?.step_id) === allStepsArray.length - 1;
-
-        if (stepActions.length === 1) {
-          // 單個 action 的 step，只有在首尾時才冷卻
-          shouldCooldown = isFirstStep || isLastStep;
-          cooldownReason = shouldCooldown
-            ? `單個 action 的 ${isFirstStep ? "首" : "尾"} step 完成`
-            : "單個 action 的中間 step，跳過冷卻";
-        } else if (stepActions.length > 1) {
-          shouldCooldown = nextAction && nextAction.isLastActionInStep;
-          cooldownReason = "進入 step 的最後一個 action";
-        }
-
-        if (shouldCooldown) {
+        if (cooldownState.shouldCooldown) {
           Logger.debug(
-            `觸發冷卻效果: ${cooldownReason} | ` +
+            `觸發冷卻效果: ${cooldownState.reason} | ` +
               `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-              `Step: ${stepInfo?.step_id || "unknown"} | ` +
-              `Step Actions: ${stepActions.length} | ` +
+              `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
+              `Step Actions: ${cooldownState.stepActions.length} | ` +
               `下一個Action: ${nextAction?.actionId || "無"}`,
           );
           this.triggerStepCompleteEffect();
         } else {
           Logger.debug(
-            `跳過冷卻效果: ${cooldownReason} | ` +
+            `跳過冷卻效果: ${cooldownState.reason} | ` +
               `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-              `Step: ${stepInfo?.step_id || "unknown"} | ` +
-              `Step Actions: ${stepActions.length} | ` +
+              `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
+              `Step Actions: ${cooldownState.stepActions.length} | ` +
               `下一個Action: ${nextAction?.actionId || "無"}`,
           );
           // 更新媒體顯示
@@ -580,6 +534,8 @@ class ButtonManager {
    * 觸發 step 完成的視覺效果
    */
   triggerStepCompleteEffect() {
+    const actionHandler = this._getActionHandler();
+    const flowManager = this._getFlowManager();
     // 檢查視覺提示是否開啟
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
     const visualsEnabled = toggleTouchVisuals
@@ -587,10 +543,9 @@ class ButtonManager {
       : true;
 
     // 檢查是否還有下一個動作（實驗是否已完成）
-    const nextAction = window.experimentActionHandler?.getCurrentAction();
+    const nextAction = actionHandler?.getCurrentAction();
     if (!nextAction) {
       // 實驗已完成，檢查是否為最後單元完成
-      const flowManager = window.experimentFlowManager;
       if (
         flowManager &&
         flowManager.currentUnitIndex === flowManager.loadedUnits.length - 1
@@ -635,14 +590,84 @@ class ButtonManager {
         btn.style.pointerEvents = "";
       });
 
-      // 【冷卻結束】現在才高亮下一個按鈕
-      this.updateMediaForCurrentAction();
+      const actionHandler = this._getActionHandler();
+      const currentAction = actionHandler?.getCurrentAction?.();
 
-      // 冷卻結束後，進入下一步
-      if (window.experimentFlowManager?.nextStep) {
-        window.experimentFlowManager.nextStep();
+      if (currentAction) {
+        // 【冷卻結束】現在才高亮下一個按鈕
+        this.updateMediaForCurrentAction();
+      } else {
+        Logger.debug("冷卻結束：動作序列已結束，進入單元完成處理");
+      }
+
+      // 冷卻結束後，進入下一步（僅在 FlowManager 有有效單元時）
+      if (flowManager?.getCurrentUnit?.()) {
+        flowManager.nextStep();
       }
     }, 3000);
+  }
+
+  /**
+   * 計算是否應該觸發冷卻效果
+   * 提取冷卻邏輯，避免重複代碼
+   *
+   * @param {Object} completedAction - 已完成的 action 物件
+   * @param {Object|null} nextAction - 下一個 action 物件（可能為 null）
+   * @returns {Object} {shouldCooldown, reason, stepInfo, stepActions}
+   */
+  _calculateCooldownState(completedAction, nextAction) {
+    const actionHandler = this._getActionHandler();
+    const flowManager = this._getFlowManager();
+    // 取得已完成 action 的 step 資訊
+    const stepInfo = actionHandler?.actionToStepMap?.get(
+      completedAction.actionId,
+    );
+
+    // 找出同一個 step 中的所有 action
+    const stepActions = stepInfo
+      ? actionHandler.currentActionSequence.filter(
+          (a) =>
+        actionHandler.actionToStepMap?.get(a.actionId)
+              ?.step_id === stepInfo.step_id,
+        )
+      : [];
+
+    // 取得目前 unit 的所有 step
+    const currentUnitId =
+      flowManager?.loadedUnits?.[flowManager?.currentUnitIndex];
+    const allStepsInUnit = new Set();
+
+    if (currentUnitId && actionHandler?.actionToStepMap) {
+      for (const [_actionId, stepData] of actionHandler.actionToStepMap) {
+        if (stepData.unit_id === currentUnitId) {
+          allStepsInUnit.add(stepData.step_id);
+        }
+      }
+    }
+
+    // 計算 step 在 unit 中的位置
+    const allStepsArray = Array.from(allStepsInUnit);
+    const isFirstStep = allStepsArray.indexOf(stepInfo?.step_id) === 0;
+    const isLastStep =
+      allStepsArray.indexOf(stepInfo?.step_id) === allStepsArray.length - 1;
+
+    // 根據 step 中 action 的數量決定冷卻策略
+    let shouldCooldown = false;
+    let reason = "";
+
+    if (stepActions.length === 1) {
+      // 單個 action 的 step：只有在首尾 step 時才冷卻
+      shouldCooldown = isFirstStep || isLastStep;
+      reason = shouldCooldown
+        ? `單個 action 的 ${isFirstStep ? "首" : "尾"} step 完成`
+        : "單個 action 的中間 step，跳過冷卻";
+    } else if (stepActions.length > 1) {
+      // 多個 action 的 step：進入最後一個 action 時冷卻
+      shouldCooldown = nextAction && nextAction.isLastActionInStep;
+      reason = "進入 step 的最後一個 action";
+    }
+
+    return { shouldCooldown, reason, stepInfo, stepActions };
   }
 
   /**
@@ -684,12 +709,14 @@ class ButtonManager {
    * @returns {Object} {isPowerOn, isPowerVideoPlaying}
    */
   _prepareUIForMedia(shouldClearHighlight = true) {
+    const flowManager = this._getFlowManager();
+    const powerControl = this._getPowerControl();
     // 啟用視覺提示
     const showTouchVisuals =
       localStorage.getItem("showTouchVisuals") !== "false";
     if (
       showTouchVisuals &&
-      window.experimentFlowManager?.isRunning &&
+      flowManager?.isRunning &&
       !document.body.classList.contains("visual-hints-enabled")
     ) {
       document.body.classList.add("visual-hints-enabled");
@@ -697,8 +724,7 @@ class ButtonManager {
 
     // 檢查電源狀態
     const isPowerOn = this.isPowerOn();
-    const isPowerVideoPlaying =
-      window.powerControl?.isPowerVideoPlaying || false;
+    const isPowerVideoPlaying = powerControl?.isPowerVideoPlaying || false;
 
     // 清除或保留高亮
     if (shouldClearHighlight) {
@@ -706,14 +732,7 @@ class ButtonManager {
     }
 
     // 管理按鈕停用狀態
-    const isWaitingForPowerOn = false;
     document.querySelectorAll(".button-overlay").forEach((btn) => {
-      if (isWaitingForPowerOn) {
-        btn.classList.add("temporarily-disabled");
-      } else {
-        btn.classList.remove("temporarily-disabled");
-      }
-
       if (!isPowerOn) {
         btn.classList.add("power-off-disabled");
       } else {
@@ -731,36 +750,37 @@ class ButtonManager {
    */
   _loadAndDisplayMedia() {
     const isPowerOn = this.isPowerOn();
-    const isWaitingForPowerOn = false;
+    const actionHandler = this._getActionHandler();
+    const mediaManager = this._getMediaManager();
 
-    if (isWaitingForPowerOn || !window.experimentActionHandler) {
+    if (!actionHandler) {
       return null;
     }
 
     // 自動跳過沒有 action_buttons 的動作
-    let currentAction = window.experimentActionHandler.getCurrentAction();
+    let currentAction = actionHandler.getCurrentAction();
     while (currentAction && !currentAction.action_buttons) {
-      if (currentAction.media_file && window.mediaManager) {
-        window.mediaManager.displayMedia(currentAction.media_file);
-      } else if (window.mediaManager) {
-        window.mediaManager.playHomePageLoop(true);
+      if (currentAction.media_file && mediaManager) {
+        mediaManager.displayMedia(currentAction.media_file);
+      } else if (mediaManager) {
+        mediaManager.playHomePageLoop(true);
       }
-      window.experimentActionHandler.completeCurrentAction();
-      currentAction = window.experimentActionHandler.getCurrentAction();
+      actionHandler.completeCurrentAction();
+      currentAction = actionHandler.getCurrentAction();
     }
 
     if (currentAction) {
       // 檢查電源狀態
       if (isPowerOn) {
-        if (currentAction.media_file && window.mediaManager) {
-          window.mediaManager.displayMedia(currentAction.media_file);
-        } else if (window.mediaManager) {
-          window.mediaManager.playHomePageLoop(true);
+        if (currentAction.media_file && mediaManager) {
+          mediaManager.displayMedia(currentAction.media_file);
+        } else if (mediaManager) {
+          mediaManager.playHomePageLoop(true);
         }
       } else {
         Logger.debug(`電源未開啟，不載入媒體: ${currentAction.actionId}`);
-        if (window.mediaManager) {
-          window.mediaManager.mediaArea.innerHTML = "";
+        if (mediaManager) {
+          mediaManager.mediaArea.innerHTML = "";
         }
       }
     }
@@ -774,8 +794,14 @@ class ButtonManager {
   _highlightButtonsForAction(currentAction, isPowerOn, isPowerVideoPlaying) {
     if (!currentAction) return;
 
-    const isExperimentRunning =
-      window.experimentFlowManager?.isRunning || false;
+    const flowManager = this._getFlowManager();
+
+    if (this._isPowerAction(currentAction)) {
+      this._highlightPowerAction(currentAction);
+      return;
+    }
+
+    const isExperimentRunning = flowManager?.isRunning || false;
     if (
       !isPowerOn ||
       isPowerVideoPlaying ||
@@ -855,7 +881,7 @@ class ButtonManager {
 
     // 處理 Shift 按鈕
     const shiftButton = document.querySelector(
-      '.button-overlay[data-label="B1"]',
+      ".button-overlay[data-label=\"B1\"]",
     );
 
     if (requiresShiftFunctions.length > 0 && shiftButton) {
@@ -877,6 +903,36 @@ class ButtonManager {
         Logger.debug("Shift 按鈕高亮已移除");
       }
     }
+  }
+
+  _isPowerAction(action) {
+    const actionId = action?.actionId || action?.action_id;
+    if (actionId === ACTION_IDS.POWER_ON || actionId === ACTION_IDS.POWER_OFF) {
+      return true;
+    }
+    const actionButtons = Array.isArray(action?.action_buttons)
+      ? action.action_buttons
+      : String(action?.action_buttons || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+    return (
+      actionButtons.includes(ACTION_BUTTONS.POWER_ON) ||
+      actionButtons.includes(ACTION_BUTTONS.POWER_OFF)
+    );
+  }
+
+  _highlightPowerAction(action) {
+    const powerSwitchArea = document.getElementById("powerSwitchArea");
+    if (powerSwitchArea) {
+      powerSwitchArea.classList.add("next-step-highlight");
+    }
+    document.querySelectorAll(".media-power-btn").forEach((btn) => {
+      btn.classList.add("next-step-highlight");
+    });
+    Logger.debug("電源動作高亮", {
+      actionId: action?.actionId || action?.action_id,
+    });
   }
 
   /**
@@ -942,10 +998,10 @@ class ButtonManager {
    * 檢查機器是否已開機
    */
   isPowerOn() {
-    if (window.powerControl) return window.powerControl.isPowerOn;
+    const powerControl = this._getPowerControl();
+    if (powerControl) return powerControl.isPowerOn;
     const powerLightOn = document.querySelector(".power-light-on-img");
     if (powerLightOn) {
-      // respect class-based hiding only (clean conversion)
       return !powerLightOn.classList.contains("is-hidden");
     }
     return true;
@@ -969,19 +1025,13 @@ class ButtonManager {
    * 設定同步事件監聽器
    */
   setupSyncEventListeners() {
-    // 監聽來自其他裝置的按鈕同步（廣播事件）
-    document.addEventListener("syncButtonPress", (e) => {
-      this.handleSyncButtonPress(e.detail);
-    });
-
-    // 監聽來自輪詢機制的全域狀態更新（從 sync-client.js 的 triggerStateUpdate 觸發）
-    window.addEventListener(window.SYNC_EVENTS.STATE_UPDATE, (e) => {
-      if (!e.detail) return;
-      // 防止自我回聲
-      const myId = window.syncClient?.clientId;
-      if (myId && e.detail.clientId === myId) return;
-      if (e.detail.type === "buttonPress") {
-        this.handleRemoteButtonPress(e.detail);
+    window.addEventListener(SYNC_EVENTS.STATE_UPDATE, (e) => {
+      const state = e.detail;
+      if (!state) return;
+      const myId = this._getSyncClient()?.clientId;
+      if (myId && state.clientId === myId) return;
+      if (state.type === SYNC_DATA_TYPES.BUTTON_PRESSED) {
+        this.handleRemoteButtonPress(state);
       }
     });
 
@@ -1000,24 +1050,14 @@ class ButtonManager {
    * 設定滑鼠事件
    */
   setupMouseEvents() {
-    // 靜默設置按鈕事件監聽器（移除詳細日誌以減少初始化噪音）
     document.querySelectorAll(".button-overlay").forEach((button) => {
-      // 移除舊的事件監聽器，防止重複綁定
-      const oldHandler = button._clickHandler;
-      if (oldHandler) {
-        button.removeEventListener("click", oldHandler);
-      }
-
-      // 建立新的事件處理器並保存引用
+      // 建立新的事件處理器
       const newHandler = (event) => {
         if (event.pointerType === "touch" || event.detail === 0) return;
-        if (typeof Logger !== "undefined") {
-          Logger.debug(`滑鼠點擊按鈕: ${button.dataset.label}`);
-        }
+        Logger.debug(`滑鼠點擊按鈕: ${button.dataset.label}`);
         this.simulateButtonClick(button.dataset.label, false);
       };
 
-      button._clickHandler = newHandler;
       button.addEventListener("click", newHandler);
     });
   }
@@ -1032,6 +1072,8 @@ class ButtonManager {
         "touchstart",
         (event) => {
           event.preventDefault();
+          const logger = this._getLogger();
+          const flowManager = this._getFlowManager();
           const buttonId = button.dataset.label;
           const touchId = event.changedTouches[0].identifier;
 
@@ -1051,20 +1093,12 @@ class ButtonManager {
               this.touchShiftTimeout = null;
             }
 
-            if (window.experiment?.isExperimentRunning) {
-              // 移除舊的實驗邏輯調用
-              this.playBeep();
+            if (flowManager?.isRunning) {
+              this.executeTouchShift();
               return;
             }
-            this.executeTouchShift();
-            return;
           }
 
-          if (window.experiment?.isExperimentRunning) {
-            // 移除舊的實驗邏輯調用
-            this.playBeep();
-            return;
-          }
 
           // 其他按鈕：檢查是否為組合操作
           const buttonData = this.buttonFunctionsMap[buttonId];
@@ -1079,7 +1113,7 @@ class ButtonManager {
               modifierSource: "touch",
             };
             const functionName = buttonData.button_functions[1];
-            window.logger?.logAction(
+            logger?.logAction(
               `觸控模擬按鈕 "${buttonId}"，功能為 "${functionName}" [組合: Shift + ${buttonId}]`,
               buttonId,
               functionName,
@@ -1178,9 +1212,9 @@ class ButtonManager {
       if (event.key === "Shift" && this.isShiftPressed) {
         this.isShiftPressed = false;
         document
-          .querySelector('.button-overlay[data-label="B1"]')
+          .querySelector(".button-overlay[data-label=\"B1\"]")
           ?.classList.remove("shift-active");
-        window.logger?.logAction("鍵盤 Shift 放開");
+        this._getLogger()?.logAction("鍵盤 Shift 放開");
       }
     });
   }
@@ -1205,94 +1239,41 @@ class ButtonManager {
   }
 
   /**
-   * 處理按鈕同步
-   */
-  handleSyncButtonPress(data) {
-    // 同步視覺效果和狀態
-    this.showButtonPressFeedback(data.button);
-
-    // 如果是 Shift 按鈕，同步 Shift 狀態
-    if (data.button === "B1") {
-      // 目前不改變本機 Shift 狀態，只顯示視覺回饋
-    }
-
-    // 在實驗模式下，如果是觀看模式，也要觸發實驗邏輯
-    if (
-      window.experiment?.isExperimentRunning &&
-      window.syncManager &&
-      !window.syncManager.isInteractiveMode
-    ) {
-      this.checkAndExecuteExperimentAction(data.button, data.function);
-    }
-  }
-
-  /**
    * 處理遠端按鈕按下事件（來自 sync_state_update 事件）
    */
   handleRemoteButtonPress(data) {
-    // 只有在檢視模式下時才套用遠端按鈕狀態
-    if (window.syncManager && window.syncManager.isInteractiveMode) {
-      return;
-    }
-
     const buttonId = data.button;
     const functionName = data.function;
+    const flowManager = this._getFlowManager();
+    const logger = this._getLogger();
 
     // 顯示按鈕按下的視覺回饋
     this.showButtonPressFeedback(buttonId);
 
-    // 播放提示音（如果遠端裝置也播放了，我們本機也應該播放）
     if (data.beepEnabled) {
       this.playBeep();
     }
 
     // 在實驗模式下，執行對應的實驗動作
-    if (window.experiment?.isExperimentRunning) {
-      const result = this.checkAndExecuteExperimentAction(
+    if (flowManager?.isRunning) {
+      this.checkAndExecuteExperimentAction(
         buttonId,
         functionName,
-      );
-      if (result) {
-        const unitId =
-          window.experiment.loadedUnits[window.experiment.currentUnitIndex];
-        const unit = window._allUnits?.find((u) => u.unit_id === unitId);
-        const step = unit?.steps?.[window.experiment.currentStepIndex];
-        const stepName = step?.step_name || step?.step_id || "未知步驟";
-
-        if (window.logger) {
-          window.logger.logAction(
-            `[遠端同步] 按鈕 "${buttonId}" → 功能 "${functionName}" | 步驟: ${stepName}`,
-          );
-        }
-      }
-    }
-
-    // 記錄遠端按鈕事件到紀錄檔
-    if (window.logger) {
-      window.logger.logAction(
-        `[遠端同步] 按鈕 "${buttonId}" 被按下，功能為 "${functionName}"`,
-        "remote_button_press",
-        functionName,
-        false,
-        false,
-        false,
-        null,
-        { buttonId, functionName, beepEnabled: data.beepEnabled },
+        true,
       );
     }
 
-    // 觸發 remote_button_pressed 事件供實驗頁面的 experiment-action-manager 接收
-    // 這樣實驗頁面可以同步完成對應的動作卡片
-    if (window.experiment?.isExperimentRunning) {
-      const remoteButtonEvent = new CustomEvent("button_pressed", {
-        detail: {
-          button: buttonId,
-          experimentId: window.experiment.currentExperimentId,
-          timestamp: data.timestamp,
-        },
-      });
-      window.dispatchEvent(remoteButtonEvent);
-    }
+    // 記錄按鈕動作
+    logger?.logAction(
+      `按鈕 "${buttonId}" 被按下，功能為 "${functionName}"`,
+      "button_press",
+      functionName,
+      false,
+      false,
+      false,
+      null,
+      { buttonId, functionName, beepEnabled: data.beepEnabled },
+    );
   }
 
   /**
@@ -1320,12 +1301,12 @@ class ButtonManager {
    * 觸控 shift 的特殊處理
    */
   executeTouchShift() {
-    const button = document.querySelector('.button-overlay[data-label="B1"]');
+    const button = document.querySelector(".button-overlay[data-label=\"B1\"]");
     if (!button) return;
 
     // 基本 Shift 按鈕記錄
-    window.logger?.logAction(
-      '觸控模擬按鈕 "B1" (Shift)，功能為 "shift"',
+    this._getLogger()?.logAction(
+      "觸控模擬按鈕 \"B1\" (Shift)，功能為 \"shift\"",
       "B1",
       "shift",
       false,
@@ -1333,19 +1314,8 @@ class ButtonManager {
     );
 
     // 實驗模式下檢查是否有對應的動作
-    if (window.experiment?.isExperimentRunning) {
-      if (this.checkAndExecuteExperimentAction("B1", "shift")) {
-        // 取得目前步驟資訊以合併紀錄
-        const unitId =
-          window.experiment.loadedUnits[window.experiment.currentUnitIndex];
-        const unit = window._allUnits?.find((u) => u.unit_id === unitId);
-        const step = unit?.steps?.[window.experiment.currentStepIndex];
-        const stepName = step?.step_name || step?.step_id || "未知步驟";
-
-        window.logger?.logAction(
-          `按鈕 "B1" → 功能 "shift" | 步驟: ${stepName}`,
-        );
-      }
+    if (this._getFlowManager()?.isRunning) {
+      this.checkAndExecuteExperimentAction("B1", "shift");
     }
 
     this.playBeep();
@@ -1545,5 +1515,6 @@ class ButtonManager {
   }
 }
 
-// 匯出單例
-window.buttonManager = new ButtonManager();
+// ES6 模組匯出
+export default ButtonManager;
+export { ButtonManager };

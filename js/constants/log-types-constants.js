@@ -13,6 +13,7 @@ export const LOG_TYPES = {
   // 手勢步驟事件
   GESTURE_STEP_START: "gesture_step_start",
   GESTURE_STEP_END: "gesture_step_end",
+  GESTURE_STEP_PAUSE: "gesture_step_pause",
   GESTURE_ATTEMPT: "gesture_attempt",
 
   // 其他事件
@@ -29,6 +30,7 @@ export const LOG_TYPE_LABELS = {
   [LOG_TYPES.EXP_RESUME]: "實驗繼續",
   [LOG_TYPES.GESTURE_STEP_START]: "步驟開始",
   [LOG_TYPES.GESTURE_STEP_END]: "步驟結束",
+  [LOG_TYPES.GESTURE_STEP_PAUSE]: "步驟暫停",
   [LOG_TYPES.GESTURE_ATTEMPT]: "手勢嘗試",
   [LOG_TYPES.ACTION]: "動作",
 };

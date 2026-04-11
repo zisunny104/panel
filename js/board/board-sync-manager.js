@@ -1,93 +1,87 @@
 /**
  * Experiment Sync Manager - 實驗狀態多裝置同步
+ *
  * 將實驗的開始、暫停、停止狀態及所有操作同步到同一工作階段的其他裝置
  */
 
+import { dispatchRemoteSync } from "./board-sync-dispatcher.js";
+import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+
 // board-side adapter: thin layer that maps DOM/events <-> experimentSyncCore
 class ExperimentSyncAdapter {
-  constructor() {
-    this.core = window.experimentSyncCore; // pure sync core
+  constructor({
+    syncManager = null,
+    syncClient = null,
+    experimentSyncCore = null,
+    experimentHubManager = null,
+  } = {}) {
+    this.syncManager = syncManager;
+    this.syncClient = syncClient;
+    this.experimentHubManager = experimentHubManager;
+    this._core = experimentSyncCore; // 懶加載 experimentSyncCore
     this.clientId = null;
     this._bindCoreEvents();
     this._bindDomEvents();
     Logger.debug("ExperimentSyncAdapter 已建立");
   }
 
+  updateDependencies({
+    syncManager,
+    syncClient,
+    experimentSyncCore,
+    experimentHubManager,
+  } = {}) {
+    if (syncManager) this.syncManager = syncManager;
+    if (syncClient) this.syncClient = syncClient;
+    if (experimentSyncCore) this._core = experimentSyncCore;
+    if (experimentHubManager) this.experimentHubManager = experimentHubManager;
+  }
+
+  get core() {
+    if (!this._core) {
+      Logger.warn("ExperimentSyncAdapter: experimentSyncCore 未設定");
+    }
+    return this._core;
+  }
+
+  get resolvedSyncClient() {
+    return this.syncClient || this.syncManager?.core?.syncClient;
+  }
+
+  get resolvedHubManager() {
+    return this.experimentHubManager;
+  }
+
   _bindCoreEvents() {
     // ExperimentSyncCore 收到遠端狀態後，會重新派發為 REMOTE_STATE 事件
-    window.addEventListener(window.SYNC_EVENTS.REMOTE_STATE, (e) => {
+    window.addEventListener(SYNC_EVENTS.REMOTE_STATE, (e) => {
       const detail = e.detail;
-      if (!detail) return;
-
-      // 依 type 對應到本地頁面事件
-      if (detail.type === window.SYNC_DATA_TYPES.EXPERIMENT_STARTED) {
-        window.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.REMOTE_EXPERIMENT_STARTED, {
-            detail,
-          }),
-        );
-      } else if (
-        detail.type === window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE
-      ) {
-        const map = {
-          [window.SYNC_DATA_TYPES.EXPERIMENT_PAUSED]:
-            window.SYNC_EVENTS.REMOTE_EXPERIMENT_PAUSED,
-          [window.SYNC_DATA_TYPES.EXPERIMENT_RESUMED]:
-            window.SYNC_EVENTS.REMOTE_EXPERIMENT_RESUMED,
-          [window.SYNC_DATA_TYPES.EXPERIMENT_STOPPED]:
-            window.SYNC_EVENTS.REMOTE_EXPERIMENT_STOPPED,
-        };
-        if (detail.event && map[detail.event]) {
-          window.dispatchEvent(new CustomEvent(map[detail.event], { detail }));
-        }
-      } else if (detail.type === window.SYNC_DATA_TYPES.EXPERIMENT_ACTION) {
-        window.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.REMOTE_EXPERIMENT_ACTION, {
-            detail,
-          }),
-        );
-      } else if (detail.type === window.SYNC_DATA_TYPES.BUTTON_ACTION) {
-        window.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.REMOTE_BUTTON_ACTION, { detail }),
-        );
-      } else {
-        // fallback: re-dispatch generic
-        window.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.REMOTE_SYNC_EVENT, { detail }),
-        );
-      }
+      dispatchRemoteSync(detail);
     });
   }
 
   _bindDomEvents() {
-    // 監聽本地實驗 DOM 事件並轉送至 ExperimentSyncCore 廣播
-    document.addEventListener(window.SYNC_EVENTS.EXPERIMENT_STARTED, (e) => {
-      this.core?.broadcastExperimentStart(e.detail);
+    // 監聽本機實驗 DOM 事件並轉送至 ExperimentSyncCore 廣播
+    document.addEventListener(SYNC_EVENTS.EXPERIMENT_STARTED, (e) => {
+      this.core.broadcastExperimentStart(e.detail);
     });
-    document.addEventListener(window.SYNC_EVENTS.EXPERIMENT_PAUSED, (e) => {
-      this.core?.broadcastExperimentPause(e.detail);
+    document.addEventListener(SYNC_EVENTS.EXPERIMENT_PAUSED, (e) => {
+      this.core.broadcastExperimentPause(e.detail);
     });
-    document.addEventListener(window.SYNC_EVENTS.EXPERIMENT_RESUMED, (e) => {
-      this.core?.broadcastExperimentResume(e.detail);
+    document.addEventListener(SYNC_EVENTS.EXPERIMENT_RESUMED, (e) => {
+      this.core.broadcastExperimentResume(e.detail);
     });
-    document.addEventListener(window.SYNC_EVENTS.EXPERIMENT_STOPPED, (e) => {
-      this.core?.broadcastExperimentStop(e.detail);
+    document.addEventListener(SYNC_EVENTS.EXPERIMENT_STOPPED, (e) => {
+      this.core.broadcastExperimentStop(e.detail);
     });
-    document.addEventListener(
-      window.SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL,
-      (e) => {
-        if (e.detail?.type === window.SYNC_DATA_TYPES.BUTTON_ACTION) {
-          this.core?.broadcastButtonAction(e.detail);
-        }
-      },
-    );
   }
 
   // adapter status
   getStatus() {
+    const syncClient = this.resolvedSyncClient;
     return {
-      connected: this.core?.isConnected || false,
-      clientId: this.core?.clientId || null,
+      connected: syncClient?.isConnected?.() || false,
+      clientId: syncClient?.clientId,
     };
   }
 
@@ -95,7 +89,7 @@ class ExperimentSyncAdapter {
   async registerExperimentIdToHub(experimentId) {
     try {
       Logger.debug(`開始註冊實驗ID到中樞: ${experimentId}`);
-      const hubManager = window.experimentHubManager;
+      const hubManager = this.resolvedHubManager;
       const success = await hubManager.registerExperimentId(
         experimentId,
         "experiment_manager",
@@ -113,15 +107,14 @@ class ExperimentSyncAdapter {
   /** 註冊實驗狀態到中樞 */
   async registerExperimentStateToHub(stateData) {
     try {
-      const hubManager = window.experimentHubManager;
+      const hubManager = this.resolvedHubManager;
       if (!hubManager?.registerExperimentState) {
         Logger.debug("ExperimentHubManager 不可用，跳過實驗狀態註冊");
         return false;
       }
 
       const payload = {
-        type: stateData.type || window.SYNC_DATA_TYPES.EXPERIMENT_STARTED,
-        event: stateData.event,
+        type: stateData.type || SYNC_DATA_TYPES.EXPERIMENT_STARTED,
         experimentId: stateData.experiment_id || stateData.experimentId || "",
         subjectName: stateData.subject_name || stateData.subjectName || "",
         combinationId:
@@ -145,34 +138,27 @@ class ExperimentSyncAdapter {
 
   /** 廣播實驗ID更新到其他連線裝置 */
   broadcastExperimentIdUpdate(experimentId) {
-    if (!this.core?.isConnected) {
-      return;
-    }
-
+    const syncClient = this.resolvedSyncClient;
     const updateData = {
-      type: window.SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
-      clientId: this.core?.syncClient?.clientId || "experiment_panel",
+      type: SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
+      clientId: syncClient?.clientId || "experiment_panel",
+      timestamp: Date.now(),
       experimentId: experimentId,
-      timestamp: new Date().toISOString(),
     };
 
-    this.core.syncState(updateData).catch((error) => {
+    this.core?.safeBroadcast?.(updateData).catch((error) => {
       Logger.warn("廣播實驗ID更新失敗:", error);
     });
 
     document.dispatchEvent(
-      new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
+      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
         detail: updateData,
       }),
     );
   }
 }
 
-// 初始化 adapter
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    window.experimentSyncManager = new ExperimentSyncAdapter();
-  });
-} else {
-  window.experimentSyncManager = new ExperimentSyncAdapter();
-}
+const experimentSyncManager = new ExperimentSyncAdapter();
+
+export { ExperimentSyncAdapter, experimentSyncManager };
+export default ExperimentSyncAdapter;

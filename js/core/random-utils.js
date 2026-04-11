@@ -108,8 +108,17 @@ function generateExperimentId() {
   return result;
 }
 
-// 移除 ES 模組 export，直接將物件指派到全域
-window.RandomUtils = {
+// 統一匯出物件（可選擇以物件或函數方式使用）
+const RandomUtils = {
+  createSeededRandom,
+  shuffleArray,
+  getCombinationUnitIds,
+  generateExperimentId,
+};
+
+// ES6 模組匯出
+export {
+  RandomUtils,
   createSeededRandom,
   shuffleArray,
   getCombinationUnitIds,

@@ -3,13 +3,36 @@
  * 負責檢視和管理所有工作階段
  */
 
+import { UIModal } from "../ui/modal.js";
+import { SYNC_EVENTS } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
+
 export class SyncManagerSessions {
-  constructor(core) {
+  constructor(core, config = {}) {
     this.core = core;
+    this.syncManager = config.syncManager || null;
+    this.timeSyncManager = config.timeSyncManager || core?.timeSyncManager || null;
+    this.roleConfig = config.roleConfig || this.syncManager?.ROLE || {
+      OPERATOR: "operator",
+      VIEWER: "viewer",
+    };
+    this.indicatorManager = config.indicatorManager || null;
     this.sessionsPanel = null;
+    this.sessionsModal = null;
     this.sessionsData = [];
     this.expandedCards = new Set();
     this.selectedSessions = new Set();
+  }
+
+  formatDateTime(timestampMs) {
+    if (this.timeSyncManager?.formatDateTime) {
+      return this.timeSyncManager.formatDateTime(timestampMs);
+    }
+    return new Date(timestampMs).toLocaleString();
+  }
+
+  getRoleText(role) {
+    return this.syncManager?.getRoleText?.(role) || role;
   }
 
   getApiUrl() {
@@ -37,17 +60,17 @@ export class SyncManagerSessions {
   }
 
   initialize() {
-    window.addEventListener(window.SYNC_EVENTS.SHOW_SESSIONS, () => {
+    window.addEventListener(SYNC_EVENTS.SHOW_SESSIONS, () => {
       this.showSessionsPanel();
     });
 
-    window.addEventListener(window.SYNC_EVENTS.SESSION_CREATED, () => {
+    window.addEventListener(SYNC_EVENTS.SESSION_CREATED, () => {
       if (this.sessionsPanel && document.body.contains(this.sessionsPanel)) {
         this.refreshSessionsList();
       }
     });
 
-    window.addEventListener(window.SYNC_EVENTS.SESSION_INVALID, (event) => {
+    window.addEventListener(SYNC_EVENTS.SESSION_INVALID, (event) => {
       const { reason, originalError } = event.detail;
 
       Logger.info("工作階段失效，重新載入列表", {
@@ -62,53 +85,56 @@ export class SyncManagerSessions {
   }
 
   async showSessionsPanel() {
-    if (this.sessionsPanel) {
-      this.sessionsPanel.remove();
+    if (this.sessionsModal) {
+      this.sessionsModal.close();
     }
 
     await this.loadSessionsData();
 
-    this.sessionsPanel = document.createElement("div");
-    this.sessionsPanel.className = "modal-overlay sync-sessions-overlay active";
-
-    this.sessionsPanel.innerHTML = `
-      <div class="modal-container sync-sessions-ui">
-        <div class="modal-header">
-          <h2 class="modal-title">工作階段管理</h2>
-          <button class="modal-close-btn" title="關閉">×</button>
-        </div>
-
-        <div class="modal-body">
-          <div class="sync-sessions-actions">
-            <button id="refreshSessionsBtn" class="sync-action-btn">重新整理</button>
-            <button id="stopAllActiveSessionsBtn" class="sync-action-btn sync-action-btn-warning">結束所有活動中工作階段</button>
-            <button id="clearAllSessionsBtn" class="sync-action-btn sync-action-btn-danger">刪除所有工作階段</button>
+    const modalHtml = `
+      <div class="modal-overlay sync-sessions-overlay active" id="syncSessionsPanel">
+        <div class="modal-container sync-sessions-ui">
+          <div class="modal-header">
+            <h2 class="modal-title">工作階段管理</h2>
+            <button class="modal-close-btn" title="關閉">×</button>
           </div>
 
-          <!-- 批次操作區域 -->
-          <div class="sync-sessions-batch-actions">
-            <div class="sync-batch-controls">
-              <label class="sync-batch-checkbox">
-                <input type="checkbox" id="selectAllSessions">
-                全選
-              </label>
-              <button id="selectNoDataSessionsBtn" class="sync-batch-select-btn">選取無同步資料</button>
-              <button id="selectSingleClientSessionsBtn" class="sync-batch-select-btn">選取單一裝置</button>
+          <div class="modal-body">
+            <div class="sync-sessions-actions">
+              <button id="refreshSessionsBtn" class="sync-action-btn">重新整理</button>
+              <button id="stopAllActiveSessionsBtn" class="sync-action-btn sync-action-btn-warning">結束所有活動中工作階段</button>
+              <button id="clearAllSessionsBtn" class="sync-action-btn sync-action-btn-danger">刪除所有工作階段</button>
             </div>
-            <div class="sync-batch-operations">
-              <button id="downloadSelectedSessionsBtn" class="sync-batch-op-btn sync-batch-op-download" disabled>下載選取工作階段</button>
-              <button id="deleteSelectedSessionsBtn" class="sync-batch-op-btn sync-batch-op-delete" disabled>刪除選取工作階段</button>
-            </div>
-          </div>
 
-          <div id="sessionsList" class="sync-sessions-list scrollbar-gray">
-            ${this.renderSessionsList()}
+            <div class="sync-sessions-batch-actions">
+              <div class="sync-batch-controls">
+                <label class="sync-batch-checkbox">
+                  <input type="checkbox" id="selectAllSessions">
+                  全選
+                </label>
+                <button id="selectNoDataSessionsBtn" class="sync-batch-select-btn">選取無同步資料</button>
+                <button id="selectSingleClientSessionsBtn" class="sync-batch-select-btn">選取單一裝置</button>
+              </div>
+              <div class="sync-batch-operations">
+                <button id="downloadSelectedSessionsBtn" class="sync-batch-op-btn sync-batch-op-download" disabled>下載選取工作階段</button>
+                <button id="deleteSelectedSessionsBtn" class="sync-batch-op-btn sync-batch-op-delete" disabled>刪除選取工作階段</button>
+              </div>
+            </div>
+
+            <div id="sessionsList" class="sync-sessions-list scrollbar-gray">
+              ${this.renderSessionsList()}
+            </div>
           </div>
         </div>
       </div>
     `;
 
-    document.body.appendChild(this.sessionsPanel);
+    this.sessionsModal = new UIModal({
+      id: "syncSessionsPanel",
+      html: modalHtml,
+    });
+    this.sessionsModal.open();
+    this.sessionsPanel = this.sessionsModal.modalEl;
 
     this.bindEvents();
   }
@@ -159,16 +185,8 @@ export class SyncManagerSessions {
 
   renderSessionCard(session) {
     const isExpanded = this.expandedCards.has(session.id);
-    const createdTime = window.timeSyncManager
-      ? window.timeSyncManager.formatDateTime(session.created * 1000)
-      : new Date(session.created * 1000).toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
-        });
-    const lastActivity = window.timeSyncManager
-      ? window.timeSyncManager.formatDateTime(session.lastActivity * 1000)
-      : new Date(session.lastActivity * 1000).toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
-        });
+    const createdTime = this.formatDateTime(session.created * 1000);
+    const lastActivity = this.formatDateTime(session.lastActivity * 1000);
     const isActive = Date.now() / 1000 - session.lastActivity < 600;
 
     return `
@@ -315,22 +333,10 @@ ${indentStr}}</span>`;
               ? "expired"
               : "active";
 
-          const createdTime = window.timeSyncManager
-            ? window.timeSyncManager.formatDateTime(code.createdAt * 1000)
-            : new Date(code.createdAt * 1000).toLocaleString("zh-TW", {
-                timeZone: window.CONFIG?.timezone || "Asia/Taipei",
-              });
-          const expiresTime = window.timeSyncManager
-            ? window.timeSyncManager.formatDateTime(code.expiresAt * 1000)
-            : new Date(code.expiresAt * 1000).toLocaleString("zh-TW", {
-                timeZone: window.CONFIG?.timezone || "Asia/Taipei",
-              });
+          const createdTime = this.formatDateTime(code.createdAt * 1000);
+          const expiresTime = this.formatDateTime(code.expiresAt * 1000);
           const usedTime = code.usedAt
-            ? window.timeSyncManager
-              ? window.timeSyncManager.formatDateTime(code.usedAt * 1000)
-              : new Date(code.usedAt * 1000).toLocaleString("zh-TW", {
-                  timeZone: window.CONFIG?.timezone || "Asia/Taipei",
-                })
+            ? this.formatDateTime(code.usedAt * 1000)
             : null;
 
           return `
@@ -371,27 +377,14 @@ ${indentStr}}</span>`;
       session.clients && session.clients.length > 0
         ? session.clients
             .map((client) => {
-              const joinedTime = window.timeSyncManager
-                ? window.timeSyncManager.formatDateTime(client.joinedAt * 1000)
-                : new Date(client.joinedAt * 1000).toLocaleString("zh-TW", {
-                    timeZone: window.CONFIG?.timezone || "Asia/Taipei",
-                  });
-              const lastActivityTime = window.timeSyncManager
-                ? window.timeSyncManager.formatDateTime(
-                    client.lastActivity * 1000,
-                  )
-                : new Date(client.lastActivity * 1000).toLocaleString("zh-TW", {
-                    timeZone: window.CONFIG?.timezone || "Asia/Taipei",
-                  });
+              const joinedTime = this.formatDateTime(client.joinedAt * 1000);
+              const lastActivityTime = this.formatDateTime(
+                client.lastActivity * 1000,
+              );
               return `
         <div class="sync-session-client ${client.role}">
           <div><strong>裝置ID:</strong> ${client.id}</div>
-          <div><strong>角色:</strong> ${
-            window.SyncManager?.getRoleText(client.role) ||
-            (client.role === window.SyncManager?.ROLE?.OPERATOR
-              ? "操作者"
-              : "檢視者")
-          }</div>
+          <div><strong>角色:</strong> ${this.getRoleText(client.role)}</div>
           <div><strong>加入時間:</strong> ${joinedTime}</div>
           <div><strong>最後活動:</strong> ${lastActivityTime}</div>
         </div>
@@ -424,7 +417,7 @@ ${indentStr}}</span>`;
           <strong>同步狀態:</strong> 有同步資料 (${fieldCount} 個欄位)
           <span class="sync-state-expand-icon">▶</span>
         </div>
-        <div class="sync-session-state-details" style="display: none;">
+        <div class="sync-session-state-details is-hidden">
           ${this.formatSyncState(session.state)}
         </div>
       </div>`;
@@ -451,7 +444,8 @@ ${indentStr}}</span>`;
   bindEvents() {
     const closeBtn = this.sessionsPanel.querySelector(".modal-close-btn");
     closeBtn.addEventListener("click", () => {
-      this.sessionsPanel.remove();
+      this.sessionsModal?.close();
+      this.sessionsModal = null;
       this.sessionsPanel = null;
     });
 
@@ -501,8 +495,8 @@ ${indentStr}}</span>`;
             </div>
           `;
         } else {
-          if (window.indicatorManager) {
-            window.indicatorManager.showStatus(
+          if (this.indicatorManager) {
+            this.indicatorManager.showStatus(
               "error",
               "刪除失敗: " + data.message,
             );
@@ -512,8 +506,8 @@ ${indentStr}}</span>`;
         }
       } catch (error) {
         Logger.error("刪除所有工作階段錯誤:", error);
-        if (window.indicatorManager) {
-          window.indicatorManager.showStatus(
+        if (this.indicatorManager) {
+          this.indicatorManager.showStatus(
             "error",
             "刪除失敗: " + (error.message || ""),
           );
@@ -536,8 +530,8 @@ ${indentStr}}</span>`;
       });
 
       if (activeSessions.length === 0) {
-        if (window.indicatorManager) {
-          window.indicatorManager.showStatus(
+        if (this.indicatorManager) {
+          this.indicatorManager.showStatus(
             "info",
             "目前沒有活動中的工作階段",
           );
@@ -557,8 +551,8 @@ ${indentStr}}</span>`;
       stopAllActiveBtn.textContent = "處理中...";
 
       try {
-        if (window.indicatorManager) {
-          window.indicatorManager.showStatus(
+        if (this.indicatorManager) {
+          this.indicatorManager.showStatus(
             "success",
             `已結束 ${activeSessions.length} 個活動中工作階段`,
           );
@@ -651,8 +645,8 @@ ${indentStr}}</span>`;
     );
     downloadSelectedBtn.addEventListener("click", () => {
       if (this.selectedSessions.size === 0) {
-        if (window.indicatorManager) {
-          window.indicatorManager.showStatus(
+        if (this.indicatorManager) {
+          this.indicatorManager.showStatus(
             "info",
             "請先選取要下載的工作階段",
           );
@@ -678,8 +672,8 @@ ${indentStr}}</span>`;
       link.click();
       document.body.removeChild(link);
 
-      if (window.indicatorManager) {
-        window.indicatorManager.showStatus(
+      if (this.indicatorManager) {
+        this.indicatorManager.showStatus(
           "success",
           `已下載 ${this.selectedSessions.size} 個工作階段的資料`,
         );
@@ -693,8 +687,8 @@ ${indentStr}}</span>`;
     );
     deleteSelectedBtn.addEventListener("click", async () => {
       if (this.selectedSessions.size === 0) {
-        if (window.indicatorManager) {
-          window.indicatorManager.showStatus(
+        if (this.indicatorManager) {
+          this.indicatorManager.showStatus(
             "info",
             "請先選取要刪除的工作階段",
           );
@@ -736,8 +730,8 @@ ${indentStr}}</span>`;
         await this.refreshSessionsList();
 
         if (failCount === 0) {
-          if (window.indicatorManager) {
-            window.indicatorManager.showStatus(
+          if (this.indicatorManager) {
+            this.indicatorManager.showStatus(
               "success",
               `成功刪除 ${successCount} 個工作階段`,
             );
@@ -745,8 +739,8 @@ ${indentStr}}</span>`;
             alert(`成功刪除 ${successCount} 個工作階段`);
           }
         } else {
-          if (window.indicatorManager) {
-            window.indicatorManager.showStatus(
+          if (this.indicatorManager) {
+            this.indicatorManager.showStatus(
               "warning",
               `刪除完成：成功 ${successCount} 個，失敗 ${failCount} 個`,
             );
@@ -756,8 +750,8 @@ ${indentStr}}</span>`;
         }
       } catch (error) {
         Logger.error("批次刪除工作階段錯誤:", error);
-        if (window.indicatorManager) {
-          window.indicatorManager.showStatus(
+        if (this.indicatorManager) {
+          this.indicatorManager.showStatus(
             "error",
             "批次刪除失敗: " + (error.message || ""),
           );
@@ -824,15 +818,15 @@ ${indentStr}}</span>`;
                   </div>
                 `;
               }
-              if (window.indicatorManager) {
-                window.indicatorManager.showStatus(
+              if (this.indicatorManager) {
+                this.indicatorManager.showStatus(
                   "success",
                   `工作階段 ${sessionId} 已刪除`,
                 );
               }
             } else {
-              if (window.indicatorManager) {
-                window.indicatorManager.showStatus(
+              if (this.indicatorManager) {
+                this.indicatorManager.showStatus(
                   "error",
                   "刪除失敗: " + data.message,
                 );

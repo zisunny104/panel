@@ -154,6 +154,24 @@
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.3s;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.experiment-start-row .experiment-start-btn:hover,
+.experiment-control-buttons button:hover {
+    filter: brightness(1.04);
+}
+
+.experiment-start-row .experiment-start-btn:active,
+.experiment-control-buttons button:active {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+}
+
+.experiment-start-row .experiment-start-btn:focus-visible,
+.experiment-control-buttons button:focus-visible {
+    outline: 2px solid rgba(102, 126, 234, 0.6);
+    outline-offset: 2px;
 }
 
 .experiment-control-buttons .experiment-pause-btn {

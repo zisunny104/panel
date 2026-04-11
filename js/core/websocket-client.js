@@ -9,6 +9,10 @@
  * - 訊息路由與事件分發
  */
 
+import { SYNC_EVENTS } from "../constants/index.js";
+import { Logger } from "./console-manager.js";
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
+
 class WebSocketClient {
   constructor(options = {}) {
     // 配置
@@ -20,6 +24,13 @@ class WebSocketClient {
       storagePrefix: options.storagePrefix || "panel_", // sessionStorage 前綴
       autoReconnect: options.autoReconnect !== false,
     };
+    this.roleConfig = {
+      VIEWER: "viewer",
+      OPERATOR: "operator",
+      LOCAL: "local",
+      ...options.roleConfig,
+    };
+    this.timeSyncManager = options.timeSyncManager || null;
 
     // 連接狀態
     this.ws = null;
@@ -38,7 +49,9 @@ class WebSocketClient {
     this.eventHandlers = new Map();
 
     // 訊息佇列（未連接時暫存）
+    // 最大限制：500 條消息（防止長期離線導致內存溢出）
     this.messageQueue = [];
+    this.maxMessageQueueSize = options.maxMessageQueueSize || 500;
 
     // 綁定方法
     this.handleOpen = this.handleOpen.bind(this);
@@ -95,8 +108,7 @@ class WebSocketClient {
     // 2. 合併認證資料（優先使用傳入的，再使用儲存的）
     this.sessionId = authData.sessionId || savedData.sessionId;
     this.clientId = authData.clientId || savedData.clientId;
-    this.role =
-      authData.role || savedData.role || window.SyncManager?.ROLE?.VIEWER;
+    this.role = authData.role || savedData.role || this.roleConfig.VIEWER;
 
     // 3. 檢查必要欄位
     if (!this.sessionId) {
@@ -169,53 +181,53 @@ class WebSocketClient {
 
       // 路由訊息到對應處理器
       switch (type) {
-        case window.WS_PROTOCOL.S2C.CONNECTED:
+        case WS_PROTOCOL.S2C.CONNECTED:
           this.handleConnected(data);
           break;
 
-        case window.WS_PROTOCOL.S2C.AUTH_SUCCESS:
+        case WS_PROTOCOL.S2C.AUTH_SUCCESS:
           this.handleAuthSuccess(data);
           break;
 
-        case window.WS_PROTOCOL.S2C.CLEAR_SYNC_DATA:
+        case WS_PROTOCOL.S2C.CLEAR_SYNC_DATA:
           Logger.warn("[WebSocketClient] 處理 clear_sync_data 訊息");
           this.handleClearSyncData(data);
           break;
 
-        case window.WS_PROTOCOL.S2C.HEARTBEAT_ACK:
+        case WS_PROTOCOL.S2C.HEARTBEAT_ACK:
           this.handleHeartbeatAck(data);
           break;
 
-        case window.WS_PROTOCOL.S2C.SESSION_STATE:
-          this.emit(window.WS_PROTOCOL.S2C.SESSION_STATE, data);
+        case WS_PROTOCOL.S2C.SESSION_STATE:
+          this.emit(WS_PROTOCOL.S2C.SESSION_STATE, data);
           break;
 
-        case window.WS_PROTOCOL.S2C.SESSION_STATE_UPDATE:
-          this.emit(window.WS_PROTOCOL.S2C.SESSION_STATE_UPDATE, data);
+        case WS_PROTOCOL.S2C.SESSION_STATE_UPDATE:
+          this.emit(WS_PROTOCOL.S2C.SESSION_STATE_UPDATE, data);
           break;
 
-        case window.WS_PROTOCOL.S2C.CLIENT_JOINED:
+        case WS_PROTOCOL.S2C.CLIENT_JOINED:
           this.emit("client_joined", data);
           break;
 
-        case window.WS_PROTOCOL.S2C.CLIENT_LEFT:
+        case WS_PROTOCOL.S2C.CLIENT_LEFT:
           this.emit("client_left", data);
           break;
 
-        case window.WS_PROTOCOL.S2C.CLIENT_RECONNECTED:
+        case WS_PROTOCOL.S2C.CLIENT_RECONNECTED:
           this.emit("client_reconnected", data);
           break;
 
-        case window.WS_PROTOCOL.S2C.STATE_UPDATE_ACK:
+        case WS_PROTOCOL.S2C.STATE_UPDATE_ACK:
           // 狀態更新確認回應，記錄但不需要特殊處理
           Logger.debug("[WebSocketClient] 伺服器確認狀態更新", data);
           break;
 
-        case window.WS_PROTOCOL.S2C.EXPERIMENT_STARTED:
-        case window.WS_PROTOCOL.S2C.EXPERIMENT_PAUSED:
-        case window.WS_PROTOCOL.S2C.EXPERIMENT_RESUMED:
-        case window.WS_PROTOCOL.S2C.EXPERIMENT_STOPPED:
-        case window.WS_PROTOCOL.S2C.EXPERIMENT_ID_CHANGED:
+        case WS_PROTOCOL.S2C.EXPERIMENT_STARTED:
+        case WS_PROTOCOL.S2C.EXPERIMENT_PAUSED:
+        case WS_PROTOCOL.S2C.EXPERIMENT_RESUMED:
+        case WS_PROTOCOL.S2C.EXPERIMENT_STOPPED:
+        case WS_PROTOCOL.S2C.EXPERIMENT_ID_CHANGED:
           // 直接以 type 作為事件名發出，WS_PROTOCOL.S2C 與 SYNC_EVENTS 的字串對時就能符合
           this.emit(type, data);
           break;
@@ -259,7 +271,7 @@ class WebSocketClient {
     });
 
     this.send({
-      type: window.WS_PROTOCOL.C2S.AUTH,
+      type: WS_PROTOCOL.C2S.AUTH,
       data: {
         sessionId: this.sessionId,
         clientId: this.clientId,
@@ -285,8 +297,8 @@ class WebSocketClient {
     this.saveToStorage();
 
     // 進行一次性校時（如果伺服器有提供時間戳）
-    if (serverTime && window.timeSyncManager) {
-      window.timeSyncManager.syncWithWebSocket(serverTime);
+    if (serverTime) {
+      this.timeSyncManager?.syncWithWebSocket?.(serverTime);
     }
 
     // 啟動心跳
@@ -323,7 +335,7 @@ class WebSocketClient {
     this.clearLocalSyncData();
 
     // 派發 window 事件，讓 SyncManager 進行後續處理
-    const clearEvent = new CustomEvent(window.SYNC_EVENTS.DATA_CLEARED, {
+    const clearEvent = new CustomEvent(SYNC_EVENTS.DATA_CLEARED, {
       detail: {
         reason,
         message,
@@ -417,7 +429,7 @@ class WebSocketClient {
     if (data && data.message && data.message.includes("工作階段不存在")) {
       Logger.warn("[WebSocketClient] 偵測到工作階段不存在錯誤，發送清理事件");
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.WEBSOCKET_SESSION_INVALID, {
+        new CustomEvent(SYNC_EVENTS.WEBSOCKET_SESSION_INVALID, {
           detail: {
             reason: "session_not_found",
             originalError: data,
@@ -459,7 +471,7 @@ class WebSocketClient {
     this.heartbeatTimer = setInterval(() => {
       if (this.isAuthenticated) {
         this.send({
-          type: window.WS_PROTOCOL.C2S.HEARTBEAT,
+          type: WS_PROTOCOL.C2S.HEARTBEAT,
           data: {
             clientId: this.clientId,
             timestamp: Date.now(),
@@ -495,8 +507,22 @@ class WebSocketClient {
    */
   send(message) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      Logger.warn("[WebSocketClient] WebSocket 未連接，訊息已加入佇列");
+      // WebSocket 未連接，將消息加入佇列
+
+      // 檢查佇列大小限制
+      if (this.messageQueue.length >= this.maxMessageQueueSize) {
+        Logger.warn(
+          `[WebSocketClient] 消息佇列已達最大限制 (${this.maxMessageQueueSize}/${this.maxMessageQueueSize})，舊消息可能被丟棄`,
+          { queueSize: this.messageQueue.length },
+        );
+        // 移除最舊的消息，騰出空間（FIFO 超限丟棄）
+        this.messageQueue.shift();
+      }
+
       this.messageQueue.push(message);
+      Logger.debug(
+        `[WebSocketClient] WebSocket 未連接，訊息已加入佇列 (佇列大小: ${this.messageQueue.length}/${this.maxMessageQueueSize})`,
+      );
       return false;
     }
 
@@ -505,6 +531,8 @@ class WebSocketClient {
       return true;
     } catch (error) {
       Logger.error("[WebSocketClient] 發送訊息失敗:", error);
+      // 發送失敗時也加入佇列以便稍後重試
+      this.messageQueue.push(message);
       return false;
     }
   }
@@ -530,7 +558,7 @@ class WebSocketClient {
    */
   updateState(state) {
     this.send({
-      type: window.WS_PROTOCOL.C2S.STATE_UPDATE,
+      type: WS_PROTOCOL.C2S.STATE_UPDATE,
       data: {
         sessionId: this.sessionId,
         clientId: this.clientId,
@@ -671,6 +699,9 @@ class WebSocketClient {
       this.ws = null;
     }
 
+    // 清除所有事件監聽器
+    this.eventHandlers.clear();
+
     this.isAuthenticated = false;
   }
 
@@ -699,9 +730,9 @@ class WebSocketClient {
   }
 }
 
-// 導出（支援 ES6 模組和全域變數）
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = WebSocketClient;
-} else {
-  window.WebSocketClient = WebSocketClient;
-}
+// ES6 模組匯出
+export default WebSocketClient;
+export { WebSocketClient };
+
+// 掛到全域 window 供其他模組使用
+window.WebSocketClient = WebSocketClient;

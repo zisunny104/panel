@@ -242,8 +242,8 @@
                 stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
                 <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
             </svg>
-            <svg class="svg-icon fullscreen-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
+            <svg class="svg-icon fullscreen-exit is-hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 9h6V3" />
                 <path d="M21 9h-6V3" />
                 <path d="M3 15h6v6" />
@@ -347,16 +347,15 @@
 
     <!-- ===== 核心基礎 ===== -->
     <!-- Logger（必須最先載入） -->
-    <script src="js/core/console-manager.js"></script>
+    <script type="module" src="js/core/console-manager.js"></script>
     <!-- WS 協議常數（Server/Client 共用，載入後暴露為 window.WS_PROTOCOL） -->
     <script type="module" src="shared/ws-protocol-constants.js"></script>
-    <!-- 同步事件常數（暴露 window.SYNC_EVENTS / window.SYNC_DATA_TYPES，必須在其他預載腳本之前載入） -->
-    <script type="module" src="js/constants/sync-events-constants.js"></script>
+    <!-- 常數入口（暴露 window.SYNC_EVENTS / window.SYNC_DATA_TYPES / window.ACTION_CONSTANTS） -->
+    <script type="module" src="js/constants/index.js"></script>
 
     <!-- ===== 面板頁面管理器 ===== -->
     <!-- 頁面入口：動態載入並協調所有其他模組（Data, Sync, UI, Experiment） -->
-    <script src="js/panel/panel-page-manager.js"></script>
-
+    <script type="module" src="js/panel/panel-page-manager.js"></script>
 </body>
 
 </html>

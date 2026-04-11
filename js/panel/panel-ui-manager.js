@@ -4,6 +4,8 @@
  * 整合面板管理、UI控制項管理和初始設定載入功能
  * 負責所有UI相關的操作和狀態管理
  */
+import { Logger } from "../core/console-manager.js";
+
 class PanelUIManager {
   /**
    * 預設設定值
@@ -20,7 +22,18 @@ class PanelUIManager {
   /**
    * 建構子
    */
-  constructor() {
+  constructor({
+    logger = Logger,
+    configManager = null,
+    uiManager = null,
+    buttonManager = null,
+    panelMediaManager = null,
+  } = {}) {
+    this.logger = logger;
+    this.configManager = configManager;
+    this.uiManager = uiManager;
+    this.buttonManager = buttonManager;
+    this.panelMediaManager = panelMediaManager;
     this.currentOpenPanel = null;
     this.panels = {
       settings: {
@@ -49,8 +62,18 @@ class PanelUIManager {
     this.powerLightArea = null;
     this.panelBottomRow = null;
     this.pendingMediaVolume = null;
+    this._resizeHandler = () => {
+      if (this.currentOpenPanel === "settings") {
+        this.alignPanelToButton("settings");
+      }
+    };
+    this._resizeHandlerBound = false;
 
     this.initialize();
+  }
+
+  updateDependencies(deps = {}) {
+    Object.assign(this, deps);
   }
 
   /**
@@ -63,10 +86,17 @@ class PanelUIManager {
     this.initializeUIState();
     this.loadInitialSettings();
 
-    window.addEventListener("resize", () => {
-      if (this.currentOpenPanel === "settings")
-        this.alignPanelToButton("settings");
-    });
+    if (!this._resizeHandlerBound) {
+      window.addEventListener("resize", this._resizeHandler);
+      this._resizeHandlerBound = true;
+    }
+  }
+
+  destroy() {
+    if (this._resizeHandlerBound) {
+      window.removeEventListener("resize", this._resizeHandler);
+      this._resizeHandlerBound = false;
+    }
   }
 
   // ============ 面板管理 ============
@@ -177,12 +207,10 @@ class PanelUIManager {
       // 對齊到設定切換按鈕，避免 UI 縮放時垂直位置偏移
       this.alignPanelToButton("settings");
     } else if (panelName === "experiment") {
-      // 初始化實驗面板UI組件
-      if (
-        window.uiManager &&
-        typeof window.uiManager.initializePanelUI === "function"
-      ) {
-        window.uiManager.initializePanelUI().catch((error) => {
+      // 初始化實驗面板 UI 元件
+      const uiManager = this.uiManager;
+      if (uiManager && typeof uiManager.initializePanelUI === "function") {
+        uiManager.initializePanelUI().catch((error) => {
           Logger.error("初始化實驗面板UI失敗:", error);
         });
       }
@@ -191,8 +219,9 @@ class PanelUIManager {
     this.currentOpenPanel = panelName;
 
     // 只記錄設定面板的操作，實驗面板不記錄
-    if (window.logger && panelName === "settings") {
-      window.logger.logAction("開啟設定面板");
+    const logger = this.logger;
+    if (logger && panelName === "settings") {
+      logger.logAction("開啟設定面板");
     }
   }
 
@@ -225,8 +254,9 @@ class PanelUIManager {
     }
 
     // 只記錄設定面板的操作，實驗面板不記錄
-    if (window.logger && panelName === "settings") {
-      window.logger.logAction("關閉設定面板");
+    const logger = this.logger;
+    if (logger && panelName === "settings") {
+      logger.logAction("關閉設定面板");
     }
   }
 
@@ -245,6 +275,31 @@ class PanelUIManager {
     if (this.currentOpenPanel) {
       this.closePanel(this.currentOpenPanel);
     }
+  }
+
+  // 根據實驗狀態切換 experimentPanelButton 底色
+  setupExperimentPanelButtonColor() {
+    this.setExperimentPanelButtonColor("default");
+  }
+
+  // 直接用 JS 切換 experimentPanelButton 底色
+  setExperimentPanelButtonColor(status) {
+    const btn = document.getElementById("experimentPanelButton");
+
+    if (status === "running") {
+      btn.style.setProperty("background", "#27ae60", "important");
+      btn.style.setProperty("color", "#fff", "important");
+      return;
+    }
+
+    if (status === "paused") {
+      btn.style.setProperty("background", "#f39c12", "important");
+      btn.style.setProperty("color", "#fff", "important");
+      return;
+    }
+
+    btn.style.setProperty("background", "#888", "important");
+    btn.style.setProperty("color", "#fff", "important");
   }
 
   // ============ UI 控制項功能============
@@ -308,7 +363,8 @@ class PanelUIManager {
     scaleNumberInput && (scaleNumberInput.value = value.toFixed(2));
 
     localStorage.setItem("mainScale", value);
-    window.configManager?.updateUserSetting?.("mainScale", value);
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("mainScale", value);
 
     this.alignPanelToButton("settings");
   }
@@ -331,7 +387,8 @@ class PanelUIManager {
     topSpacerNumberInput && (topSpacerNumberInput.value = value);
 
     localStorage.setItem("topSpacerHeight", value);
-    window.configManager?.updateUserSetting?.("topSpacerHeight", value);
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("topSpacerHeight", value);
 
     this.alignPanelToButton("settings");
   }
@@ -353,7 +410,8 @@ class PanelUIManager {
     bottomSpacerNumberInput && (bottomSpacerNumberInput.value = value);
 
     localStorage.setItem("bottomSpacerHeight", value);
-    window.configManager?.updateUserSetting?.("bottomSpacerHeight", value);
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("bottomSpacerHeight", value);
     this.alignPanelToButton("settings");
   }
 
@@ -375,7 +433,8 @@ class PanelUIManager {
     powerScaleNumberInput && (powerScaleNumberInput.value = value.toFixed(2));
 
     localStorage.setItem("powerSwitchScale", value);
-    window.configManager?.updateUserSetting?.("powerSwitchScale", value);
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("powerSwitchScale", value);
   }
 
   /**
@@ -387,7 +446,8 @@ class PanelUIManager {
       label.classList.toggle("hidden", !visible);
     });
     localStorage.setItem("showButtonLabels", visible ? "true" : "false");
-    window.configManager?.updateUserSetting?.("showButtonLabels", visible);
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("showButtonLabels", visible);
   }
 
   /**
@@ -399,8 +459,9 @@ class PanelUIManager {
       button.classList.toggle("no-color", !visible);
     });
     localStorage.setItem("showButtonColors", visible ? "true" : "false");
-    window.configManager?.updateUserSetting?.("showButtonColors", visible);
-    window.buttonManager?.updateExperimentButtonStyles?.();
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("showButtonColors", visible);
+    this.buttonManager?.updateExperimentButtonStyles?.();
   }
 
   /**
@@ -410,13 +471,14 @@ class PanelUIManager {
   updateTouchVisuals(visible) {
     const buttonOverlays = document.querySelectorAll(".button-overlay");
     const shiftButtonOverlay = document.querySelector(
-      '.button-overlay[data-label="B1"]',
+      ".button-overlay[data-label=\"B1\"]",
     );
     const mediaArea = document.getElementById("mediaArea");
     const powerSwitchArea = document.getElementById("powerSwitchArea");
 
     localStorage.setItem("showTouchVisuals", visible ? "true" : "false");
-    window.configManager?.updateUserSetting?.("showTouchVisuals", visible);
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("showTouchVisuals", visible);
 
     // 控制 body 上的視覺提示類別
     document.body.classList.toggle("visual-hints-enabled", visible);
@@ -433,7 +495,7 @@ class PanelUIManager {
       mediaArea?.classList.add("hidden-indicator");
     } else {
       mediaArea?.classList.remove("hidden-indicator");
-      window.experiment?.updateHighlightVisibility?.();
+      this.uiManager?.updateHighlightVisibility?.();
     }
   }
 
@@ -444,7 +506,8 @@ class PanelUIManager {
   updateMediaAreaMarkerVisibility(visible) {
     this.mediaArea?.classList.toggle("hide-area-marker", !visible);
     localStorage.setItem("showMediaAreaMarker", visible ? "true" : "false");
-    window.configManager?.updateUserSetting?.("showMediaAreaMarker", visible);
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("showMediaAreaMarker", visible);
   }
 
   /**
@@ -452,13 +515,14 @@ class PanelUIManager {
    * @param {boolean} visible - 是否顯示媒體內容
    */
   updateMediaContentVisibility(visible) {
-    const mediaFiles = window.mediaManager?.mediaFiles || [];
+    const mediaFiles = this.panelMediaManager?.mediaFiles || [];
     this.mediaArea?.classList.toggle(
       "hide-media-content",
       !(visible && mediaFiles.length > 0),
     );
     localStorage.setItem("showMediaContent", visible ? "true" : "false");
-    window.configManager?.updateUserSetting?.("showMediaContent", visible);
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("showMediaContent", visible);
   }
 
   /**
@@ -479,7 +543,7 @@ class PanelUIManager {
    */
   updateMediaVolume(volume) {
     const normalizedVolume = parseInt(volume) / 100;
-    window.mediaManager?.setMediaVolume?.(normalizedVolume);
+    this.panelMediaManager?.setMediaVolume(normalizedVolume);
   }
 
   /**
@@ -495,11 +559,11 @@ class PanelUIManager {
 
     const isFullscreen = !!document.fullscreenElement;
 
+    // 根據全屏狀態切換 SVG 顯示/隱藏
     enterSvg.classList.toggle("is-hidden", isFullscreen);
     exitSvg.classList.toggle("is-hidden", !isFullscreen);
 
-    this.hideElement(enterSvg);
-    this.showElement(exitSvg);
+    // 更新按鈕提示文字
     fullscreenButton.title = isFullscreen ? "退出全螢幕" : "切換全螢幕";
   }
 
@@ -509,17 +573,17 @@ class PanelUIManager {
   toggleFullscreen() {
     if (document.fullscreenElement) {
       document.exitFullscreen();
-      window.logger?.logAction?.("退出全螢幕模式");
+      this.logger?.logAction("退出全螢幕模式");
     } else {
       try {
         document.documentElement.requestFullscreen().catch((err) => {
           alert(`無法啟用全螢幕模式: ${err.message}`);
-          window.logger?.logAction?.(`無法啟用全螢幕模式: ${err.message}`);
+          this.logger?.logAction(`無法啟用全螢幕模式: ${err.message}`);
         });
-        window.logger?.logAction?.("進入全螢幕模式");
+        this.logger?.logAction("進入全螢幕模式");
       } catch (err) {
         Logger.warn("requestFullscreen failed synchronously:", err);
-        window.logger?.logAction?.(`同步啟用全螢幕失敗: ${err?.message}`);
+        this.logger?.logAction(`同步啟用全螢幕失敗: ${err.message}`);
       }
     }
   }
@@ -535,6 +599,11 @@ class PanelUIManager {
 
     // UI控制項相關事件監聽器
     this.setupUIControlEventListeners();
+
+    document.addEventListener("panel:experiment-button-status", (event) => {
+      const status = event.detail.status;
+      this.setExperimentPanelButtonColor(status);
+    });
   }
 
   /**
@@ -646,8 +715,9 @@ class PanelUIManager {
     toggleBeepSound?.addEventListener("change", (e) => {
       const checked = e.target.checked;
       localStorage.setItem("playBeepSound", checked ? "true" : "false");
-      window.configManager?.updateUserSetting?.("playBeepSound", checked);
-      window.logger?.logAction?.(`提示音效已 ${checked ? "開啟" : "關閉"}`);
+      const configManager = this.configManager;
+      configManager?.updateUserSetting("playBeepSound", checked);
+      this.logger?.logAction(`提示音效已 ${checked ? "開啟" : "關閉"}`);
     });
 
     // 音量控制
@@ -673,7 +743,8 @@ class PanelUIManager {
       const syncValues = (value) => {
         const clamped = Math.max(0, Math.min(100, value));
         localStorage.setItem(key, clamped);
-        window.configManager?.updateUserSetting?.(key, clamped);
+        const configManager = this.configManager;
+        configManager?.updateUserSetting(key, clamped);
         handler(clamped);
         if (range && range.value !== clamped) range.value = clamped;
         if (input && input.value !== clamped) input.value = clamped;
@@ -713,7 +784,7 @@ class PanelUIManager {
   initializeUIState() {
     this.updateFullscreenButtonIcon();
 
-    const configSettings = window.configManager?.userSettings || {};
+    const configSettings = this.configManager?.userSettings || {};
     this.updateScale(
       configSettings.mainScale ??
         localStorage.getItem("mainScale") ??
@@ -898,11 +969,12 @@ class PanelUIManager {
     if (!resetSettingsBtn) return;
 
     resetSettingsBtn.addEventListener("click", async () => {
-      if (window.configManager?.resetUserSettingsToDefaults) {
-        await window.configManager.resetUserSettingsToDefaults();
+      const configManager = this.configManager;
+      if (configManager?.resetUserSettingsToDefaults) {
+        await configManager.resetUserSettingsToDefaults();
         // 重置後重新初始化 UI 狀態以載入預設值
         this.initializeUIState();
-        if (window.logger) window.logger.logAction("已還原設定為預設值");
+        this.logger?.logAction("已還原設定為預設值");
       }
     });
   }
@@ -941,5 +1013,6 @@ class PanelUIManager {
   }
 }
 
-// 匯出單例
-window.panelUIManager = new PanelUIManager();
+// ES6 模組匯出
+export default PanelUIManager;
+export { PanelUIManager };

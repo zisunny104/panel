@@ -7,6 +7,11 @@
  * 此檔案聚焦於現行行為與公開 API，說明反映目前實作與責任範圍。
  */
 
+import { loadScenariosData } from "../core/data-loader.js";
+import { SYNC_DATA_TYPES, SYNC_EVENTS } from "../constants/index.js";
+import { generateExperimentId } from "../core/random-utils.js";
+import ExperimentFlowManager from "./experiment-flow-manager.js";
+
 class ExperimentUIManager {
   /**
    * 建構函式
@@ -20,9 +25,17 @@ class ExperimentUIManager {
       selectors: config.selectors || {},
     };
 
+    this.timerManager = config.timerManager || null;
+
     // 依賴注入容器
     this.dependencies = {
       flowManager: null,
+      combinationManager: null,
+      hubManager: null,
+      panelUIManager: null,
+      syncManager: null,
+      syncClient: null,
+      experimentSyncCore: null,
     };
 
     // UI 狀態
@@ -102,32 +115,35 @@ class ExperimentUIManager {
     Logger.debug("已注入 FlowManager");
 
     try {
-      // 鎖定事件：當實驗正在 RUNNING 或 PAUSED 時，停用 experimentId 與 組合選擇
-      flowManager.on(ExperimentFlowManager.EVENT.LOCKED, () => {
-        Logger.debug("收到 flow:locked，鎖定實驗相關輸入");
-        this._handleFlowLocked(true);
-      });
-
-      // 解鎖事件：實驗結束或重置時恢復
-      flowManager.on(ExperimentFlowManager.EVENT.UNLOCKED, () => {
-        Logger.debug("收到 flow:unlocked，解除鎖定");
-        this._handleFlowLocked(false);
-      });
-
-      // 受試者名稱允許編輯事件（PAUSED 時為 true）
-      flowManager.on(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, (data) => {
-        const allowed = !!data?.allowed;
-        Logger.debug(
-          "收到 flow:participant_edit，允許編輯受試者名稱:",
-          allowed,
-        );
-        this._handleParticipantEditAllowed(allowed);
-      });
-
-      Logger.debug("已綁定 FlowManager 事件: locked/unlocked/participant_edit");
+      Logger.debug(
+        "FlowManager 綁定完成（鎖定/解鎖由 ExperimentSystemManager 統一管理）",
+      );
     } catch (e) {
       Logger.warn("綁定 FlowManager 事件失敗", e);
     }
+  }
+
+  updateDependencies(deps = {}) {
+    Object.assign(this.dependencies, deps);
+  }
+
+  updateSelectAllState() {
+    const selectAllCheckbox = document.querySelector("#selectAllUnits");
+    const unitList = document.querySelector(
+      "#unitsPanelContainer .experiment-units-list",
+    );
+    if (!selectAllCheckbox || !unitList) {
+      return;
+    }
+    const checkboxes = Array.from(
+      unitList.querySelectorAll("input[name=\"unitCheckbox\"]"),
+    );
+    const checkedCount = checkboxes.filter((cb) => cb.checked).length;
+
+    selectAllCheckbox.checked =
+      checkedCount === checkboxes.length && checkboxes.length > 0;
+    selectAllCheckbox.indeterminate =
+      checkedCount > 0 && checkedCount < checkboxes.length;
   }
 
   // ==========================================
@@ -875,7 +891,7 @@ class ExperimentUIManager {
   }
 
   // ==========================================
-  // 通用UI組件渲染方法
+  // 通用 UI 元件渲染方法
   // ==========================================
 
   /**
@@ -1054,13 +1070,6 @@ class ExperimentUIManager {
     }
 
     const renderNow = () => {
-      Logger.debug(
-        `【排序追蹤】renderNow capturedIds=[${unitIds ? unitIds.join("→") : "null"}]`,
-        {
-          unitIds: unitIds ? [...unitIds] : null,
-          totalUnits: units.length,
-        },
-      );
       const config = {
         showHeader: options.showHeader !== false,
         headerTitle: options.headerTitle || "實驗單元",
@@ -1197,7 +1206,7 @@ class ExperimentUIManager {
         if (selectAllCheckbox) {
           selectAllCheckbox.addEventListener("change", (e) => {
             const checkboxes = containerEl.querySelectorAll(
-              'input[name="unitCheckbox"]',
+              "input[name=\"unitCheckbox\"]",
             );
             checkboxes.forEach((cb) => (cb.checked = e.target.checked));
             if (config.onUnitToggle) {
@@ -1213,7 +1222,7 @@ class ExperimentUIManager {
       // 綁定單元切換事件
       if (config.onUnitToggle) {
         const checkboxes = containerEl.querySelectorAll(
-          'input[name="unitCheckbox"]',
+          "input[name=\"unitCheckbox\"]",
         );
         checkboxes.forEach((checkbox) => {
           checkbox.addEventListener("change", (e) => {
@@ -1293,7 +1302,7 @@ class ExperimentUIManager {
       }
 
       Logger.debug(
-        `【排序追蹤】渲染完成 HTML順序[${displayUnits.map((u) => u.unit_id || u.id).join("→")}]`,
+        `【<cyan>排序追蹤</cyan>】<green>渲染完成</green> HTML順序[${displayUnits.map((u) => u.unit_id || u.id).join("→")}]`,
         {
           count: displayUnits.length,
           displayOrder: displayUnits.map((u) => u.unit_id || u.id),
@@ -1310,12 +1319,6 @@ class ExperimentUIManager {
       const mo = new MutationObserver((mutations, obs) => {
         if (window.getComputedStyle(panelAncestor).display !== "none") {
           obs.disconnect();
-          Logger.debug(
-            `【排序追蹤】renderNow MO觸發 capturedIds=[${unitIds ? unitIds.join("→") : "null"}]`,
-            {
-              capturedUnitIds: unitIds ? [...unitIds] : null,
-            },
-          );
           renderNow();
         }
       });
@@ -1592,7 +1595,7 @@ class ExperimentUIManager {
           <div class="form-group experiment-control-group">
             <div class="experiment-control-header">
               <label>實驗控制</label>
-              ${config.showTimer ? '<div id="experimentTimer" class="experiment-timer">00:00.000</div>' : ""}
+              ${config.showTimer ? "<div id=\"experimentTimer\" class=\"experiment-timer\">00:00.000</div>" : ""}
             </div>
 
             <div id="experimentIdRow" class="experiment-start-row">
@@ -1738,7 +1741,7 @@ class ExperimentUIManager {
    * 啟動實驗計時器（委派給 experimentTimerManager）
    */
   startExperimentTimer() {
-    window.experimentTimerManager.startExperimentTimer();
+    this.timerManager.startExperimentTimer();
     Logger.debug("實驗計時器已啟動");
   }
 
@@ -1747,7 +1750,7 @@ class ExperimentUIManager {
    * @returns {boolean} 是否成功暫停
    */
   pauseExperimentTimer() {
-    const etm = window.experimentTimerManager;
+    const etm = this.timerManager;
     if (!etm.experimentStartTime) {
       Logger.warn("計時器未在執行中");
       return false;
@@ -1766,7 +1769,7 @@ class ExperimentUIManager {
    * @returns {boolean} 是否成功恢復
    */
   resumeExperimentTimer() {
-    const etm = window.experimentTimerManager;
+    const etm = this.timerManager;
     if (!etm.experimentStartTime) {
       Logger.warn("計時器未在執行中");
       return false;
@@ -1784,7 +1787,7 @@ class ExperimentUIManager {
    * 停止實驗計時器（委派給 experimentTimerManager）
    */
   stopExperimentTimer() {
-    window.experimentTimerManager.stopExperimentTimer();
+    this.timerManager.stopExperimentTimer();
     Logger.debug("實驗計時器已停止");
   }
 
@@ -1793,12 +1796,12 @@ class ExperimentUIManager {
    * @returns {number} 經過的毫秒數
    */
   getElapsedTime() {
-    return window.experimentTimerManager.getExperimentElapsedMs();
+    return this.timerManager.getExperimentElapsedMs();
   }
 
   /**
-   * 初始化 Panel 頁面的 UI 組件
-   * 只渲染系統管理器未處理的組件（如實驗日誌）
+  * 初始化 Panel 頁面的 UI 元件
+  * 只渲染系統管理器未處理的元件（如實驗日誌）
    */
   async initializePanelUI() {
     try {
@@ -1808,12 +1811,12 @@ class ExperimentUIManager {
         return;
       }
 
-      Logger.debug("開始初始化 Panel UI 組件");
+      Logger.debug("開始初始化 Panel UI 元件");
 
       // 注意：組合選擇器、單元面板和實驗控制由 ExperimentSystemManager.initializeUI() 處理
       // 實驗日誌面板由 board-log-ui.js 的 ExperimentLogUI 負責初始化
 
-      Logger.debug("Panel UI 組件初始化完成");
+      Logger.debug("Panel UI 元件初始化完成");
 
       // 標記為已初始化
       this.state.panelUIInitialized = true;
@@ -1828,9 +1831,7 @@ class ExperimentUIManager {
    */
   async _loadScenariosData() {
     try {
-      const response = await fetch("data/scenarios.json");
-      if (!response.ok) throw new Error("Failed to load scenarios.json");
-      return await response.json();
+      return await loadScenariosData();
     } catch (error) {
       Logger.error("載入 scenarios.json 失敗:", error);
       return null;
@@ -1868,13 +1869,15 @@ class ExperimentUIManager {
   _handleCombinationSelect(combinationId) {
     Logger.debug("選擇組合:", combinationId);
 
-    if (window.experimentCombinationManager) {
+    const combinationManager = this.dependencies.combinationManager;
+    const hubManager = this.dependencies.hubManager;
+
+    if (combinationManager) {
       const combination =
-        window.experimentCombinationManager.getCombinationById(combinationId);
+        combinationManager.getCombinationById(combinationId);
       if (combination) {
-        const experimentId =
-          window.experimentHubManager?.getExperimentId?.() || null;
-        window.experimentCombinationManager.setCombination(
+        const experimentId = hubManager?.getExperimentId?.() || null;
+        combinationManager.setCombination(
           combination,
           experimentId,
         );
@@ -1886,23 +1889,6 @@ class ExperimentUIManager {
     }
   }
 
-  /**
-   * 處理單元切換
-   * @private
-   */
-  _handleUnitToggle(unitId, checked) {
-    Logger.debug("單元切換:", unitId, checked);
-    // 未實作：單元切換邏輯（保留作為未完成提示）
-  }
-
-  /**
-   * 處理單元重新排序
-   * @private
-   */
-  _handleUnitReorder(newOrder) {
-    Logger.debug("單元重新排序:", newOrder);
-    // 未實作：單元排序邏輯
-  }
 
   /**
    * 處理實驗開始
@@ -1911,11 +1897,13 @@ class ExperimentUIManager {
   _handleExperimentStart() {
     Logger.debug("開始實驗");
 
+    const panelUIManager = this.dependencies.panelUIManager;
+
     // 關閉所有面板（實驗、日誌、設定）
-    if (window.panelUIManager) {
-      window.panelUIManager.closePanel("experiment");
-      window.panelUIManager.closePanel("logger");
-      window.panelUIManager.closePanel("settings");
+    if (panelUIManager) {
+      panelUIManager.closePanel("experiment");
+      panelUIManager.closePanel("logger");
+      panelUIManager.closePanel("settings");
       Logger.debug("實驗開始：已關閉所有面板");
     }
 
@@ -1927,23 +1915,6 @@ class ExperimentUIManager {
     }
   }
 
-  /**
-   * 處理實驗暫停
-   * @private
-   */
-  _handleExperimentPause() {
-    Logger.debug("暫停/繼續實驗");
-    // 未實作：暫停處理（由 FlowManager 驅動為主要實現點）
-  }
-
-  /**
-   * 處理實驗停止
-   * @private
-   */
-  _handleExperimentStop() {
-    Logger.debug("停止實驗");
-    // 未實作：停止處理（由 FlowManager 驅動為主要實現點）
-  }
 
   /**
    * 處理重新產生ID
@@ -1954,7 +1925,7 @@ class ExperimentUIManager {
 
     try {
       // 檢查是否在同步模式，並選擇適當的產生方法
-      const hubManager = window.experimentHubManager;
+      const hubManager = this.dependencies.hubManager;
       let newId;
       // 即使 hubManager 不存在，也允許在本機產生 ID（離線模式）
       if (hubManager && hubManager.isInSyncMode && hubManager.isInSyncMode()) {
@@ -1990,9 +1961,10 @@ class ExperimentUIManager {
       this._broadcastExperimentIdUpdate(newId);
 
       // 觸發組合管理器的同步（如果需要）
-      if (window.experimentCombinationManager) {
+      const combinationManager = this.dependencies.combinationManager;
+      if (combinationManager?.handleExperimentIdChanged) {
         // 通知組合管理器實驗ID已更改，可能需要重新同步
-        window.experimentCombinationManager.handleExperimentIdChanged(newId);
+        combinationManager.handleExperimentIdChanged(newId);
       }
     } catch (error) {
       Logger.error("重新產生實驗ID失敗:", error);
@@ -2005,28 +1977,13 @@ class ExperimentUIManager {
    * @returns {string} 新產生的實驗ID
    */
   _generateExperimentId() {
-    // 優先使用 ExperimentHubManager（若存在），否則使用 RandomUtils 或內建後備方法
-    if (
-      window.experimentHubManager &&
-      typeof window.experimentHubManager.generateExperimentId === "function"
-    ) {
-      return window.experimentHubManager.generateExperimentId();
+    // 優先使用 ExperimentHubManager（若存在），否則使用 random-utils 產生器
+    const hubManager = this.dependencies.hubManager;
+    if (hubManager?.generateExperimentId) {
+      return hubManager.generateExperimentId();
     }
 
-    if (
-      window.RandomUtils &&
-      typeof window.RandomUtils.generateExperimentId === "function"
-    ) {
-      return window.RandomUtils.generateExperimentId();
-    }
-
-    // 後備簡單產生器（6 位大寫英數）
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let result = "";
-    for (let i = 0; i < 6; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
+    return generateExperimentId();
   }
 
   /**
@@ -2042,7 +1999,7 @@ class ExperimentUIManager {
       const newId = this._generateExperimentId();
 
       // 檢查是否在同步模式
-      const hubManager = window.experimentHubManager;
+      const hubManager = this.dependencies.hubManager;
       if (hubManager?.isInSyncMode?.()) {
         Logger.debug(`同步模式: 註冊新ID到中樞: ${newId}`);
         // 在同步模式下，experimentHubManager.generateExperimentId() 應該已經處理了註冊
@@ -2063,27 +2020,31 @@ class ExperimentUIManager {
    * @param {string} experimentId - 新的實驗ID
    */
   _broadcastExperimentIdUpdate(experimentId) {
+    const syncManager = this.dependencies.syncManager;
+    const syncClient =
+      this.dependencies.syncClient || syncManager?.core?.syncClient;
+    const experimentSyncCore = this.dependencies.experimentSyncCore;
+
     // 檢查是否存在同步工作階段
-    if (!window.syncManager?.core?.isConnected?.()) {
+    if (!syncManager?.core?.isConnected?.()) {
       return;
     }
 
     const updateData = {
-      type: window.SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
-      clientId:
-        window.syncManager?.core?.syncClient?.clientId || "experiment_panel",
+      type: SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
+      clientId: syncClient?.clientId || "experiment_panel",
+      timestamp: Date.now(),
       experimentId: experimentId,
-      timestamp: new Date().toISOString(),
     };
 
     // 使用統一的同步機制
-    window.syncManager.core.syncState(updateData).catch((error) => {
-      Logger.warn("廣播實驗ID更新失敗:", error);
+    experimentSyncCore?.safeBroadcast?.(updateData).catch((error) => {
+      Logger.warn("同步實驗ID更新失敗:", error);
     });
 
     // 分派事件供本機同步管理器捕獲
     document.dispatchEvent(
-      new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
+      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
         detail: updateData,
       }),
     );
@@ -2092,12 +2053,6 @@ class ExperimentUIManager {
   }
 }
 
-// 匯出到全域（向後相容）
-if (typeof window !== "undefined") {
-  window.ExperimentUIManager = ExperimentUIManager;
-}
-
 // ES6 模組匯出
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = ExperimentUIManager;
-}
+export default ExperimentUIManager;
+export { ExperimentUIManager };

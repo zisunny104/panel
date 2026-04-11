@@ -1,107 +1,73 @@
 /**
  * ExperimentSyncCore - 實驗狀態同步核心
  *
- * 負責多裝置同步邏輯、訊息佇列與廣播，不直接操作 DOM。
- * 通過 window.experimentSyncCore 暴露單一實例供各模組使用。
+ * 負責實驗狀態廣播和遠端事件轉發，不直接操作 DOM。
+ * 由呼叫端負責建立與注入實例。
+ * 佇列管理由 SyncManagerCore 統一負責。
  */
 
+import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+
 class ExperimentSyncCore {
-  constructor() {
-    this.clientId = null;
-    this.isConnected = false;
-    this._pendingQueue = []; // 離線時的訊息佇列
+  constructor(config = {}) {
+    this.syncManager = config.syncManager || null;
+    this.syncClient = config.syncClient || null;
     this._initSyncEvents();
-    this._setupConnectionListeners();
     Logger.debug("ExperimentSyncCore 已建立");
   }
 
-  _initSyncEvents() {
-    this.SYNC_EVENTS = window.SYNC_EVENTS;
+  updateDependencies(deps = {}) {
+    Object.assign(this, deps);
+  }
 
-    window.addEventListener(this.SYNC_EVENTS.STATE_UPDATE, (e) =>
+  _initSyncEvents() {
+    window.addEventListener(SYNC_EVENTS.STATE_UPDATE, (e) =>
       this._onRemoteStateUpdate(e.detail),
     );
   }
 
-  _setupConnectionListeners() {
-    window.addEventListener(this.SYNC_EVENTS.SESSION_JOINED, (e) => {
-      this.isConnected = true;
-      this.clientId =
-        window.syncManager?.core?.syncClient?.clientId ||
-        e?.detail?.clientId ||
-        null;
-      Logger.debug("ExperimentSyncCore: SESSION_JOINED", {
-        clientId: this.clientId,
-      });
-      this._flushQueue();
-    });
-
-    window.addEventListener(this.SYNC_EVENTS.CONNECTED, (e) => {
-      this.isConnected = true;
-      this.clientId =
-        e?.detail?.clientId ||
-        window.syncManager?.core?.syncClient?.clientId ||
-        this.clientId;
-      Logger.debug("ExperimentSyncCore: CONNECTED", {
-        clientId: this.clientId,
-      });
-      this._flushQueue();
-    });
-
-    window.addEventListener(this.SYNC_EVENTS.DISCONNECTED, () => {
-      this.isConnected = false;
-      Logger.debug("ExperimentSyncCore: DISCONNECTED");
-    });
-  }
-
   async _onRemoteStateUpdate(detail) {
-    // 將遠端狀態標準化後重新派發，供 Board 端的 Adapter 接收
-    try {
-      if (!detail) return;
-      window.dispatchEvent(
-        new CustomEvent(this.SYNC_EVENTS.REMOTE_STATE, { detail }),
-      );
-    } catch (err) {
-      Logger.warn("ExperimentSyncCore: 處理遠端狀態失敗", err);
-    }
+    if (!detail) return;
+    window.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.REMOTE_STATE, { detail }),
+    );
   }
 
+  /**
+   * 委派給 SyncManagerCore 進行同步（包括佇列管理）
+   */
   async syncState(payload) {
-    if (!window.syncManager?.core?.syncState) {
-      this._enqueue(payload);
-      return;
+    if (!this.syncManager?.core) {
+      Logger.warn("ExperimentSyncCore: syncManager 未設定，無法同步狀態");
+      return false;
     }
-    try {
-      await window.syncManager.core.syncState(payload);
-    } catch (err) {
-      Logger.warn("ExperimentSyncCore: syncState 失敗，加入佇列", err);
-      this._enqueue(payload);
-    }
+    return await this.syncManager.core.syncState(payload);
   }
 
-  _enqueue(payload) {
-    this._pendingQueue.push(payload);
-    if (this._pendingQueue.length > 50) {
-      // 防止佇列無限展長，保留最新 50 筆
-      this._pendingQueue.splice(0, this._pendingQueue.length - 50);
-    }
+  /**
+   * 檢查是否可以廣播（連線狀態檢查）
+   */
+  canBroadcast() {
+    return this.syncManager?.core?.isConnected?.() || false;
   }
 
-  async _flushQueue() {
-    if (!this._pendingQueue.length) return;
-    const pending = this._pendingQueue.splice(0);
-    Logger.debug(`ExperimentSyncCore: 清空佇列，發送 ${pending.length} 筆`);
-    for (const p of pending) {
-      await this.syncState(p);
-    }
+  /**
+   * 安全廣播：檢查連線後進行同步
+   * @param {Object} payload - 廣播資料
+   * @returns {Promise<boolean>} 廣播是否成功
+   */
+  async safeBroadcast(payload) {
+    if (!this.canBroadcast()) return false;
+    return await this.syncState(payload);
   }
 
   // 廣播方法（純封裝，不操作 DOM）
   async broadcastExperimentStart(details) {
     const payload = Object.assign(
       {
-        type: window.SYNC_DATA_TYPES.EXPERIMENT_STARTED,
-        timestamp: new Date().toISOString(),
+        type: SYNC_DATA_TYPES.EXPERIMENT_STARTED,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
       },
       details || {},
     );
@@ -111,9 +77,9 @@ class ExperimentSyncCore {
   async broadcastExperimentPause(details) {
     const payload = Object.assign(
       {
-        type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
-        event: window.SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
-        timestamp: new Date().toISOString(),
+        type: SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
       },
       details || {},
     );
@@ -123,9 +89,9 @@ class ExperimentSyncCore {
   async broadcastExperimentResume(details) {
     const payload = Object.assign(
       {
-        type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
-        event: window.SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
-        timestamp: new Date().toISOString(),
+        type: SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
       },
       details || {},
     );
@@ -135,9 +101,9 @@ class ExperimentSyncCore {
   async broadcastExperimentStop(details) {
     const payload = Object.assign(
       {
-        type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
-        event: window.SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
-        timestamp: new Date().toISOString(),
+        type: SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
       },
       details || {},
     );
@@ -147,25 +113,17 @@ class ExperimentSyncCore {
   async broadcastExperimentAction(actionData) {
     const payload = Object.assign(
       {
-        type: window.SYNC_DATA_TYPES.EXPERIMENT_ACTION,
-        timestamp: new Date().toISOString(),
+        type: SYNC_DATA_TYPES.EXPERIMENT_ACTION,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
       },
       actionData || {},
     );
     await this.syncState(payload);
   }
-
-  async broadcastButtonAction(buttonData) {
-    const payload = Object.assign(
-      {
-        type: window.SYNC_DATA_TYPES.BUTTON_ACTION,
-        timestamp: new Date().toISOString(),
-      },
-      buttonData || {},
-    );
-    await this.syncState(payload);
-  }
 }
 
-// 實例化並暴露到 window
-window.experimentSyncCore = new ExperimentSyncCore();
+// ES6 模組匯出
+export default ExperimentSyncCore;
+export { ExperimentSyncCore };
+

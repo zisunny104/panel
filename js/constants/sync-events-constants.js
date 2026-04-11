@@ -42,9 +42,6 @@ export const SYNC_EVENTS = {
   // 實驗 ID 事件
   EXPERIMENT_ID_CHANGED: "experiment_id_changed",
 
-  // 實驗日誌事件
-  EXPERIMENT_COMBINATION_SELECTED: "combination_selected", // 組合選擇記錄
-
   // 步驟生命周期事件
   STEP_STARTED: "step_started",
   STEP_COMPLETED: "step_completed",
@@ -54,13 +51,10 @@ export const SYNC_EVENTS = {
   ACTION_COMPLETED: "action_completed",
   ACTION_CANCELLED: "action_cancelled",
 
-  // 面板按鈕事件
-  BUTTON_PRESSED: "button_pressed",
-
   // 錯誤事件
   DATA_CLEARED: "data_cleared", // WebSocket斷開時清除同步數據
 
-  // UI 本地事件（非同步）
+  // UI 本機事件（非同步）
   POWER_STATE_CHANGED: "power_state_changed",
   USER_SETTINGS_RESET: "user_settings_reset",
 
@@ -90,8 +84,8 @@ export const SYNC_EVENTS = {
   START_QR_SCAN: "sync_start_qr_scan",
   CONNECTION_LOST: "sync_connection_lost",
 
-  // 本地 DOM 事件（dispatched on document，僅限頁面內部使用，非 WebSocket 同步）
-  EXPERIMENT_STATE_CHANGE_LOCAL: "experimentStateChange",
+  // 本機 DOM 事件（dispatched on document，僅限頁面內部使用，非 WebSocket 同步）
+  EXPERIMENT_STATE_CHANGE_LOCAL: "experiment_state_change_local",
 
   // 遠端實驗橋接事件（board-sync-manager ↔ board-page-manager）
   REMOTE_EXPERIMENT_STARTED: "remote_experiment_started",
@@ -99,23 +93,27 @@ export const SYNC_EVENTS = {
   REMOTE_EXPERIMENT_RESUMED: "remote_experiment_resumed",
   REMOTE_EXPERIMENT_STOPPED: "remote_experiment_stopped",
   REMOTE_EXPERIMENT_ACTION: "remote_experiment_action",
-  REMOTE_BUTTON_ACTION: "remote_button_action",
   REMOTE_PANEL_STATE_UPDATE: "remote_panel_state_update",
   REMOTE_SYNC_EVENT: "remote_sync_event",
+  REMOTE_STATE: "remote_state",
+
+  // 同步資料事件（來自遠端裝置的狀態同步）
+  COMBINATION_SELECTED: "combination_selected",
+  GESTURE_MARKED: "gesture_marked",
 };
 
 // 同步資料類型常數
 export const SYNC_DATA_TYPES = {
   // 實驗管理
-  EXPERIMENT_INITIALIZE: "experimentInitialize",
+  EXPERIMENT_INITIALIZE: "experiment_initialize",
   EXPERIMENT_STARTED: "experiment_started",
   EXPERIMENT_PAUSED: "experiment_paused",
   EXPERIMENT_RESUMED: "experiment_resumed",
   EXPERIMENT_STOPPED: "experiment_stopped",
 
   // 實驗資訊更新
-  SUBJECT_NAME_UPDATE: "subjectNameUpdate",
-  EXPERIMENT_ID_UPDATE: "experimentIdUpdate",
+  SUBJECT_NAME_UPDATE: "subject_name_update",
+  EXPERIMENT_ID_UPDATE: "experiment_id_update",
   COMBINATION_SELECTED: "combination_selected",
 
   // 動作與步驟
@@ -126,7 +124,7 @@ export const SYNC_DATA_TYPES = {
   BUTTON_PRESSED: "button_pressed",
 
   // 電源狀態
-  POWER_STATE_UPDATE: "powerState",
+  POWER_STATE_UPDATE: "power_state_update",
   POWER_STATE_CHANGED: "power_state_changed",
 
   // 日誌更新
@@ -141,7 +139,7 @@ export const SYNC_DATA_TYPES = {
   GESTURE_STEP_COMPLETED: "gesture_step_completed",
 
   // 工作階段狀態
-  SESSION_STATE_UPDATE: "sessionState",
+  SESSION_STATE_UPDATE: "session_state_update",
 
   // 狀態請求
   REQUEST_EXPERIMENT_STATE: "request_experiment_state",
@@ -150,12 +148,8 @@ export const SYNC_DATA_TYPES = {
   EXPERIMENT_STATE_CHANGE: "experiment_state_change",
 
   // 內部中繼事件（由 ExperimentSyncCore 派發，Board 端接收）
-  REMOTE_STATE: "experiment:sync:remote_state",
+  REMOTE_STATE: "remote_state",
 };
-
-// 暴露至全域以供非 module 腳本使用（例如直接載入的 panel 腳本）
-window.SYNC_EVENTS = SYNC_EVENTS;
-window.SYNC_DATA_TYPES = SYNC_DATA_TYPES;
 
 /**
  * 取得事件名稱（用於動態事件分發）

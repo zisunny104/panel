@@ -1,18 +1,29 @@
-// config.js - 設定與設定管理模塊
-
-// ========== 全域除錯開關 ==========
-// 注意：DEBUG_MODE、debugLog、toggleDebugMode 現在由 ConsoleManager 管理
-// 為了向後相容性，這些函數仍然可用，但建議直接使用 ConsoleManager
-
 /**
- * ConfigManager 負責管理設定的載入、套用、儲存與事件監聽。
+ * ConfigManager 設定管理模組
+ *
+ * 負責管理設定的載入、套用、儲存與事件監聽。
  */
+import { Logger } from "./console-manager.js";
+
+let sharedConfig = {};
+
+const setSharedConfig = (config) => {
+  sharedConfig = config || {};
+};
+
+const getSharedConfig = () => sharedConfig;
+
 class ConfigManager {
   constructor() {
     this.defaultSettings = {};
     this.userSettings = {};
     this.resetLanguageOnLoad = true;
     this.configData = {}; // 儲存完整的 config.json 資料
+    this.panelUIManager = null;
+  }
+
+  updateDependencies(deps = {}) {
+    Object.assign(this, deps);
   }
 
   /**
@@ -32,7 +43,7 @@ class ConfigManager {
       }
       const config = await response.json();
       this.configData = config; // 儲存完整的 config 資料
-      window.CONFIG = config; // 暴露到全域作用域供其他模塊使用
+      setSharedConfig(config);
       this.defaultSettings = config.settings || {};
 
       // 嘗試載入本機儲存的設定
@@ -63,10 +74,9 @@ class ConfigManager {
         author: "開發版本",
         description: "虛擬操作面板",
       };
+      setSharedConfig(this.configData);
       // 仍然嘗試載入版本資訊
-      if (window.Logger) {
-        this.loadVersionInfo();
-      }
+      this.loadVersionInfo();
     }
   }
 
@@ -81,7 +91,7 @@ class ConfigManager {
       await this.applySettings(this.userSettings);
       // 一旦套用到 DOM，上面的 saveUserSettings() 監聽器會儲存新的值
       this.saveUserSettings();
-      if (window.Logger) Logger.info("使用者設定已還原為預設值");
+      Logger.info("使用者設定已還原為預設值");
       // 通知 UI
       document.dispatchEvent(new CustomEvent("user_settings_reset", {}));
     } catch (e) {
@@ -132,9 +142,7 @@ class ConfigManager {
       scaleRange.value = settings.mainScale;
       if (scaleNumberInput) scaleNumberInput.value = settings.mainScale;
       // 套用縮放
-      if (window.panelUIManager) {
-        window.panelUIManager.updateScale(settings.mainScale);
-      }
+      this.panelUIManager?.updateScale?.(settings.mainScale);
     }
     // 上方間距設定
     if (settings.topSpacerHeight !== undefined && topSpacerRange) {
@@ -142,9 +150,7 @@ class ConfigManager {
       if (topSpacerNumberInput)
         topSpacerNumberInput.value = settings.topSpacerHeight;
       // 套用頂部間距
-      if (window.panelUIManager) {
-        window.panelUIManager.updateTopSpacer(settings.topSpacerHeight);
-      }
+      this.panelUIManager?.updateTopSpacer?.(settings.topSpacerHeight);
     }
 
     // 底部間距設定
@@ -152,9 +158,7 @@ class ConfigManager {
       bottomSpacerRange.value = settings.bottomSpacerHeight;
       if (bottomSpacerNumberInput)
         bottomSpacerNumberInput.value = settings.bottomSpacerHeight;
-      if (window.panelUIManager) {
-        window.panelUIManager.updateBottomSpacer(settings.bottomSpacerHeight);
-      }
+      this.panelUIManager?.updateBottomSpacer?.(settings.bottomSpacerHeight);
     }
 
     // 電源按鈕縮放
@@ -162,9 +166,7 @@ class ConfigManager {
       powerScaleRange.value = settings.powerSwitchScale;
       if (powerScaleNumberInput)
         powerScaleNumberInput.value = settings.powerSwitchScale;
-      if (window.panelUIManager) {
-        window.panelUIManager.updatePowerScale(settings.powerSwitchScale);
-      }
+      this.panelUIManager?.updatePowerScale?.(settings.powerSwitchScale);
     }
     // 按鈕標籤顯示
     if (settings.showButtonLabels !== undefined && toggleButtonLabels)
@@ -229,6 +231,20 @@ class ConfigManager {
       beepVolume: beepVolume ? beepVolume.value : "50",
       mediaVolume: mediaVolume ? mediaVolume.value : "70",
     };
+    localStorage.setItem("userSettings", JSON.stringify(this.userSettings));
+  }
+
+  /**
+   * 更新單個用戶設定值（由 panel-ui-manager 調用）
+   * 假設 panel-ui-manager 已更新 DOM，此方法僅更新內存和 localStorage
+   * @param {string} key - 設定鍵名
+   * @param {any} value - 設定值
+   */
+  updateUserSetting(key, value) {
+    // 更新內存中的設定
+    this.userSettings[key] = value;
+
+    // 立即保存到 localStorage
     localStorage.setItem("userSettings", JSON.stringify(this.userSettings));
   }
 
@@ -386,28 +402,6 @@ class ConfigManager {
   }
 }
 
-// 匯出單例
-window.configManager = new ConfigManager();
-
-// 立即載入設定
-window.configManager.loadConfigSettings().catch((err) => {
-  Logger.error("設定載入失敗:", err);
-});
-
-// 全域版本管理函數
-window.updateAppVersion = function () {
-  if (window.configManager) {
-    return window.configManager.updateVersion();
-  } else {
-    Logger.error("ConfigManager 尚未初始化");
-  }
-};
-
-window.getAppVersionInfo = function () {
-  if (window.configManager) {
-    return window.configManager.getVersionInfo();
-  } else {
-    Logger.error("ConfigManager 尚未初始化");
-    return null;
-  }
-};
+// ES6 模組匯出
+export default ConfigManager;
+export { ConfigManager, getSharedConfig, setSharedConfig };

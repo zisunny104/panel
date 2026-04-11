@@ -5,12 +5,22 @@
  * 心跳檢測與分享代碼管理，支援多客戶端協同同步。
  */
 
+import { SYNC_EVENTS } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
+
 class SyncClient {
   /**
    * 建構函數
    * @param {Object} config - 配置選項
    */
   constructor(config = {}) {
+    this.roleConfig = {
+      VIEWER: "viewer",
+      OPERATOR: "operator",
+      LOCAL: "local",
+      ...config.roleConfig,
+    };
     // API 端點配置
     this.apiBaseUrl = config.apiBaseUrl || this.getDefaultApiUrl();
 
@@ -21,11 +31,12 @@ class SyncClient {
       storagePrefix: "panel_sync_",
       autoReconnect: true,
     };
+    this.timeSyncManager = config.timeSyncManager || null;
 
     // 連線和狀態管理
     this.sessionId = null;
     this.clientId = null;
-    this.role = window.SyncManager?.ROLE?.LOCAL;
+    this.role = this.roleConfig.LOCAL;
     this.connected = false;
     this.serverOnline = true;
     this.previousServerOnline = true;
@@ -59,7 +70,7 @@ class SyncClient {
    */
   setupGlobalEventHandlers() {
     window.addEventListener(
-      window.SYNC_EVENTS.WEBSOCKET_SESSION_INVALID,
+      SYNC_EVENTS.WEBSOCKET_SESSION_INVALID,
       (event) => {
         const { reason, originalError } = event.detail;
         Logger.warn("收到全域工作階段失效事件", { reason, originalError });
@@ -68,7 +79,7 @@ class SyncClient {
         this.clearInvalidSessionData();
 
         window.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.SESSION_INVALID, {
+          new CustomEvent(SYNC_EVENTS.SESSION_INVALID, {
             detail: { reason, originalError },
           }),
         );
@@ -85,17 +96,26 @@ class SyncClient {
       return;
     }
 
+    const initStart = performance.now();
+
     Logger.info("初始化同步功能...");
 
     this.stopHealthCheck();
 
-    this.wsClient = new WebSocketClient(this.wsConfig);
+    this.wsClient = new WebSocketClient({
+      ...this.wsConfig,
+      roleConfig: this.roleConfig,
+      timeSyncManager: this.timeSyncManager,
+    });
     this.setupWebSocketHandlers();
 
     this.healthCheckMethod = "websocket";
 
     this.initialized = true;
-    Logger.info("同步功能初始化完成，切換到 WebSocket 狀態監聽");
+    const duration = performance.now() - initStart;
+    Logger.info(
+      `同步功能初始化完成，切換到 WebSocket 狀態監聽 (<orange>${duration.toFixed(0)} ms</orange>)`,
+    );
   }
 
   /**
@@ -138,7 +158,7 @@ class SyncClient {
       this.saveState();
 
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.CONNECTED, { detail: data }),
+        new CustomEvent(SYNC_EVENTS.CONNECTED, { detail: data }),
       );
     });
 
@@ -147,7 +167,7 @@ class SyncClient {
       this.connected = true;
 
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.RECONNECTED, { detail: data }),
+        new CustomEvent(SYNC_EVENTS.RECONNECTED, { detail: data }),
       );
     });
 
@@ -156,11 +176,11 @@ class SyncClient {
       this.connected = false;
 
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.DISCONNECTED, { detail: data }),
+        new CustomEvent(SYNC_EVENTS.DISCONNECTED, { detail: data }),
       );
     });
 
-    this.wsClient.on(window.WS_PROTOCOL.S2C.SESSION_STATE_UPDATE, (data) => {
+    this.wsClient.on(WS_PROTOCOL.S2C.SESSION_STATE_UPDATE, (data) => {
       Logger.debug("收到狀態更新", data);
       this.triggerStateUpdate(data.state);
     });
@@ -168,21 +188,21 @@ class SyncClient {
     this.wsClient.on("client_joined", (data) => {
       Logger.debug("新客戶端加入", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.CLIENT_JOINED, { detail: data }),
+        new CustomEvent(SYNC_EVENTS.CLIENT_JOINED, { detail: data }),
       );
     });
 
     this.wsClient.on("client_left", (data) => {
       Logger.debug("客戶端退出", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.CLIENT_LEFT, { detail: data }),
+        new CustomEvent(SYNC_EVENTS.CLIENT_LEFT, { detail: data }),
       );
     });
 
     this.wsClient.on("client_reconnected", (data) => {
       Logger.debug("客戶端重新連接", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.CLIENT_RECONNECTED, {
+        new CustomEvent(SYNC_EVENTS.CLIENT_RECONNECTED, {
           detail: data,
         }),
       );
@@ -198,7 +218,7 @@ class SyncClient {
         this.clearInvalidSessionData();
 
         window.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.SESSION_INVALID, {
+          new CustomEvent(SYNC_EVENTS.SESSION_INVALID, {
             detail: {
               reason: "session_not_found",
               originalError: data,
@@ -208,48 +228,48 @@ class SyncClient {
       }
 
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.SERVER_ERROR, { detail: data }),
+        new CustomEvent(SYNC_EVENTS.SERVER_ERROR, { detail: data }),
       );
     });
 
-    this.wsClient.on(window.SYNC_EVENTS.EXPERIMENT_STARTED, (data) => {
+    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_STARTED, (data) => {
       Logger.debug("收到實驗開始事件", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STARTED, {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
           detail: data,
         }),
       );
     });
 
-    this.wsClient.on(window.SYNC_EVENTS.EXPERIMENT_PAUSED, (data) => {
+    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_PAUSED, (data) => {
       Logger.debug("收到實驗暫停事件", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_PAUSED, { detail: data }),
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_PAUSED, { detail: data }),
       );
     });
 
-    this.wsClient.on(window.SYNC_EVENTS.EXPERIMENT_RESUMED, (data) => {
+    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_RESUMED, (data) => {
       Logger.debug("收到實驗恢復事件", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_RESUMED, {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_RESUMED, {
           detail: data,
         }),
       );
     });
 
-    this.wsClient.on(window.SYNC_EVENTS.EXPERIMENT_STOPPED, (data) => {
+    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_STOPPED, (data) => {
       Logger.debug("收到實驗停止事件", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STOPPED, {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, {
           detail: data,
         }),
       );
     });
 
-    this.wsClient.on(window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
+    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
       Logger.debug("收到實驗ID變化事件", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED, {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, {
           detail: data,
         }),
       );
@@ -258,7 +278,7 @@ class SyncClient {
     this.wsClient.on("session_state", (data) => {
       Logger.debug("收到工作階段狀態", data);
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.SESSION_STATE, { detail: data }),
+        new CustomEvent(SYNC_EVENTS.SESSION_STATE, { detail: data }),
       );
 
       // 若工作階段中儲存有實驗狀態，重新派發為 STATE_UPDATE 以觸發各頁面的恢復邏輯
@@ -269,7 +289,7 @@ class SyncClient {
         // 延遲一個 tick，確保所有模組（FlowManager、SyncManager 等）已就緒
         setTimeout(() => {
           window.dispatchEvent(
-            new CustomEvent(window.SYNC_EVENTS.STATE_UPDATE, {
+            new CustomEvent(SYNC_EVENTS.STATE_UPDATE, {
               detail: { ...experimentState, _sessionRestore: true },
             }),
           );
@@ -373,8 +393,9 @@ class SyncClient {
    */
   async joinSessionByShareCode(
     shareCode,
-    role = window.SyncManager?.ROLE?.VIEWER,
+    role = null,
   ) {
+    const resolvedRole = role || this.roleConfig.VIEWER;
     if (this.sessionInvalid) {
       this.sessionInvalid = false;
       Logger.info("重置工作階段失效標記，允許重新加入");
@@ -390,7 +411,7 @@ class SyncClient {
     const response = await fetch(`${this.apiBaseUrl}/sync/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shareCode, role, clientId: this.clientId }),
+      body: JSON.stringify({ shareCode, role: resolvedRole, clientId: this.clientId }),
     });
 
     if (!response.ok) {
@@ -426,8 +447,9 @@ class SyncClient {
    */
   async joinPublicChannel(
     channelName,
-    role = window.SyncManager?.ROLE?.OPERATOR,
+    role = null,
   ) {
+    const resolvedRole = role || this.roleConfig.OPERATOR;
     this.initializeSync();
 
     await this.checkServerHealth();
@@ -438,7 +460,7 @@ class SyncClient {
     const response = await fetch(`${this.apiBaseUrl}/sync/channel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channelName, role, clientId: this.clientId }),
+      body: JSON.stringify({ channelName, role: resolvedRole, clientId: this.clientId }),
     });
 
     if (!response.ok) {
@@ -560,7 +582,7 @@ class SyncClient {
       throw new Error("未連線到工作階段");
     }
 
-    if (this.role !== window.SyncManager?.ROLE?.OPERATOR) {
+    if (this.role !== this.roleConfig.OPERATOR) {
       throw new Error("僅操作者可以重新產生分享代碼");
     }
 
@@ -624,7 +646,7 @@ class SyncClient {
       return false;
     }
 
-    if (this.role !== window.SyncManager?.ROLE?.OPERATOR) {
+    if (this.role !== this.roleConfig.OPERATOR) {
       Logger.warn("僅操作者可以發送狀態更新");
       return false;
     }
@@ -640,7 +662,7 @@ class SyncClient {
   triggerStateUpdate(state) {
     try {
       const parsedState = typeof state === "string" ? JSON.parse(state) : state;
-      const event = new CustomEvent(window.SYNC_EVENTS.STATE_UPDATE, {
+      const event = new CustomEvent(SYNC_EVENTS.STATE_UPDATE, {
         detail: parsedState,
       });
       window.dispatchEvent(event);
@@ -654,6 +676,7 @@ class SyncClient {
    */
   disconnect() {
     Logger.info("斷開連線");
+    this.stopHealthCheck();
     if (this.wsClient) {
       this.wsClient.disconnect();
     }
@@ -671,7 +694,7 @@ class SyncClient {
     sessionStorage.setItem("sync_clientId", this.clientId || "");
     sessionStorage.setItem(
       "sync_role",
-      this.role || window.SyncManager?.ROLE?.LOCAL,
+      this.role || this.roleConfig.LOCAL,
     );
     Logger.debug("狀態已儲存至 sessionStorage");
   }
@@ -698,7 +721,7 @@ class SyncClient {
       this.sessionId = sessionStorage.getItem("sync_sessionId") || null;
       this.clientId = sessionStorage.getItem("sync_clientId") || null;
       this.role =
-        sessionStorage.getItem("sync_role") || window.SyncManager?.ROLE?.LOCAL;
+        sessionStorage.getItem("sync_role") || this.roleConfig.LOCAL;
 
       if (this.sessionId && this.clientId) {
         Logger.debug("從 sessionStorage 載入狀態:", {
@@ -723,7 +746,7 @@ class SyncClient {
 
       this.sessionId = null;
       this.clientId = null;
-      this.role = window.SyncManager?.ROLE?.LOCAL;
+      this.role = this.roleConfig.LOCAL;
       this.connectionAttempted = false;
 
       Logger.debug("已清除 sessionStorage 狀態");
@@ -738,6 +761,7 @@ class SyncClient {
   clearInvalidSessionData() {
     Logger.info("清理無效的工作階段資料");
 
+    this.stopHealthCheck();
     this.clearState();
 
     this.connected = false;
@@ -777,7 +801,7 @@ class SyncClient {
         this.serverOnline = newOnlineStatus;
 
         window.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.SERVER_STATUS_CHANGED, {
+          new CustomEvent(SYNC_EVENTS.SERVER_STATUS_CHANGED, {
             detail: {
               online: this.serverOnline,
               previousOnline: this.previousServerOnline,
@@ -800,7 +824,7 @@ class SyncClient {
       if (wasOnline !== false) {
         this.previousServerOnline = wasOnline;
         window.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.SERVER_STATUS_CHANGED, {
+          new CustomEvent(SYNC_EVENTS.SERVER_STATUS_CHANGED, {
             detail: {
               online: false,
               previousOnline: wasOnline,
@@ -872,7 +896,7 @@ class SyncClient {
    * @returns {boolean}
    */
   canOperate() {
-    return this.connected && this.role === window.SyncManager?.ROLE?.OPERATOR;
+    return this.connected && this.role === this.roleConfig.OPERATOR;
   }
 
   /**
@@ -904,12 +928,6 @@ class SyncClient {
   }
 }
 
-// UMD 模式：同時支援全域和 ES6 模組
-if (typeof window !== "undefined") {
-  window.SyncClient = SyncClient;
-}
-
-// 僅在模組環境中匯出
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = SyncClient;
-}
+// ES6 模組匯出
+export default SyncClient;
+export { SyncClient };

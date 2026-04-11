@@ -25,31 +25,107 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 0.75rem;
-    background: #f5f5f5;
-    padding: 1rem;
-    border-radius: 6px;
-    border: 2px solid #ddd;
+    padding: 0;
 }
 
 .metadata-item {
     display: flex;
     flex-direction: column;
+    background: #f5f5f5;
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+.metadata-value-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.metadata-value-row .metadata-value {
+    flex: 1;
+    min-width: 160px;
+}
+
+.metadata-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+    justify-content: flex-end;
+}
+
+.metadata-actions .metadata-copy-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: none;
+    background: #667eea;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+}
+
+.metadata-actions .metadata-copy-btn:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.45);
+}
+
+.metadata-actions .metadata-copy-btn:active {
+    transform: translateY(0);
+}
+
+.metadata-actions .metadata-copy-btn .copy-icon,
+.metadata-actions .metadata-copy-btn .check-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.metadata-actions .metadata-copy-btn .check-icon {
+    display: none;
+}
+
+.metadata-actions .metadata-copy-btn.is-copied {
+    background: #4caf50;
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.45);
+}
+
+.metadata-actions .metadata-copy-btn.is-copied .copy-icon {
+    display: none;
+}
+
+.metadata-actions .metadata-copy-btn.is-copied .check-icon {
+    display: block;
 }
 
 /* 受試者名稱編輯輸入框 */
 .metadata-edit-input {
+    flex: 1;
+    min-width: 160px;
     font-size: 0.95rem;
     color: #2c3e50;
-    border: 1px solid #aaa;
-    border-radius: 4px;
-    padding: 2px 6px;
-    width: 200px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    padding: 6px 10px;
+    background: #fff;
     outline: none;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+    height: 34px;
 }
 
 .metadata-edit-input:focus {
-    border-color: #3498db;
-    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
 .metadata-label {
@@ -136,7 +212,7 @@
 
 .gesture-stats-header {
     display: grid;
-    grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr;
+    grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr 0.8fr;
     gap: 0.75rem;
     padding-bottom: 0.75rem;
     border-bottom: 2px solid #667eea;
@@ -151,14 +227,15 @@
 }
 
 .header-record,
-.header-accuracy,
-.header-concordance {
+.header-correct,
+.header-uncertain,
+.header-incorrect {
     text-align: center;
 }
 
 .gesture-stats .stat-item {
     display: grid;
-    grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
     gap: 0.75rem;
     justify-content: space-between;
     align-items: center;
@@ -186,7 +263,16 @@
     text-align: center;
 }
 
-.gesture-stats .stat-accuracy {
+.gesture-stats .stat-correct {
+    background: #c8e6c9;
+    color: #2e7d32;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.gesture-stats .stat-uncertain {
     background: #fff3e0;
     color: #f57c00;
     padding: 0.25rem 0.5rem;
@@ -195,9 +281,9 @@
     text-align: center;
 }
 
-.gesture-stats .stat-concordance {
-    background: #c8e6c9;
-    color: #2e7d32;
+.gesture-stats .stat-incorrect {
+    background: #ffcdd2;
+    color: #c62828;
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
     font-weight: 600;
@@ -335,12 +421,14 @@
 
     .header-label,
     .header-record,
-    .header-accuracy,
-    .header-concordance,
+    .header-correct,
+    .header-uncertain,
+    .header-incorrect,
     .gesture-stats .stat-label,
     .gesture-stats .stat-record,
-    .gesture-stats .stat-accuracy,
-    .gesture-stats .stat-concordance {
+    .gesture-stats .stat-correct,
+    .gesture-stats .stat-uncertain,
+    .gesture-stats .stat-incorrect {
         text-align: left;
     }
 

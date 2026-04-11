@@ -4,12 +4,27 @@
  */
 
 import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { SyncClient } from "./sync-client.js";
+import { TimeSyncManager } from "../core/time-sync-manager.js";
 
 export class SyncManagerCore {
-  constructor() {
-    this.initDependencies();
+  // 離線佇列大小限制
+  static MAX_OFFLINE_QUEUE_SIZE = 50;
 
-    this.currentRole = window.SyncManager?.ROLE?.VIEWER;
+  constructor(config = {}) {
+    this.roleConfig = config.roleConfig || {
+      VIEWER: "viewer",
+      OPERATOR: "operator",
+      LOCAL: "local",
+    };
+    this.pageConfig = config.pageConfig || {
+      PANEL: "panel",
+      BOARD: "board",
+    };
+
+    this.initDependencies(config);
+
+    this.currentRole = this.roleConfig.VIEWER;
 
     this.baseUrl = this.getBaseUrl();
 
@@ -17,17 +32,12 @@ export class SyncManagerCore {
     this.isProcessingQueue = false;
   }
 
-  initDependencies() {
-    const { SyncClient, TimeSyncManager } = window;
-
-    if (!SyncClient) {
-      throw new Error("SyncClient 未載入，請確認 script 載入順序");
-    }
-
-    this.syncClient = new SyncClient();
-    this.timeSyncManager =
-      window.timeSyncManager ||
-      (TimeSyncManager ? new TimeSyncManager() : null);
+  initDependencies(config = {}) {
+    this.timeSyncManager = config.timeSyncManager || new TimeSyncManager();
+    this.syncClient = config.syncClient || new SyncClient({
+      roleConfig: this.roleConfig,
+      timeSyncManager: this.timeSyncManager,
+    });
   }
 
   getBaseUrl() {
@@ -58,8 +68,8 @@ export class SyncManagerCore {
 
   generateQRContent(
     code,
-    role = window.SyncManager?.ROLE?.VIEWER,
-    target = window.SyncManager?.PAGE?.PANEL,
+    role = this.roleConfig.VIEWER,
+    target = this.pageConfig.PANEL,
   ) {
     let url = this.baseUrl;
     if (!url.endsWith("/")) {
@@ -68,7 +78,7 @@ export class SyncManagerCore {
 
     const encodedCode = encodeURIComponent(code);
     let qrUrl;
-    if (target === window.SyncManager?.PAGE?.BOARD) {
+    if (target === this.pageConfig.BOARD) {
       qrUrl = `${url}board.html?join=${encodedCode}&role=${encodeURIComponent(
         role,
       )}`;
@@ -91,7 +101,7 @@ export class SyncManagerCore {
         sessionId: result.sessionId,
       });
 
-      this.currentRole = window.SyncManager?.ROLE?.OPERATOR;
+      this.currentRole = this.roleConfig.OPERATOR;
       this.currentSessionId = result.sessionId;
       this.currentShareCode = null;
 
@@ -144,7 +154,7 @@ export class SyncManagerCore {
 
   async joinSessionByShareCode(
     shareCode,
-    role = window.SyncManager?.ROLE?.VIEWER,
+    role = this.roleConfig.VIEWER,
   ) {
     try {
       await this.syncClient.joinSessionByShareCode(shareCode, role);
@@ -182,7 +192,7 @@ export class SyncManagerCore {
    */
   async joinPublicChannel(
     channelName,
-    role = window.SyncManager?.ROLE?.OPERATOR,
+    role = this.roleConfig.OPERATOR,
   ) {
     try {
       await this.syncClient.joinPublicChannel(channelName, role);
@@ -211,7 +221,7 @@ export class SyncManagerCore {
   async restoreSession(
     sessionId,
     clientId,
-    role = window.SyncManager?.ROLE?.VIEWER,
+    role = this.roleConfig.VIEWER,
   ) {
     try {
       const result = await this.syncClient.restoreSession(
@@ -371,6 +381,14 @@ export class SyncManagerCore {
     }
 
     this.offlineQueue.sort((a, b) => a.state.timestamp - b.state.timestamp);
+
+    // 檢查佇列大小，超過限制時移除最舊項目
+    if (this.offlineQueue.length > SyncManagerCore.MAX_OFFLINE_QUEUE_SIZE) {
+      const removed = this.offlineQueue.shift();
+      Logger.warn(
+        `離線佇列超過限制(${SyncManagerCore.MAX_OFFLINE_QUEUE_SIZE}), 移除最舊項目: ${removed.state.type}`,
+      );
+    }
 
     Logger.debug(`已加入離線佇列，目前佇列長度: ${this.offlineQueue.length}`);
   }

@@ -5,6 +5,11 @@
  * 處理與中樞伺服器的通訊和事件通知，支援多裝置協同實驗。
  */
 
+import { LOG_SOURCES, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { generateExperimentId } from "../core/random-utils.js";
+import { Logger } from "../core/console-manager.js";
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
+
 class ExperimentHubManager {
   /**
    * 同步模式常數
@@ -59,9 +64,17 @@ class ExperimentHubManager {
     // WebSocket 相關
     this.syncClientReady = false;
     this.reconnectTimer = null;
+    this.syncManager = config.syncManager || null;
+    this.syncClient = config.syncClient || null;
+    this.experimentSyncCore = config.experimentSyncCore || null;
+    this.roleConfig = config.roleConfig || { VIEWER: "viewer" };
 
     // 初始化
     this.initialize();
+  }
+
+  updateDependencies(deps = {}) {
+    Object.assign(this, deps);
   }
 
   /**
@@ -72,7 +85,7 @@ class ExperimentHubManager {
     this.restoreIds();
 
     // 等待 SyncClient 就緒（如果需要 Hub 模式）
-    if (window.syncManager) {
+    if (this.syncManager) {
       this.waitForSyncClient();
     }
 
@@ -169,7 +182,7 @@ class ExperimentHubManager {
   /**
    * 設定實驗 ID
    */
-  setExperimentId(id, source = "local", options = {}) {
+  setExperimentId(id, source = LOG_SOURCES.LOCAL_INPUT, options = {}) {
     const oldId = this.ids.experiment;
     this.ids.experiment = id;
 
@@ -232,20 +245,9 @@ class ExperimentHubManager {
    * 範例: "JHWH4A"
    */
   generateExperimentId() {
-    if (window.RandomUtils && window.RandomUtils.generateExperimentId) {
-      const id = window.RandomUtils.generateExperimentId();
-      this.setExperimentId(id, "generated");
-      return id;
-    } else {
-      // 後備實現
-      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-      let result = "";
-      for (let i = 0; i < 6; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      this.setExperimentId(result, "generated");
-      return result;
-    }
+    const id = generateExperimentId();
+    this.setExperimentId(id, LOG_SOURCES.LOCAL_GENERATE);
+    return id;
   }
 
   /**
@@ -315,9 +317,7 @@ class ExperimentHubManager {
       }
 
       const message = {
-        type:
-          window.WS_PROTOCOL?.C2S?.EXPERIMENT_STATE_REGISTER ||
-          "experiment_state_register",
+        type: WS_PROTOCOL.C2S.EXPERIMENT_STATE_REGISTER,
         data: {
           state: {
             ...state,
@@ -341,7 +341,7 @@ class ExperimentHubManager {
    * @returns {boolean} 是否為同步模式
    */
   isSyncMode() {
-    return window.syncManager?.isSyncMode === true;
+    return this.syncManager?.isSyncMode === true;
   }
 
   /**
@@ -548,7 +548,7 @@ class ExperimentHubManager {
     if (this.syncClientReady) return;
 
     const checkInterval = setInterval(() => {
-      if (window.syncManager?.core?.syncClient) {
+      if (this.syncClient || this.syncManager?.core?.syncClient) {
         clearInterval(checkInterval);
         this.onSyncClientReady();
       }
@@ -567,15 +567,22 @@ class ExperimentHubManager {
    * SyncClient 就緒回調
    */
   onSyncClientReady() {
-    Logger.info("[HubManager] SyncClient 就緒");
+    Logger.debug("[HubManager] SyncClient 就緒");
     this.syncClientReady = true;
 
-    const syncClient = window.syncManager.core.syncClient;
-    this.connection.wsClient = syncClient.wsClient;
+    const syncClient =
+      this.syncClient || this.syncManager?.core?.syncClient;
+    this.syncClient = syncClient;
+    this.connection.wsClient = syncClient?.wsClient || null;
+
+    if (!syncClient) {
+      Logger.warn("SyncClient 尚未就緒，跳過 Hub 註冊");
+      return;
+    }
 
     this.setupEventHandlers();
 
-    if (syncClient.isConnected()) {
+    if (syncClient?.isConnected?.()) {
       this.connection.connected = true;
       this.connection.role = syncClient.getRole();
       this.updateModeFromRole();
@@ -618,12 +625,12 @@ class ExperimentHubManager {
     });
 
     // 實驗 ID 更新事件
-    ws.on(window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
+    ws.on(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
       Logger.debug("收到實驗 ID 更新", data);
       if (data.clientId !== this.getClientId()) {
-        this.setExperimentId(data.experimentId, "remote", { silent: false });
+        this.setExperimentId(data.experimentId, LOG_SOURCES.REMOTE_SYNC, { silent: false });
         this.emit(ExperimentHubManager.EVENT.MESSAGE_RECEIVED, {
-          type: window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
+          type: SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
           data,
         });
       }
@@ -631,16 +638,16 @@ class ExperimentHubManager {
 
     // 其他實驗狀態事件
     [
-      window.SYNC_EVENTS.EXPERIMENT_STARTED,
-      window.SYNC_EVENTS.EXPERIMENT_PAUSED,
-      window.SYNC_EVENTS.EXPERIMENT_RESUMED,
-      window.SYNC_EVENTS.EXPERIMENT_STOPPED,
+      SYNC_EVENTS.EXPERIMENT_STARTED,
+      SYNC_EVENTS.EXPERIMENT_PAUSED,
+      SYNC_EVENTS.EXPERIMENT_RESUMED,
+      SYNC_EVENTS.EXPERIMENT_STOPPED,
     ].forEach((eventName) => {
       ws.on(eventName, (data) => {
         Logger.debug(`收到 ${eventName}`, data);
 
         // 特別處理實驗開始事件：廣播轉發
-        if (eventName === window.SYNC_EVENTS.EXPERIMENT_STARTED) {
+        if (eventName === SYNC_EVENTS.EXPERIMENT_STARTED) {
           this.handleExperimentStartedBroadcast(data);
         }
 
@@ -663,7 +670,7 @@ class ExperimentHubManager {
 
       // 轉發到全域事件系統，讓其他模組知道實驗已開始
       window.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STARTED, {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
           detail: {
             ...data,
             broadcasted: true,
@@ -672,10 +679,10 @@ class ExperimentHubManager {
         }),
       );
 
-      // 如果是操作者角色，確保本地狀態同步
+      // 如果是操作者角色，確保本機狀態同步
       if (this.connection.role === "operator") {
-        Logger.debug("操作者收到實驗開始廣播，更新本地狀態");
-        // 可以在这里新增本地狀態同步邏輯
+        Logger.debug("操作者收到實驗開始廣播，更新本機狀態");
+        // 可以在这里新增本機狀態同步邏輯
       }
     } catch (error) {
       Logger.error("處理實驗開始廣播轉發失敗:", error);
@@ -687,11 +694,7 @@ class ExperimentHubManager {
    */
   updateModeFromRole() {
     const role = this.connection.role;
-    const ROLE = window.SyncManager?.ROLE;
-
-    if (!ROLE) return;
-
-    if (role === ROLE.VIEWER) {
+    if (role === this.roleConfig.VIEWER) {
       this.setViewerMode(true);
     } else if (this.connection.connected) {
       this.connection.mode = ExperimentHubManager.MODE.HUB;
@@ -769,21 +772,29 @@ class ExperimentHubManager {
       experimentId,
       source,
       clientId: this.getClientId(),
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
     };
 
     // 使用 SyncClient 的 syncState 方法
-    if (
-      window.syncClient &&
-      typeof window.syncClient.syncState === "function"
-    ) {
+    const syncClient = this.syncClient;
+    if (syncClient?.syncState) {
       const updateData = {
-        type: window.SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
+        type: SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
+        clientId: syncClient?.clientId,
+        timestamp: Date.now(),
         ...data,
       };
 
-      window.syncClient.syncState(updateData);
-      Logger.debug("實驗 ID 已透過 SyncClient 同步", experimentId);
+      if (!this.experimentSyncCore?.safeBroadcast) {
+        Logger.warn("experimentSyncCore 未注入，改用 Hub 訊息同步");
+        this.sendMessage("experiment_id_update", data);
+        return;
+      }
+
+      this.experimentSyncCore.safeBroadcast(updateData).catch((error) => {
+        Logger.warn("同步實驗ID更新失敗:", error);
+      });
+      Logger.debug("實驗 ID 已廣播", experimentId);
     } else {
       // 備用方案：直接發送 WebSocket 訊息
       this.sendMessage("experiment_id_update", data);
@@ -801,7 +812,7 @@ class ExperimentHubManager {
    * 取得客戶端 ID
    */
   getClientId() {
-    return window.syncManager?.core?.syncClient?.clientId || "panel_device";
+    return this.syncClient?.clientId || "panel_device";
   }
 
   /**
@@ -901,12 +912,8 @@ class ExperimentHubManager {
   }
 }
 
-// 導出到全域（用於向後相容）
-if (typeof window !== "undefined") {
-  window.ExperimentHubManager = ExperimentHubManager;
-}
+// 全域暴露 - 供動態載入的模組使用
 
-// 支援模組導出
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = ExperimentHubManager;
-}
+// ES6 模組匯出
+export default ExperimentHubManager;
+export { ExperimentHubManager };

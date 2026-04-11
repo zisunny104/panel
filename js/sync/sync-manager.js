@@ -7,7 +7,10 @@ import { SyncManagerCore } from "./sync-manager-core.js";
 import { SyncManagerUI } from "./sync-manager-ui.js";
 import { SyncManagerQR } from "./sync-manager-qr.js";
 import { SyncManagerSessions } from "./sync-manager-sessions.js";
+import SyncConfirmDialogManager from "./sync-confirm-dialog.js";
 import { SYNC_EVENTS } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
+import { IndicatorManager } from "./indicator-manager.js";
 
 class SyncManager {
   static ROLE = {
@@ -111,11 +114,44 @@ class SyncManager {
     return true;
   }
 
-  constructor() {
-    this.core = new SyncManagerCore();
-    this.ui = new SyncManagerUI(this.core);
-    this.qr = new SyncManagerQR(this.core);
-    this.sessions = new SyncManagerSessions(this.core);
+  constructor(config = {}) {
+    this.experimentHubManager = null;
+    this.indicatorManager =
+      config.indicatorManager || new IndicatorManager();
+    this.core = new SyncManagerCore({
+      roleConfig: SyncManager.ROLE,
+      pageConfig: SyncManager.PAGE,
+    });
+    this.indicatorManager?.updateDependencies?.({
+      getStatus: () => this.core.syncClient?.getStatusText?.() || "idle",
+      getStatusText: (status) => SyncManager.getStatusText(status),
+    });
+    SyncConfirmDialogManager.configure({
+      syncManager: SyncManager,
+      syncClientProvider: () => this.core.syncClient,
+      indicatorManager: this.indicatorManager,
+    });
+    this.qr = new SyncManagerQR(this.core, {
+      syncManager: SyncManager,
+      roleConfig: SyncManager.ROLE,
+      pageConfig: SyncManager.PAGE,
+      confirmDialogManager: SyncConfirmDialogManager,
+      indicatorManager: this.indicatorManager,
+    });
+    this.sessions = new SyncManagerSessions(this.core, {
+      syncManager: SyncManager,
+      roleConfig: SyncManager.ROLE,
+      timeSyncManager: this.core?.timeSyncManager,
+      indicatorManager: this.indicatorManager,
+    });
+    this.ui = new SyncManagerUI(this.core, {
+      syncManager: SyncManager,
+      roleConfig: SyncManager.ROLE,
+      pageConfig: SyncManager.PAGE,
+      statusConfig: SyncManager.STATUS,
+      qrManager: this.qr,
+      indicatorManager: this.indicatorManager,
+    });
     this.connectionCheckTimer = null;
     this.connectionCheckInterval = 5000;
     this.offlineCheckInterval = 20000;
@@ -124,15 +160,23 @@ class SyncManager {
     this.eventListeners = [];
     this.isSyncMode = null;
     this.initialized = false;
+    this._isRestoring = false; // 初始化還原標誌
     this.initialize();
   }
 
+  updateDependencies({ experimentHubManager } = {}) {
+    if (experimentHubManager) {
+      this.experimentHubManager = experimentHubManager;
+    }
+  }
+
   initialize() {
+    const initStart = performance.now();
     Logger.debug("開始初始化");
 
-    // 膠囊指示器總是被建立（本機模式也需要）
-    Logger.debug("建立膠囊指示器");
-    this.ui.createCapsuleIndicator();
+    // 初始化 UI（包含膠囊指示器與事件監聽）
+    Logger.debug("初始化同步 UI");
+    this.ui.initialize();
 
     // 先嘗試還原工作階段，判斷是本機模式還是同步模式
     this.attemptSessionRestore()
@@ -145,8 +189,6 @@ class SyncManager {
 
         // 只在同步模式下初始化完整功能
         if (isSync) {
-          this.ui.createControlPanel();
-          this.ui.setupEventListeners();
           this.sessions.initialize();
           this.ui.initialized = true;
           // 同步模式下立即更新膠囊狀態（根據實際 role）
@@ -155,10 +197,6 @@ class SyncManager {
           // 本機模式下設定角色為 LOCAL
           this.core.syncClient.role = SyncManager.ROLE.LOCAL;
           Logger.debug("本機模式設定角色為 LOCAL");
-          // 本機模式下也需要初始化控制面板和事件監聽，讓膠囊可以點擊打開同步面板
-          // 但不需要初始化 QR 和 Sessions
-          this.ui.createControlPanel();
-          this.ui.setupEventListeners();
           this.ui.initialized = true;
           // 膠囊根據 SyncClient.getStatusText() 自動顯示 "idle"（未同步）
         }
@@ -190,12 +228,9 @@ class SyncManager {
         this.serverOnline = online;
         Logger.debug("伺服器心跳檢測完成", { online });
 
-        // 只在 UI 已初始化且存在時更新（同步模式）
-        if (this.ui && this.ui.initialized) {
-          Logger.debug("UI 已初始化，更新指示器");
+        // 只在 UI 已初始化時更新指示器
+        if (this.ui?.initialized) {
           this.ui.updateIndicator();
-        } else if (this.ui && !this.ui.initialized) {
-          Logger.debug("UI 尚未初始化，略過更新指示器");
         }
 
         // 初始化完成後，觸發事件讓日誌管理器知道 syncClient 已就緒
@@ -205,7 +240,10 @@ class SyncManager {
           }),
         );
 
-        Logger.debug("初始化完成，已觸發 CLIENT_INITIALIZED 事件");
+        const duration = performance.now() - initStart;
+        Logger.debug(
+          `初始化完成，已觸發 CLIENT_INITIALIZED 事件 (<orange>${duration.toFixed(0)} ms</orange>)`,
+        );
       })
       .catch((error) => {
         Logger.warn("伺服器心跳檢測失敗", error);
@@ -215,14 +253,19 @@ class SyncManager {
             detail: { serverOnline: false },
           }),
         );
+
+        const duration = performance.now() - initStart;
+        Logger.debug(
+          `初始化完成，已觸發 CLIENT_INITIALIZED 事件 (<orange>${duration.toFixed(0)} ms</orange>)`,
+        );
       });
 
     // 當工作階段加入時，初始化 QR 和 Sessions 模組（動態進入同步）
-    window.addEventListener(SYNC_EVENTS.SESSION_JOINED, () => {
+    const sessionJoinedDynamicHandler = () => {
       Logger.debug("工作階段已加入，初始化 QR 和 Sessions 模組");
 
       // 如果之前在本機模式，現在需要動態初始化 QR 和 Sessions
-      if (this.isSyncMode === false) {
+      if (!this.isSyncMode) {
         Logger.debug("動態初始化 QR 與 Sessions（已加入工作階段）");
         this.isSyncMode = true;
         this.qr.initialize();
@@ -230,9 +273,15 @@ class SyncManager {
       }
 
       // 通知 ExperimentHubClient 可以連線
-      if (window.experimentHubManager?.hubClient?.tryConnect) {
-        window.experimentHubManager.hubClient.tryConnect();
+      if (this.experimentHubManager?.hubClient?.tryConnect) {
+        this.experimentHubManager.hubClient.tryConnect();
       }
+    };
+    window.addEventListener(SYNC_EVENTS.SESSION_JOINED, sessionJoinedDynamicHandler);
+    this.eventListeners.push({
+      target: window,
+      event: SYNC_EVENTS.SESSION_JOINED,
+      handler: sessionJoinedDynamicHandler,
     });
 
     // 監聽伺服器狀態變化
@@ -292,7 +341,7 @@ class SyncManager {
           role,
         );
         if (result && result.success !== false) {
-          Logger.info("工作階段還原成功", {
+          Logger.debug("工作階段還原成功", {
             sessionId,
             clientId,
           });
@@ -330,10 +379,8 @@ class SyncManager {
           );
 
           // 更新 UI（延遲初始化，但由於 initialize() 已做，這裡只是更新狀態）
-          if (this.ui) {
-            this.ui.updateIndicator();
-            this.ui.updateConnectedSessionInfo();
-          }
+          this.ui?.updateIndicator?.();
+          this.ui?.updateConnectedSessionInfo?.();
 
           return true; // 同步模式
         }
@@ -399,17 +446,9 @@ class SyncManager {
       this.isSyncMode = false;
       Logger.info("已切換為本機模式");
 
-      // 隱藏同步面板
-      if (this.ui && this.ui.hidePanel) {
-        Logger.debug("隱藏同步面板");
-        this.ui.hidePanel();
-      }
-
-      // 更新膠囊指示器為離線狀態
-      if (this.ui && this.ui.updateIndicator) {
-        Logger.debug("更新膠囊指示器為離線狀態");
-        this.ui.updateIndicator();
-      }
+      // 隱藏同步面板並更新指示器
+      this.ui?.hidePanel();
+      this.ui?.updateIndicator();
 
       // 觸發事件通知其他模組同步已清除
       window.dispatchEvent(
@@ -440,17 +479,13 @@ class SyncManager {
       this.isSyncMode = false;
 
       // 將 SyncClient 角色設為 LOCAL，讓 UI 與按鈕回復本機行為
-      if (this.core && this.core.syncClient) {
+      if (this.core?.syncClient) {
         this.core.syncClient.role = SyncManager.ROLE.LOCAL;
       }
 
       // 隱藏同步面板並更新指示器
-      if (this.ui && this.ui.hidePanel) {
-        this.ui.hidePanel();
-      }
-      if (this.ui && this.ui.updateIndicator) {
-        this.ui.updateIndicator();
-      }
+      this.ui?.hidePanel();
+      this.ui?.updateIndicator();
 
       // 通知其他模組：連線中斷（保留 session 以便還原）
       window.dispatchEvent(
@@ -484,7 +519,7 @@ class SyncManager {
           if (isSync) {
             this.isSyncMode = true;
             Logger.info("連線恢復且工作階段還原成功，回到同步模式");
-            if (this.ui && this.ui.updateIndicator) this.ui.updateIndicator();
+            this.ui?.updateIndicator?.();
             window.dispatchEvent(
               new CustomEvent(SYNC_EVENTS.SESSION_RESTORED, {
                 detail: { restored: true },
@@ -511,7 +546,7 @@ class SyncManager {
   }
 
   startConnectionCheck() {
-    if (this.isSyncMode === false) {
+    if (!this.isSyncMode) {
       Logger.debug("本機模式，不啟動連線檢查");
       return;
     }
@@ -547,7 +582,7 @@ class SyncManager {
 
   async checkConnection() {
     // 在本機模式或 UI 未初始化時，跳過連線檢查
-    if (this.isSyncMode === false || !this.ui.initialized) {
+    if (!this.isSyncMode || !this.ui?.initialized) {
       return;
     }
 
@@ -559,7 +594,7 @@ class SyncManager {
     try {
       await this.core.checkConnection();
       // 只有在同步模式且 UI 已初始化時才更新指示器
-      if (this.isSyncMode === true && this.ui && this.ui.initialized) {
+      if (this.isSyncMode && this.ui?.initialized) {
         this.ui.updateIndicator();
       }
     } finally {
@@ -584,15 +619,26 @@ class SyncManager {
   }
 
   cleanup() {
-    this.ui.cleanup();
-    this.qr.cleanup();
-    this.sessions.cleanup();
-    this.core.cleanup();
+    // 清除所有事件監聽器
+    this.eventListeners.forEach(({ target, event, handler }) => {
+      target.removeEventListener(event, handler);
+    });
+
+    // 清除連線檢查定時器
+    if (this.connectionCheckTimer) {
+      clearInterval(this.connectionCheckTimer);
+    }
+
+    // 清除各個模組
+    this.ui?.cleanup();
+    this.qr?.cleanup();
+    this.sessions?.cleanup();
+    this.core?.cleanup();
+
+    Logger.debug("SyncManager 清理完成");
   }
 }
 
-window.SyncManager = SyncManager;
-window.syncManager = new SyncManager();
-// 暴露 syncClient 到全局，供其他模組使用（如實驗日誌管理器）
-window.syncClient = window.syncManager.core.syncClient;
-export { SyncManager }; // 使用命名匯出以維持一致性
+// ES6 模組匯出
+export default SyncManager;
+export { SyncManager };

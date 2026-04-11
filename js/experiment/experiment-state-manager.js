@@ -5,8 +5,11 @@
  * 提供狀態快照還原與多裝置同步支援。
  */
 
+import { LOG_SOURCES, SYNC_EVENTS } from "../constants/index.js";
+import { generateExperimentId } from "../core/random-utils.js";
+
 class ExperimentStateManager {
-  constructor() {
+  constructor({ timeSyncManager = null, experimentLogManager = null, experimentHubManager = null } = {}) {
     this.experimentId = null;
     this.participantName = null;
     this.currentCombination = null;
@@ -17,7 +20,11 @@ class ExperimentStateManager {
     this.experimentElapsed = 0;
 
     // 時間同步管理器
-    this.timeSyncManager = window.timeSyncManager;
+    this.timeSyncManager = timeSyncManager;
+
+    // 依賴注入
+    this.experimentLogManager = experimentLogManager;
+    this.experimentHubManager = experimentHubManager;
 
     // 事件監聽器
     this.listeners = new Map();
@@ -27,6 +34,18 @@ class ExperimentStateManager {
 
     // 初始化同步
     this.setupSync && this.setupSync();
+  }
+
+  updateDependencies({ timeSyncManager, experimentLogManager, experimentHubManager } = {}) {
+    if (timeSyncManager) {
+      this.timeSyncManager = timeSyncManager;
+    }
+    if (experimentLogManager) {
+      this.experimentLogManager = experimentLogManager;
+    }
+    if (experimentHubManager) {
+      this.experimentHubManager = experimentHubManager;
+    }
   }
 
   setupSync() {
@@ -46,7 +65,7 @@ class ExperimentStateManager {
         if (_debounceTimer) clearTimeout(_debounceTimer);
         _debounceTimer = setTimeout(() => {
           if (newId !== this.experimentId) {
-            this.setExperimentId(newId, "input");
+            this.setExperimentId(newId, LOG_SOURCES.LOCAL_INPUT);
           }
           _debounceTimer = null;
         }, DEBOUNCE_MS);
@@ -60,7 +79,7 @@ class ExperimentStateManager {
           _debounceTimer = null;
         }
         if (newId !== this.experimentId) {
-          this.setExperimentId(newId, "input");
+          this.setExperimentId(newId, LOG_SOURCES.LOCAL_INPUT);
         }
       });
 
@@ -100,10 +119,10 @@ class ExperimentStateManager {
     });
 
     document.addEventListener(
-      window.SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
+      SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
       (event) => {
         const { experimentId } = event.detail;
-        this.setExperimentId && this.setExperimentId(experimentId, "hub");
+        this.setExperimentId && this.setExperimentId(experimentId, LOG_SOURCES.HUB_SYNC);
       },
     );
 
@@ -117,7 +136,7 @@ class ExperimentStateManager {
   applyHubState(state) {
     if (state.experimentId !== undefined) {
       this.setExperimentId &&
-        this.setExperimentId(state.experimentId, "hub_state");
+        this.setExperimentId(state.experimentId, LOG_SOURCES.HUB_SYNC);
     }
     if (state.participantName !== undefined) {
       this.setParticipantName &&
@@ -142,7 +161,7 @@ class ExperimentStateManager {
     }
   }
 
-  setExperimentId(experimentId, source = "unknown") {
+  setExperimentId(experimentId, source = LOG_SOURCES.LOCAL_INPUT) {
     if (this.experimentId !== experimentId) {
       const oldId = this.experimentId;
       this.experimentId = experimentId;
@@ -158,25 +177,24 @@ class ExperimentStateManager {
         experimentIdInput.value = experimentId;
       }
 
-      if (window.experimentLogManager) {
-        window.experimentLogManager.setExperimentId(experimentId, source);
+      if (this.experimentLogManager?.setExperimentId) {
+        this.experimentLogManager.setExperimentId(experimentId, source);
       }
 
       // 如果有 Hub 管理器，且更新不是來自 Hub，才同步到 Hub（避免 hub -> local -> hub 迴圈）
       try {
         if (
-          source !== "hub" &&
-          source !== "hub_state" &&
-          window.experimentHubManager &&
-          typeof window.experimentHubManager.setExperimentId === "function"
+          source !== "hub_sync" &&
+          this.experimentHubManager &&
+          typeof this.experimentHubManager.setExperimentId === "function"
         ) {
           const hubCurrent =
-            typeof window.experimentHubManager.getExperimentId === "function"
-              ? window.experimentHubManager.getExperimentId()
+            typeof this.experimentHubManager.getExperimentId === "function"
+              ? this.experimentHubManager.getExperimentId()
               : null;
           if (hubCurrent !== experimentId) {
             // 使用現有的 Hub API，同步時保留 source 資訊
-            window.experimentHubManager.setExperimentId(experimentId, source);
+            this.experimentHubManager.setExperimentId(experimentId, source);
           }
         }
       } catch (err) {
@@ -266,14 +284,14 @@ class ExperimentStateManager {
       this.experimentPaused = false;
       Logger && Logger.info && Logger.info("實驗已開始");
 
-      if (window.experimentLogManager) {
+      if (this.experimentLogManager) {
         const defaultParticipantName =
           this.participantName || `受試者_${this.experimentId}`;
-        window.experimentLogManager.initialize(
+        this.experimentLogManager.initialize(
           this.experimentId,
           defaultParticipantName,
         );
-        window.experimentLogManager.logExperimentStart();
+        this.experimentLogManager.logExperimentStart();
       }
 
       this.emit &&
@@ -291,10 +309,10 @@ class ExperimentStateManager {
       this.experimentPaused = false;
       Logger && Logger.info && Logger.info("實驗已停止");
 
-      if (window.experimentLogManager) {
-        window.experimentLogManager.logExperimentEnd();
-        window.experimentLogManager.flushAll &&
-          window.experimentLogManager.flushAll();
+      if (this.experimentLogManager) {
+        this.experimentLogManager.logExperimentEnd();
+        this.experimentLogManager.flushAll &&
+          this.experimentLogManager.flushAll();
       }
 
       this.emit &&
@@ -310,8 +328,8 @@ class ExperimentStateManager {
       this.experimentPaused = true;
       Logger && Logger.info && Logger.info("實驗已暫停");
 
-      if (window.experimentLogManager) {
-        window.experimentLogManager.logExperimentPause();
+      if (this.experimentLogManager) {
+        this.experimentLogManager.logExperimentPause();
       }
 
       this.emit &&
@@ -324,8 +342,8 @@ class ExperimentStateManager {
       this.experimentPaused = false;
       Logger && Logger.info && Logger.info("實驗已還原");
 
-      if (window.experimentLogManager) {
-        window.experimentLogManager.logExperimentResume();
+      if (this.experimentLogManager) {
+        this.experimentLogManager.logExperimentResume();
       }
 
       this.emit &&
@@ -334,15 +352,15 @@ class ExperimentStateManager {
   }
 
   generateExperimentId() {
-    const newId = RandomUtils.generateExperimentId();
-    this.setExperimentId && this.setExperimentId(newId, "generate");
+    const newId = generateExperimentId();
+    this.setExperimentId && this.setExperimentId(newId, LOG_SOURCES.LOCAL_GENERATE);
 
-    if (window.experimentHubManager?.isInSyncMode?.()) {
+    if (this.experimentHubManager?.isInSyncMode?.()) {
       Logger &&
         Logger.debug &&
         Logger.debug(`同步模式，註冊實驗ID到中樞: ${newId}`);
-      window.experimentHubManager.registerExperimentId &&
-        window.experimentHubManager.registerExperimentId(
+      this.experimentHubManager.registerExperimentId &&
+        this.experimentHubManager.registerExperimentId(
           newId,
           "state_manager",
         );
@@ -369,11 +387,6 @@ class ExperimentStateManager {
   }
 }
 
-// 匯出到全域與模組
-if (typeof window !== "undefined") {
-  window.ExperimentStateManager = ExperimentStateManager;
-}
-
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = ExperimentStateManager;
-}
+// ES6 模組匯出
+export default ExperimentStateManager;
+export { ExperimentStateManager };

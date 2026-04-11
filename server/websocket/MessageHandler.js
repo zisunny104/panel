@@ -568,22 +568,13 @@ export class MessageHandler {
     if (state.type === "experiment_paused") return "paused";
     if (state.type === "experiment_resumed") return "resumed";
     if (state.type === "experiment_stopped") return "stopped";
-    if (
-      state.type === "experiment_state_change" &&
-      state.event === "experiment_paused"
-    ) {
+    if (state.type === "experiment_paused") {
       return "paused";
     }
-    if (
-      state.type === "experiment_state_change" &&
-      state.event === "experiment_resumed"
-    ) {
+    if (state.type === "experiment_resumed") {
       return "resumed";
     }
-    if (
-      state.type === "experiment_state_change" &&
-      state.event === "experiment_stopped"
-    ) {
+    if (state.type === "experiment_stopped") {
       return "stopped";
     }
     return null;

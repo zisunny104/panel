@@ -1,6 +1,7 @@
 {
+    "type": "module",
     "name": "panel",
-    "version": "2.2.6f0af64",
+    "version": "2.3.f366c7b",
     "description": "機台操作面板與實驗設定",
     "main": "index.html",
     "scripts": {

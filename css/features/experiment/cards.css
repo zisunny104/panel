@@ -282,6 +282,7 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .gesture-action-btn.correct {
@@ -299,6 +300,23 @@
 .gesture-action-btn.next-step {
     width: 100%;
     background: #667eea;
+}
+
+.gesture-action-btn:hover,
+.gesture-next-button:hover {
+    filter: brightness(1.04);
+}
+
+.gesture-action-btn:active,
+.gesture-next-button:active {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+}
+
+.gesture-action-btn:focus-visible,
+.gesture-next-button:focus-visible {
+    outline: 2px solid rgba(102, 126, 234, 0.6);
+    outline-offset: 2px;
 }
 
 .gesture-step-card {
@@ -373,4 +391,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }

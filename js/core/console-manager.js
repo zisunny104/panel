@@ -3,6 +3,7 @@
  * 支援多部分著色和手動顏色標記
  */
 
+
 class Logger {
   static LOG_LEVEL = "debug"; // 'debug', 'info', 'warn', 'error', 'none'
 
@@ -94,7 +95,7 @@ class Logger {
       styles.push(...extraStyles);
     }
 
-    // 返回格式字串、樣式和物件參數
+    // 回傳格式字串、樣式和物件參數
     return [formatString, ...styles, ...objectArgs];
   }
 
@@ -223,13 +224,8 @@ class Logger {
         args[1] !== null &&
         !args[2]?.noGroup
       ) {
-        if (console.groupCollapsed) {
-          console.groupCollapsed(...this.formatMessage("debug", args[0]));
-          console.log(args[1]);
-          console.groupEnd();
-        } else {
-          console.debug(...this.formatMessage("debug", ...args));
-        }
+        console.debug(...this.formatMessage("debug", args[0]));
+        console.debug(args[1]);
       } else {
         console.debug(...this.formatMessage("debug", ...args));
       }
@@ -293,13 +289,8 @@ class Logger {
       args[1] !== null &&
       !args[2]?.noGroup
     ) {
-      if (console.groupCollapsed) {
-        console.groupCollapsed(...this.formatMessage("error", args[0]));
-        console.log(args[1]);
-        console.groupEnd();
-      } else {
-        console.error(...this.formatMessage("error", ...args));
-      }
+      console.error(...this.formatMessage("error", args[0]));
+      console.error(args[1]);
     } else {
       console.error(...this.formatMessage("error", ...args));
     }
@@ -319,6 +310,11 @@ class Logger {
   }
 }
 
-window.Logger = Logger;
+// ES6 模組匯出
+export default Logger;
+export { Logger };
 
-window.ConsoleManager = Logger;
+// 全域暴露（用於HTML直接引用和舊式script）
+if (typeof window !== "undefined") {
+  window.Logger = Logger;
+}

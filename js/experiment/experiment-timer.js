@@ -1,15 +1,22 @@
 /**
- * ExperimentTimerManager - 統一計時器管理器
- *
- * 提供單一實驗計時和多個單元/步驟計時功能
- */
+* ExperimentTimerManager - 統一計時器管理器
+*
+* 提供實驗總計時與步驟計時功能。
+*/
 
-class ExperimentTimerManager {
-  constructor() {
+import { TimeSyncManager } from "../core/time-sync-manager.js";
+
+export const ExperimentTimerManager = class ExperimentTimerManager {
+  constructor(options = {}) {
     this.experimentStartTime = null;
     this.experimentElapsedMs = 0;
     this.experimentInterval = null;
     this.experimentPaused = false;
+
+    this.timeSyncManager =
+      options.timeSyncManager || new TimeSyncManager();
+    this.experimentLogManager = options.experimentLogManager || null;
+    this.getCurrentCombination = options.getCurrentCombination || null;
 
     this.timerStates = {};
     this.timerIntervals = {};
@@ -20,16 +27,7 @@ class ExperimentTimerManager {
     this.onIndexedTick = null;
   }
 
-  // ========== utility ==========
-  formatDuration(ms) {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const milliseconds = ms % 1000;
-    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
-  }
-
-  // ========== experiment timer ==========
+  // ===== 實驗計時 =====
   startExperimentTimer() {
     if (this.experimentInterval) return;
     this.experimentStartTime = Date.now();
@@ -39,12 +37,17 @@ class ExperimentTimerManager {
     this.experimentInterval = setInterval(() => {
       if (!this.experimentPaused) {
         this.experimentElapsedMs = Date.now() - this.experimentStartTime;
-        if (typeof this.onExperimentTick === "function")
+        if (typeof this.onExperimentTick === "function") {
           this.onExperimentTick(this.experimentElapsedMs);
+        }
         const el =
           document.getElementById("experimentTimer") ||
           document.getElementById("experiment-timer");
-        if (el) el.textContent = this.formatDuration(this.experimentElapsedMs);
+        if (el) {
+          el.textContent = this.timeSyncManager.formatStopwatch(
+            this.experimentElapsedMs,
+          );
+        }
       }
     }, 50);
   }
@@ -91,7 +94,7 @@ class ExperimentTimerManager {
     const el =
       document.getElementById("experimentTimer") ||
       document.getElementById("experiment-timer");
-    if (el) el.textContent = this.formatDuration(0);
+    if (el) el.textContent = this.timeSyncManager.formatStopwatch(0);
 
     // 停止所有手勢時間卡片計時器並重置狀態
     Object.keys(this.timerStates).forEach((idx) => {
@@ -112,7 +115,7 @@ class ExperimentTimerManager {
     return this.experimentElapsedMs;
   }
 
-  // ========== indexed timers (for board per-unit timers) ==========
+  // ===== 步驟計時 =====
   _ensureState(idx) {
     if (!this.timerStates[idx]) {
       this.timerStates[idx] = {
@@ -139,11 +142,15 @@ class ExperimentTimerManager {
       if (this.currentActiveIndex === idx) {
         this.currentActiveIndex = null;
       }
-      if (window.experimentLogManager && window.app) {
-        const currentGesture = window.app.currentCombination?.gestures?.[idx];
-        const stepId = currentGesture?.step_id || null;
-        window.experimentLogManager.logGestureStepPause &&
-          window.experimentLogManager.logGestureStepPause(idx, stepId);
+      if (this.experimentLogManager && this.getCurrentCombination) {
+        const currentCombination = this.getCurrentCombination();
+        const currentGesture = currentCombination?.gestures?.[idx];
+        if (currentGesture?.step_id) {
+          this.experimentLogManager.logGestureStepPause(
+            idx,
+            currentGesture.step_id,
+          );
+        }
       }
     } else {
       if (this.currentActiveIndex !== null && this.currentActiveIndex !== idx) {
@@ -167,16 +174,25 @@ class ExperimentTimerManager {
         const currentElapsed =
           state.elapsedTime + (Date.now() - state.startTime);
         const display = document.getElementById(`timer-display-${idx}`);
-        if (display) display.textContent = this.formatDuration(currentElapsed);
-        if (typeof this.onIndexedTick === "function")
+        if (display) {
+          display.textContent = this.timeSyncManager.formatStopwatch(
+            currentElapsed,
+          );
+        }
+        if (typeof this.onIndexedTick === "function") {
           this.onIndexedTick(idx, currentElapsed);
+        }
       }, 10);
 
-      if (window.experimentLogManager && window.app) {
-        const currentGesture = window.app.currentCombination?.gestures?.[idx];
-        const stepId = currentGesture?.step_id || null;
-        window.experimentLogManager.logGestureStepStart &&
-          window.experimentLogManager.logGestureStepStart(idx, stepId);
+      if (this.experimentLogManager && this.getCurrentCombination) {
+        const currentCombination = this.getCurrentCombination();
+        const currentGesture = currentCombination?.gestures?.[idx];
+        if (currentGesture?.step_id) {
+          this.experimentLogManager.logGestureStepStart(
+            idx,
+            currentGesture.step_id,
+          );
+        }
       }
     }
   }
@@ -235,20 +251,5 @@ class ExperimentTimerManager {
     }
     return Math.floor((state.elapsedTime || 0) / 1000);
   }
-}
+};
 
-// 註冊到全域
-const manager = new ExperimentTimerManager();
-window.experimentTimerManager = manager;
-
-// 也提供兼容的全域函式名稱（原 board/panel 期待）
-window.formatDuration =
-  window.formatDuration || ((ms) => manager.formatDuration(ms));
-window.toggleTimer =
-  window.toggleTimer || ((idx) => manager.toggleIndexedTimer(idx));
-window.timerLongPressStart =
-  window.timerLongPressStart || ((idx) => manager.longPressStart(idx));
-window.timerLongPressEnd =
-  window.timerLongPressEnd || ((idx) => manager.longPressEnd(idx));
-window.resetTimer =
-  window.resetTimer || ((idx) => manager.resetIndexedTimer(idx));

@@ -3,13 +3,24 @@
  *
  * 負責建立、管理膠囊指示器（支援 idle/connected/error/connecting 等狀態）
  * 與短暫狀態訊息（toast），支援 success/error/info/warning 四種類型。
- * 以單例形式暴露至 window.indicatorManager 供各模組使用。
  */
+import { Logger } from "../core/console-manager.js";
 class IndicatorManager {
   constructor() {
     this.capsule = null;
     this.statusContainer = null;
+    this.getStatus = () => "idle";
+    this.getStatusText = (status) => status;
     this._initContainers();
+  }
+
+  updateDependencies({ getStatus, getStatusText } = {}) {
+    if (typeof getStatus === "function") {
+      this.getStatus = getStatus;
+    }
+    if (typeof getStatusText === "function") {
+      this.getStatusText = getStatusText;
+    }
   }
 
   _initContainers() {
@@ -35,7 +46,7 @@ class IndicatorManager {
     this.capsule = document.createElement("div");
     this.capsule.className = "sync-capsule-indicator idle";
 
-    const idleText = window.SyncManager?.getStatusText?.("idle") || "未連線";
+    const idleText = this.getStatusText?.("idle") || "未連線";
     this.capsule.innerHTML = `
       <div class="sync-status-indicator">
         <div class="sync-status-light"></div>
@@ -57,8 +68,8 @@ class IndicatorManager {
     if (!this.capsule) return;
 
     try {
-      const status = window.SyncManager?.getStatus?.() || "idle";
-      const text = window.SyncManager?.getStatusText?.(status) || status;
+      const status = this.getStatus?.() || "idle";
+      const text = this.getStatusText?.(status) || status;
 
       this.capsule.classList.remove("idle", "connected", "error", "connecting");
       this.capsule.classList.add(status || "idle");
@@ -112,5 +123,6 @@ class IndicatorManager {
   }
 }
 
-// 單例暴露到 window，其他模組可直接使用 window.indicatorManager
-window.indicatorManager = window.indicatorManager || new IndicatorManager();
+// ES6 模組匯出
+export default IndicatorManager;
+export { IndicatorManager };

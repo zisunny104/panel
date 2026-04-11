@@ -7,7 +7,7 @@
 @import url('./base/scrollbar.css');
 @import url('./base/layout.css');
 
-/* ===== 組件 ===== */
+/* ===== 元件 ===== */
 @import url('./components/buttons.css');
 @import url('./components/forms.css');
 @import url('./components/svg-panel.css');

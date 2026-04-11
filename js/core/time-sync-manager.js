@@ -5,6 +5,8 @@
  * 確保多裝置間的時間戳一致性
  */
 
+import { getSharedConfig } from "./config.js";
+
 class TimeSyncManager {
   constructor() {
     // 時間偏差（毫秒）= 本機時間 - 伺服器時間
@@ -15,11 +17,22 @@ class TimeSyncManager {
     this.lastSyncTime = null;
 
     // 時區設定
-    this.timezone = window.CONFIG?.timezone || "Asia/Taipei";
+    this.timezone = getSharedConfig()?.timezone || "Asia/Taipei";
 
     // 多次同步結果用於計算平均偏差
     this.syncSamples = [];
     this.maxSamples = 3;
+
+    // 時間格式預設值（可由 CONFIG.timeFormatPresets 覆蓋）
+    this.dateTimePresets = {
+      dateTime: { includeSeconds: true },
+      dateTimeShort: { includeSeconds: false },
+      logDetail: { includeSeconds: true },
+      logFilter: { includeSeconds: false },
+    };
+
+    // 時間長度格式（可由 CONFIG.durationTextStyle 覆蓋）
+    this.durationTextStyle = getSharedConfig()?.durationTextStyle || "zh";
   }
 
   /**
@@ -42,11 +55,7 @@ class TimeSyncManager {
    * @returns {string} 時區字串
    */
   static getTimezone() {
-    return (
-      window.timeSyncManager?.timezone ||
-      window.CONFIG?.timezone ||
-      "Asia/Taipei"
-    );
+    return getSharedConfig()?.timezone || "Asia/Taipei";
   }
 
   /**
@@ -184,6 +193,19 @@ class TimeSyncManager {
   }
 
   /**
+   * 格式化計時器（分:秒.毫秒）
+   * @param {number} milliseconds - 毫秒數
+   * @returns {string} 格式化的計時字串 (MM:SS.mmm)
+   */
+  formatStopwatch(milliseconds) {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const ms = milliseconds % 1000;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
+  }
+
+  /**
    * 格式化時間為東八區 YYYY-MM-DD HH:MM:SS 格式
    * @param {number|Date} timestamp - 毫秒級時間戳或 Date 物件
    * @param {Object} options - 選項
@@ -203,14 +225,26 @@ class TimeSyncManager {
         return "無效時間";
       }
 
+      const includeDate = options.includeDate !== false;
+      const includeTime = options.includeTime !== false;
+      const includeSeconds = options.includeSeconds !== false;
+
       // 使用更有效率的 Intl.DateTimeFormat 直接格式化
       const formatter = new Intl.DateTimeFormat("zh-TW", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
+        ...(includeDate
+          ? {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            }
+          : {}),
+        ...(includeTime
+          ? {
+              hour: "2-digit",
+              minute: "2-digit",
+              ...(includeSeconds ? { second: "2-digit" } : {}),
+            }
+          : {}),
         timeZone: this.timezone,
         hour12: false,
       });
@@ -228,6 +262,29 @@ class TimeSyncManager {
       Logger.error("[TimeSyncManager] 時間格式化失敗:", error);
       return "格式化錯誤";
     }
+  }
+
+  /**
+   * 以預設格式名稱格式化時間
+   * @param {number|Date} timestamp - 毫秒級時間戳或 Date 物件
+   * @param {string} preset - 預設名稱（例如 dateTime, dateTimeShort, logDetail, logFilter）
+   * @param {Object} overrideOptions - 覆蓋預設值的選項
+   * @returns {string} 格式化的時間字串
+   */
+  formatDateTimeWithPreset(timestamp, preset, overrideOptions = {}) {
+    const presetOptions = this._getDateTimePreset(preset);
+    return this.formatDateTime(timestamp, {
+      ...presetOptions,
+      ...overrideOptions,
+    });
+  }
+
+  _getDateTimePreset(preset) {
+    const configPresets = getSharedConfig()?.timeFormatPresets || {};
+    return {
+      ...(this.dateTimePresets[preset] || {}),
+      ...(configPresets[preset] || {}),
+    };
   }
 
   /**
@@ -256,7 +313,7 @@ class TimeSyncManager {
    */
   formatDate(timestamp) {
     try {
-      const dateTime = this.formatDateTime(timestamp);
+      const dateTime = this.formatDateTime(timestamp, { includeTime: false });
       // 取出日期部分（空格前的內容）
       const dateMatch = dateTime.match(/^([^\s]+)/);
       return dateMatch ? dateMatch[1] : "無效日期";
@@ -265,7 +322,33 @@ class TimeSyncManager {
       return "格式化錯誤";
     }
   }
+
+  /**
+   * 格式化時間長度（文字顯示）
+   * @param {number} seconds - 秒數
+   * @param {Object} options - 顯示選項
+   * @returns {string} 格式化的時間長度
+   */
+  formatDurationText(seconds, options = {}) {
+    const style = options.style || this.durationTextStyle;
+    if (style !== "zh") {
+      return this.formatDuration(seconds * 1000);
+    }
+
+    if (seconds < 60) {
+      return `${seconds}秒`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (minutes < 60) {
+      return `${minutes}分${secs}秒`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}小時${mins}分${secs}秒`;
+  }
 }
 
-// 建立全局時間同步管理器實例
-window.timeSyncManager = window.timeSyncManager || new TimeSyncManager();
+// ES6 模組匯出
+export default TimeSyncManager;
+export { TimeSyncManager };

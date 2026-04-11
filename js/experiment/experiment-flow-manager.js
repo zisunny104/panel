@@ -6,6 +6,9 @@
  * 與 ExperimentTimerManager 和 UI 層互動以驅動實驗進行。
  */
 
+import { buildActionSequenceFromUnits } from "../core/data-loader.js";
+import { SYNC_EVENTS } from "../constants/index.js";
+
 class ExperimentFlowManager {
   /**
    * 實驗狀態常數
@@ -29,7 +32,6 @@ class ExperimentFlowManager {
     COMPLETED: "flow:completed",
     LOCKED: "flow:locked",
     UNLOCKED: "flow:unlocked",
-    PARTICIPANT_EDIT: "flow:participant_edit",
     STEP_CHANGED: "flow:step_changed",
     UNIT_CHANGED: "flow:unit_changed",
     UNIT_COMPLETED: "flow:unit_completed",
@@ -64,6 +66,8 @@ class ExperimentFlowManager {
       combinationManager: null,
       actionHandler: null,
       uiManager: null,
+      actionsMap: null,
+      unitsData: null,
     };
 
     // 事件監聽器
@@ -72,7 +76,29 @@ class ExperimentFlowManager {
     // 自動推進計時器
     this.autoProgressTimer = null;
 
+    // 可見度自動暫停/恢復狀態
+    this.pausedByVisibility = false;
+    this._setupVisibilityHandler();
+
     Logger.debug("ExperimentFlowManager 初始化完成");
+  }
+
+  _setupVisibilityHandler() {
+    if (typeof document === "undefined") return;
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if (this.isRunning && !this.isPaused) {
+          this.pausedByVisibility = true;
+          this.pauseExperiment();
+        }
+      } else {
+        if (this.pausedByVisibility && this.isRunning && this.isPaused) {
+          this.pausedByVisibility = false;
+          this.resumeExperiment();
+        }
+      }
+    });
   }
 
   // ==================== 依賴注入 ====================
@@ -114,6 +140,18 @@ class ExperimentFlowManager {
   }
 
   /**
+   * 更新依賴 (支援批次注入)
+   */
+  updateDependencies(deps = {}) {
+    Object.keys(deps).forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(this.dependencies, key)) {
+        this.dependencies[key] = deps[key];
+      }
+    });
+    return this;
+  }
+
+  /**
    * 取得依賴
    */
   getDependency(name) {
@@ -151,6 +189,34 @@ class ExperimentFlowManager {
       this.currentStepIndex = 0;
       this.completedUnits.clear();
 
+      // Initialize action sequence (if actionHandler is available)
+      if (this.dependencies.actionHandler && typeof window !== "undefined") {
+        const unitIds =
+          this.loadedUnits.length > 0
+            ? this.loadedUnits
+            : this.dependencies.combinationManager?.getLoadedUnits?.() || [];
+        const actionsMap = this.dependencies.actionsMap || new Map();
+        const unitsData = this.dependencies.unitsData || [];
+        const actionSequence = buildActionSequenceFromUnits(
+          unitIds,
+          actionsMap,
+          unitsData,
+          {
+            includeStartup:
+              document.getElementById("includeStartup")?.checked ?? true,
+            includeShutdown:
+              document.getElementById("includeShutdown")?.checked ?? true,
+          },
+        );
+
+        if (actionSequence && actionSequence.length > 0) {
+          this.dependencies.actionHandler.initializeSequence(actionSequence);
+          Logger.debug("已初始化 action 序列", {
+            actionCount: actionSequence.length,
+          });
+        }
+      }
+
       // 更新狀態
       this.isRunning = true;
       this.isPaused = false;
@@ -158,10 +224,6 @@ class ExperimentFlowManager {
       // 鎖定變更（禁止變更 experimentId/組合）
       this.locked = true;
       this.emit(ExperimentFlowManager.EVENT.LOCKED, { locked: true });
-      // 在進行中不允許修改受試者名稱
-      this.emit(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, {
-        allowed: false,
-      });
 
       // 觸發內部事件
       const startData = {
@@ -176,9 +238,9 @@ class ExperimentFlowManager {
       });
 
       // 廣播 DOM 事件供同步橋接器使用
-      if (typeof window !== "undefined" && window.SYNC_EVENTS) {
+      if (typeof window !== "undefined") {
         document.dispatchEvent(
-          new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STARTED, {
+          new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
             detail: startData,
           }),
         );
@@ -220,7 +282,6 @@ class ExperimentFlowManager {
     // 保持鎖定（仍禁止變更 experimentId/組合），但允許編輯受試者名稱
     this.locked = true;
     this.emit(ExperimentFlowManager.EVENT.LOCKED, { locked: true });
-    this.emit(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, { allowed: true });
 
     // 清除自動推進計時器
     this.clearAutoProgress();
@@ -238,9 +299,9 @@ class ExperimentFlowManager {
     });
 
     // 廣播 DOM 事件供同步橋接器使用
-    if (typeof window !== "undefined" && window.SYNC_EVENTS) {
+    if (typeof window !== "undefined") {
       document.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_PAUSED, {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_PAUSED, {
           detail: pauseData,
         }),
       );
@@ -270,7 +331,6 @@ class ExperimentFlowManager {
     // 重新鎖定並禁止修改受試者名稱
     this.locked = true;
     this.emit(ExperimentFlowManager.EVENT.LOCKED, { locked: true });
-    this.emit(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, { allowed: false });
 
     const resumeData = {
       currentUnit: this.currentUnitIndex,
@@ -285,9 +345,9 @@ class ExperimentFlowManager {
     });
 
     // 廣播 DOM 事件供同步橋接器使用
-    if (typeof window !== "undefined" && window.SYNC_EVENTS) {
+    if (typeof window !== "undefined") {
       document.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_RESUMED, {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_RESUMED, {
           detail: resumeData,
         }),
       );
@@ -314,7 +374,6 @@ class ExperimentFlowManager {
     // 解鎖並禁止受試者名稱編輯
     this.locked = false;
     this.emit(ExperimentFlowManager.EVENT.UNLOCKED, { locked: false });
-    this.emit(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, { allowed: false });
 
     // 清除自動推進計時器
     this.clearAutoProgress();
@@ -334,9 +393,9 @@ class ExperimentFlowManager {
     });
 
     // 廣播 DOM 事件供同步橋接器使用
-    if (typeof window !== "undefined" && window.SYNC_EVENTS) {
+    if (typeof window !== "undefined") {
       document.dispatchEvent(
-        new CustomEvent(window.SYNC_EVENTS.EXPERIMENT_STOPPED, {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, {
           detail: stopData,
         }),
       );
@@ -363,7 +422,6 @@ class ExperimentFlowManager {
     // 解鎖並禁止受試者名稱編輯
     this.locked = false;
     this.emit(ExperimentFlowManager.EVENT.UNLOCKED, { locked: false });
-    this.emit(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, { allowed: false });
 
     // 清除自動推進計時器
     this.clearAutoProgress();
@@ -399,7 +457,6 @@ class ExperimentFlowManager {
     // 解鎖並禁止受試者名稱編輯
     this.locked = false;
     this.emit(ExperimentFlowManager.EVENT.UNLOCKED, { locked: false });
-    this.emit(ExperimentFlowManager.EVENT.PARTICIPANT_EDIT, { allowed: false });
 
     this.clearAutoProgress();
 
@@ -674,10 +731,14 @@ class ExperimentFlowManager {
     }
 
     const unitId = this.loadedUnits[index];
+    const unitsData = this.dependencies.unitsData;
 
-    // 從全域 _allUnits 取得單元資料
-    if (window._allUnits) {
-      return window._allUnits.find((u) => u.unit_id === unitId);
+    if (Array.isArray(unitsData) && unitsData.length > 0) {
+      return unitsData.find((u) => u.unit_id === unitId) || null;
+    }
+
+    if (typeof window !== "undefined" && window._allUnits) {
+      return window._allUnits.find((u) => u.unit_id === unitId) || null;
     }
 
     return null;
@@ -880,7 +941,8 @@ class ExperimentFlowManager {
   }
 }
 
-// 導出到全域
-if (typeof window !== "undefined") {
-  window.ExperimentFlowManager = ExperimentFlowManager;
-}
+// Removed global exposure of ExperimentFlowManager
+
+// ES6 模組匯出
+export default ExperimentFlowManager;
+export { ExperimentFlowManager };

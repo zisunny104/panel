@@ -1,6 +1,5 @@
 /**
  * ExperimentActionHandler - 實驗動作處理器
- * Phase 3 - P1 輔助模組
  *
  * 職責：
  * 1. 動作判定邏輯
@@ -10,10 +9,11 @@
  * 5. 遠端同步處理
  * 6. 錯誤處理
  *
- * 提取來源：
- * - action-manager.js (動作序列管理)
- * - panel-experiment-flow.js (步驟執行邏輯)
+ * 備註：
+ * - 對外以事件與公開方法協調動作序列、驗證與同步。
  */
+
+import { SYNC_DATA_TYPES, SYNC_EVENTS } from "../constants/index.js";
 
 class ExperimentActionHandler {
   /**
@@ -60,6 +60,8 @@ class ExperimentActionHandler {
     this.dependencies = {
       flowManager: null,
       hubManager: null,
+      syncClient: null,
+      experimentSystemManager: null,
     };
     Logger.debug("ExperimentActionHandler 初始化完成");
   }
@@ -72,6 +74,11 @@ class ExperimentActionHandler {
   injectFlowManager(flowManager) {
     this.dependencies.flowManager = flowManager;
     Logger.debug("FlowManager 已注入到 ActionHandler");
+    return this;
+  }
+
+  updateDependencies(deps = {}) {
+    Object.assign(this.dependencies, deps);
     return this;
   }
 
@@ -105,6 +112,14 @@ class ExperimentActionHandler {
     });
 
     return true;
+  }
+
+  /**
+   * 取得 action 的統一識別
+   * @private
+   */
+  _getActionId(action) {
+    return action.actionId;
   }
 
   /**
@@ -162,14 +177,12 @@ class ExperimentActionHandler {
     }
 
     // 檢查動作 ID 是否符合
-    if (
-      currentAction.actionId !== actionId &&
-      currentAction.expected_button !== actionId
-    ) {
+    const currentActionId = this._getActionId(currentAction);
+    if (currentActionId !== actionId && currentAction.expected_button !== actionId) {
       return {
         valid: false,
         error: "動作不符合預期",
-        expected: currentAction.expected_button || currentAction.actionId,
+        expected: currentAction.expected_button || currentActionId,
         actual: actionId,
       };
     }
@@ -218,19 +231,22 @@ class ExperimentActionHandler {
     });
 
     // 標記為完成
-    this.completedActions.add(action.actionId);
+    const normalizedActionId = this._getActionId(action) || actionId;
+    this.completedActions.add(normalizedActionId);
     this.currentActionIndex++;
 
     Logger.info("動作完成", {
-      actionId,
+      actionId: normalizedActionId,
       progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`,
     });
 
     this.emit(ExperimentActionHandler.EVENT.ACTION_COMPLETED, {
-      actionId,
+      actionId: normalizedActionId,
       action,
       progress: this.getProgress(),
     });
+
+    this._broadcastButtonAction(action, actionData);
 
     // 檢查序列是否完成
     if (this.currentActionIndex >= this.currentActionSequence.length) {
@@ -244,7 +260,7 @@ class ExperimentActionHandler {
 
     // 遠端同步
     if (this.config.enableRemoteSync) {
-      this.syncActionToRemote(actionId, "completed");
+      this.syncActionToRemote(normalizedActionId, "completed");
     }
 
     return true;
@@ -266,7 +282,9 @@ class ExperimentActionHandler {
 
     Logger.warn("錯誤動作", {
       actionId,
-      expected: currentAction?.actionId || currentAction?.expected_button,
+      expected: currentAction
+        ? currentAction.actionId || currentAction.expected_button
+        : null,
       error,
     });
 
@@ -282,7 +300,7 @@ class ExperimentActionHandler {
   /**
    * 完成目前動作（不進行驗證）
    */
-  completeCurrentAction() {
+  completeCurrentAction(actionData = {}) {
     const currentAction = this.getCurrentAction();
     if (!currentAction) {
       Logger.warn("沒有目前動作可完成");
@@ -290,28 +308,31 @@ class ExperimentActionHandler {
     }
 
     // 記錄到歷史
+    const normalizedActionId = this._getActionId(currentAction);
     this.actionHistory.push({
-      actionId: currentAction.actionId,
+      actionId: normalizedActionId,
       timestamp: Date.now(),
       correct: true, // 直接完成視為正確
       skipped: true, // 標記為跳過
     });
 
     // 標記為完成
-    this.completedActions.add(currentAction.actionId);
+    this.completedActions.add(normalizedActionId);
     this.currentActionIndex++;
 
     Logger.info("動作已完成（跳過）", {
-      actionId: currentAction.actionId,
+      actionId: normalizedActionId,
       progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`,
     });
 
     this.emit(ExperimentActionHandler.EVENT.ACTION_COMPLETED, {
-      actionId: currentAction.actionId,
+      actionId: normalizedActionId,
       action: currentAction,
       progress: this.getProgress(),
       skipped: true,
     });
+
+    this._broadcastButtonAction(currentAction, actionData);
 
     // 檢查序列是否完成
     if (this.currentActionIndex >= this.currentActionSequence.length) {
@@ -325,10 +346,49 @@ class ExperimentActionHandler {
 
     // 遠端同步
     if (this.config.enableRemoteSync) {
-      this.syncActionToRemote(currentAction.actionId, "completed");
+      this.syncActionToRemote(normalizedActionId, "completed");
     }
 
     return true;
+  }
+
+  /**
+   * 廣播按鈕動作完成
+   * Schema: {type, clientId, timestamp, actionId, button, function, experimentId}
+   * 僅在本機按鈕觸發動作時廣播（actionData.buttonId 存在）
+   */
+  _broadcastButtonAction(action, actionData) {
+    if (!actionData.buttonId) {
+      return;
+    }
+
+    const experimentId =
+      this.dependencies.experimentSystemManager?.getExperimentId?.();
+    if (!experimentId) {
+      Logger.warn("ExperimentActionHandler: experimentId 不可用，跳過廣播");
+      return;
+    }
+
+    if (!this.dependencies.syncClient?.clientId) {
+      Logger.warn("ExperimentActionHandler: syncClient 不可用，跳過廣播");
+      return;
+    }
+
+    const payload = {
+      type: SYNC_DATA_TYPES.BUTTON_ACTION,
+      clientId: this.dependencies.syncClient?.clientId,
+      timestamp: Date.now(),
+      actionId: action.actionId,
+      button: actionData.buttonId,
+      function: actionData.functionName || actionData.function,
+      experimentId,
+    };
+
+    document.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
+        detail: payload,
+      }),
+    );
   }
 
   /**
@@ -564,11 +624,11 @@ class ExperimentActionHandler {
       const nextAction = this.getCurrentAction();
       if (nextAction) {
         this.emit(ExperimentActionHandler.EVENT.AUTO_PROGRESS, {
-          actionId: nextAction.actionId,
+          actionId: this._getActionId(nextAction),
         });
 
         // 自動執行下一個動作
-        this.handleCorrectAction(nextAction.actionId, {
+        this.handleCorrectAction(this._getActionId(nextAction), {
           auto: true,
         });
       }
@@ -641,6 +701,23 @@ class ExperimentActionHandler {
         this.currentActionIndex = Math.max(
           this.currentActionIndex,
           actionIndex + 1,
+        );
+      }
+      return;
+    }
+
+    if (status === "cancelled") {
+      this.completedActions.delete(actionId);
+      this.clearAutoProgress();
+
+      const actionIndex = this.currentActionSequence.findIndex(
+        (a) => this._getActionId(a) === actionId,
+      );
+
+      if (actionIndex !== -1) {
+        this.currentActionIndex = Math.min(
+          this.currentActionIndex,
+          actionIndex,
         );
       }
     }
@@ -769,12 +846,6 @@ class ExperimentActionHandler {
   }
 }
 
-// 導出到全域（用於向後相容）
-if (typeof window !== "undefined") {
-  window.ExperimentActionHandler = ExperimentActionHandler;
-}
-
-// 支援模組導出
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = ExperimentActionHandler;
-}
+// ES6 模組匯出
+export default ExperimentActionHandler;
+export { ExperimentActionHandler };

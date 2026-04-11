@@ -5,18 +5,55 @@
 
 import { SYNC_EVENTS } from "../constants/index.js";
 import CameraUtils from "../core/camera-utils.js";
+import { Logger } from "../core/console-manager.js";
 
 export class SyncManagerQR {
-  constructor(core) {
+  constructor(core, config = {}) {
     this.core = core;
+    this.syncManager = config.syncManager || null;
+    this.roleConfig = config.roleConfig || {
+      VIEWER: "viewer",
+      OPERATOR: "operator",
+      LOCAL: "local",
+    };
+    this.pageConfig = config.pageConfig || {
+      PANEL: "panel",
+      BOARD: "board",
+    };
+    this.confirmDialogManager = config.confirmDialogManager || null;
+    this.indicatorManager = config.indicatorManager || null;
     this.qrScanner = null;
     this.countdownInterval = null;
     this.scanning = false;
     this.scanTimer = null;
     this.initialized = false;
 
+    // 事件監聽器追蹤
+    this.eventListeners = [];
+    this.domListeners = [];
+
     // 通用相機邏輯委派給 CameraUtils
     this.cameraUtils = new CameraUtils();
+  }
+
+  getRoleText(role) {
+    return this.syncManager?.getRoleText?.(role) || role;
+  }
+
+  getPageName(pageKey) {
+    return this.syncManager?.getPageName?.(pageKey) || pageKey;
+  }
+
+  /**
+   * 追蹤式 addEventListener - 自動追蹤以便清理
+   */
+  _addEventListener(target, event, handler, options = false) {
+    target.addEventListener(event, handler, options);
+    if (target === window || target === document || target === navigator.mediaDevices) {
+      this.eventListeners.push({ target, event, handler, options });
+    } else {
+      this.domListeners.push({ target, event, handler, options });
+    }
   }
 
   /**
@@ -44,7 +81,8 @@ export class SyncManagerQR {
 
     // 確保在 DOM 完全準備好後再檢查 URL 參數
     if (document.readyState === "loading") {
-      document.addEventListener(
+      this._addEventListener(
+        document,
         "DOMContentLoaded",
         () => {
           this.checkUrlParameters();
@@ -57,11 +95,11 @@ export class SyncManagerQR {
     }
 
     // 監聽 QR Code 產生事件
-    window.addEventListener(SYNC_EVENTS.GENERATE_QR, async (event) => {
+    this._addEventListener(window, SYNC_EVENTS.GENERATE_QR, async (event) => {
       const {
         shareCode,
         role,
-        target = window.SyncManager?.PAGE?.PANEL,
+        target = this.pageConfig.PANEL,
       } = event.detail;
 
       Logger.debug("收到 QR Code 產生事件", { shareCode, role, target });
@@ -81,7 +119,7 @@ export class SyncManagerQR {
     });
 
     // 監聽 QR Code 掃描事件
-    window.addEventListener(SYNC_EVENTS.START_QR_SCAN, () => {
+    this._addEventListener(window, SYNC_EVENTS.START_QR_SCAN, () => {
       this.startQRScanner();
     });
 
@@ -90,7 +128,7 @@ export class SyncManagerQR {
       navigator.mediaDevices &&
       typeof navigator.mediaDevices.addEventListener === "function"
     ) {
-      navigator.mediaDevices.addEventListener("devicechange", async () => {
+      this._addEventListener(navigator.mediaDevices, "devicechange", async () => {
         const video = document.getElementById("syncQrVideo");
         // 只有當掃描器已經打開時才重新載入，避免背景執行報錯
         if (this.qrScanner && video) {
@@ -112,14 +150,14 @@ export class SyncManagerQR {
   checkUrlParameters() {
     const urlParams = new URLSearchParams(window.location.search);
     const shareCode = urlParams.get("shareCode");
-    const role = urlParams.get("role") || window.SyncManager?.ROLE?.VIEWER;
+    const role = urlParams.get("role") || this.roleConfig.VIEWER;
 
     // 使用分享代碼
     const code = shareCode;
 
     if (code) {
       // 檢查目前裝置是否已在工作階段中（產生者自己不應該加入）
-      if (this.core?.syncClient?.sessionId) {
+      if (this.core.syncClient?.sessionId) {
         // 立即清理 URL
         window.history.replaceState(
           {},
@@ -142,24 +180,10 @@ export class SyncManagerQR {
       }
 
       // 延遲檢查以確保 SyncConfirmDialogManager 已載入
-      if (window.SyncConfirmDialogManager) {
-        // 已載入，直接顯示
+      if (this.confirmDialogManager) {
         this.showJoinConfirmation(code, role);
       } else {
-        // 未載入，延遲 500ms 後重試（最多重試 20 次 = 10秒）
-        let retryCount = 0;
-        const maxRetries = 20;
-        const retryInterval = setInterval(() => {
-          retryCount++;
-          if (window.SyncConfirmDialogManager) {
-            clearInterval(retryInterval);
-            this.showJoinConfirmation(code, role);
-          } else if (retryCount >= maxRetries) {
-            clearInterval(retryInterval);
-            Logger.error("SyncConfirmDialogManager 載入超時");
-            alert("系統初始化失敗，請重新整理頁面");
-          }
-        }, 500);
+        Logger.error("SyncConfirmDialogManager 未設定，無法顯示確認對話框");
       }
     }
   }
@@ -169,13 +193,14 @@ export class SyncManagerQR {
    */
   showJoinConfirmation(code, role) {
     // 確保 SyncConfirmDialogManager 已載入
-    if (!window.SyncConfirmDialogManager) {
+    const confirmDialogManager = this.confirmDialogManager;
+    if (!confirmDialogManager) {
       Logger.error("SyncConfirmDialogManager 未載入");
       return;
     }
 
     // 使用統一的對話框管理器
-    window.SyncConfirmDialogManager.showJoinConfirmation(
+    confirmDialogManager.showJoinConfirmation(
       code,
       role,
       // onConfirm Callback
@@ -271,8 +296,8 @@ export class SyncManagerQR {
    */
   async generateQRCode(
     code,
-    role = window.SyncManager?.ROLE?.VIEWER,
-    target = window.SyncManager?.PAGE?.PANEL,
+    role = this.roleConfig.VIEWER,
+    target = this.pageConfig.PANEL,
   ) {
     Logger.debug("開始產生 QR Code ", { code, role, target });
 
@@ -350,14 +375,14 @@ export class SyncManagerQR {
         container.appendChild(qrImageContainer);
 
         // 建立控制按鈕容器
-        const roleText = window.SyncManager?.getRoleText(role) || "未知角色";
+        const roleText = this.getRoleText(role) || "未知角色";
         const initialTarget =
           target ||
           (window.location.pathname.includes("board.html")
-            ? window.SyncManager?.PAGE?.BOARD
-            : window.SyncManager?.PAGE?.PANEL);
+            ? this.pageConfig.BOARD
+            : this.pageConfig.PANEL);
         const enterLabel =
-          window.SyncManager?.getPageName(initialTarget) || initialTarget;
+          this.getPageName(initialTarget) || initialTarget;
 
         const codeText = document.createElement("div");
         codeText.className = "sync-qr-code-text";
@@ -418,14 +443,14 @@ export class SyncManagerQR {
       // 更新按鈕狀態
       const modeBtn = container.querySelector("#qrDefaultModeBtn");
       if (modeBtn) {
-        const roleText = window.SyncManager?.getRoleText(role) || "未知角色";
+        const roleText = this.getRoleText(role) || "未知角色";
         modeBtn.textContent = roleText;
         modeBtn.dataset.role = role;
       }
 
       const enterBtn = container.querySelector("#qrEnterPageBtn");
       if (enterBtn) {
-        const enterLabel = window.SyncManager?.getPageName(target) || target;
+        const enterLabel = this.getPageName(target) || target;
         enterBtn.textContent = enterLabel;
       }
 
@@ -446,14 +471,14 @@ export class SyncManagerQR {
     const modeBtn = container.querySelector("#qrDefaultModeBtn");
     if (modeBtn && !modeBtn._isBound) {
       modeBtn._isBound = true;
-      modeBtn.addEventListener("click", () => {
+      this._addEventListener(modeBtn, "click", () => {
         try {
           const current =
-            modeBtn.dataset.role || window.SyncManager?.ROLE?.VIEWER;
+            modeBtn.dataset.role || this.roleConfig.VIEWER;
           const newRole =
-            current === window.SyncManager?.ROLE?.OPERATOR
-              ? window.SyncManager?.ROLE?.VIEWER
-              : window.SyncManager?.ROLE?.OPERATOR;
+            current === this.roleConfig.OPERATOR
+              ? this.roleConfig.VIEWER
+              : this.roleConfig.OPERATOR;
 
           Logger.debug("使用者切換預設模式，重新產生 QR", {
             code,
@@ -461,7 +486,7 @@ export class SyncManagerQR {
           });
           // 重新產生 QR（保留目前 target）
           const currentTarget =
-            container.dataset.qrTarget || window.SyncManager?.PAGE?.PANEL;
+            container.dataset.qrTarget || this.pageConfig.PANEL;
           this.generateQRCode(code, newRole, currentTarget);
         } catch (err) {
           Logger.error("切換預設模式失敗:", err);
@@ -473,21 +498,21 @@ export class SyncManagerQR {
     const enterBtn = container.querySelector("#qrEnterPageBtn");
     if (enterBtn && !enterBtn._isBound) {
       enterBtn._isBound = true;
-      enterBtn.addEventListener("click", () => {
+      this._addEventListener(enterBtn, "click", () => {
         try {
           // 切換 QR 目標（只影響 QR 的內容，不會在此頁面跳轉）
           const currentTarget =
-            container.dataset.qrTarget || window.SyncManager?.PAGE?.PANEL;
+            container.dataset.qrTarget || this.pageConfig.PANEL;
           const newTarget =
-            currentTarget === window.SyncManager?.PAGE?.BOARD
-              ? window.SyncManager?.PAGE?.PANEL
-              : window.SyncManager?.PAGE?.BOARD;
+            currentTarget === this.pageConfig.BOARD
+              ? this.pageConfig.PANEL
+              : this.pageConfig.BOARD;
 
           Logger.debug("使用者切換 QR 目標頁面", { code, newTarget });
 
           // 重新產生 QR（使用相同 shareCode 與目前 role）
           const currentRole =
-            container.dataset.qrRole || window.SyncManager?.ROLE?.VIEWER;
+            container.dataset.qrRole || this.roleConfig.VIEWER;
           this.generateQRCode(code, currentRole, newTarget);
         } catch (err) {
           Logger.error("切換 QR 目標頁面失敗:", err);
@@ -546,7 +571,7 @@ export class SyncManagerQR {
         const qrSection = document.getElementById("qrCodeSection");
         if (qrSection) {
           qrSection.innerHTML =
-            '<div class="sync-qr-expired"> QR Code 已過期，請重新建立工作階段</div>';
+            "<div class=\"sync-qr-expired\"> QR Code 已過期，請重新建立工作階段</div>";
         }
         return;
       }
@@ -712,11 +737,11 @@ export class SyncManagerQR {
     );
 
     // 關閉掃描器
-    closeBtn.addEventListener("click", () => this.stopQRScanner());
+    this._addEventListener(closeBtn, "click", () => this.stopQRScanner());
 
     // 複製偵錯資訊按鈕（使用 SVG 圖示而非 emoji）
     if (copyBtn) {
-      copyBtn.addEventListener("click", async (e) => {
+      this._addEventListener(copyBtn, "click", async (e) => {
         e.preventDefault();
         const debug = {
           timestamp: new Date().toISOString(),
@@ -729,8 +754,8 @@ export class SyncManagerQR {
         };
         try {
           await navigator.clipboard.writeText(JSON.stringify(debug, null, 2));
-          if (window.indicatorManager) {
-            window.indicatorManager.showStatus(
+          if (this.indicatorManager) {
+            this.indicatorManager.showStatus(
               "success",
               "已複製偵錯資訊到剪貼簿",
             );
@@ -739,7 +764,7 @@ export class SyncManagerQR {
           }
           const originalHTML = copyBtn.innerHTML;
           copyBtn.innerHTML =
-            '<svg class="sync-icon sync-icon-checkmark" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+            "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
           copyBtn.classList.add("copied");
           Logger.info("已複製偵錯資訊到剪貼簿", debug);
           setTimeout(() => {
@@ -748,8 +773,8 @@ export class SyncManagerQR {
           }, 1400);
         } catch (err) {
           Logger.warn("複製偵錯資訊失敗:", err);
-          if (window.indicatorManager) {
-            window.indicatorManager.showStatus("error", "無法複製偵錯資訊");
+          if (this.indicatorManager) {
+            this.indicatorManager.showStatus("error", "無法複製偵錯資訊");
           } else if (statusEl) {
             statusEl.textContent = "無法複製偵錯資訊";
           }
@@ -759,7 +784,7 @@ export class SyncManagerQR {
 
     // 重新整理按鈕：重新列舉相機並重新啟動（使用者可視覺確認）
     if (refreshBtn) {
-      refreshBtn.addEventListener("click", async (e) => {
+      this._addEventListener(refreshBtn, "click", async (e) => {
         e.preventDefault();
         if (this.cameraUtils.cameraLoading) {
           if (statusEl) statusEl.textContent = "攝影機正在啟動中，請稍後...";
@@ -863,7 +888,7 @@ export class SyncManagerQR {
     }
 
     // 相機選擇變更事件
-    cameraSelect.addEventListener("change", async () => {
+    this._addEventListener(cameraSelect, "change", async () => {
       // 停止目前stream
       if (this.cameraUtils.currentStream) {
         this.cameraUtils.currentStream
@@ -910,13 +935,13 @@ export class SyncManagerQR {
     };
 
     if (filterInput) {
-      filterInput.addEventListener("input", (e) => {
+      this._addEventListener(filterInput, "input", (e) => {
         rebuildCameraOptions(e.target.value);
       });
     }
 
     if (applyFilterBtn) {
-      applyFilterBtn.addEventListener("click", async (e) => {
+      this._addEventListener(applyFilterBtn, "click", async (e) => {
         e.preventDefault();
         const filter = filterInput?.value?.trim();
         if (!filter) {
@@ -1105,7 +1130,7 @@ export class SyncManagerQR {
           const url = new URL(qrData);
           shareCode = url.searchParams.get("shareCode");
           role =
-            url.searchParams.get("role") || window.SyncManager?.ROLE?.VIEWER;
+            url.searchParams.get("role") || this.roleConfig.VIEWER;
         } catch (e) {
           Logger.warn("URL 解析失敗:", e);
           return;
@@ -1115,7 +1140,7 @@ export class SyncManagerQR {
         const code = qrData.trim().toUpperCase();
         // 作為分享代碼
         shareCode = code;
-        role = window.SyncManager?.ROLE?.VIEWER;
+        role = this.roleConfig.VIEWER;
       } else {
         // 非分享代碼相關的 QR Code ，靜默忽略
         return;
@@ -1189,6 +1214,18 @@ export class SyncManagerQR {
    * 清理資源
    */
   cleanup() {
+    // 清除所有全域事件監聽器
+    this.eventListeners.forEach(({ target, event, handler, options }) => {
+      target.removeEventListener(event, handler, options);
+    });
+    this.eventListeners = [];
+
+    // 清除所有 DOM 元素事件監聽器
+    this.domListeners.forEach(({ target, event, handler, options }) => {
+      target.removeEventListener(event, handler, options);
+    });
+    this.domListeners = [];
+
     this.stopQRScanner();
     if (this.countdownInterval) {
       clearInterval(this.countdownInterval);

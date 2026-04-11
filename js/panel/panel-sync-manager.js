@@ -3,12 +3,54 @@
  *
  * 負責處理面板頁面的同步狀態更新事件，包括實驗控制和UI同步
  */
+import { ACTION_IDS, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
 
 class PanelSyncManager {
-  constructor() {
+  constructor({
+    logger = null,
+    panelExperiment = null,
+    syncClient = null,
+    experimentSyncCore = null,
+    experimentFlowManager = null,
+    experimentSystemManager = null,
+    experimentActionHandler = null,
+    experimentCombinationManager = null,
+    powerControl = null,
+  } = {}) {
+    this.logger = logger;
+    this.panelExperiment = panelExperiment;
+    this.syncClient = syncClient;
+    this.experimentSyncCore = experimentSyncCore;
+    this.experimentFlowManager = experimentFlowManager;
+    this.experimentSystemManager = experimentSystemManager;
+    this.experimentActionHandler = experimentActionHandler;
+    this.experimentCombinationManager = experimentCombinationManager;
+    this.powerControl = powerControl;
     this.initialized = false;
     this.modules = {};
     this._remoteStartInProgress = false;
+  }
+
+  updateDependencies(deps = {}) {
+    Object.assign(this, deps);
+  }
+
+  /**
+   * 檢查是否可以廣播（連線狀態 + 防回聲）
+   */
+  _canBroadcast() {
+    return (
+      !this._remoteStartInProgress &&
+      this.experimentSyncCore?.canBroadcast?.()
+    );
+  }
+
+  /**
+   * 取得實驗組合，統一處理多個可能的路徑
+   */
+  _getExperimentCombo() {
+    return this.experimentCombinationManager?.getCurrentCombination?.();
   }
 
   /**
@@ -18,6 +60,8 @@ class PanelSyncManager {
     if (this.initialized) {
       return;
     }
+
+    const initStart = performance.now();
 
     try {
       Logger.debug("PanelSyncManager 初始化開始");
@@ -29,7 +73,10 @@ class PanelSyncManager {
       this.setupSyncEventListeners();
 
       this.initialized = true;
-      Logger.debug("PanelSyncManager 初始化完成");
+      const duration = performance.now() - initStart;
+      Logger.debug(
+        `PanelSyncManager 初始化完成 (<orange>${duration.toFixed(0)} ms</orange>)`,
+      );
     } catch (error) {
       Logger.error("PanelSyncManager 初始化失敗:", error);
     }
@@ -40,9 +87,9 @@ class PanelSyncManager {
    */
   setupModuleReferences() {
     this.modules = {
-      logger: window.logger,
-      panelExperiment: window.panelExperiment,
-      boardPageManager: window.boardPageManager,
+      logger: this.logger,
+      panelExperiment: this.panelExperiment,
+      boardPageManager: null,
     };
   }
 
@@ -51,34 +98,29 @@ class PanelSyncManager {
    */
   setupSyncEventListeners() {
     // 監聽同步狀態更新事件
-    window.addEventListener(window.SYNC_EVENTS.STATE_UPDATE, (event) => {
+    window.addEventListener(SYNC_EVENTS.STATE_UPDATE, (event) => {
       const state = event.detail;
       if (!state) return;
       // 防止自我回聲：拋棄自己廣播們回來的訊息
       // _sessionRestore 旗標由 sync-client.js 的工作階段狀態還原流程設置，應豁免此限制
-      const myId = window.syncClient?.clientId;
+      const myId = this.syncClient?.clientId;
       if (myId && state.clientId === myId && !state._sessionRestore) return;
-      if (state?.type === window.SYNC_DATA_TYPES.EXPERIMENT_STARTED) {
+      if (state.type === SYNC_DATA_TYPES.EXPERIMENT_STARTED) {
         this.handleSyncExperimentStart(state);
-      } else if (
-        state?.type === window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE &&
-        state?.event === window.SYNC_DATA_TYPES.EXPERIMENT_PAUSED
-      ) {
+      } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_PAUSED) {
         this.handleSyncExperimentPaused(state);
-      } else if (
-        state?.type === window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE &&
-        state?.event === window.SYNC_DATA_TYPES.EXPERIMENT_RESUMED
-      ) {
+      } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_RESUMED) {
         this.handleSyncExperimentResumed(state);
-      } else if (
-        state?.type === window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE &&
-        state?.event === window.SYNC_DATA_TYPES.EXPERIMENT_STOPPED
-      ) {
+      } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_STOPPED) {
         this.handleSyncExperimentStopped(state);
-      } else if (state?.type === window.SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE) {
+      } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE) {
         this.handleSyncExperimentIdUpdate(state);
-      } else if (state?.type === window.SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE) {
+      } else if (state.type === SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE) {
         this.handleSyncSubjectNameUpdate(state);
+      } else if (state.type === SYNC_DATA_TYPES.ACTION_COMPLETED) {
+        this.handleSyncActionCompleted(state);
+      } else if (state.type === SYNC_DATA_TYPES.ACTION_CANCELLED) {
+        this.handleSyncActionCancelled(state);
       }
     });
 
@@ -91,15 +133,12 @@ class PanelSyncManager {
       if (_subjectNameDebounce) clearTimeout(_subjectNameDebounce);
       _subjectNameDebounce = setTimeout(() => {
         _subjectNameDebounce = null;
-        if (!window.syncManager?.core?.isConnected()) return;
-        window.syncManager.core
-          .syncState({
-            type: window.SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE,
-            clientId: window.syncClient?.clientId,
-            subjectName: newName,
-            timestamp: new Date().toISOString(),
-          })
-          .catch((err) => Logger.warn("廣播受試者名稱失敗:", err));
+        this.experimentSyncCore?.safeBroadcast?.({
+          type: SYNC_DATA_TYPES.SUBJECT_NAME_UPDATE,
+          clientId: this.syncClient?.clientId,
+          timestamp: Date.now(),
+          subjectName: newName,
+        }).catch((err) => Logger.warn("廣播受試者名稱失敗:", err));
       }, 300);
     });
   }
@@ -112,7 +151,7 @@ class PanelSyncManager {
       clientId: syncData.clientId,
       experimentId: syncData.experimentId,
       _sessionRestore: syncData._sessionRestore,
-      isRunning: window.experimentFlowManager?.isRunning,
+      isRunning: this.experimentFlowManager?.isRunning,
     });
     // 更新面板的實驗資訊（使用 camelCase 欄位名稱，與 board 廣播一致）
     const expIdInput = document.getElementById("experimentIdInput");
@@ -141,15 +180,14 @@ class PanelSyncManager {
       }
     }
     // 在 index.html（panel）端或其他環境，直接使用 FlowManager
-    else if (window.experimentFlowManager) {
-      const isRunning = window.experimentFlowManager.isRunning || false;
+    else if (this.experimentFlowManager) {
+      const isRunning = this.experimentFlowManager.isRunning || false;
 
       if (!isRunning) {
         this._remoteStartInProgress = true;
         try {
           // 檢查遠端組合是否與本機相同
-          const currentCombo =
-            window.experimentSystemManager?.combinationManager?.getCurrentCombination?.();
+          const currentCombo = this._getExperimentCombo();
           const remoteComboId = syncData.combinationId;
           const localComboId = currentCombo?.combinationId;
 
@@ -162,7 +200,7 @@ class PanelSyncManager {
           // 若同步資料包含 combinationId，先套用組合確保有單元可載入
           if (
             syncData.combinationId &&
-            window.experimentSystemManager?.selectCombination
+            this.experimentSystemManager?.selectCombination
           ) {
             if (
               !currentCombo ||
@@ -171,7 +209,7 @@ class PanelSyncManager {
               Logger.info(
                 `[PanelSync] 組合不一致，同步遠端組合: ${syncData.combinationId}`,
               );
-              await window.experimentSystemManager
+              await this.experimentSystemManager
                 .selectCombination(syncData.combinationId)
                 .catch((err) =>
                   Logger.warn("[PanelSync] 設定遠端組合失敗:", err),
@@ -182,7 +220,7 @@ class PanelSyncManager {
           }
           // 呼叫 FlowManager 啟動實驗
           // FlowManager 會自動發出所有必要的事件和廣播
-          window.experimentFlowManager.startExperiment();
+          this.experimentFlowManager.startExperiment();
         } catch (error) {
           Logger.error("experimentFlowManager.startExperiment() 失敗:", error);
         } finally {
@@ -256,9 +294,8 @@ class PanelSyncManager {
       } catch (error) {
         Logger.error(`panelExperiment.${methodName}() 失敗:`, error);
       }
-    } else if (window.experimentFlowManager) {
-      // Panel page fallback: map to ExperimentFlowManager methods
-      const fm = window.experimentFlowManager;
+    } else if (this.experimentFlowManager) {
+      const fm = this.experimentFlowManager;
       const flowMethodMap = {
         pauseExperiment: "pauseExperiment",
         resumeExperiment: "resumeExperiment",
@@ -281,7 +318,7 @@ class PanelSyncManager {
 
   /**
    * 綁定 ExperimentFlowManager 的廣播（由 PanelPageManager 初始化後呼叫）
-   * 當 panel 本地發起任何實驗狀態變化時，廣播到其他裝置
+   * 當 panel 本機發起任何實驗狀態變化時，廣播到其他裝置
    * @param {ExperimentFlowManager} flowManager
    */
   bindExperimentBroadcast(flowManager) {
@@ -289,69 +326,52 @@ class PanelSyncManager {
 
     // 廣播實驗開始
     flowManager.on(ExperimentFlowManager.EVENT.STARTED, () => {
-      if (this._remoteStartInProgress) return; // 防止回聲
-      if (!window.syncManager?.core?.isConnected()) return;
+      if (!this._canBroadcast()) return;
+      const currentCombo = this._getExperimentCombo();
       const experimentId =
-        window.experimentSystemManager?.getExperimentId?.() || "";
+        this.experimentSystemManager?.getExperimentId?.() || "";
       const subjectName =
         document.getElementById("participantNameInput")?.value?.trim() || "";
-      const currentCombo =
-        window.experimentSystemManager?.getCurrentCombination?.() ||
-        window.experimentSystemManager?.combinationManager?.getCurrentCombination?.() ||
-        null;
-      window.syncManager.core
-        .syncState({
-          type: window.SYNC_DATA_TYPES.EXPERIMENT_STARTED,
-          clientId: window.syncClient?.clientId,
-          experimentId,
-          subjectName,
-          combinationId: currentCombo?.combinationId || "",
-          combinationName: currentCombo?.combinationName || "",
-          timestamp: new Date().toISOString(),
+      this.experimentSyncCore?.safeBroadcast?.({
+        type: SYNC_DATA_TYPES.EXPERIMENT_STARTED,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
+        experimentId,
+        subjectName,
+        combinationId: currentCombo?.combinationId || "",
+        combinationName: currentCombo?.combinationName || "",
         })
         .catch((err) => Logger.warn("廣播實驗開始失敗:", err));
     });
 
     // 廣播實驗暫停
-    flowManager.on(ExperimentFlowManager.EVENT.PAUSED, (data) => {
-      if (this._remoteStartInProgress) return;
-      if (!window.syncManager?.core?.isConnected()) return;
-      window.syncManager.core
-        .syncState({
-          type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
-          event: window.SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
-          clientId: window.syncClient?.clientId,
-          timestamp: new Date().toISOString(),
-        })
-        .catch((err) => Logger.warn("廣播實驗暫停失敗:", err));
+    flowManager.on(ExperimentFlowManager.EVENT.PAUSED, () => {
+      if (!this._canBroadcast()) return;
+      this.experimentSyncCore?.safeBroadcast?.({
+        type: SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
+      }).catch((err) => Logger.warn("廣播實驗暫停失敗:", err));
     });
 
     // 廣播實驗繼續
-    flowManager.on(ExperimentFlowManager.EVENT.RESUMED, (data) => {
-      if (this._remoteStartInProgress) return;
-      if (!window.syncManager?.core?.isConnected()) return;
-      window.syncManager.core
-        .syncState({
-          type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
-          event: window.SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
-          clientId: window.syncClient?.clientId,
-          timestamp: new Date().toISOString(),
-        })
-        .catch((err) => Logger.warn("廣播實驗繼續失敗:", err));
+    flowManager.on(ExperimentFlowManager.EVENT.RESUMED, () => {
+      if (!this._canBroadcast()) return;
+      this.experimentSyncCore?.safeBroadcast?.({
+        type: SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
+      }).catch((err) => Logger.warn("廣播實驗繼續失敗:", err));
     });
 
     // 廣播實驗停止
-    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
-      if (this._remoteStartInProgress) return;
-      if (!window.syncManager?.core?.isConnected()) return;
-      window.syncManager.core
-        .syncState({
-          type: window.SYNC_DATA_TYPES.EXPERIMENT_STATE_CHANGE,
-          event: window.SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
-          clientId: window.syncClient?.clientId,
-          timestamp: new Date().toISOString(),
-        })
-        .catch((err) => Logger.warn("廣播實驗停止失敗:", err));
+    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
+      if (!this._canBroadcast()) return;
+      this.experimentSyncCore?.safeBroadcast?.({
+        type: SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
+        clientId: this.syncClient?.clientId,
+        timestamp: Date.now(),
+      }).catch((err) => Logger.warn("廣播實驗停止失敗:", err));
     });
 
     Logger.debug("PanelSyncManager: 已綁定所有實驗狀態廣播");
@@ -364,16 +384,9 @@ class PanelSyncManager {
     const { experimentId } = syncData;
     if (!experimentId) return;
 
-    if (!window.experimentSystemManager?.setExperimentId) {
-      Logger.error(
-        "handleSyncExperimentIdUpdate: experimentSystemManager 不存在，無法套用實驗ID",
-      );
-      return;
-    }
-
-    const currentId = window.experimentSystemManager.getExperimentId();
+    const currentId = this.experimentSystemManager?.getExperimentId?.();
     if (currentId !== experimentId) {
-      window.experimentSystemManager.setExperimentId(experimentId, {
+      this.experimentSystemManager?.setExperimentId?.(experimentId, {
         registerToHub: false,
         broadcast: false,
         reapplyCombination: true,
@@ -392,7 +405,138 @@ class PanelSyncManager {
       input.value = subjectName;
     }
   }
+
+  /**
+   * 處理遠端 ACTION_COMPLETED 廣播
+   * 接收來自 Board 端的 action 完成信號
+   * 若 Panel 未開機，則強制開機並推進至該 action 的下一個
+   */
+  async handleSyncActionCompleted(syncData) {
+    const { actionId, clientId } = syncData;
+
+    Logger.debug("[PanelSync] handleSyncActionCompleted 被呼叫", {
+      actionId,
+      clientId,
+      panelRunning: this.experimentFlowManager?.isRunning,
+    });
+
+    // 若收到的廣播來自本機，忽略（已經由本地邏輯處理）
+    const myId = this.syncClient?.clientId;
+    if (myId && clientId === myId) {
+      Logger.debug("[PanelSync] ACTION_COMPLETED 來自本機，忽略");
+      return;
+    }
+
+    // 若 Panel 未開機，使用 Board 端的實驗資訊強制開機並推進至該 action
+    if (!this.experimentFlowManager?.isRunning) {
+      Logger.info("[PanelSync] Panel 未開機，嘗試以遠端資訊開機並推進至 action");
+
+      // 若有 Board 端傳來的實驗資訊（experimentId, combinationId 等在廣播中）
+      if (syncData.experimentId && syncData.combinationId) {
+        try {
+          // 1. 設定實驗ID
+          const expIdInput = document.getElementById("experimentIdInput");
+          if (expIdInput) {
+            expIdInput.value = syncData.experimentId;
+          }
+
+          // 2. 設定受試者名稱（若有的話）
+          if (syncData.subjectName) {
+            const participantInput = document.getElementById("participantNameInput");
+            if (participantInput) {
+              participantInput.value = syncData.subjectName;
+            }
+          }
+
+          // 3. 同步組合（若不一致）
+          if (this.experimentSystemManager?.selectCombination) {
+            const currentCombo = this.experimentCombinationManager?.getCurrentCombination?.();
+            if (!currentCombo || currentCombo.combinationId !== syncData.combinationId) {
+              await this.experimentSystemManager.selectCombination(syncData.combinationId);
+            }
+          }
+
+          // 4. 啟動實驗
+          if (this.experimentFlowManager?.startExperiment) {
+            this.experimentFlowManager.startExperiment();
+            Logger.info("[PanelSync] Panel 已啟動實驗");
+          }
+        } catch (error) {
+          Logger.error("[PanelSync] 遠端強制開機失敗:", error);
+          return;
+        }
+      } else {
+        Logger.warn("[PanelSync] 廣播缺少實驗資訊 (experimentId/combinationId)，無法遠端開機");
+        return;
+      }
+    }
+
+    const isPowerAction =
+      actionId === ACTION_IDS.POWER_ON || actionId === ACTION_IDS.POWER_OFF;
+    if (isPowerAction && this.powerControl) {
+      const desiredState = actionId === "POWER_ON";
+      if (this.powerControl.isPowerOn === desiredState) {
+        this.experimentActionHandler?.handleRemoteAction?.({
+          actionId,
+          status: "completed",
+          source: clientId,
+        });
+        return;
+      }
+
+      this.powerControl.setPowerState(desiredState, "sync");
+      return;
+    }
+
+    // Panel 已開機（或剛才被強制開機）
+    // 將該 action 標記為已完成，推進至下一個 action
+    if (this.experimentActionHandler) {
+      this.experimentActionHandler.handleRemoteAction({
+        actionId: actionId,
+        status: "completed",
+        source: clientId,
+      });
+      Logger.debug("[PanelSync] 已將 action 推進至下一個", { actionId });
+    } else {
+      Logger.warn("[PanelSync] experimentActionHandler 不可用");
+    }
+  }
+
+  /**
+   * 處理遠端 ACTION_CANCELLED 廣播
+   * 接收來自 Board 端的 action 取消信號
+   */
+  handleSyncActionCancelled(syncData) {
+    const { actionId, clientId } = syncData;
+
+    Logger.debug("[PanelSync] handleSyncActionCancelled 被呼叫", {
+      actionId,
+      clientId,
+    });
+
+    // 若收到的廣播來自本機，忽略
+    const myId = this.syncClient?.clientId;
+    if (myId && clientId === myId) {
+      return;
+    }
+
+    // 若 Panel 未開機，無法處理取消操作
+    if (!this.experimentFlowManager?.isRunning) {
+      Logger.debug("[PanelSync] Panel 未開機，忽略 ACTION_CANCELLED");
+      return;
+    }
+
+    // 通知 actionHandler 取消該 action（若實現了此邏輯）
+    if (this.experimentActionHandler?.handleRemoteAction) {
+      this.experimentActionHandler.handleRemoteAction({
+        actionId: actionId,
+        status: "cancelled",
+        source: clientId,
+      });
+    }
+  }
 }
 
-// 建立全域實例
-window.panelSyncManager = new PanelSyncManager();
+// ES6 模組匯出
+export default PanelSyncManager;
+export { PanelSyncManager };

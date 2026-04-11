@@ -2,14 +2,37 @@
  * MediaManager - 媒體管理器
  *
  * 負責媒體播放、預載入和快取管理
- * 支援影片、圖片和音頻檔案的播放
+ * 支援影片、圖片和音訊檔案的播放
  */
+
+import { loadScenariosData } from "../core/data-loader.js";
+import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
+import { getSharedConfig } from "../core/config.js";
 class MediaManager {
   /**
    * 建構子 - 初始化媒體管理器
    */
-  constructor() {
+  constructor({
+    syncClient = null,
+    panelUIManager = null,
+    powerControl = null,
+    logger = null,
+    experimentFlowManager = null,
+    timeSyncManager = null,
+    configManager = null,
+    experimentCombinationManager = null,
+  } = {}) {
+    this.syncClient = syncClient;
+    this.panelUIManager = panelUIManager;
+    this.powerControl = powerControl;
+    this.logger = logger;
+    this.experimentFlowManager = experimentFlowManager;
+    this.timeSyncManager = timeSyncManager;
+    this.configManager = configManager;
+    this.experimentCombinationManager = experimentCombinationManager;
     this.mediaArea = document.getElementById("mediaArea");
+
     this.isHomePageLooping = false;
     this.homePageVideoElement = null;
 
@@ -25,11 +48,15 @@ class MediaManager {
     // 監聽組合選擇事件，進行組合特定的預先載入
     this.setupEventListeners();
 
-    // 應用已儲存的媒體音量設定
+    // 套用已儲存的媒體音量設定
     this.applyStoredMediaVolume();
 
     // 延遲預載基本媒體資源，避免影響初始載入性能
     this.scheduleEssentialPreload();
+  }
+
+  updateDependencies(deps = {}) {
+    Object.assign(this, deps);
   }
 
   /**
@@ -54,7 +81,8 @@ class MediaManager {
    * 設置事件監聽器
    */
   setupEventListeners() {
-    // 監聽組合選擇事件
+    const syncClient = this.syncClient;
+    // 監聽本機組合選擇事件
     document.addEventListener("combination:selected", (event) => {
       const combination = event.detail?.combination;
       if (combination) {
@@ -64,13 +92,16 @@ class MediaManager {
       }
     });
 
-    // 監聽遠端組合選擇事件
-    document.addEventListener("remote_combination_selected", (event) => {
-      const combination = event.detail?.combination;
-      if (combination) {
-        setTimeout(() => this.preloadCombinationMedia(combination), 500);
-      } else {
-        setTimeout(() => this.preloadCombinationMedia(), 500);
+    // 監聽遠端同步狀態事件 (來自other devices的組合選擇)
+    window.addEventListener(SYNC_EVENTS.REMOTE_STATE, (event) => {
+      const detail = event.detail;
+      // 檢查類型是否為組合選擇，並避免處理自己發送的事件
+      if (detail.type === SYNC_DATA_TYPES.COMBINATION_SELECTED &&
+          detail.clientId !== syncClient?.clientId) {
+        const combination = detail.combination;
+        if (combination) {
+          setTimeout(() => this.preloadCombinationMedia(combination), 500);
+        }
       }
     });
   }
@@ -364,11 +395,7 @@ class MediaManager {
    */
   playHomePageLoop(forcePlay = false) {
     // 檢查是否在實驗模式，如果是且沒有強制播放就不播放首頁影片
-    if (
-      !forcePlay &&
-      window.experiment &&
-      window.experiment.isExperimentRunning
-    ) {
+    if (!forcePlay && this.experimentFlowManager?.isRunning) {
       return;
     }
 
@@ -381,9 +408,9 @@ class MediaManager {
         Logger.error("首頁影片載入失敗", e);
 
         // 檢查系統是否還在開機狀態，如果已關機就不顯示錯誤
-        const isSystemOn = window.powerControl && window.powerControl.isPowerOn;
+        const isSystemOn = this.powerControl?.isPowerOn;
 
-        if (!window.experiment || !window.experiment.isExperimentRunning) {
+        if (!this.experimentFlowManager?.isRunning) {
           if (isSystemOn && this.isHomePageLooping) {
             // 只有在系統開機且首頁循環標記還在時才顯示錯誤
             this.mediaArea.innerHTML = `
@@ -429,15 +456,6 @@ class MediaManager {
       autoplay: true,
       loop: false,
       scrollIntoView: true,
-      onEnded: () => {
-        // 媒體播放結束時，通知 PanelPageManager 處理
-        if (
-          window.panelPageManager &&
-          window.panelPageManager._handleMediaEnd
-        ) {
-          window.panelPageManager._handleMediaEnd();
-        }
-      },
     });
 
     return mediaElement;
@@ -537,19 +555,19 @@ class MediaManager {
     }
 
     // 更新顯示狀態
-    if (window.panelUIManager) {
+    if (this.panelUIManager) {
       const toggleMediaAreaMarker = document.getElementById(
         "toggleMediaAreaMarker",
       );
       const toggleMediaContent = document.getElementById("toggleMediaContent");
 
       if (toggleMediaAreaMarker) {
-        window.panelUIManager.updateMediaAreaMarkerVisibility(
+        this.panelUIManager.updateMediaAreaMarkerVisibility(
           toggleMediaAreaMarker.checked,
         );
       }
       if (toggleMediaContent) {
-        window.panelUIManager.updateMediaContentVisibility(
+        this.panelUIManager.updateMediaContentVisibility(
           toggleMediaContent.checked,
         );
       }
@@ -562,9 +580,7 @@ class MediaManager {
   reset() {
     this.stopHomePageLoop();
     this.clearMediaArea();
-    if (window.logger) {
-      window.logger.logAction("媒體已初始化");
-    }
+    this.logger?.logAction?.("媒體已初始化");
   }
 
   /**
@@ -575,10 +591,10 @@ class MediaManager {
    * @returns {Object} 錯誤資訊物件
    */
   getDetailedErrorInfo(mediaElement, errorEvent, originalSrc) {
-    const timestamp = window.timeSyncManager
-      ? window.timeSyncManager.formatDateTime(Date.now())
+    const timestamp = this.timeSyncManager
+      ? this.timeSyncManager.formatDateTime(Date.now())
       : new Date().toLocaleString("zh-TW", {
-          timeZone: window.CONFIG?.timezone || "Asia/Taipei",
+          timeZone: getSharedConfig()?.timezone || "Asia/Taipei",
         });
 
     const errorInfo = {
@@ -697,8 +713,8 @@ class MediaManager {
     this.mediaArea.innerHTML = errorHtml;
 
     // 記錄到日誌
-    if (window.logger) {
-      window.logger.logAction(
+    if (this.logger) {
+      this.logger.logAction(
         `${mediaType}載入失敗: ${errorInfo.errorMessage} (${errorInfo.originalSrc})`,
       );
     }
@@ -806,7 +822,7 @@ class MediaManager {
         priority += 100;
       }
 
-      // 音頻檔案優先級高
+      // 音訊檔案優先級高
       if (file.endsWith(".mp3") || file.endsWith(".wav")) {
         priority += 50;
       }
@@ -841,7 +857,7 @@ class MediaManager {
     const mediaFiles = new Set();
 
     // 手動新增已知的重要媒體檔案（首頁輪播和固定資源）
-    // 注意：音頻檔案通常不需要預先載入，因為它們在需要時才播放
+    // 注意：音訊檔案通常不需要預先載入，因為它們在需要時才播放
     const essentialFiles = ["./assets/ui/panel.webp"];
 
     essentialFiles.forEach((file) => mediaFiles.add(file));
@@ -866,9 +882,7 @@ class MediaManager {
 
     const currentCombination =
       providedCombination ||
-      window.experimentCombinationManager?.getCurrentCombination() ||
-      window.experimentManager?.currentCombination ||
-      window.combinationSelector?.currentCombination;
+      this.experimentCombinationManager?.getCurrentCombination?.();
 
     if (!currentCombination) {
       Logger.debug("沒有找到目前組合，跳過組合媒體預先載入");
@@ -979,32 +993,30 @@ class MediaManager {
 
       Logger.debug("collectCombinationMediaFiles: 組合單元 =", unitIds);
 
-      for (const unitId of unitIds) {
-        try {
-          // 從 scenarios.json 中查找對應的單元
-          const scenariosResponse = await fetch("./data/scenarios.json");
-          const scenariosData = await scenariosResponse.json();
+      let scenariosData = null;
+      try {
+        scenariosData = await loadScenariosData();
+      } catch (error) {
+        Logger.warn("載入 scenarios.json 失敗，無法收集媒體檔案:", error);
+        scenariosData = null;
+      }
 
-          if (scenariosData.sections) {
-            for (const section of scenariosData.sections) {
-              if (section.units) {
-                const unit = section.units.find((u) => u.unit_id === unitId);
-                if (unit && unit.steps) {
-                  unit.steps.forEach((step) => {
-                    if (step.actions) {
-                      step.actions.forEach((action) => {
-                        if (action.media_file) {
-                          mediaFiles.add(action.media_file);
-                        }
-                      });
-                    }
-                  });
-                }
+      if (scenariosData?.sections) {
+        for (const unitId of unitIds) {
+          const unit = scenariosData.sections
+            .flatMap((section) => section.units || [])
+            .find((u) => u.unit_id === unitId);
+          if (unit && unit.steps) {
+            unit.steps.forEach((step) => {
+              if (step.actions) {
+                step.actions.forEach((action) => {
+                  if (action.media_file) {
+                    mediaFiles.add(action.media_file);
+                  }
+                });
               }
-            }
+            });
           }
-        } catch (error) {
-          Logger.warn(`收集單元 ${unitId} 的媒體檔案失敗:`, error);
         }
       }
     } catch (error) {
@@ -1066,7 +1078,7 @@ class MediaManager {
       let element;
       let timeoutId;
 
-      // 對於音頻檔案，先檢查檔案是否存在
+      // 對於音訊檔案，先檢查檔案是否存在
       if (
         src.endsWith(".mp3") ||
         src.endsWith(".wav") ||
@@ -1091,7 +1103,7 @@ class MediaManager {
         src.endsWith(".wav") ||
         src.endsWith(".ogg")
       ) {
-        // 音頻檔案
+        // 音訊檔案
         element = new Audio();
         element.preload = "metadata"; // 只載入元資料，不載入整個檔案
       } else if (src.endsWith(".mp4") || src.endsWith(".webm")) {
@@ -1167,11 +1179,11 @@ class MediaManager {
   }
 
   /**
-   * 應用已儲存的媒體音量設定
+   * 套用已儲存的媒體音量設定
    */
   applyStoredMediaVolume() {
     // 檢查是否有已儲存的媒體音量設定
-    const configSettings = window.configManager?.userSettings || {};
+    const configSettings = this.configManager?.userSettings || {};
     const storedVolume =
       configSettings.mediaVolume ?? localStorage.getItem("mediaVolume") ?? 70; // 預設 70%
 
@@ -1185,22 +1197,15 @@ class MediaManager {
    */
   onLanguageChange(newLanguage) {
     // 記錄語言變更
-    if (window.logger) {
+    if (this.logger) {
       const langName = newLanguage === "zh" ? "中文" : "English";
-      window.logger.logAction(`媒體語言已變更為: ${langName}`);
+      this.logger.logAction(`媒體語言已變更為: ${langName}`);
     }
 
     // 未來可以在這裡新增語言相關的媒體路徑處理邏輯
   }
 }
 
-// 匯出單例
-window.mediaManager = new MediaManager();
-
-// 通知其他模組 mediaManager 已載入
-if (
-  window.panelUIManager &&
-  typeof window.panelUIManager.applyPendingMediaVolume === "function"
-) {
-  window.panelUIManager.applyPendingMediaVolume();
-}
+// ES6 模組匯出
+export default MediaManager;
+export { MediaManager };

@@ -4,21 +4,37 @@
  * 負責操作日誌記錄、顯示和管理
  * 提供日誌記錄、面板控制、匯出等功能
  */
+import { Logger } from "../core/console-manager.js";
+
 class PanelLogger {
   // ==================== 建構子與初始化 ====================
 
   /**
    * 建構子 - 初始化日誌面板
    */
-  constructor() {
+  constructor({
+    timeSyncManager,
+    experimentFlowManager,
+    experimentActionHandler,
+    syncClient,
+    syncManager,
+    panelMediaManager,
+    buttonManager,
+  } = {}) {
     this.logEntries = [];
+    this.logger = Logger;
+    this.timeSyncManager = timeSyncManager;
+    this.experimentFlowManager = experimentFlowManager;
+    this.experimentActionHandler = experimentActionHandler;
+    this.syncClient = syncClient;
+    this.syncManager = syncManager;
+    this.panelMediaManager = panelMediaManager;
+    this.buttonManager = buttonManager;
 
     // DOM 元素引用 - 延遲初始化
     this.loggerOutput = null;
     this.logContent = null;
     this.loggerFabButton = null;
-
-    // FAB click is handled by PanelUIManager to keep panel open/close logic consistent
 
     // 延遲初始化，等待 DOM 載入完成
     this.initializeDOMElements();
@@ -51,33 +67,16 @@ class PanelLogger {
   /**
    * 偵測是否在實驗模式
    */
-  isExperimentMode() {
-    return (
-      (window.experimentFlowManager &&
-        window.experimentFlowManager.isExperimentRunning()) ||
-      false
-    );
+  updateDependencies(deps = {}) {
+    Object.assign(this, deps);
   }
 
-  /**
-   * 格式化日期時間為 YYYY-MM-DD HH:MM:SS 格式（東八區）
-   * @param {Date|number} date - 要格式化的日期物件或毫秒級時間戳
-   * @param {Object} options - 選項
-   * @returns {string} 格式化後的時間字串
-   */
-  formatDateTime(date, options = {}) {
-    return window.timeSyncManager
-      ? window.timeSyncManager.formatDateTime(date, options)
-      : (() => {
-          const d = typeof date === "number" ? new Date(date) : date;
-          const year = d.getFullYear();
-          const month = String(d.getMonth() + 1).padStart(2, "0");
-          const day = String(d.getDate()).padStart(2, "0");
-          const hours = String(d.getHours()).padStart(2, "0");
-          const minutes = String(d.getMinutes()).padStart(2, "0");
-          const seconds = String(d.getSeconds()).padStart(2, "0");
-          return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-        })();
+  isExperimentMode() {
+    const flowManager = this.experimentFlowManager;
+    return (
+      (flowManager && flowManager.isExperimentRunning()) ||
+      false
+    );
   }
 
   /**
@@ -91,10 +90,9 @@ class PanelLogger {
       current_step: null,
     };
 
+    const flowManager = this.experimentFlowManager;
     const isRunning =
-      window.experimentFlowManager?.isRunning ||
-      (window.experiment && window.experiment.isExperimentRunning) ||
-      false;
+      flowManager?.isRunning || false;
 
     if (!isRunning) {
       return defaultInfo;
@@ -106,17 +104,15 @@ class PanelLogger {
       current_step: null,
     };
 
-    if (
-      window.experimentActionHandler &&
-      window.experimentActionHandler.getProgress
-    ) {
+    const actionHandler = this.experimentActionHandler;
+    if (actionHandler && actionHandler.getProgress) {
       try {
-        const progress = window.experimentActionHandler.getProgress();
+        const progress = actionHandler.getProgress();
         if (progress) {
           experimentInfo.action_progress = progress;
         }
       } catch (error) {
-        Logger.warn("取得動作進度時發生錯誤:", error);
+        this.logger.warn("取得動作進度時發生錯誤:", error);
       }
     }
 
@@ -146,9 +142,16 @@ class PanelLogger {
     comboDetails = null,
     additionalData = {},
   ) {
-    const now = new Date();
+    // 取得同步的時間戳（毫秒級），或降級到本機時間
+    const timeSyncManager = this.timeSyncManager;
+    const serverTime = timeSyncManager?.isSynchronized?.()
+      ? timeSyncManager.getServerTime()
+      : Date.now();
+    const now = new Date(serverTime);
     const timestamp = now.toISOString();
-    const formattedTime = this.formatDateTime(now);
+    const formattedTime = timeSyncManager?.formatDateTime
+      ? timeSyncManager.formatDateTime(now)
+      : timestamp;
 
     // 取得實驗狀態資訊
     const experimentInfo = this.getExperimentInfo();
@@ -162,8 +165,8 @@ class PanelLogger {
 
     // 取得裝置ID
     const clientId =
-      window.syncManager?.core?.syncClient?.clientId ||
-      window.syncClient?.clientId ||
+      this.syncClient?.clientId ||
+      this.syncManager?.clientId ||
       "panel_device";
 
     const logEntry = {
@@ -289,14 +292,16 @@ class PanelLogger {
     this.logAction("日誌已清空");
 
     // 重設媒體
-    if (window.mediaManager) {
-      window.mediaManager.reset();
+    const mediaManager = this.panelMediaManager;
+    if (mediaManager) {
+      mediaManager.reset();
     }
 
     // 重設按鈕功能
-    if (window.buttonManager) {
-      window.buttonManager.buttonFunctionsMap = {};
-      window.buttonManager.loadButtonFunctions();
+    const buttonManager = this.buttonManager;
+    if (buttonManager) {
+      buttonManager.buttonFunctionsMap = {};
+      buttonManager.loadButtonFunctions();
     }
   }
 
@@ -332,14 +337,17 @@ class PanelLogger {
   copyLog() {
     // 檢查是否有日誌內容
     if (this.logEntries.length === 0) {
-      Logger.warn("沒有日誌內容可複製");
+      this.logger.warn("沒有日誌內容可複製");
       return;
     }
 
     // 將日誌格式化為可讀的文字
+    const timeSyncManager = this.timeSyncManager;
     const logText = this.logEntries
       .map((entry) => {
-        const time = this.formatDateTime(new Date(entry.timestamp));
+        const time = timeSyncManager?.formatDateTime
+          ? timeSyncManager.formatDateTime(new Date(entry.timestamp))
+          : new Date(entry.timestamp).toISOString();
         return `[${time}] ${entry.action} (${entry.action_type || "unknown"})`;
       })
       .join("\n");
@@ -349,9 +357,7 @@ class PanelLogger {
       navigator.clipboard
         .writeText(logText)
         .then(() => {
-          if (typeof Logger !== "undefined") {
-            Logger.debug("日誌已複製到剪貼簿");
-          }
+          this.logger.debug("日誌已複製到剪貼簿");
           this.logAction("日誌已複製到剪貼簿");
           this.showCopySuccess();
         })
@@ -369,7 +375,7 @@ class PanelLogger {
    * 處理複製錯誤
    */
   handleCopyError(errorMessage) {
-    Logger.error("複製功能錯誤:", errorMessage);
+    this.logger.error("複製功能錯誤:", errorMessage);
     this.showCopyError();
   }
 
@@ -401,14 +407,6 @@ class PanelLogger {
     }
   }
 
-  // showLoggerPanel / hideLoggerPanel / minimizeLogger 已移除
-  // 所有面板開關統一透過 PanelUIManager.openPanel / closePanel 處理
-
-  /**
-   * 切換日誌面板，加入短暫去抖動以避免多重輸入事件造成重複切換
-   */
-  // toggleLogger removed; PanelUIManager handles panel toggling centrally
-
   /**
    * 設定事件監聽器
    */
@@ -431,9 +429,9 @@ class PanelLogger {
       copyLogButton.addEventListener("click", () => this.copyLog());
     }
 
-    // 關閉按鈕 / FAB 按鈕 / 點擊外部關閉 — 統一由 PanelUIManager 處理
   }
 }
 
-// 匯出單例
-window.logger = new PanelLogger();
+// ES6 模組匯出
+export default PanelLogger;
+export { PanelLogger };
