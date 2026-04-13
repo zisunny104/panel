@@ -70,6 +70,7 @@ class ButtonManager {
     // 動作冷卻機制
     this.lastActionTime = 0;
     this.actionCooldown = 200; // 200ms 冷卻時間
+        this.isCooldownActive = false;
 
     // 實驗動作管理
     this.experimentActions = new Map(); // 儲存實驗動作數據
@@ -335,15 +336,16 @@ class ButtonManager {
   checkAndExecuteExperimentAction(buttonId, functionName, isRemote = false) {
     const flowManager = this._getFlowManager();
     const actionHandler = this._getActionHandler();
+    const isRunning = flowManager?.isRunning;
     // 檢查是否為新的實驗動作按鈕（事件驅動）
-    if (this.isExperimentActionButton(buttonId)) {
+    if (!isRunning && this.isExperimentActionButton(buttonId)) {
       Logger.debug(`檢測到新實驗動作按鈕: ${buttonId}`);
       this.emitButtonActionClick(buttonId);
       return true;
     }
 
     // 檢查實驗是否在執行中
-    if (!flowManager?.isRunning) {
+    if (!isRunning) {
       Logger.debug(`實驗未執行，跳過按鈕動作: ${buttonId}`);
       return false;
     }
@@ -562,6 +564,7 @@ class ButtonManager {
     }
 
     const mediaArea = document.getElementById("mediaArea");
+    const powerControl = this._getPowerControl();
 
     // 新增冷卻指示效果（亮橘色外框）
     if (mediaArea && mediaArea.classList.contains("step-complete-indicator")) {
@@ -577,6 +580,8 @@ class ButtonManager {
 
     // 【冷卻期間】先清除所有高亮，只更新媒體而不高亮按鈕
     this.clearAllButtonHighlights();
+    powerControl?.setPowerSwitchHighlight(false);
+    this.isCooldownActive = true;
     this.updateMediaForCurrentActionWithoutHighlight();
 
     // 3 秒後移除冷卻效果並進入下一步
@@ -595,9 +600,11 @@ class ButtonManager {
 
       if (currentAction) {
         // 【冷卻結束】現在才高亮下一個按鈕
+        this.isCooldownActive = false;
         this.updateMediaForCurrentAction();
       } else {
         Logger.debug("冷卻結束：動作序列已結束，進入單元完成處理");
+        this.isCooldownActive = false;
       }
 
       // 冷卻結束後，進入下一步（僅在 FlowManager 有有效單元時）
@@ -623,6 +630,16 @@ class ButtonManager {
       completedAction.actionId,
     );
 
+    const stepId = stepInfo?.step_id || null;
+    if (stepId === "POWER_STARTUP" || stepId === "POWER_SHUTDOWN") {
+      return {
+        shouldCooldown: false,
+        reason: "電源步驟不參與冷卻判定",
+        stepInfo,
+        stepActions: [],
+      };
+    }
+
     // 找出同一個 step 中的所有 action
     const stepActions = stepInfo
       ? actionHandler.currentActionSequence.filter(
@@ -640,6 +657,12 @@ class ButtonManager {
     if (currentUnitId && actionHandler?.actionToStepMap) {
       for (const [_actionId, stepData] of actionHandler.actionToStepMap) {
         if (stepData.unit_id === currentUnitId) {
+          if (
+            stepData.step_id === "POWER_STARTUP" ||
+            stepData.step_id === "POWER_SHUTDOWN"
+          ) {
+            continue;
+          }
           allStepsInUnit.add(stepData.step_id);
         }
       }
@@ -939,11 +962,18 @@ class ButtonManager {
    * 更新目前 action 的媒體顯示
    */
   updateMediaForCurrentAction() {
+    if (this.isCooldownActive) {
+      this.updateMediaForCurrentActionWithoutHighlight();
+      return;
+    }
     // 準備 UI 並清除高亮
     const { isPowerOn, isPowerVideoPlaying } = this._prepareUIForMedia(true);
 
     // 載入並顯示媒體
     const currentAction = this._loadAndDisplayMedia();
+    const powerControl = this._getPowerControl();
+
+    powerControl?.setPowerSwitchHighlight(false);
 
     if (!currentAction) {
       Logger.debug("沒有目前動作，不進行按鈕高亮");
@@ -995,6 +1025,7 @@ class ButtonManager {
   }
 
   /**
+    if (this.isCooldownActive) return;
    * 檢查機器是否已開機
    */
   isPowerOn() {

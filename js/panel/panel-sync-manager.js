@@ -35,6 +35,7 @@ class PanelSyncManager {
     this.initialized = false;
     this.modules = {};
     this._remoteStartInProgress = false;
+    this._remoteExperimentActive = false;
   }
 
   updateDependencies(deps = {}) {
@@ -189,6 +190,8 @@ class PanelSyncManager {
       const isRunning = this.experimentFlowManager.isRunning || false;
 
       if (!isRunning) {
+        this._remoteExperimentActive = true;
+        this._setDeferCompletion(true);
         this._remoteStartInProgress = true;
         try {
           // 檢查遠端組合是否與本機相同
@@ -266,6 +269,13 @@ class PanelSyncManager {
    * 處理同步的實驗暫停狀態
    */
   handleSyncExperimentPaused(syncData) {
+    if (!this._isExperimentRunningForSync()) {
+      Logger.debug("[PanelSync] 實驗未進行，忽略暫停同步", {
+        clientId: syncData?.clientId,
+        _sessionRestore: syncData?._sessionRestore,
+      });
+      return;
+    }
     this.callExperimentMethod("pauseExperiment", "暫停實驗失敗");
   }
 
@@ -273,13 +283,33 @@ class PanelSyncManager {
    * 處理同步的實驗還原狀態
    */
   handleSyncExperimentResumed(syncData) {
+    if (!this._isExperimentRunningForSync()) {
+      Logger.debug("[PanelSync] 實驗未進行，忽略恢復同步", {
+        clientId: syncData?.clientId,
+        _sessionRestore: syncData?._sessionRestore,
+      });
+      return;
+    }
     this.callExperimentMethod("resumeExperiment", "還原實驗失敗");
+  }
+
+  _isExperimentRunningForSync() {
+    if (this.modules.boardPageManager) {
+      return (
+        this.modules.boardPageManager.experimentRunning ||
+        this.modules.boardPageManager.state?.running ||
+        false
+      );
+    }
+    return this.experimentFlowManager?.isRunning || false;
   }
 
   /**
    * 處理同步的實驗停止狀態
    */
   handleSyncExperimentStopped(syncData) {
+    this._remoteExperimentActive = false;
+    this._setDeferCompletion(false);
     this.callExperimentMethod("stopExperiment", "停止實驗失敗", false);
   }
 
@@ -331,6 +361,10 @@ class PanelSyncManager {
 
     // 廣播實驗開始
     flowManager.on(ExperimentFlowManager.EVENT.STARTED, () => {
+      if (!this._remoteStartInProgress) {
+        this._remoteExperimentActive = false;
+        this._setDeferCompletion(false);
+      }
       if (!this._canBroadcast()) return;
       const currentCombo = this._getExperimentCombo();
       const experimentId =
@@ -371,6 +405,8 @@ class PanelSyncManager {
 
     // 廣播實驗停止
     flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
+      this._remoteExperimentActive = false;
+      this._setDeferCompletion(false);
       if (!this._canBroadcast()) return;
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
@@ -380,6 +416,15 @@ class PanelSyncManager {
     });
 
     Logger.debug("PanelSyncManager: 已綁定所有實驗狀態廣播");
+  }
+
+  _setDeferCompletion(shouldDefer) {
+    if (!this.experimentFlowManager?.setDeferCompletion) return;
+    this.experimentFlowManager.setDeferCompletion(shouldDefer);
+    Logger.debug("[PanelSync] deferCompletion 狀態更新", {
+      shouldDefer,
+      remoteActive: this._remoteExperimentActive,
+    });
   }
 
   /**
@@ -541,6 +586,7 @@ class PanelSyncManager {
     }
 
     // 若 Panel 未開機，無法處理取消操作
+
     if (!this.experimentFlowManager?.isRunning) {
       Logger.debug("[PanelSync] Panel 未開機，忽略 ACTION_CANCELLED");
       return;

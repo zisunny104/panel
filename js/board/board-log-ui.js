@@ -8,7 +8,6 @@
 import {
   LOG_TYPES,
 } from "../constants/index.js";
-import { boardPageManager } from "./board-page-manager.js";
 import { logFilterPanel } from "./board-log-ui-filter.js";
 import { logModalPanel } from "./board-log-ui-modal.js";
 import { logListPanel } from "./board-log-ui-list.js";

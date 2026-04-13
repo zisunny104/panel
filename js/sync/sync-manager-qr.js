@@ -321,20 +321,9 @@ export class SyncManagerQR {
       clearInterval(this.countdownInterval);
     }
 
-    // 取得分享代碼資訊
-    let shareCodeInfo = null;
-    try {
-      shareCodeInfo = await this.core.getShareCodeInfo(code);
-    } catch (error) {
-      Logger.error("取得分享代碼資訊失敗（將繼續產生 QR Code）", error);
-    }
-
     // 構建完整URL（根據 target）
     const qrUrl = this.core.generateQRContent(code, role, target);
 
-    // 檢查分享代碼是否已過期
-    const isExpired = shareCodeInfo && shareCodeInfo.expired;
-    const statusText = isExpired ? " (已過期)" : "";
 
     // 檢查 QRCodeStyling 庫是否已載入
     if (typeof QRCodeStyling === "undefined") {

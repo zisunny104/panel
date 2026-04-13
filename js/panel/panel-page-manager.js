@@ -4,7 +4,7 @@
 * 負責面板頁面腳本的載入與初始化。
 */
 
-import { loadUnitsFromScenarios } from "../core/data-loader.js";
+import { buildActionSequenceFromUnits, loadUnitsFromScenarios } from "../core/data-loader.js";
 import { MediaManager } from "./panel-media-manager.js";
 import { PowerControl } from "./panel-power-control.js";
 import { PanelLogger } from "./panel-logger.js";
@@ -17,11 +17,11 @@ import { experimentSyncManager } from "../board/board-sync-manager.js";
 import { ExperimentHubManager } from "../experiment/experiment-hub-manager.js";
 import { ExperimentCombinationManager } from "../experiment/experiment-combination-manager.js";
 import { ExperimentFlowManager } from "../experiment/experiment-flow-manager.js";
-import { ExperimentUIManager } from "../experiment/experiment-ui-manager.js";
 import { ExperimentSystemManager } from "../experiment/experiment-system-manager.js";
 import { ExperimentStateManager } from "../experiment/experiment-state-manager.js";
 import { ExperimentTimerManager } from "../experiment/experiment-timer.js";
 import { ExperimentActionHandler } from "../experiment/experiment-action-handler.js";
+import { ACTION_IDS } from "../constants/index.js";
 import {
   initExperimentFlowManager,
   initExperimentUIManager,
@@ -350,15 +350,31 @@ class PanelPageManager {
     const flowManager = this.experimentFlowManager;
 
     flowManager.on(ExperimentFlowManager.EVENT.STARTED, async (data) => {
+      this.panelUIManager?.closeAllPanels();
       Logger.debug("Panel: 收到實驗開始事件，開始載入動作序列");
       await this._handleExperimentStarted(data);
     });
 
     this.panelSyncManager.bindExperimentBroadcast(flowManager);
 
-    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
+    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
       Logger.debug("Panel: 收到實驗停止事件，清理按鈕狀態");
       this._handleExperimentStopped();
+      this._handleExperimentSystemFlowStopped(data);
+    });
+
+    flowManager.on(ExperimentFlowManager.EVENT.COMPLETED, (data) => {
+      const powerOptions = this._getPowerOptionsForCurrentCombination();
+      const reason = powerOptions.includeShutdown ? "power_off" : "completed";
+      Logger.debug("Panel: 收到實驗完成事件，清理按鈕狀態", {
+        reason,
+      });
+      this._handleExperimentStopped();
+      this._handleExperimentSystemFlowStopped({
+        reason,
+        completedUnits: data?.completedUnits,
+        timestamp: data?.timestamp,
+      });
     });
 
     this.experimentActionHandler.on(
@@ -378,21 +394,41 @@ class PanelPageManager {
     this._panelPageEventsBound = true;
   }
 
+  _getPowerOptionsForCurrentCombination() {
+    const combo =
+      this.experimentCombinationManager?.getCurrentCombination?.() ||
+      this.experimentSystemManager?.state?.currentCombination ||
+      null;
+    const powerOptions = combo?.powerOptions || {};
+    return {
+      includeStartup:
+        typeof powerOptions.includeStartup === "boolean"
+          ? powerOptions.includeStartup
+          : true,
+      includeShutdown:
+        typeof powerOptions.includeShutdown === "boolean"
+          ? powerOptions.includeShutdown
+          : true,
+    };
+  }
+
   /**
    * 處理實驗開始事件：載入動作序列並通知相關管理器
    * @private
    */
   async _handleExperimentStarted(data) {
     const unitIds = data.units;
+    const powerOptions = this._getPowerOptionsForCurrentCombination();
+
+    if (powerOptions.includeStartup) {
+      this.powerControl?.ensurePowerOffForExperimentStart();
+    }
+
     const isPowerOn = this.powerControl.isPowerOn;
 
     Logger.debug(
       `[實驗開始] 電源狀態: ${isPowerOn ? "已開啟" : "未開啟"} | 單元: ${unitIds.join(", ")}`,
     );
-
-    if (!isPowerOn) {
-      this.powerControl?.setPowerSwitchHighlight(true);
-    }
 
     if (unitIds.length === 0) {
       Logger.warn("沒有可用的單元 ID，無法載入動作序列");
@@ -402,22 +438,7 @@ class PanelPageManager {
     const systemManager = this.experimentSystemManager;
     const allUnits = systemManager.state.scriptData.units || [];
 
-    let unitIdToLoad = unitIds[0];
-    let adjustedUnitIds = [...unitIds];
-
-    if (isPowerOn && unitIds.length > 0) {
-      const firstUnit = allUnits.find((unit) => unit.unit_id === unitIds[0]);
-      if (firstUnit && firstUnit.title && firstUnit.title.includes("開機")) {
-        Logger.debug(
-          `電源已開啟，自動跳過開機單元: ${unitIds[0]}，進入下一個單元`,
-        );
-        if (unitIds.length > 1) {
-          unitIdToLoad = unitIds[1];
-          adjustedUnitIds = unitIds.slice(1);
-          this.experimentFlowManager.loadedUnits = adjustedUnitIds;
-        }
-      }
-    }
+    const unitIdToLoad = unitIds[0];
 
     const firstUnitToLoad = allUnits.find(
       (unit) => unit.unit_id === unitIdToLoad,
@@ -428,7 +449,12 @@ class PanelPageManager {
       return;
     }
 
-    await this._loadUnitActionsToActionHandler(firstUnitToLoad);
+    await this._loadUnitActionsToActionHandler(firstUnitToLoad, {
+      includeStartup: powerOptions.includeStartup,
+      includeShutdown: powerOptions.includeShutdown,
+      isFirstUnit: true,
+      isLastUnit: unitIds.length === 1,
+    });
     this._notifyButtonManagerForActions(firstUnitToLoad);
     this.powerControl?.syncPowerActionWithState();
     this.panelUIManager.setExperimentPanelButtonColor("running");
@@ -440,9 +466,24 @@ class PanelPageManager {
    * 載入單元動作序列到 ActionHandler
    * @private
    */
-  async _loadUnitActionsToActionHandler(unit) {
+  async _loadUnitActionsToActionHandler(unit, options = {}) {
     const actionHandler = this.experimentActionHandler;
-    const actions = (unit.steps || []).flatMap((step) => step.actions || []);
+    const {
+      includeStartup = false,
+      includeShutdown = false,
+      isFirstUnit = false,
+      isLastUnit = false,
+    } = options;
+    const allUnits = this.experimentSystemManager?.state?.scriptData?.units || [];
+    const actions = buildActionSequenceFromUnits(
+      [unit.unit_id],
+      this.actionsMap,
+      allUnits,
+      {
+        includeStartup: includeStartup && isFirstUnit,
+        includeShutdown: includeShutdown && isLastUnit,
+      },
+    );
 
     if (actions.length === 0) {
       Logger.warn(`單元 ${unit.unit_id} 沒有動作序列`);
@@ -457,6 +498,14 @@ class PanelPageManager {
     }
 
     const actionToStepMap = new Map();
+    if (includeStartup && isFirstUnit) {
+      actionToStepMap.set(ACTION_IDS.POWER_ON, {
+        unit_id: unit.unit_id,
+        step_id: "POWER_STARTUP",
+        step_name: "電源開機",
+        isLastActionInStep: true,
+      });
+    }
     (unit.steps || []).forEach((step) => {
       (step.actions || []).forEach((action, actionIndex) => {
         const actionId = action.action_id || action.actionId;
@@ -470,6 +519,14 @@ class PanelPageManager {
         }
       });
     });
+    if (includeShutdown && isLastUnit) {
+      actionToStepMap.set(ACTION_IDS.POWER_OFF, {
+        unit_id: unit.unit_id,
+        step_id: "POWER_SHUTDOWN",
+        step_name: "電源關機",
+        isLastActionInStep: true,
+      });
+    }
 
     actionHandler.actionToStepMap = actionToStepMap;
 
@@ -592,18 +649,8 @@ class PanelPageManager {
    * @private
    * 用於後處理邏輯（日誌保存、同步通知等）
    */
-  async _handleExperimentSystemFlowStopped(data) {
+  async _handleExperimentSystemFlowStopped(data = {}) {
     Logger.info("Panel: 處理實驗系統停止後續邏輯", data);
-
-    const isSyncMode = this.experimentHubManager.isInSyncMode();
-    if (isSyncMode) {
-      this.panelSyncManager.onExperimentStop({
-        reason: data.reason,
-        completedUnits: data.completedUnits,
-        timestamp: data.timestamp,
-      });
-      Logger.debug("Panel: 已通知同步管理器實驗停止");
-    }
 
     if (
       this.panelMediaManager &&
@@ -611,6 +658,11 @@ class PanelPageManager {
     ) {
       this.panelMediaManager.playSound("experimentEnd");
       Logger.debug("Panel: 已播放實驗結束音效");
+    }
+
+    if (data?.reason === "power_off" && this.panelLogger?.exportLog) {
+      this.panelLogger.exportLog();
+      Logger.debug("Panel: 關機結束實驗，已自動匯出日誌");
     }
     Logger.debug("Panel: 實驗系統停止後續邏輯已完成");
   }
@@ -622,10 +674,10 @@ class PanelPageManager {
    */
   async _handleSequenceCompletedForUnitProgression() {
     const flowManager = this.experimentFlowManager;
+    const powerOptions = this._getPowerOptionsForCurrentCombination();
 
     if (flowManager.currentUnitIndex >= flowManager.loadedUnits.length - 1) {
       Logger.debug("Panel: 所有單元已完成");
-      this.powerControl?.highlightShutdownIfNeeded();
       return;
     }
 
@@ -642,7 +694,13 @@ class PanelPageManager {
       return;
     }
 
-    await this._loadUnitActionsToActionHandler(nextUnit);
+    await this._loadUnitActionsToActionHandler(nextUnit, {
+      includeStartup: false,
+      includeShutdown: powerOptions.includeShutdown,
+      isFirstUnit: false,
+      isLastUnit:
+        flowManager.currentUnitIndex >= flowManager.loadedUnits.length - 1,
+    });
     this._notifyButtonManagerForActions(nextUnit);
     this.powerControl?.syncPowerActionWithState();
 

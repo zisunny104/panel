@@ -58,6 +58,8 @@ class ExperimentSyncCore {
    */
   async safeBroadcast(payload) {
     if (!this.canBroadcast()) return false;
+    const role = this.syncClient?.getRole?.() || this.syncClient?.role;
+    if (role && role !== "operator") return false;
     return await this.syncState(payload);
   }
 
@@ -71,7 +73,7 @@ class ExperimentSyncCore {
       },
       details || {},
     );
-    await this.syncState(payload);
+    await this.safeBroadcast(payload);
   }
 
   async broadcastExperimentPause(details) {
@@ -83,7 +85,7 @@ class ExperimentSyncCore {
       },
       details || {},
     );
-    await this.syncState(payload);
+    await this.safeBroadcast(payload);
   }
 
   async broadcastExperimentResume(details) {
@@ -95,7 +97,7 @@ class ExperimentSyncCore {
       },
       details || {},
     );
-    await this.syncState(payload);
+    await this.safeBroadcast(payload);
   }
 
   async broadcastExperimentStop(details) {
@@ -107,7 +109,7 @@ class ExperimentSyncCore {
       },
       details || {},
     );
-    await this.syncState(payload);
+    await this.safeBroadcast(payload);
   }
 
   async broadcastExperimentAction(actionData) {
@@ -119,7 +121,7 @@ class ExperimentSyncCore {
       },
       actionData || {},
     );
-    await this.syncState(payload);
+    await this.safeBroadcast(payload);
   }
 }
 

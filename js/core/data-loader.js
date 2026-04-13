@@ -139,6 +139,7 @@ function buildActionSequenceFromUnits(unitIds, actionsMap, unitsData, options = 
   if (includeStartup) {
     sequence.unshift({
       action_id: ACTION_IDS.POWER_ON,
+      actionId: ACTION_IDS.POWER_ON,
       action_name: "電源開機",
       action_buttons: ACTION_BUTTONS.POWER_ON,
       media_file: null,
@@ -149,6 +150,7 @@ function buildActionSequenceFromUnits(unitIds, actionsMap, unitsData, options = 
   if (includeShutdown) {
     sequence.push({
       action_id: ACTION_IDS.POWER_OFF,
+      actionId: ACTION_IDS.POWER_OFF,
       action_name: "電源關機",
       action_buttons: ACTION_BUTTONS.POWER_OFF,
       media_file: null,

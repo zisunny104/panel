@@ -1051,7 +1051,8 @@
     margin-bottom: 15px;
 }
 
-.sync-share-code-display label {
+.sync-share-code-display label,
+.sync-share-code-display .sync-share-code-label {
     display: block;
     font-weight: 600;
     margin-bottom: 8px;

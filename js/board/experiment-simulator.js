@@ -467,13 +467,16 @@ class ExperimentSimulator {
             `#gesture-card-${gestureIndex} .gesture-action-btn.correct`,
           );
           if (markButton) {
+            markButton.classList.add("is-pressed");
+            setTimeout(() => {
+              markButton.classList.remove("is-pressed");
+            }, 120);
             markButton.click();
           } else {
-            boardPageManager?.gestureUtils?.markGesture?.(
+            this._log("找不到手勢標記按鈕，略過標記", {
               gestureIndex,
-              "correct",
               gestureName,
-            );
+            });
           }
 
           const nextButton = document.querySelector(

@@ -8,15 +8,14 @@ import { SYNC_DATA_TYPES } from "../constants/index.js";
 
 export const createBoardGestureUtils = function (deps) {
   const {
-    app,
+    pageManager,
     timerManager,
     syncClient,
     syncCore,
-    logger,
     experimentLogManager,
   } = deps;
 
-  const activateGestureStep = function (idx) {
+  const setActiveGestureCard = function (idx, { forceScroll = false } = {}) {
     const cards = document.querySelectorAll(
       ".gesture-card-active, .gesture-card-current",
     );
@@ -30,6 +29,11 @@ export const createBoardGestureUtils = function (deps) {
       currentCard.classList.remove("gesture-card-inactive");
       currentCard.classList.add("gesture-card-active", "gesture-card-current");
 
+      if (forceScroll) {
+        currentCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
       const scrollContainer = document.querySelector(".right-panel");
       const containerRect = scrollContainer?.getBoundingClientRect();
       const cardRect = currentCard.getBoundingClientRect();
@@ -41,6 +45,10 @@ export const createBoardGestureUtils = function (deps) {
         currentCard.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
+  };
+
+  const activateGestureStep = function (idx) {
+    setActiveGestureCard(idx);
 
     if (timerManager) {
       const currentIdx = timerManager.currentActiveIndex;
@@ -57,21 +65,24 @@ export const createBoardGestureUtils = function (deps) {
     }
   };
 
+  const focusGestureStep = function (idx) {
+    setActiveGestureCard(idx, { forceScroll: true });
+  };
+
   const markGesture = function (idx, status, gestureName) {
-    const timestamp = new Date().toISOString();
     const timerValue =
       document.getElementById(`timer-display-${idx}`)?.textContent ||
       "00:00.000";
 
-    if (app?.gestureStats && app.gestureStats[gestureName]) {
+    if (pageManager?.gestureStats && pageManager.gestureStats[gestureName]) {
       if (status === "correct") {
-        app.gestureStats[gestureName].correct++;
+        pageManager.gestureStats[gestureName].correct++;
       } else if (status === "uncertain") {
-        app.gestureStats[gestureName].uncertain++;
+        pageManager.gestureStats[gestureName].uncertain++;
       } else if (status === "incorrect") {
-        app.gestureStats[gestureName].incorrect++;
+        pageManager.gestureStats[gestureName].incorrect++;
       }
-      app.renderGestureCountList();
+      pageManager.renderGestureCountList();
     }
 
     const gestureMarkPayload = {
@@ -105,7 +116,7 @@ export const createBoardGestureUtils = function (deps) {
     if (experimentLogManager) {
       const gestureType =
         status === "correct" ? "t" : status === "uncertain" ? "n" : "f";
-      const currentGesture = app?.currentCombination?.gestures?.[idx];
+      const currentGesture = pageManager?.currentCombination?.gestures?.[idx];
       const stepId = currentGesture?.step_id || null;
       experimentLogManager.logAction("gesture_marked", idx, stepId);
       experimentLogManager.logGestureAttempt(idx, gestureType, stepId);
@@ -121,9 +132,9 @@ export const createBoardGestureUtils = function (deps) {
       timerManager.toggleIndexedTimer(idx);
     }
 
-    if (app?.gestureStats && app.gestureStats[gestureName]) {
-      app.gestureStats[gestureName].completed++;
-      app.renderGestureCountList();
+    if (pageManager?.gestureStats && pageManager.gestureStats[gestureName]) {
+      pageManager.gestureStats[gestureName].completed++;
+      pageManager.renderGestureCountList();
     }
 
     const stepCompletedPayload = {
@@ -139,14 +150,18 @@ export const createBoardGestureUtils = function (deps) {
     });
 
     if (experimentLogManager) {
-      const currentGesture = app?.currentCombination?.gestures?.[idx];
+      const currentGesture = pageManager?.currentCombination?.gestures?.[idx];
       const stepId = currentGesture?.step_id || null;
       experimentLogManager.logAction("next_step", idx, stepId);
       experimentLogManager.logGestureStepEnd(idx, stepId);
     }
 
-    const totalGestures = app?.currentCombination?.gestures?.length || 0;
+    const totalGestures = pageManager?.currentCombination?.gestures?.length || 0;
     const isLastStep = idx + 1 >= totalGestures;
+
+    if (!isLastStep) {
+      focusGestureStep(idx + 1);
+    }
 
     if (isLastStep) {
       const currentCard = document.getElementById(`gesture-card-${idx}`);

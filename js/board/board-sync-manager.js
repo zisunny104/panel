@@ -156,6 +156,46 @@ class ExperimentSyncAdapter {
       }),
     );
   }
+
+  /** 廣播 action 完成到其他連線裝置（僅同步模式且操作者可送） */
+  broadcastActionCompleted({
+    actionId,
+    experimentId = "",
+    combinationId = "",
+    participantName = "",
+    powerState,
+  } = {}) {
+    if (!actionId) return false;
+
+    const isSyncMode =
+      this.experimentHubManager?.isInSyncMode?.() ||
+      this.syncManager?.isSyncMode === true;
+    if (!isSyncMode) return false;
+
+    const syncClient = this.resolvedSyncClient;
+    const role = syncClient?.getRole?.() || syncClient?.role;
+    if (role && role !== "operator") return false;
+
+    const payload = {
+      type: SYNC_DATA_TYPES.ACTION_COMPLETED,
+      clientId: syncClient?.clientId || "board",
+      timestamp: Date.now(),
+      actionId,
+      experimentId,
+      combinationId,
+      participantName,
+    };
+
+    if (typeof powerState === "boolean") {
+      payload.powerState = powerState;
+    }
+
+    this.core?.safeBroadcast?.(payload).catch((error) => {
+      Logger.warn("同步 action 完成失敗:", error);
+    });
+
+    return true;
+  }
 }
 
 const experimentSyncManager = new ExperimentSyncAdapter();

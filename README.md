@@ -6,17 +6,17 @@
 
 - **多裝置同步**：支援多個客戶端即時同步實驗狀態
 - **本機/同步模式**：自動判斷是否啟用同步功能
-- **即時通訊**：基於 Server-Sent Events (SSE) 的雙向通訊
-- ** QR Code 分享**：快速分享工作階段
+- **即時通訊**：`WebSocket` + `REST API` 的雙向通訊
+- **QR Code 分享**：快速分享工作階段
 - **實驗日誌**：完整的實驗資訊記錄和管理
 
 ## 技術堆疊
 
-- **前端**：Vanilla JavaScript (ES6+)
-- **即時通訊**：WebSocket + REST API
-- **資料持久性**：sessionStorage + Server-side session
-- **樣式**：CSS3 + 響應式設計
-- **後端**：Node.js + Express + SQLite
+- **前端**：`Vanilla JavaScript` (`ES6+`)
+- **即時通訊**：`WebSocket` + `REST API`
+- **資料持久性**：`localStorage` + `sessionStorage` + `IndexedDB` + `SQLite`
+- **樣式**：`CSS3` + 響應式設計（`Responsive Web Design`）
+- **後端**：`Node.js` + `Express` + `SQLite`
 
 ## 文件
 
@@ -32,8 +32,9 @@ panel/
 ├── js/                     # JavaScript 模組
 │   ├── core/              # 核心功能
 │   ├── board/             # 實驗相關
+│   ├── constants/         # 常數定義
+│   ├── experiment/        # 實驗系統
 │   ├── panel/             # 面板控制
-│   ├── power/             # 電源控制
 │   ├── sync/              # 同步系統
 │   └── ui/                # UI 元件
 ├── css/                   # 樣式表
@@ -48,13 +49,15 @@ panel/
 
 ## 開發者
 
-謝祥紫 Xiang-zi Xie(@zisunny104)、Github Copilot
+謝祥紫 Xiang-zi Xie(@zisunny104)、GitHub Copilot
 
 ## 版本
 
-#### v2.3.esm - Full ES6 Module Migration
+#### v2.4.aa637d3 - 同步與電源流程調整
 
-- All project code is now ES6 module based; no CommonJS remains in the app/server code.
+- 遠端同步啟動延後完成，需手動停止才結束並匯出操作日誌；本機關機後直接結束
+- 電源/動作流程整理：快速開機、關機完成回報、冷卻與高亮同步
+- 組合、同步與日誌流程調整，介面樣式小幅修正
 
 #### v2.3.f366c7b - 同步與模組化更新
 

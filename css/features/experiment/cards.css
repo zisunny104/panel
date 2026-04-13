@@ -313,6 +313,11 @@
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
 }
 
+.gesture-action-btn.is-pressed {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+}
+
 .gesture-action-btn:focus-visible,
 .gesture-next-button:focus-visible {
     outline: 2px solid rgba(102, 126, 234, 0.6);

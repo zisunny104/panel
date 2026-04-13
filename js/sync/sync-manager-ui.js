@@ -266,7 +266,7 @@ export class SyncManagerUI {
                 <h3>分享此工作階段</h3>
 
                 <div class="sync-share-code-display">
-                  <label>分享代碼:</label>
+                  <span class="sync-share-code-label">分享代碼:</span>
                   <div class="sync-share-code-container">
                     <button id="regenerateShareCodeBtn" class="sync-regenerate-code-btn sync-regenerate-inline-btn sync-btn-base" title="重新產生分享代碼">
                       <svg class="sync-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

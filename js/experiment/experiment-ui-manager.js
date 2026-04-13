@@ -10,7 +10,6 @@
 import { loadScenariosData } from "../core/data-loader.js";
 import { SYNC_DATA_TYPES, SYNC_EVENTS } from "../constants/index.js";
 import { generateExperimentId } from "../core/random-utils.js";
-import ExperimentFlowManager from "./experiment-flow-manager.js";
 
 class ExperimentUIManager {
   /**
@@ -1114,7 +1113,7 @@ class ExperimentUIManager {
                 ? `
               <li class="power-option-card startup-card">
                 <label class="unit-checkbox">
-                  <input type="checkbox" id="includeStartup" checked>
+                  <input type="checkbox" id="includeStartup" checked disabled>
                 </label>
                 <div class="unit-sort">
                   <div class="power-option-title">機器開機</div>
@@ -1157,7 +1156,7 @@ class ExperimentUIManager {
                 ? `
               <li class="power-option-card shutdown-card">
                 <label class="unit-checkbox">
-                  <input type="checkbox" id="includeShutdown" checked>
+                  <input type="checkbox" id="includeShutdown" checked disabled>
                 </label>
                 <div class="unit-sort">
                   <div class="power-option-title">機器關機</div>
@@ -1568,7 +1567,7 @@ class ExperimentUIManager {
 
           <div class="form-group experiment-control-group">
             <div class="experiment-control-header">
-              <label>實驗控制</label>
+              <span class="experiment-control-title">實驗控制</span>
               ${config.showTimer ? "<div id=\"experimentTimer\" class=\"experiment-timer\">00:00.000</div>" : ""}
             </div>
 

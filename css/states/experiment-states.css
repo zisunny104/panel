@@ -68,9 +68,7 @@ body.visual-hints-enabled .next-step-highlight {
 }
 
 body.visual-hints-enabled .next-step-highlight-secondary {
-    filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.6));
-    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.5),
-        inset 0 0 0 1px rgba(255, 152, 0, 0.4);
+    filter: drop-shadow(0 0 6px rgba(255, 152, 0, 0.6));
 }
 
 .next-step-highlight-shift {
@@ -104,9 +102,7 @@ body.visual-hints-enabled .button-overlay.next-step-highlight {
 body.visual-hints-enabled .button-overlay.next-step-highlight-secondary {
     background-color: rgba(255, 152, 0, 0.3);
     border-color: #ff9800;
-    filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.6));
-    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.5),
-        inset 0 0 0 1px rgba(255, 152, 0, 0.4);
+    filter: drop-shadow(0 0 6px rgba(255, 152, 0, 0.6));
 }
 
 .button-overlay.next-step-highlight-shift {

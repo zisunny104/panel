@@ -21,7 +21,6 @@ import { experimentSyncManager } from "./board-sync-manager.js";
 import { ExperimentCombinationManager } from "../experiment/experiment-combination-manager.js";
 import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
 import { ExperimentTimerManager } from "../experiment/experiment-timer.js";
-import ExperimentUIManager from "../experiment/experiment-ui-manager.js";
 import {
   initExperimentFlowManager,
   initExperimentUIManager,
@@ -369,7 +368,7 @@ class BoardPageManager {
 
       if (!this.gestureUtils) {
         this.gestureUtils = createBoardGestureUtils({
-          app: this,
+          pageManager: this,
           timerManager: this.timerManager,
           syncClient: this.syncManager?.core?.syncClient,
           syncCore: this.experimentSyncCore,
@@ -441,7 +440,8 @@ class BoardPageManager {
     this.completedActions = new Set();
     this.actionTimings = new Map();
     this.processedRemoteActions = new Map();
-    this.remotActionDedupeWindow = 500;
+    // 避免遠端 action 短時間內重複處理
+    this.remoteActionDedupeWindow = 500;
     this.boardUIManager = new BoardUIManager(this);
     this.boardUIManager.init();
     Logger.debug("BoardUIManager 已初始化");
@@ -449,11 +449,7 @@ class BoardPageManager {
   }
 
   /**
-  * 使用統一的 UI 管理器渲染所有 UI 元件
-   */
-
-  /**
-  * 設定事件監聽器（僅應被呼叫一次）
+   * 設定事件監聽器（僅應被呼叫一次）
    * @private
    */
   _setupEventListeners() {
@@ -559,9 +555,33 @@ class BoardPageManager {
 
     this.updateExperimentStats();
 
+    const container = document.querySelector(".container");
+    const isStackedLayout =
+      container &&
+      window.getComputedStyle(container).flexDirection === "column";
     const experimentControls = document.getElementById("experimentControlsContainer");
+    const scrollToFirstStep = () => {
+      const firstGestureCard = document.getElementById("gesture-card-0");
+      if (firstGestureCard) {
+        firstGestureCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        return true;
+      }
+      return false;
+    };
+
+    if (isStackedLayout) {
+      if (!scrollToFirstStep() && this.currentCombination?.gestures?.length) {
+        setTimeout(scrollToFirstStep, 0);
+      }
+      return;
+    }
+
     if (experimentControls) {
       experimentControls.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    if (!scrollToFirstStep() && this.currentCombination?.gestures?.length) {
+      setTimeout(scrollToFirstStep, 0);
     }
 
     // 廣播由 startExperiment() 在呼叫 FlowManager 前先 dispatchEvent("experiment_started")
@@ -837,10 +857,15 @@ class BoardPageManager {
       });
 
       if (this.scenariosData && this.scenariosData.sections) {
-        const startupCheckbox = document.getElementById("includeStartup");
-        const shutdownCheckbox = document.getElementById("includeShutdown");
-        const includeStartup = startupCheckbox ? startupCheckbox.checked : true;
-        const includeShutdown = shutdownCheckbox ? shutdownCheckbox.checked : true;
+        const powerOptions = combination?.powerOptions || {};
+        const includeStartup =
+          typeof powerOptions.includeStartup === "boolean"
+            ? powerOptions.includeStartup
+            : true;
+        const includeShutdown =
+          typeof powerOptions.includeShutdown === "boolean"
+            ? powerOptions.includeShutdown
+            : true;
 
         // 開機步驟
         if (openGesture) {
@@ -1711,6 +1736,44 @@ class BoardPageManager {
     buttonElement._rollbackTimer = null;
   }
 
+  _scrollActionCardIntoView(buttonElement) {
+    const card = buttonElement?.closest("[id^='gesture-card-']");
+    if (!card) return;
+
+    const scrollContainer = document.querySelector(".right-panel");
+    const containerRect = scrollContainer?.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    const isOutOfView = containerRect
+      ? cardRect.top < containerRect.top || cardRect.bottom > containerRect.bottom
+      : cardRect.top < 0 || cardRect.bottom > window.innerHeight;
+
+    if (isOutOfView) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    this._scrollActionButtonHorizontally(buttonElement);
+  }
+
+  _scrollActionButtonHorizontally(buttonElement) {
+    const actionContainer = buttonElement?.closest(".gesture-actions-container");
+    if (!actionContainer) return;
+
+    const containerRect = actionContainer.getBoundingClientRect();
+    const buttonRect = buttonElement.getBoundingClientRect();
+    const isOutOfView =
+      buttonRect.left < containerRect.left ||
+      buttonRect.right > containerRect.right;
+    if (!isOutOfView) return;
+
+    const targetLeft =
+      buttonElement.offsetLeft -
+      (actionContainer.clientWidth - buttonElement.offsetWidth) / 2;
+    actionContainer.scrollTo({
+      left: Math.max(0, targetLeft),
+      behavior: "smooth",
+    });
+  }
+
   _markActionCompleted(
     buttonElement,
     actionId,
@@ -1724,8 +1787,35 @@ class BoardPageManager {
     buttonElement.style.borderColor = "#4caf50";
     buttonElement.style.boxShadow = "0 0 8px rgba(76, 175, 80, 0.3)";
 
+    this._scrollActionCardIntoView(buttonElement);
+
     if (!isRemote && this.experimentLogManager) {
       this.experimentLogManager.logAction(actionId, gestureIndex, null);
+    }
+
+    if (!isRemote && actionId) {
+      const isPowerAction =
+        actionId === ACTION_IDS.POWER_ON || actionId === ACTION_IDS.POWER_OFF;
+      if (isPowerAction) {
+        const experimentId =
+          this.experimentSystemManager?.getExperimentId?.() ||
+          document.getElementById("experimentIdInput")?.value?.trim() ||
+          "";
+        const combinationId =
+          this.currentCombination?.combinationId ||
+          this.experimentCombinationManager?.getCurrentCombination?.()
+            ?.combinationId ||
+          "";
+        const participantName =
+          document.getElementById("participantNameInput")?.value?.trim() ||
+          "";
+        experimentSyncManager.broadcastActionCompleted({
+          actionId,
+          experimentId,
+          combinationId,
+          participantName,
+        });
+      }
     }
   }
 
@@ -1852,15 +1942,22 @@ class BoardPageManager {
         combination,
         experimentId,
       );
+      const powerOptions = combination?.powerOptions || {};
+      const includeStartup =
+        typeof powerOptions.includeStartup === "boolean"
+          ? powerOptions.includeStartup
+          : true;
+      const includeShutdown =
+        typeof powerOptions.includeShutdown === "boolean"
+          ? powerOptions.includeShutdown
+          : true;
       this.currentActionSequence = buildActionSequenceFromUnits(
         unitIds,
         this.actionsMap,
         this.scriptData.units,
         {
-          includeStartup:
-            document.getElementById("includeStartup")?.checked ?? true,
-          includeShutdown:
-            document.getElementById("includeShutdown")?.checked ?? true,
+          includeStartup,
+          includeShutdown,
         },
       );
       this.currentActionIndex = 0;
@@ -2034,8 +2131,6 @@ class BoardPageManager {
         this.updateUnitButtonStates();
       this.onUnitSelectionChanged();
       return;
-
-      return;
     }
 
     Logger.warn("handleUnitReorder: unsupported arguments", arg1, arg2);
@@ -2118,6 +2213,14 @@ class BoardPageManager {
         selectedUnits.push(li.dataset.unitId);
       }
     });
+
+    if (this.experimentSystemManager?.applyCustomUnitSelection) {
+      this.experimentSystemManager.applyCustomUnitSelection(selectedUnits);
+      document.querySelectorAll(".combination-item").forEach((el) => {
+        el.classList.remove("active");
+      });
+      return;
+    }
 
     if (selectedUnits.length > 0) {
       const customCombination = {
@@ -2511,11 +2614,6 @@ class BoardPageManager {
         Logger.info(`已同步實驗ID到UI: ${experimentId}`);
       }
     });
-
-    // combination:selected DOM 事件不再於此監聽
-    // 統一透過 experimentSystem:combinationSelected 處理
-    // （由 _setupEventListeners 中的 _handleSystemCombinationSelected 接收）
-
   }
 
   /**
@@ -2526,9 +2624,7 @@ class BoardPageManager {
     const { data } = syncData;
     if (!data) return;
 
-    // 接收面板實驗狀態更新
-
-    // 在experiment.html中觸發事件，更新虛擬面板的狀態顯示
+    // 只轉發事件，讓 UI 更新面板狀態
     const event = new CustomEvent(
       SYNC_EVENTS.REMOTE_PANEL_STATE_UPDATE,
       {
@@ -2578,7 +2674,6 @@ class BoardPageManager {
           // 這裡可以新增額外的狀態同步邏輯
           // 例如自動推進到下一步或更新 UI
         }
-      } else {
       }
     }
   }
@@ -2614,10 +2709,6 @@ class BoardPageManager {
 
     const currentExperimentId =
       document.getElementById("experimentIdInput")?.value || "";
-    const expId = experimentId;
-    const btn = button;
-    const func = buttonFunction;
-    const deviceInfo = clientId;
 
     // 去重檢查：避免同個 action 在時間視窗內被重複處理
     if (actionId) {
@@ -2626,7 +2717,7 @@ class BoardPageManager {
 
       if (
         lastProcessTime &&
-        now - lastProcessTime < this.remotActionDedupeWindow
+        now - lastProcessTime < this.remoteActionDedupeWindow
       ) {
         return;
       }
@@ -2637,15 +2728,19 @@ class BoardPageManager {
 
     //記錄到日誌系統
     if (this.experimentLogManager) {
-      this.experimentLogManager.logButtonAction(btn, func, deviceInfo);
+      this.experimentLogManager.logButtonAction(
+        button,
+        buttonFunction,
+        clientId,
+      );
     }
 
     // 如果目前實驗ID相符，執行相應的 UI 更新
-    if (expId === currentExperimentId && this.experimentRunning) {
+    if (experimentId === currentExperimentId && this.experimentRunning) {
       // 使用 action_id 標記對應的卡片
       this.showRemoteActionFeedback(
         actionId,
-        { button: btn, function: func },
+        { button, function: buttonFunction },
         timestamp,
       );
     }

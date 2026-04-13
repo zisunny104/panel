@@ -139,7 +139,6 @@ class ExperimentLogManager {
    */
   _getGestureId(gestureIndex) {
     const gesture =
-      window.app?.currentCombination?.gestures?.[gestureIndex] ||
       boardPageManager?.currentCombination?.gestures?.[gestureIndex] ||
       boardPageManager?.experimentSystemManager?.state?.gestures?.[gestureIndex];
 
@@ -157,11 +156,11 @@ class ExperimentLogManager {
    * @private
    */
   _getGestureName(gestureIndex) {
-    return (
-      window.app?.currentCombination?.gestures?.[gestureIndex]?.gesture_name ||
-      window.app?.currentCombination?.gestures?.[gestureIndex]?.name ||
-      null
-    );
+    const gesture =
+      boardPageManager?.currentCombination?.gestures?.[gestureIndex] ||
+      boardPageManager?.experimentSystemManager?.state?.gestures?.[gestureIndex];
+
+    return gesture?.gesture_name || gesture?.name || null;
   }
 
   /**
@@ -341,10 +340,7 @@ class ExperimentLogManager {
     }
     this.experimentStartTime = this._getTimestamp();
 
-    const combinationInfo =
-      boardPageManager?.currentCombination ||
-      window.app?.currentCombination ||
-      {};
+    const combinationInfo = boardPageManager?.currentCombination || {};
     const unitOrder =
       boardPageManager?.experimentSystemManager?.state?.currentUnitIds?.join("->") ||
       boardPageManager?.loadedUnits?.join("->") ||
@@ -359,7 +355,7 @@ class ExperimentLogManager {
 
     const clientId = this._getClientId();
     if (clientId) {
-      logEntry.d_id = clientId;
+      logEntry.c_id = clientId;
     }
 
     if (combinationInfo.combinationId) {
@@ -395,7 +391,7 @@ class ExperimentLogManager {
 
     const clientId = this._getClientId();
     if (clientId) {
-      logEntry.d_id = clientId;
+      logEntry.c_id = clientId;
     }
 
     this._addLog(logEntry);
@@ -420,7 +416,7 @@ class ExperimentLogManager {
 
     const clientId = this._getClientId();
     if (clientId) {
-      logEntry.d_id = clientId;
+      logEntry.c_id = clientId;
     }
 
     this._addLog(logEntry);
@@ -445,7 +441,7 @@ class ExperimentLogManager {
 
     const clientId = this._getClientId();
     if (clientId) {
-      logEntry.d_id = clientId;
+      logEntry.c_id = clientId;
     }
 
     this._addLog(logEntry);
@@ -473,7 +469,7 @@ class ExperimentLogManager {
 
     if (gestureId) logEntry.g_id = gestureId;
     if (stepId) logEntry.s_id = stepId;
-    if (clientId) logEntry.d_id = clientId;
+    if (clientId) logEntry.c_id = clientId;
 
     this._addLog(logEntry);
     Logger.debug("記錄: 手勢步驟開始", logEntry);
@@ -498,7 +494,7 @@ class ExperimentLogManager {
 
     if (gestureId) logEntry.g_id = gestureId;
     if (stepId) logEntry.s_id = stepId;
-    if (clientId) logEntry.d_id = clientId;
+    if (clientId) logEntry.c_id = clientId;
 
     this._addLog(logEntry);
     Logger.debug("記錄: 手勢步驟結束", logEntry);
@@ -523,7 +519,7 @@ class ExperimentLogManager {
 
     if (gestureId) logEntry.g_id = gestureId;
     if (stepId) logEntry.s_id = stepId;
-    if (clientId) logEntry.d_id = clientId;
+    if (clientId) logEntry.c_id = clientId;
 
     this._addLog(logEntry);
     Logger.debug("記錄: 手勢步驟暫停", logEntry);
@@ -599,7 +595,7 @@ class ExperimentLogManager {
       logEntry.s_id = stepId;
     }
     if (clientId) {
-      logEntry.d_id = clientId;
+      logEntry.c_id = clientId;
     }
     this._addLog(logEntry);
     Logger.debug("記錄: 按鈕動作", logEntry);
@@ -829,7 +825,7 @@ class ExperimentLogManager {
       const detailParts = [];
       let gestureMeta = "";
       if (log.g_id) {
-        const gestureName = window.app?.gesturesData?.[log.g_id]?.zh;
+        const gestureName = boardPageManager?.gesturesData?.[log.g_id]?.zh;
         gestureMeta = gestureName ? `${gestureName} (${log.g_id})` : log.g_id;
       }
       if (log.g_idx !== undefined) {
@@ -1030,7 +1026,7 @@ class ExperimentLogManager {
       participant: this.participantName || `受試者_${experimentId}`,
       button: button,
       function: buttonFunction,
-      client_id: clientId,
+      c_id: clientId,
     };
 
     this._addLog(logEntry);

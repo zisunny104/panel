@@ -5,7 +5,7 @@
  * 事件串接與狀態同步，確保各模組正確互動與資料一致性。
  */
 
-import { LOG_SOURCES } from "../constants/index.js";
+import { LOG_SOURCES, SYNC_EVENTS } from "../constants/index.js";
 import { experimentSyncManager } from "../board/board-sync-manager.js";
 import { generateExperimentId } from "../core/random-utils.js";
 import ExperimentActionHandler from "./experiment-action-handler.js";
@@ -49,6 +49,7 @@ class ExperimentSystemManager {
     };
 
     this.listeners = new Map();
+    this._comboSignatureCache = null;
 
     Logger.debug("ExperimentSystemManager 已建立");
   }
@@ -280,6 +281,11 @@ class ExperimentSystemManager {
       },
     );
 
+    this._applyPowerOptionsToUi(
+      this._normalizePowerOptions(this.state.currentCombination?.powerOptions),
+    );
+    this._bindPowerOptionListeners();
+
     setTimeout(() => this._tryCallPageManager("updateSelectAllState"), 100);
 
     Logger.debug("單元面板已初始化");
@@ -326,8 +332,12 @@ class ExperimentSystemManager {
       }
 
       const experimentId = this.hubManager.getExperimentId();
+      const combinationWithOptions = {
+        ...combination,
+        powerOptions: this._getPowerOptionsFromUi(),
+      };
       const success = await this.combinationManager.setCombination(
-        combination,
+        combinationWithOptions,
         experimentId,
       );
 
@@ -376,6 +386,14 @@ class ExperimentSystemManager {
       this._handleFlowStopped(data);
     });
 
+    this.flowManager.on(ExperimentFlowManager.EVENT.COMPLETED, (data) => {
+      this._handleFlowStopped({
+        reason: data?.reason || "completed",
+        completedUnits: data?.completedUnits,
+        timestamp: data?.timestamp,
+      });
+    });
+
     window.addEventListener("panel:experiment:opened", () => {
       this.refreshPanelUi();
     });
@@ -389,6 +407,10 @@ class ExperimentSystemManager {
     });
     this.uiManager.on("experiment-controls-rendered-delayed", () => {
       this._bindExperimentIdInputListener();
+    });
+
+    window.addEventListener(SYNC_EVENTS.COMBINATION_SELECTED, (event) => {
+      this._handleRemoteCombinationSelected(event?.detail);
     });
   }
 
@@ -448,7 +470,7 @@ class ExperimentSystemManager {
   }
 
   /**
-   * 當實驗 ID 變化時重新初始化組合信息
+   * 當實驗 ID 變化時重新初始化組合資訊
    * @private
    */
   async _reinitializeCombinationForNewExperimentId(experimentId) {
@@ -464,18 +486,18 @@ class ExperimentSystemManager {
         Logger.debug("已清除所有單元選擇");
       }
 
-      // 這樣當用戶再次選擇組合時，會使用新的實驗 ID
+      // 這樣當使用者再次選擇組合時，會使用新的實驗 ID
       // 如果需要自動應用預設組合，可以在這裡呼叫
-      Logger.debug("準備使用新實驗 ID 載入組合信息:", experimentId);
+      Logger.debug("準備使用新實驗 ID 載入組合資訊:", experimentId);
 
-      // 觸發面板重新刷新的事件
+      // 觸發面板重新產生的事件
       window.dispatchEvent(
         new CustomEvent("experimentSystem:shouldRefreshPanel", {
           detail: { experimentId },
         }),
       );
     } catch (error) {
-      Logger.warn("重新初始化組合信息失敗:", error);
+      Logger.warn("重新初始化組合資訊失敗:", error);
     }
   }
 
@@ -525,10 +547,18 @@ class ExperimentSystemManager {
    */
   _handleCombinationSelected(data) {
     const { combination, unitIds } = data;
+    const normalizedPowerOptions = this._normalizePowerOptions(
+      combination?.powerOptions,
+    );
 
     // 更新狀態
-    this.state.currentCombination = combination;
+    this.state.currentCombination = {
+      ...combination,
+      powerOptions: normalizedPowerOptions,
+    };
     this.state.currentUnitIds = unitIds || [];
+
+    this._applyPowerOptionsToUi(normalizedPowerOptions);
 
     Logger.debug(
       `【<cyan>排序追蹤</cyan>】<blue>組合選擇</blue> [組合: ${combination?.combinationName}] [順序: ${(unitIds || []).join("→")}]`,
@@ -554,12 +584,45 @@ class ExperimentSystemManager {
     Logger.debug("組合選擇事件已處理:", combination.combinationName);
   }
 
+  _handleRemoteCombinationSelected(detail) {
+    if (!detail || detail.source !== LOG_SOURCES.REMOTE_SYNC) {
+      return;
+    }
+
+    const combination = detail.combination;
+    if (!combination) {
+      Logger.warn("遠端組合資料缺失，忽略同步");
+      return;
+    }
+
+    if (this.flowManager?.isRunning) {
+      Logger.debug("實驗進行中，忽略遠端組合同步");
+      return;
+    }
+
+    const normalizedPowerOptions = this._normalizePowerOptions(
+      combination.powerOptions,
+    );
+    this._applyPowerOptionsToUi(normalizedPowerOptions);
+    const normalizedCombination = {
+      ...combination,
+      powerOptions: normalizedPowerOptions,
+    };
+
+    const experimentId = detail.experimentId || this.getExperimentId();
+    const skipCache = combination.combinationId === "custom";
+    this.combinationManager.setCombination(normalizedCombination, experimentId, {
+      skipBroadcast: true,
+      skipCache,
+    });
+  }
+
   _handleCombinationLoaded(data) {
     Logger.debug("組合載入事件已處理:", data);
   }
 
   /**
-   * 應用預設組合
+   * 套用預設組合
    * @private
    */
   async _applyDefaultCombination() {
@@ -570,7 +633,7 @@ class ExperimentSystemManager {
         this.state.currentCombination = currentCombo;
         this.state.currentUnitIds =
           this.combinationManager.getCombinationUnitIds(currentCombo) || [];
-        Logger.debug("預設組合已應用:", currentCombo?.combinationName);
+        Logger.debug("預設組合已套用:", currentCombo?.combinationName);
         Logger.debug(
           `【<cyan>排序追蹤</cyan>】<blue>預設組合自動套用</blue> [組合: ${currentCombo?.combinationName}] [順序: ${this.state.currentUnitIds.join("→")}]`,
           {
@@ -587,7 +650,7 @@ class ExperimentSystemManager {
       }
       return success;
     } catch (error) {
-      Logger.error("應用預設組合失敗:", error);
+      Logger.error("套用預設組合失敗:", error);
       return false;
     }
   }
@@ -778,21 +841,8 @@ class ExperimentSystemManager {
    * @private
    */
   _handleUnitToggle(event) {
-    if (event.type === "select-all") {
-      this.state.currentUnitIds =
-        event.checked && event.unitIds ? event.unitIds : [];
-    } else if (event.type === "unit") {
-      if (event.checked) {
-        if (!this.state.currentUnitIds.includes(event.unitId)) {
-          this.state.currentUnitIds.push(event.unitId);
-        }
-      } else {
-        const index = this.state.currentUnitIds.indexOf(event.unitId);
-        if (index > -1) {
-          this.state.currentUnitIds.splice(index, 1);
-        }
-      }
-    }
+    const selectedUnitIds = this._getUnitIdsFromUi({ onlyChecked: true });
+    this._applyCustomUnitSelection(selectedUnitIds);
     setTimeout(() => this._tryCallPageManager("updateSelectAllState"), 10);
   }
 
@@ -802,8 +852,228 @@ class ExperimentSystemManager {
    */
   _handleUnitReorder(fromIndex, toIndex) {
     Logger.debug("單元重新排序:", { fromIndex, toIndex });
-    // 將排序事件轉發到頁面管理器，觸發按鈕狀態更新與手勢序列重新產生
+    const selectedUnitIds = this._getUnitIdsFromUi({ onlyChecked: true });
+    this._applyCustomUnitSelection(selectedUnitIds);
     this._tryCallPageManager("handleUnitReorder", fromIndex, toIndex);
+  }
+
+  applyCustomUnitSelection(unitIds = [], options = {}) {
+    return this._applyCustomUnitSelection(unitIds, options);
+  }
+
+  _applyCustomUnitSelection(unitIds = [], options = {}) {
+    if (!Array.isArray(unitIds)) return false;
+
+    const powerOptions = this._normalizePowerOptions(
+      options.powerOptions || this._getPowerOptionsFromUi(),
+    );
+    const currentUnitIds = this.state.currentUnitIds || [];
+    const currentCombo =
+      this.state.currentCombination ||
+      this.combinationManager.getCurrentCombination();
+    const baseComboId =
+      currentCombo?.baseCombinationId || currentCombo?.combinationId;
+    const baseCombo = baseComboId
+      ? this.combinationManager.getCombinationById(baseComboId)
+      : null;
+    const currentPowerOptions = this._normalizePowerOptions(
+      currentCombo?.powerOptions,
+    );
+    const powerOptionsChanged = !this._isSamePowerOptions(
+      powerOptions,
+      currentPowerOptions,
+    );
+    const experimentId = this.getExperimentId();
+
+    if (unitIds.length === 0) {
+      this.state.currentUnitIds = [];
+      const customCombination = this._buildCustomCombination(
+        [],
+        baseCombo || currentCombo,
+        powerOptions,
+      );
+      return this.combinationManager.setCombination(
+        customCombination,
+        experimentId,
+        {
+          skipCache: true,
+          skipBroadcast: options.skipBroadcast === true,
+        },
+      );
+    }
+
+    const orderUnchanged = this._isSameUnitOrder(unitIds, currentUnitIds);
+    if (orderUnchanged && !powerOptionsChanged && !options.forceBroadcast) {
+      return false;
+    }
+
+    this.state.currentUnitIds = [...unitIds];
+
+    const matchedCombo = this._findMatchingCombination(unitIds, experimentId);
+    if (matchedCombo) {
+      const combinationWithOptions = {
+        ...matchedCombo,
+        powerOptions,
+      };
+      return this.combinationManager.setCombination(
+        combinationWithOptions,
+        experimentId,
+        {
+          skipCache: false,
+          skipBroadcast: options.skipBroadcast === true,
+        },
+      );
+    }
+
+    const customCombination = this._buildCustomCombination(
+      unitIds,
+      baseCombo || currentCombo,
+      powerOptions,
+    );
+    return this.combinationManager.setCombination(
+      customCombination,
+      experimentId,
+      {
+        skipCache: true,
+        skipBroadcast: options.skipBroadcast === true,
+      },
+    );
+  }
+
+  _buildCustomCombination(unitIds, baseCombination = null, powerOptions = null) {
+    return {
+      combinationId: "custom",
+      combinationName: "自訂組合",
+      description: "根據選擇和排序產生的自訂組合",
+      units: [...unitIds],
+      is_randomizable: false,
+      baseCombinationId: baseCombination?.combinationId || null,
+      baseCombinationName: baseCombination?.combinationName || null,
+      powerOptions: this._normalizePowerOptions(
+        powerOptions || this._getPowerOptionsFromUi(),
+      ),
+      source: "custom_order",
+    };
+  }
+
+  _normalizePowerOptions(options = {}) {
+    return { includeStartup: true, includeShutdown: true };
+  }
+
+  _isSamePowerOptions(a = {}, b = {}) {
+    return a.includeStartup === b.includeStartup &&
+      a.includeShutdown === b.includeShutdown;
+  }
+
+  _getPowerOptionsFromUi() {
+    const includeStartup =
+      document.getElementById("includeStartup")?.checked ?? true;
+    const includeShutdown =
+      document.getElementById("includeShutdown")?.checked ?? true;
+    return { includeStartup, includeShutdown };
+  }
+
+  _applyPowerOptionsToUi(options = {}) {
+    const startupCheckbox = document.getElementById("includeStartup");
+    if (
+      startupCheckbox &&
+      typeof options.includeStartup === "boolean" &&
+      startupCheckbox.checked !== options.includeStartup
+    ) {
+      startupCheckbox.checked = options.includeStartup;
+    }
+
+    const shutdownCheckbox = document.getElementById("includeShutdown");
+    if (
+      shutdownCheckbox &&
+      typeof options.includeShutdown === "boolean" &&
+      shutdownCheckbox.checked !== options.includeShutdown
+    ) {
+      shutdownCheckbox.checked = options.includeShutdown;
+    }
+  }
+
+  _bindPowerOptionListeners() {
+    const startupCheckbox = document.getElementById("includeStartup");
+    if (startupCheckbox && !startupCheckbox._experimentSystemBound) {
+      startupCheckbox._experimentSystemBound = true;
+      startupCheckbox.addEventListener("change", () => {
+        this._handlePowerOptionsChanged();
+      });
+    }
+
+    const shutdownCheckbox = document.getElementById("includeShutdown");
+    if (shutdownCheckbox && !shutdownCheckbox._experimentSystemBound) {
+      shutdownCheckbox._experimentSystemBound = true;
+      shutdownCheckbox.addEventListener("change", () => {
+        this._handlePowerOptionsChanged();
+      });
+    }
+  }
+
+  _handlePowerOptionsChanged() {
+    const selectedUnitIds = this._getUnitIdsFromUi({ onlyChecked: true });
+    this._applyCustomUnitSelection(selectedUnitIds, {
+      forceBroadcast: true,
+      powerOptions: this._getPowerOptionsFromUi(),
+    });
+  }
+
+  _getUnitIdsFromUi({ onlyChecked = false } = {}) {
+    const unitPanelSelector = this.state.containers?.unitPanel;
+    const unitList = unitPanelSelector
+      ? document.querySelector(`${unitPanelSelector} .experiment-units-list`)
+      : document.querySelector(".experiment-units-list");
+    if (!unitList) return [];
+
+    const items = Array.from(unitList.querySelectorAll("li[data-unit-id]"));
+    const filtered = onlyChecked
+      ? items.filter((li) => li.querySelector("input[type=\"checkbox\"]")?.checked)
+      : items;
+
+    return filtered.map((li) => li.dataset.unitId).filter(Boolean);
+  }
+
+  _isSameUnitOrder(a = [], b = []) {
+    if (a.length !== b.length) return false;
+    return a.every((id, index) => id === b[index]);
+  }
+
+  _getUnitSignature(unitIds = []) {
+    return Array.isArray(unitIds) ? unitIds.join("|") : "";
+  }
+
+  _getComboSignatureMap(experimentId) {
+    const combos = this.combinationManager.getAvailableCombinations?.() || [];
+    const comboKey = combos.map((c) => c.combinationId).join("|");
+    if (
+      this._comboSignatureCache?.experimentId === experimentId &&
+      this._comboSignatureCache?.comboKey === comboKey
+    ) {
+      return this._comboSignatureCache.map;
+    }
+
+    const map = new Map();
+    combos.forEach((combo) => {
+      const ids =
+        this.combinationManager.getCombinationUnitIds(combo, experimentId) || [];
+      if (!ids.length) return;
+      map.set(this._getUnitSignature(ids), combo);
+    });
+
+    this._comboSignatureCache = {
+      experimentId,
+      comboKey,
+      map,
+    };
+    return map;
+  }
+
+  _findMatchingCombination(unitIds = [], experimentId = null) {
+    const signature = this._getUnitSignature(unitIds);
+    if (!signature) return null;
+    const map = this._getComboSignatureMap(experimentId);
+    return map.get(signature) || null;
   }
 
   /**
@@ -1054,6 +1324,15 @@ class ExperimentSystemManager {
     }
 
     this._applyPendingUiUpdates();
+
+    if (this.state.currentCombination && this.state.currentUnitIds.length > 0) {
+      setTimeout(() => {
+        this._updateUIForCombination(
+          this.state.currentCombination,
+          this.state.currentUnitIds,
+        );
+      }, 0);
+    }
 
     if (this.pageManager?.experimentStateManager?.setupInputSync) {
       this.pageManager.experimentStateManager.setupInputSync();
@@ -1404,8 +1683,6 @@ class ExperimentSystemManager {
     }
   }
 }
-
-// 全域暴露 - 供動態載入的模組使用
 
 // 匯出到全域
 export default ExperimentSystemManager;

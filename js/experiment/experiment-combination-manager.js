@@ -357,6 +357,11 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
     const experimentSyncCore = this.dependencies.experimentSyncCore;
     const syncClient =
       this.dependencies.syncClient || this.dependencies.syncManager?.core?.syncClient;
+    const role = syncClient?.getRole?.() || syncClient?.role;
+    if (role && role !== "operator") return false;
+
+    const experimentId = this.dependencies.hubManager?.getExperimentId?.() || null;
+    const unitIds = Array.isArray(this.loadedUnits) ? [...this.loadedUnits] : [];
 
     if (!experimentSyncCore?.safeBroadcast) {
       Logger.warn("同步組合選擇失敗: experimentSyncCore 不可用");
@@ -367,6 +372,8 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
       type: SYNC_DATA_TYPES.COMBINATION_SELECTED,
       clientId: syncClient?.clientId,
       timestamp: Date.now(),
+      experimentId,
+      unitIds,
       combination: targetCombination,
     }).catch((error) => {
       Logger.warn("同步組合選擇失敗:", error);
@@ -379,7 +386,10 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
    * 檢查是否在同步工作階段中
    */
   isInSyncSession() {
-    return this.dependencies.syncManager?.isInSession?.() || false;
+    return (
+      this.dependencies.hubManager?.isInSyncMode?.() ||
+      this.dependencies.syncManager?.isSyncMode === true
+    );
   }
 
   // ==================== 快取管理 ====================

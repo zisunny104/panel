@@ -25,9 +25,8 @@
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  通訊層 (Communication)                              │   │
 │  │  ┌──────────────┐  ┌──────────────┐                │   │
-│  │  │ WebSocket    │  │  HTTP HEAD   │                │   │
-│  │  │   Client     │  │(/api/health  │                │   │
-│  │  │              │  │  心跳 30s)   │                │   │
+│  │  │ WebSocket    │  │   REST API   │                │   │
+│  │  │   Client     │  │(/api/health) │                │   │
 │  │  └──────────────┘  └──────────────┘                │   │
 │  └──────────────────────────────────────────────────────┘   │
 └──────────────────────┬──────────────────────────────────────┘
@@ -163,11 +162,11 @@ data/
 | **panel-page-manager.js**     | `PanelPageManager`     | 面板頁面腳本載入協調。方法：initialize, loadCoreScripts, loadUIScripts, loadExperimentScripts, loadSyncScripts, loadScript, onInitializationComplete                                                                   |
 | **panel-button-manager.js**   | `ButtonManager`        | 按鈕互動與邏輯。方法：loadButtonFunctions, clearButtonFunctions, simulateButtonClick, setupEventListeners, updateExperimentButtonStyles, handleButtonPressed                                                           |
 | **panel-ui-manager.js**       | `PanelUIManager`       | UI 控制項與視覺設定。方法：updateScale, updateTopSpacer, updateBottomSpacer, updatePowerScale, updateButtonLabelVisibility, updateButtonColorVisibility, updateTouchVisuals, setupEventListeners, initializeUIControls |
-| **panel-power-control.js**    | `PowerControl`         | 電源狀態管理。方法：updatePowerUI, setPowerState, updatePowerUIWithoutSync, updateMediaControlButtons, dispatchPowerStateChanged, setupEventListeners, disableAllButtons, enableAllButtons                             |
+| **panel-power-control.js**    | `PowerControl`         | 電源狀態管理。方法：setPowerState, updatePowerUIWithoutSync, updateMediaControlButtons, dispatchPowerStateChanged, quickPowerOn, ensurePowerOffForExperimentStart, highlightShutdownIfNeeded, setPowerSwitchHighlight, _updatePowerKnobUI |
 | **panel-media-manager.js**    | `MediaManager`         | 媒體預載入與快取。方法：setupEventListeners, playMedia, processMediaSrc, setupVideoElement, setupImageElement, playMediaInArea, preloadMedia, preloadCombinationMedia, stopHomePageLoop, playHomePageLoop              |
 | **panel-logger.js**           | `PanelLogger`          | 操作日誌記錄。方法：initializeDOMElements, setupDOMElements, isExperimentMode, formatDateTime, getExperimentInfo, logAction, toggleLogger, showLogger, hideLogger, clearLog, exportLog                                 |
 | **panel-experiment-power.js** | `PanelExperimentPower` | 電源管理與狀態監控。方法：handlePowerOn, handlePowerOff, highlightPowerSwitch, checkPowerState, setPowerState, handlePowerStateChange                                                                                  |
-| **panel-sync-manager.js**     | `PanelSyncManager`     | 面板同步管理。方法：setupModuleReferences, setupSyncEventListeners, handleSyncExperimentStart, handleSyncExperimentPaused, handleSyncExperimentResumed, handleSyncExperimentStopped, handleSyncExperimentIdUpdate, handleSyncParticipantNameUpdate, handleSyncActionCompleted, handleSyncActionCancelled                                                                                          |
+| **panel-sync-manager.js**     | `PanelSyncManager`     | 面板同步管理。方法：setupModuleReferences, setupSyncEventListeners, handleSyncExperimentStart, handleSyncExperimentPaused, handleSyncExperimentResumed, handleSyncExperimentStopped, handleSyncExperimentIdUpdate, handleSyncParticipantNameUpdate, handleSyncActionCompleted, handleSyncActionCancelled, _setDeferCompletion（遠端啟動延後完成） |
 
 #### js/sync/ - 同步模組
 
@@ -191,7 +190,7 @@ data/
 js/experiment/
 ├── experiment-action-handler.js      # ExperimentActionHandler - 動作處理與事件路由，支援注入 FlowManager、HubManager
 ├── experiment-combination-manager.js # ExperimentCombinationManager - 組合載入、快取還原、隨機化與預設組合應用
-├── experiment-flow-manager.js        # ExperimentFlowManager - 實驗流程協調（開始/暫停/停止/步進），接受 CombinationManager 注入
+├── experiment-flow-manager.js        # ExperimentFlowManager - 實驗流程協調（開始/暫停/停止/步進），支援 setDeferCompletion 以延後完成狀態
 ├── experiment-hub-manager.js         # ExperimentHubManager - 與實驗中樞/同步相關的延遲初始化與工作階段管理
 ├── experiment-state-manager.js       # ExperimentStateManager - 實驗狀態管理與持久化（從 js/core/ 遷移而來）
 ├── experiment-system-manager.js      # ExperimentSystemManager - 實驗系統統一管理器，協調各模組

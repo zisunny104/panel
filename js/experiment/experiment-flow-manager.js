@@ -59,6 +59,8 @@ class ExperimentFlowManager {
     this.currentStepIndex = 0;
     this.loadedUnits = [];
     this.completedUnits = new Set();
+    // 若為遠端啟動且需要手動結束，延後完成狀態切換
+    this.deferCompletion = false;
 
     // 依賴注入
     this.dependencies = {
@@ -197,15 +199,24 @@ class ExperimentFlowManager {
             : this.dependencies.combinationManager?.getLoadedUnits?.() || [];
         const actionsMap = this.dependencies.actionsMap || new Map();
         const unitsData = this.dependencies.unitsData || [];
+        const combo =
+          this.dependencies.combinationManager?.getCurrentCombination?.() || null;
+        const powerOptions = combo?.powerOptions || {};
+        const includeStartup =
+          typeof powerOptions.includeStartup === "boolean"
+            ? powerOptions.includeStartup
+            : true;
+        const includeShutdown =
+          typeof powerOptions.includeShutdown === "boolean"
+            ? powerOptions.includeShutdown
+            : true;
         const actionSequence = buildActionSequenceFromUnits(
           unitIds,
           actionsMap,
           unitsData,
           {
-            includeStartup:
-              document.getElementById("includeStartup")?.checked ?? true,
-            includeShutdown:
-              document.getElementById("includeShutdown")?.checked ?? true,
+            includeStartup,
+            includeShutdown,
           },
         );
 
@@ -636,23 +647,18 @@ class ExperimentFlowManager {
     } else {
       // 所有單元已完成
       Logger.info("所有單元已完成");
-
-      // 【最後單元完成時的電源高亮】
-      // 高亮電源開關，提示用戶進行關機流程
-      if (
-        typeof Logger !== "undefined" &&
-        document.getElementById("powerSwitchArea")
-      ) {
-        const powerSwitchArea = document.getElementById("powerSwitchArea");
-        if (powerSwitchArea) {
-          powerSwitchArea.classList.add("next-step-highlight");
-        }
-        Logger.debug("最後單元已完成，高亮電源開關提示關機");
+      if (this.deferCompletion) {
+        Logger.debug("完成已延後，等待手動結束");
+        return false;
       }
 
       this.completeExperiment();
       return false;
     }
+  }
+
+  setDeferCompletion(shouldDefer) {
+    this.deferCompletion = Boolean(shouldDefer);
   }
 
   /**
