@@ -559,7 +559,7 @@ class ExperimentSimulator {
     const bpm = boardPageManager;
     if (typeof bpm.stopExperiment === "function") {
       try {
-        await bpm.stopExperiment(false); // isManualStop = false（模擬完成）
+        await bpm.stopExperiment();
       } catch (error) {
         this._log("停止失敗", error);
       }

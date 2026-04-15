@@ -4,7 +4,6 @@
  * 負責處理面板頁面的同步狀態更新事件，包括實驗控制和UI同步
  */
 import {
-  ACTION_IDS,
   LOG_SOURCES,
   SYNC_EVENTS,
   SYNC_DATA_TYPES,
@@ -43,10 +42,11 @@ class PanelSyncManager {
   }
 
   /**
-   * 檢查是否可以廣播（連線狀態 + 防回聲）
+   * 檢查是否可以廣播（必須在工作階段中 + 連線狀態 + 防回聲）
    */
   _canBroadcast() {
     return (
+      this._isInSession() &&
       !this._remoteStartInProgress &&
       this.experimentSyncCore?.canBroadcast?.()
     );
@@ -102,13 +102,25 @@ class PanelSyncManager {
   /**
    * 設定同步事件監聽器
    */
+  /**
+   * 判斷目前是否在有效的同步工作階段中
+   * 本機模式（無 session）時，遠端狀態更新一律忽略，避免污染本機實驗狀態
+   */
+  _isInSession() {
+    return !!this.syncClient?.getSessionId?.();
+  }
+
   setupSyncEventListeners() {
     // 監聽同步狀態更新事件
     window.addEventListener(SYNC_EVENTS.STATE_UPDATE, (event) => {
       const state = event.detail;
       if (!state) return;
+
+      // 未加入工作階段時，忽略所有遠端狀態更新（本機獨立模式）
+      // _sessionRestore 是工作階段還原流程，允許通過
+      if (!state._sessionRestore && !this._isInSession()) return;
+
       // 防止自我回聲：拋棄自己廣播們回來的訊息
-      // _sessionRestore 旗標由 sync-client.js 的工作階段狀態還原流程設置，應豁免此限制
       const myId = this.syncClient?.clientId;
       if (myId && state.clientId === myId && !state._sessionRestore) return;
       if (state.type === SYNC_DATA_TYPES.EXPERIMENT_STARTED) {
@@ -123,10 +135,6 @@ class PanelSyncManager {
         this.handleSyncExperimentIdUpdate(state);
       } else if (state.type === SYNC_DATA_TYPES.PARTICIPANT_NAME_UPDATE) {
         this.handleSyncParticipantNameUpdate(state);
-      } else if (state.type === SYNC_DATA_TYPES.ACTION_COMPLETED) {
-        this.handleSyncActionCompleted(state);
-      } else if (state.type === SYNC_DATA_TYPES.ACTION_CANCELLED) {
-        this.handleSyncActionCancelled(state);
       }
     });
 
@@ -134,6 +142,7 @@ class PanelSyncManager {
     let _participantNameDebounce = null;
     document.addEventListener("input", (e) => {
       if (e.target.id !== "participantNameInput") return;
+      if (!this._isInSession()) return;
       const newName = e.target.value.trim();
       if (!newName) return;
       if (_participantNameDebounce) clearTimeout(_participantNameDebounce);
@@ -153,6 +162,11 @@ class PanelSyncManager {
    * 處理同步的實驗開始狀態
    */
   async handleSyncExperimentStart(syncData) {
+    // FlowManager 尚未就緒（初始化期間的 session restore 訊息）→ 安全忽略
+    if (!this.experimentFlowManager) {
+      Logger.debug("[PanelSync] FlowManager 未就緒，忽略 EXPERIMENT_STARTED");
+      return;
+    }
     Logger.debug("[PanelSync] handleSyncExperimentStart 被呼叫", {
       clientId: syncData.clientId,
       experimentId: syncData.experimentId,
@@ -269,6 +283,7 @@ class PanelSyncManager {
    * 處理同步的實驗暫停狀態
    */
   handleSyncExperimentPaused(syncData) {
+    if (!this.experimentFlowManager) return;
     if (!this._isExperimentRunningForSync()) {
       Logger.debug("[PanelSync] 實驗未進行，忽略暫停同步", {
         clientId: syncData?.clientId,
@@ -283,6 +298,7 @@ class PanelSyncManager {
    * 處理同步的實驗還原狀態
    */
   handleSyncExperimentResumed(syncData) {
+    if (!this.experimentFlowManager) return;
     if (!this._isExperimentRunningForSync()) {
       Logger.debug("[PanelSync] 實驗未進行，忽略恢復同步", {
         clientId: syncData?.clientId,
@@ -308,6 +324,7 @@ class PanelSyncManager {
    * 處理同步的實驗停止狀態
    */
   handleSyncExperimentStopped(syncData) {
+    if (!this.experimentFlowManager) return;
     const myId = this.syncClient?.clientId;
     if (myId && syncData?.clientId === myId) {
       Logger.debug("[PanelSync] EXPERIMENT_STOPPED 來自本機，忽略", {
@@ -478,182 +495,6 @@ class PanelSyncManager {
     }
   }
 
-  /**
-   * 處理遠端 ACTION_COMPLETED 廣播
-   * 接收來自 Board 端的 action 完成資訊
-   * 若 Panel 未開機，則強制開機並推進至該 action 的下一個
-   */
-  async handleSyncActionCompleted(syncData) {
-    const { actionId, clientId } = syncData;
-    const currentExperimentId =
-      this.experimentSystemManager?.getExperimentId?.() ||
-      document.getElementById("experimentIdInput")?.value?.trim() ||
-      "";
-
-    if (
-      syncData.experimentId &&
-      currentExperimentId &&
-      syncData.experimentId !== currentExperimentId
-    ) {
-      Logger.debug("[PanelSync] 忽略不同 experimentId 的 ACTION_COMPLETED", {
-        actionId,
-        remoteExperimentId: syncData.experimentId,
-        currentExperimentId,
-      });
-      return;
-    }
-
-    if (syncData._sessionRestore && !this.experimentFlowManager?.isRunning) {
-      Logger.debug("[PanelSync] 忽略 session restore 的 ACTION_COMPLETED（未啟動實驗）", {
-        actionId,
-      });
-      return;
-    }
-
-    Logger.debug("[PanelSync] handleSyncActionCompleted 被呼叫", {
-      actionId,
-      clientId,
-      panelRunning: this.experimentFlowManager?.isRunning,
-    });
-
-    // 若收到的廣播來自本機，忽略（已經由本地邏輯處理）
-    const myId = this.syncClient?.clientId;
-    if (myId && clientId === myId) {
-      Logger.debug("[PanelSync] ACTION_COMPLETED 來自本機，忽略");
-      return;
-    }
-
-    // 若 Panel 未開機，使用 Board 端的實驗資訊強制開機並推進至該 action
-    if (!this.experimentFlowManager?.isRunning) {
-      Logger.info("[PanelSync] Panel 未開機，嘗試以遠端資訊開機並推進至 action");
-
-      // 若有 Board 端傳來的實驗資訊（experimentId, combinationId 等在廣播中）
-      if (syncData.experimentId && syncData.combinationId) {
-        try {
-          // 同步實驗識別與組合，確保可載入單元
-          const expIdInput = document.getElementById("experimentIdInput");
-          if (expIdInput) {
-            expIdInput.value = syncData.experimentId;
-          }
-
-          if (syncData.participantName) {
-            const participantInput = document.getElementById("participantNameInput");
-            if (participantInput) {
-              participantInput.value = syncData.participantName;
-            }
-          }
-
-          if (this.experimentSystemManager?.selectCombination) {
-            const currentCombo = this.experimentCombinationManager?.getCurrentCombination?.();
-            if (!currentCombo || currentCombo.combinationId !== syncData.combinationId) {
-              await this.experimentSystemManager.selectCombination(syncData.combinationId);
-            }
-          }
-
-          // 啟動實驗流程
-          if (this.experimentFlowManager?.startExperiment) {
-            this.experimentFlowManager.startExperiment();
-            Logger.info("[PanelSync] Panel 已啟動實驗");
-          }
-        } catch (error) {
-          Logger.error("[PanelSync] 遠端強制開機失敗:", error);
-          return;
-        }
-      } else {
-        Logger.warn("[PanelSync] 廣播缺少實驗資訊 (experimentId/combinationId)，無法遠端開機");
-        return;
-      }
-    }
-
-    // ================= 遠端推進時的自動開機邏輯 =================
-    // 當 Board 端遠端推進 action 到 Panel 時的自動開機
-    // 場景：Panel 已啟動實驗但尚未開機，收到遠端 action 推進
-    // 行為：自動開啟電源再進行 action
-    // 原因：
-    //   - 機台硬體通常需要電源才能執行 action（馬達驅動、感測器啟動等）
-    //   - 不自動開機會導致遠端 action 無法真正執行
-    // 限制：
-    //   - 只在「實驗已啟動但電源未開」時觸發（避免完全冷啟時自動開機）
-    //   - 排除電源相關 action（POWER_ON/OFF 有個別邏輯）
-    // 註：第一次來時，實驗本身尚未啟動，此邏輯不會觸發
-    if (
-      !this.powerControl?.isPowerOn &&
-      actionId !== ACTION_IDS.POWER_ON &&
-      actionId !== ACTION_IDS.POWER_OFF
-    ) {
-      this.powerControl?.setPowerState(true, "sync");
-    }
-
-    const isPowerAction =
-      actionId === ACTION_IDS.POWER_ON || actionId === ACTION_IDS.POWER_OFF;
-    if (isPowerAction && this.powerControl) {
-      const desiredState = actionId === ACTION_IDS.POWER_ON;
-      if (this.powerControl.isPowerOn === desiredState) {
-        this.experimentActionHandler?.handleRemoteAction?.({
-          actionId,
-          status: "completed",
-          source: clientId,
-        });
-        return;
-      }
-
-      this.powerControl.setPowerState(desiredState, "sync");
-      this.experimentActionHandler?.handleRemoteAction?.({
-        actionId,
-        status: "completed",
-        source: clientId,
-      });
-      return;
-    }
-
-    // Panel 已開機（或剛才被強制開機）
-    // 將該 action 標記為已完成，推進至下一個 action
-    if (this.experimentActionHandler) {
-      this.experimentActionHandler.handleRemoteAction({
-        actionId: actionId,
-        status: "completed",
-        source: clientId,
-      });
-      Logger.debug("[PanelSync] 已將 action 推進至下一個", { actionId });
-    } else {
-      Logger.warn("[PanelSync] experimentActionHandler 不可用");
-    }
-  }
-
-  /**
-   * 處理遠端 ACTION_CANCELLED 廣播
-   * 接收來自 Board 端的 action 取消資訊
-   */
-  handleSyncActionCancelled(syncData) {
-    const { actionId, clientId } = syncData;
-
-    Logger.debug("[PanelSync] handleSyncActionCancelled 被呼叫", {
-      actionId,
-      clientId,
-    });
-
-    // 若收到的廣播來自本機，忽略
-    const myId = this.syncClient?.clientId;
-    if (myId && clientId === myId) {
-      return;
-    }
-
-    // 若 Panel 未開機，無法處理取消操作
-
-    if (!this.experimentFlowManager?.isRunning) {
-      Logger.debug("[PanelSync] Panel 未開機，忽略 ACTION_CANCELLED");
-      return;
-    }
-
-    // 通知 actionHandler 取消該 action（若實現了此邏輯）
-    if (this.experimentActionHandler?.handleRemoteAction) {
-      this.experimentActionHandler.handleRemoteAction({
-        actionId: actionId,
-        status: "cancelled",
-        source: clientId,
-      });
-    }
-  }
 }
 
 // ES6 模組匯出

@@ -59,10 +59,7 @@ class BoardPageManager {
     this.experimentLogManager = null;
     this.experimentStateManager = null;
 
-    this.config = {
-      autoStopCooldownMs:
-        getSharedConfig()?.experiment?.autoStopCooldownMs ?? 5000,
-    };
+    this.config = {};
   }
 
   /**
@@ -2379,12 +2376,10 @@ class BoardPageManager {
     return true;
   }
 
-  async stopExperiment(isManualStop = true) {
-    if (!this.experimentRunning) {
+  async stopExperiment() {
+    if (!this.experimentFlowManager?.isRunning) {
       return;
     }
-
-    this.experimentRunning = false;
 
     if (this.pendingExperimentIdUpdate) {
       this.handleRemoteExperimentIdUpdate(this.pendingExperimentIdUpdate);
@@ -2394,15 +2389,6 @@ class BoardPageManager {
     if (this.pendingParticipantNameUpdate) {
       this.handleRemoteParticipantNameUpdate(this.pendingParticipantNameUpdate);
       this.pendingParticipantNameUpdate = null;
-    }
-
-    if (!isManualStop) {
-      const participantNameInput = document.getElementById("participantNameInput");
-      if (participantNameInput) {
-        participantNameInput.value = "";
-      }
-      this.participantName = "";
-      this.lastSavedParticipantName = "";
     }
 
     if (this.pendingCombinationUpdate) {
@@ -2461,23 +2447,8 @@ class BoardPageManager {
       this.timerManager.stopExperimentTimer();
     }
 
-    this.experimentFlowManager.stopExperiment(
-      isManualStop ? "manual" : "auto",
-    );
+    this.experimentFlowManager.stopExperiment();
 
-    if (!isManualStop) {
-      if (this.config.autoStopCooldownMs > 0) {
-        Logger.debug(
-          `自動停止冷卻 ${this.config.autoStopCooldownMs} ms`,
-        );
-        await new Promise((resolve) =>
-          setTimeout(resolve, this.config.autoStopCooldownMs),
-        );
-      }
-      if (this.experimentSystemManager) {
-        await this.experimentSystemManager.regenerateExperimentId();
-      }
-    }
   }
 
   /**
@@ -3286,8 +3257,7 @@ class BoardPageManager {
       clientId: detail.clientId,
     });
 
-    //回應遠端停止訊號時不廣播（false = 不廣播）
-    this.stopExperiment(false);
+    this.stopExperiment();
 
     // 記錄停止完成
     this.logAction("remote_experiment_stopped_completed", {

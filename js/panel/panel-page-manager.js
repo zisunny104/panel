@@ -356,6 +356,7 @@ class PanelPageManager {
     });
 
     this.panelSyncManager.bindExperimentBroadcast(flowManager);
+    this.panelLogger.bindExperimentEvents(flowManager);
 
     flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
       Logger.debug("Panel: 收到實驗停止事件，清理按鈕狀態");

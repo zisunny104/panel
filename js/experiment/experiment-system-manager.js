@@ -1131,7 +1131,7 @@ class ExperimentSystemManager {
     // boardPageManager.stopExperiment() 內部會呼叫 flowManager.stopExperiment()
     // 並執行 board 端特定清理（卡片重設、計時器清除、統計顯示等）
     if (this.pageManager?.stopExperiment) {
-      this.pageManager.stopExperiment(true);
+      this.pageManager.stopExperiment();
       Logger.debug("實驗停止 - 委派給 boardPageManager");
     } else if (this.flowManager) {
       this.flowManager.stopExperiment();
