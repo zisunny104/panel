@@ -1,10 +1,10 @@
 {
-    "version": "2.4.d3fdddb",
+    "version": "2.5.da4fff5",
     "description": "虛擬操作面板實驗設定範例 (多裝置同步系統優化版)",
     "author": "謝祥紫、Github Copilot",
     "created_at": "2024-07-16T10:00:00Z",
-    "updated_at": "2026-04-14 下午04:13:54.000Z",
-    "git_commit_hash": "d3fdddb",
+    "updated_at": "2026-04-16 上午04:24:21.000Z",
+    "git_commit_hash": "da4fff5",
     "media_base_path": "assets/",
     "settings": {
         "mainScale": 1.29,
