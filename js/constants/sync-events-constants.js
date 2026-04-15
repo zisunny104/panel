@@ -80,8 +80,6 @@ export const SYNC_EVENTS = {
 
   // 面板顯示事件
   SHOW_SESSIONS: "sync_show_sessions",
-  GENERATE_QR: "sync_generate_qr",
-  START_QR_SCAN: "sync_start_qr_scan",
   CONNECTION_LOST: "sync_connection_lost",
 
   // 本機 DOM 事件（dispatched on document，僅限頁面內部使用，非 WebSocket 同步）

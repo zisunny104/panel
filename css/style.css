@@ -34,7 +34,6 @@
 
 /* ===== 多螢幕同步 ===== */
 @import url('./sync/indicator.css');
-@import url('./sync/qr.css');
 @import url('./sync/sessions.css');
 @import url('./sync/confirm.css');
 @import url('./sync/modal.css');

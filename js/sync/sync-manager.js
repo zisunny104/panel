@@ -5,7 +5,6 @@
  */
 import { SyncManagerCore } from "./sync-manager-core.js";
 import { SyncManagerUI } from "./sync-manager-ui.js";
-import { SyncManagerQR } from "./sync-manager-qr.js";
 import { SyncManagerSessions } from "./sync-manager-sessions.js";
 import SyncConfirmDialogManager from "./sync-confirm-dialog.js";
 import { SYNC_EVENTS } from "../constants/index.js";
@@ -131,13 +130,6 @@ class SyncManager {
       syncClientProvider: () => this.core.syncClient,
       indicatorManager: this.indicatorManager,
     });
-    this.qr = new SyncManagerQR(this.core, {
-      syncManager: SyncManager,
-      roleConfig: SyncManager.ROLE,
-      pageConfig: SyncManager.PAGE,
-      confirmDialogManager: SyncConfirmDialogManager,
-      indicatorManager: this.indicatorManager,
-    });
     this.sessions = new SyncManagerSessions(this.core, {
       syncManager: SyncManager,
       roleConfig: SyncManager.ROLE,
@@ -149,7 +141,6 @@ class SyncManager {
       roleConfig: SyncManager.ROLE,
       pageConfig: SyncManager.PAGE,
       statusConfig: SyncManager.STATUS,
-      qrManager: this.qr,
       indicatorManager: this.indicatorManager,
     });
     this.connectionCheckTimer = null;
@@ -200,10 +191,6 @@ class SyncManager {
           this.ui.initialized = true;
           // 膠囊根據 SyncClient.getStatusText() 自動顯示 "idle"（未同步）
         }
-
-        // 無論模式如何，都檢查URL參數（處理分享連結進入）
-        Logger.debug("檢查URL參數以處理分享連結");
-        this.qr.initialize();
 
         // 模式確認後才啟動連線檢查
         this.startConnectionCheck();
@@ -264,11 +251,10 @@ class SyncManager {
     const sessionJoinedDynamicHandler = () => {
       Logger.debug("工作階段已加入，初始化 QR 和 Sessions 模組");
 
-      // 如果之前在本機模式，現在需要動態初始化 QR 和 Sessions
+      // 如果之前在本機模式，現在需要動態初始化 Sessions
       if (!this.isSyncMode) {
-        Logger.debug("動態初始化 QR 與 Sessions（已加入工作階段）");
+        Logger.debug("動態初始化 Sessions（已加入工作階段）");
         this.isSyncMode = true;
-        this.qr.initialize();
         this.sessions.initialize();
       }
 
@@ -631,7 +617,6 @@ class SyncManager {
 
     // 清除各個模組
     this.ui?.cleanup();
-    this.qr?.cleanup();
     this.sessions?.cleanup();
     this.core?.cleanup();
 

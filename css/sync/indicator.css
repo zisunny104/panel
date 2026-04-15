@@ -43,29 +43,9 @@
 }
 
 /* 統一的可滾動內容區域 */
-.sync-panel-body {
-    flex: 1;
-    padding: 20px 20px 20px 20px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #bbb #f5f5f5;
-}
-
-.sync-panel-body::-webkit-scrollbar {
-    width: 8px;
-}
-
-.sync-panel-body::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.sync-panel-body::-webkit-scrollbar-thumb {
-    background: #bbb;
-    border-radius: 4px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    min-height: 40px;
+border: 2px solid transparent;
+background-clip: padding-box;
+min-height: 40px;
 }
 
 .sync-panel-body::-webkit-scrollbar-thumb:hover {
@@ -128,16 +108,14 @@
     animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
+0%,
+100% {
+    opacity: 1;
+}
 
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.5;
-    }
+50% {
+    opacity: 0.5;
+}
 }
 
 .sync-status-text {
@@ -462,144 +440,6 @@
     opacity: 0.6;
 }
 
-/* QR Code 區塊 */
-.sync-qr-section {
-    margin-top: 20px;
-    padding: 15px;
-    background: white;
-    border: 2px solid #28a745;
-    border-radius: 15px;
-}
-
-/* QR Code 預設模式選擇 */
-.sync-qr-role-selector {
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.sync-qr-role-selector label {
-    display: block;
-    font-size: 13px;
-    font-weight: bold;
-    color: #495057;
-    margin-bottom: 8px;
-}
-
-.sync-qr-role-buttons {
-    display: flex;
-    gap: 8px;
-}
-
-.sync-qr-role-btn {
-    flex: 1;
-    padding: 10px 12px;
-    border: 2px solid #dee2e6;
-    background: white;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: bold;
-    transition: all 0.2s;
-    color: #495057;
-}
-
-.sync-qr-role-btn:hover {
-    border-color: #28a745;
-    color: #28a745;
-}
-
-.sync-qr-role-btn.active {
-    background: #28a745;
-    color: white;
-    border-color: #28a745;
-}
-
-.sync-qr-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.sync-qr-countdown {
-    font-size: 20px;
-    font-weight: bold;
-    color: #28a745;
-}
-
-.sync-qr-expired {
-    color: #dc3545 !important;
-}
-
-.sync-regenerate-qr-btn {
-    padding: 8px 12px;
-    background: #28a745;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: bold;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-}
-
-.sync-regenerate-qr-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
-.sync-regenerate-qr-btn:hover {
-    background: #218838;
-    transform: scale(1.05);
-}
-
-.sync-regenerate-qr-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    transform: none;
-}
-
-/* 加入工作階段區塊 - 樣式已合併至上方 .sync-join-section */
-
-.sync-role-selector {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-}
-
-.sync-role-btn {
-    flex: 1;
-    padding: 12px;
-    border: 2px solid #dee2e6;
-    background: white;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-weight: bold;
-}
-
-.sync-role-btn:hover {
-    border-color: #adb5bd;
-}
-
-.sync-role-btn.active {
-    background: #28a745;
-    color: white;
-    border-color: #28a745;
-}
-
-.sync-role-btn.viewer.active {
-    background: #17a2b8;
-    border-color: #17a2b8;
-}
-
 /* 加入工作階段的輸入與建立輸入使用相同佈局以保持尺寸一致 */
 .sync-join-input-group {
     display: flex;
@@ -648,75 +488,6 @@
     box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
 }
 
-.sync-scan-btn {
-    width: 100%;
-    padding: 12px 16px;
-    margin-top: 10px;
-    background: #6c757d;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.sync-scan-btn:hover {
-    background: #5a6268;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 6px rgba(108, 117, 125, 0.3);
-}
-
-.sync-scan-hint {
-    font-size: 12px;
-    color: #6c757d;
-    text-align: center;
-    margin-top: 8px;
-}
-
-.sync-scan-btn:active {
-    transform: translateY(0);
-}
-
-.sync-qr-display {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    text-align: center;
-    padding: 20px;
-    background: #fff;
-    border-radius: 15px;
-    margin-top: 20px;
-}
-
-.sync-qr-code-text {
-    margin-top: 15px;
-    font-size: 16px;
-    color: #495057;
-}
-
-.sync-qr-code-text strong {
-    font-size: 24px;
-    color: #28a745;
-    letter-spacing: 3px;
-}
-
-/* QR Code 角色文字 */
-.sync-qr-role-text {
-    font-size: 11px;
-    color: #6c757d;
-    margin-top: 5px;
-}
-
-/* QR Code 過期訊息 */
-.sync-qr-expired {
-    padding: 20px;
-    text-align: center;
-}
-
 /* 狀態訊息 */
 .sync-status-message {
     padding: 12px 20px;
@@ -758,7 +529,6 @@
 }
 
 /* .sync-session-info strong → 已移至 sessions.css */
-/* .sync-btn-cancel:hover → 已移至 qr.css */
 
 /* ===== 代碼顯示與複製 ===== */
 .sync-join-code-display {
@@ -1017,34 +787,7 @@
 }
 
 /* 分享展開/隱藏按鈕 */
-.sync-share-toggle-btn {
-    background: #17a2b8;
-    color: white;
-    border: none;
-    padding: 12px 16px;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s;
-    width: 100%;
-}
-
-.sync-share-toggle-btn:hover {
-    background: #138496;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
-}
-
-.sync-share-toggle-btn:active {
-    transform: translateY(0);
-}
-
-/* 分享內容（展開狀態） */
-.sync-share-content {
-    background: #f0f7ff;
-    border: 2px solid #17a2b8;
-    border-radius: 8px;
+.sync-status-message {
     padding: 15px;
     margin-top: 10px;
     animation: slideDown 0.3s ease;
@@ -1395,11 +1138,6 @@
         flex: 0 0 auto;
     }
 
-    .sync-role-btn {
-        padding: 8px 10px;
-        font-size: 11px;
-    }
-
     .sync-session-info-cards {
         grid-template-columns: 1fr;
         gap: 8px;
@@ -1522,60 +1260,6 @@
         min-width: 60px;
         padding: 10px 14px;
         font-size: 13px;
-    }
-
-    /* 角色選擇 */
-    .sync-role-selector {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-bottom: 12px;
-    }
-
-    .sync-role-btn {
-        padding: 10px 12px;
-        font-size: 12px;
-    }
-
-    /* 掃描按鈕 */
-    .sync-scan-btn {
-        width: 100%;
-        padding: 10px 14px;
-        font-size: 13px;
-        margin: 8px 0;
-    }
-
-    /* QR 相關 */
-    .sync-share-qr-section {
-        margin: 12px 0;
-    }
-
-    .sync-qr-display {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        padding: 16px;
-        min-height: auto;
-    }
-
-    .sync-qr-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 120px;
-    }
-
-    /* QR canvas 尺寸由 qr.css 控制 */
-
-    .sync-qr-code-text {
-        font-size: 14px;
-        margin-top: 10px;
-    }
-
-    .sync-qr-code-text strong {
-        font-size: 18px;
-        letter-spacing: 2px;
     }
 
     /* 工作階段資訊卡片 */

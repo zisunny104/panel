@@ -17,6 +17,7 @@ class ButtonManager {
     logger = Logger,
     experimentActionHandler = null,
     experimentFlowManager = null,
+    experimentSystemManager = null,
     experimentSyncCore = null,
     syncClient = null,
     powerControl = null,
@@ -25,6 +26,7 @@ class ButtonManager {
     this.logger = logger;
     this.experimentActionHandler = experimentActionHandler;
     this.experimentFlowManager = experimentFlowManager;
+    this.experimentSystemManager = experimentSystemManager;
     this.experimentSyncCore = experimentSyncCore;
     this.syncClient = syncClient;
     this.powerControl = powerControl;
@@ -96,6 +98,10 @@ class ButtonManager {
     return this.experimentFlowManager;
   }
 
+  _getSystemManager() {
+    return this.experimentSystemManager;
+  }
+
   _getSyncCore() {
     return this.experimentSyncCore;
   }
@@ -110,6 +116,31 @@ class ButtonManager {
 
   _getMediaManager() {
     return this.panelMediaManager;
+  }
+
+  _isExperimentRunning(flowManager = this._getFlowManager()) {
+    const systemManager = this._getSystemManager();
+    if (systemManager?.isExperimentRunning) {
+      return systemManager.isExperimentRunning();
+    }
+    return flowManager ? (flowManager.isExperimentRunning?.() ?? Boolean(flowManager.isRunning)) : false;
+  }
+
+  _getFlowProgressSnapshot(flowManager = this._getFlowManager()) {
+    const systemManager = this._getSystemManager();
+    if (systemManager?.getFlowProgressSnapshot) {
+      return systemManager.getFlowProgressSnapshot();
+    }
+    const unitIds = Array.isArray(flowManager?.loadedUnits)
+      ? [...flowManager.loadedUnits]
+      : [];
+    const currentUnitIndex = flowManager?.currentUnitIndex ?? -1;
+
+    return {
+      currentUnitIndex,
+      totalUnits: unitIds.length,
+      unitIds,
+    };
   }
 
   // ==========================================
@@ -280,7 +311,7 @@ class ButtonManager {
     }
 
     // 實驗模式下檢查是否有對應的動作
-    if (flowManager?.isRunning) {
+    if (this._isExperimentRunning(flowManager)) {
       if (this.checkAndExecuteExperimentAction(buttonId, functionName)) {
         if (actionHandler && actionHandler.currentActionSequence?.length > 0) {
           const currentActionIndex = actionHandler.currentActionIndex;
@@ -336,7 +367,7 @@ class ButtonManager {
   checkAndExecuteExperimentAction(buttonId, functionName, isRemote = false) {
     const flowManager = this._getFlowManager();
     const actionHandler = this._getActionHandler();
-    const isRunning = flowManager?.isRunning;
+    const isRunning = this._isExperimentRunning(flowManager);
     // 檢查是否為新的實驗動作按鈕（事件驅動）
     if (!isRunning && this.isExperimentActionButton(buttonId)) {
       Logger.debug(`檢測到新實驗動作按鈕: ${buttonId}`);
@@ -547,10 +578,14 @@ class ButtonManager {
     // 檢查是否還有下一個動作（實驗是否已完成）
     const nextAction = actionHandler?.getCurrentAction();
     if (!nextAction) {
+      const { currentUnitIndex, totalUnits } = this._getFlowProgressSnapshot(
+        flowManager,
+      );
       // 實驗已完成，檢查是否為最後單元完成
       if (
         flowManager &&
-        flowManager.currentUnitIndex === flowManager.loadedUnits.length - 1
+        totalUnits > 0 &&
+        currentUnitIndex === totalUnits - 1
       ) {
         Logger.debug("最後單元完成，即將顯示電源開關高亮");
         // 最後單元完成時的電源高亮由 nextUnit() 處理
@@ -612,7 +647,12 @@ class ButtonManager {
         flowManager?.getCurrentUnit?.() &&
         currentAction?.actionId !== ACTION_IDS.POWER_OFF
       ) {
-        flowManager.nextStep();
+        const systemManager = this._getSystemManager();
+        if (!systemManager?.advanceToNextStep) {
+          Logger.warn("ExperimentSystemManager 未就緒，跳過 step 推進");
+          return;
+        }
+        systemManager.advanceToNextStep();
       }
     }, 3000);
   }
@@ -653,8 +693,10 @@ class ButtonManager {
       : [];
 
     // 取得目前 unit 的所有 step
-    const currentUnitId =
-      flowManager?.loadedUnits?.[flowManager?.currentUnitIndex];
+    const { unitIds, currentUnitIndex } = this._getFlowProgressSnapshot(
+      flowManager,
+    );
+    const currentUnitId = unitIds?.[currentUnitIndex];
     const allStepsInUnit = new Set();
 
     if (currentUnitId && actionHandler?.actionToStepMap) {
@@ -742,7 +784,7 @@ class ButtonManager {
       localStorage.getItem("showTouchVisuals") !== "false";
     if (
       showTouchVisuals &&
-      flowManager?.isRunning &&
+      this._isExperimentRunning(flowManager) &&
       !document.body.classList.contains("visual-hints-enabled")
     ) {
       document.body.classList.add("visual-hints-enabled");
@@ -827,7 +869,7 @@ class ButtonManager {
       return;
     }
 
-    const isExperimentRunning = flowManager?.isRunning || false;
+    const isExperimentRunning = this._isExperimentRunning(flowManager);
     if (
       !isPowerOn ||
       isPowerVideoPlaying ||
@@ -1127,7 +1169,7 @@ class ButtonManager {
               this.touchShiftTimeout = null;
             }
 
-            if (flowManager?.isRunning) {
+            if (this._isExperimentRunning(flowManager)) {
               this.executeTouchShift();
               return;
             }
@@ -1289,7 +1331,7 @@ class ButtonManager {
     }
 
     // 在實驗模式下，執行對應的實驗動作
-    if (flowManager?.isRunning) {
+    if (this._isExperimentRunning(flowManager)) {
       this.checkAndExecuteExperimentAction(
         buttonId,
         functionName,
@@ -1348,7 +1390,7 @@ class ButtonManager {
     );
 
     // 實驗模式下檢查是否有對應的動作
-    if (this._getFlowManager()?.isRunning) {
+    if (this._isExperimentRunning()) {
       this.checkAndExecuteExperimentAction("B1", "shift");
     }
 

@@ -1079,17 +1079,161 @@ class ExperimentSystemManager {
     return map.get(signature) || null;
   }
 
+  _getFlow() {
+    return this.flowManager || null;
+  }
+
+  getFlowProgressSnapshot() {
+    const flow = this._getFlow();
+    if (!flow) {
+      return {
+        currentUnitIndex: -1,
+        totalUnits: 0,
+        unitIds: [],
+        isLastUnit: false,
+      };
+    }
+
+    const progress = flow.getProgress?.() || null;
+    const unitIds =
+      flow.getUnitList?.() ||
+      (Array.isArray(flow.loadedUnits) ? [...flow.loadedUnits] : []);
+    const currentUnitIndex = progress?.currentUnitIndex ?? flow.currentUnitIndex ?? -1;
+    const totalUnits = progress?.totalUnits ?? unitIds.length;
+    const isLastUnit = totalUnits > 0 && currentUnitIndex >= totalUnits - 1;
+
+    return {
+      currentUnitIndex,
+      totalUnits,
+      unitIds,
+      isLastUnit,
+    };
+  }
+
+  advanceToNextUnit() {
+    return this._getFlow()?.nextUnit?.() || false;
+  }
+
+  advanceToNextStep() {
+    return this._getFlow()?.nextStep?.() || false;
+  }
+
+  isExperimentRunning() {
+    const flow = this._getFlow();
+    return flow ? (flow.isExperimentRunning?.() ?? Boolean(flow.isRunning)) : false;
+  }
+
+  async startExperiment() {
+    const flow = this._getFlow();
+    if (!flow) {
+      throw new Error("ExperimentFlowManager 不可用，無法開始實驗");
+    }
+    return flow.startExperiment();
+  }
+
+  pauseExperiment() {
+    return this._getFlow()?.pauseExperiment?.() || false;
+  }
+
+  resumeExperiment() {
+    return this._getFlow()?.resumeExperiment?.() || false;
+  }
+
+  togglePauseExperiment() {
+    const flow = this._getFlow();
+    if (!flow?.isRunning) return false;
+    return flow.isPaused ? this.resumeExperiment() : this.pauseExperiment();
+  }
+
+  stopFlowExperiment(...args) {
+    return this._getFlow()?.stopExperiment?.(...args) || false;
+  }
+
+  stopExperiment(...args) {
+    // board 端需要 pageManager.stopExperiment() 以確保 UI/計時器等清理完整
+    if (this.pageManager?.stopExperiment) {
+      return this.pageManager.stopExperiment(...args);
+    }
+    return this.stopFlowExperiment(...args);
+  }
+
+  async startExperimentFromSync(syncData = {}) {
+    const remoteComboId = syncData?.combinationId;
+    const currentCombo = this.combinationManager?.getCurrentCombination?.();
+
+    if (
+      remoteComboId &&
+      (!currentCombo || currentCombo.combinationId !== remoteComboId)
+    ) {
+      Logger.info(`[ExperimentSystem] 組合不一致，同步遠端組合: ${remoteComboId}`);
+      await this.selectCombination(remoteComboId).catch((err) =>
+        Logger.warn("[ExperimentSystem] 設定遠端組合失敗:", err),
+      );
+    }
+
+    if (this.isExperimentRunning()) {
+      Logger.debug("[ExperimentSystem] 實驗已在進行中，略過同步啟動");
+      return false;
+    }
+
+    return this.startExperiment();
+  }
+
+  async handleSyncExperimentStart(syncData = {}) {
+    await this.handleSyncExperimentIdUpdate(syncData);
+    this.handleSyncParticipantNameUpdate(syncData);
+
+    if (!this.isExperimentRunning()) {
+      return this.startExperimentFromSync(syncData);
+    }
+    Logger.debug("[ExperimentSystem] 實驗已在進行中，忽略遠端開始請求");
+    return false;
+  }
+
+  handleSyncExperimentPaused() {
+    if (!this.isExperimentRunning()) return false;
+    return this.pauseExperiment();
+  }
+
+  handleSyncExperimentResumed() {
+    if (!this.isExperimentRunning()) return false;
+    return this.resumeExperiment();
+  }
+
+  handleSyncExperimentStopped() {
+    if (!this.isExperimentRunning()) return false;
+    return this.stopExperiment();
+  }
+
+  async handleSyncExperimentIdUpdate(syncData = {}) {
+    const { experimentId } = syncData;
+    if (!experimentId) return false;
+
+    const currentId = this.getExperimentId();
+    if (currentId === experimentId) return false;
+
+    await this.setExperimentId(experimentId, LOG_SOURCES.REMOTE_SYNC, {
+      registerToHub: false,
+      broadcast: false,
+      reapplyCombination: true,
+    });
+    return true;
+  }
+
+  handleSyncParticipantNameUpdate(syncData = {}) {
+    const { participantName } = syncData;
+    if (!participantName) return false;
+    this.updateParticipantNameUi(participantName);
+    return true;
+  }
+
   /**
    * 處理實驗開始事件
    * @private
    */
   _handleExperimentStart() {
-    if (this.flowManager) {
-      this.flowManager.startExperiment();
-      Logger.debug("實驗開始 - 使用 ExperimentFlowManager");
-    } else {
-      throw new Error("ExperimentFlowManager 不可用，無法開始實驗");
-    }
+    this.startExperiment();
+    Logger.debug("實驗開始 - 透過 ExperimentSystemManager");
 
     // 通知 UI 管理器處理實驗開始（關閉所有面板等）
     if (this.uiManager) {
@@ -1102,12 +1246,8 @@ class ExperimentSystemManager {
    * @private
    */
   _handleExperimentPause() {
-    if (this.flowManager) {
-      this.flowManager.pauseExperiment();
-      Logger.debug("實驗暫停 - 使用 ExperimentFlowManager");
-    } else {
-      Logger.debug("實驗暫停 - ExperimentFlowManager 不可用");
-    }
+    this.pauseExperiment();
+    Logger.debug("實驗暫停 - 透過 ExperimentSystemManager");
   }
 
   /**
@@ -1115,12 +1255,8 @@ class ExperimentSystemManager {
    * @private
    */
   _handleExperimentResume() {
-    if (this.flowManager) {
-      this.flowManager.resumeExperiment();
-      Logger.debug("實驗繼續 - 使用 ExperimentFlowManager");
-    } else {
-      Logger.debug("實驗繼續 - ExperimentFlowManager 不可用");
-    }
+    this.resumeExperiment();
+    Logger.debug("實驗繼續 - 透過 ExperimentSystemManager");
   }
 
   /**
@@ -1128,15 +1264,8 @@ class ExperimentSystemManager {
    * @private
    */
   _handleExperimentStop() {
-    // boardPageManager.stopExperiment() 內部會呼叫 flowManager.stopExperiment()
-    // 並執行 board 端特定清理（卡片重設、計時器清除、統計顯示等）
-    if (this.pageManager?.stopExperiment) {
-      this.pageManager.stopExperiment();
-      Logger.debug("實驗停止 - 委派給 boardPageManager");
-    } else if (this.flowManager) {
-      this.flowManager.stopExperiment();
-      Logger.debug("實驗停止 - 使用 ExperimentFlowManager");
-    }
+    this.stopExperiment();
+    Logger.debug("實驗停止 - 透過 ExperimentSystemManager");
   }
 
   /**

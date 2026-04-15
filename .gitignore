@@ -15,3 +15,6 @@ runtime/experiment-data/
 # Editor
 .vscode/
 .DS_Store
+
+# Local AI tool settings
+.claude/

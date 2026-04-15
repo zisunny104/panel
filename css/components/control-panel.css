@@ -60,14 +60,19 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.75rem;
 }
 
 .control-group span {
     margin-right: 0.3125rem;
+    flex: 1 1 auto;
 }
 
 .control-group .switch {
-    margin-right: 0.5rem;
+    margin-right: 0;
+    flex: 0 0 auto;
 }
 
 .panel-divider {

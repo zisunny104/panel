@@ -26,13 +26,11 @@ export class SyncManagerUI {
       VIEWER: "viewer",
       OPERATOR: "operator",
     };
-    this.qrManager = config.qrManager || null;
     this.indicatorManager = config.indicatorManager || null;
     this.capsuleIndicator = null;
     this.controlPanel = null;
     this.controlPanelModal = null;
     this.statusElement = null;
-    this.currentQRRole = this.roleConfig.VIEWER;
     this.currentShareCode = null;
     this.initialized = false;
     this.sharePanelOpened = false;
@@ -228,7 +226,6 @@ export class SyncManagerUI {
 
             <div class="sync-join-method-divider"></div>
 
-            <button class="sync-scan-btn" id="scanQrBtn">掃描 QR Code</button>
           </div>
         </div>
       </div>
@@ -291,13 +288,6 @@ export class SyncManagerUI {
                         </svg>
                       </button>
                     </div>
-                  </div>
-                </div>
-
-                <div class="sync-qr-display">
-                  <div id="shareQRCountdown" class="sync-qr-countdown">60</div>
-                  <div class="sync-qr-container">
-                    <div id="shareQRCode" class="sync-qr-code"></div>
                   </div>
                 </div>
 
@@ -488,25 +478,6 @@ export class SyncManagerUI {
         }
       });
 
-      const qrRoleButtons =
-        this.controlPanel.querySelectorAll(".sync-qr-role-btn");
-      qrRoleButtons.forEach((btn) => {
-        this.addDOMListener(btn, "click", () => {
-          qrRoleButtons.forEach((b) => b.classList.remove("active"));
-          btn.classList.add("active");
-          this.currentQRRole = btn.dataset.role;
-
-          const sessionId = this.core.getSessionId();
-          if (sessionId) {
-            window.dispatchEvent(
-              new CustomEvent(SYNC_EVENTS.GENERATE_QR, {
-                detail: { sessionId, role: this.currentQRRole },
-              }),
-            );
-          }
-        });
-      });
-
       const roleCard = document.getElementById("roleCard");
       if (roleCard) {
         this.addDOMListener(roleCard, "click", () => {
@@ -572,11 +543,6 @@ export class SyncManagerUI {
         }
       });
 
-      const scanBtn = document.getElementById("scanQrBtn");
-      this.addDOMListener(scanBtn, "click", () => {
-        window.dispatchEvent(new CustomEvent(SYNC_EVENTS.START_QR_SCAN));
-      });
-
       const shareSessionToggleBtn = document.getElementById(
         "shareSessionToggleBtn",
       );
@@ -602,8 +568,6 @@ export class SyncManagerUI {
           if (shareSessionToggleBtn) {
             shareSessionToggleBtn.classList.remove("hidden");
           }
-
-          this.qrManager?.stopQRCodeCountdown?.();
         });
       }
 
@@ -674,22 +638,6 @@ export class SyncManagerUI {
               if (shareDisplayCode) {
                 shareDisplayCode.textContent = newShareCode;
               }
-
-              const remainingTime = result.remainingTime || 300;
-              this.qrManager?.startQRCodeCountdown?.(
-                remainingTime,
-                "shareQRCountdown",
-              );
-
-              window.dispatchEvent(
-                new CustomEvent(SYNC_EVENTS.GENERATE_QR, {
-                  detail: {
-                    shareCode: newShareCode,
-                    role: this.core.syncClient.role,
-                    isShareCode: true,
-                  },
-                }),
-              );
 
               this.showStatus("success", "已重新產生分享代碼");
             }
@@ -794,13 +742,6 @@ export class SyncManagerUI {
       this.updateUIState();
       this.updateConnectedSessionInfo();
 
-      const shareDisplayCode = document.getElementById("shareDisplayCode");
-      if (shareDisplayCode) {
-        shareDisplayCode.textContent = "點擊「產生分享代碼」按鈕";
-      }
-
-      this.currentQRRole = this.roleConfig.VIEWER;
-
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.SESSION_CREATED, {
           detail: { sessionId },
@@ -813,39 +754,6 @@ export class SyncManagerUI {
     } catch (error) {
       this.showStatus("error", "建立工作階段失敗", error && error.message);
       Logger.error("[SyncUI] 建立工作階段失敗:", error);
-    }
-  }
-
-  async handleGenerateShareCode() {
-    this.showStatus("info", "產生中...");
-
-    try {
-      const result = await this.core.generateShareCode();
-      this.currentShareCode = result.shareCode;
-
-      this.showStatus("success", "分享代碼已產生");
-
-      const shareDisplayCode = document.getElementById("shareDisplayCode");
-      if (shareDisplayCode) {
-        shareDisplayCode.textContent = result.shareCode;
-      }
-
-      const qrRoleButtons =
-        this.controlPanel.querySelectorAll(".sync-qr-role-btn");
-      qrRoleButtons.forEach((btn) => {
-        if (btn.dataset.role === this.roleConfig.VIEWER) {
-          btn.classList.add("active");
-        } else {
-          btn.classList.remove("active");
-        }
-      });
-
-      Logger.info("[SyncUI] 分享代碼已產生", {
-        shareCode: result.shareCode,
-      });
-    } catch (error) {
-      this.showStatus("error", "產生失敗", error && error.message);
-      Logger.error("[SyncUI] 產生分享代碼失敗:", error);
     }
   }
 
@@ -889,25 +797,6 @@ export class SyncManagerUI {
       this.updateIndicator();
       this.updateUIState();
       this.updateConnectedSessionInfo();
-
-      this.currentQRRole = role;
-      const qrRoleButtons =
-        this.controlPanel.querySelectorAll(".sync-qr-role-btn");
-      qrRoleButtons.forEach((btn) => {
-        if (btn.dataset.role === role) {
-          btn.classList.add("active");
-        } else {
-          btn.classList.remove("active");
-        }
-      });
-
-      if (this.currentShareCode) {
-        window.dispatchEvent(
-          new CustomEvent(SYNC_EVENTS.GENERATE_QR, {
-            detail: { shareCode: this.currentShareCode, role },
-          }),
-        );
-      }
 
       input.value = "";
     } catch (error) {
@@ -959,8 +848,6 @@ export class SyncManagerUI {
 
     try {
       this.showStatus("info", "正在退出工作階段...");
-
-      this.qrManager?.stopQRCodeCountdown?.();
 
       localStorage.removeItem("sync_session_backup");
 
@@ -1059,7 +946,7 @@ export class SyncManagerUI {
   }
 
   async initializeShareCode() {
-    Logger.debug("開始初始化分享代碼和 QR Code ");
+    Logger.debug("開始初始化分享代碼");
 
     this.sharePanelOpened = true;
 
@@ -1071,64 +958,8 @@ export class SyncManagerUI {
         shareDisplayCode.textContent = shareCode;
       }
 
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.GENERATE_QR, {
-          detail: {
-            shareCode: shareCode,
-            role:
-              this.core.syncClient?.role ||
-              this.roleConfig.VIEWER ||
-              "viewer",
-            isShareCode: true,
-          },
-        }),
-      );
-
-      this.validateAndRefreshShareCodeInBackground(shareCode);
     } else {
       await this.regenerateAndDisplayShareCode();
-    }
-  }
-
-  async validateAndRefreshShareCodeInBackground(shareCode) {
-    try {
-      const shareCodeInfo = await this.core.getShareCodeInfo(shareCode);
-
-      const isValid = !shareCodeInfo.used && !shareCodeInfo.expired;
-
-      if (isValid) {
-        this.qrManager?.startQRCodeCountdown?.(
-          shareCodeInfo.remainingTime,
-          "shareQRCountdown",
-        );
-      } else {
-        await this.regenerateAndDisplayShareCode();
-      }
-    } catch (error) {
-      Logger.warn("背景驗證分享代碼失敗，將重新產生", error);
-      await this.regenerateAndDisplayShareCode();
-    }
-  }
-
-  updateShareCodeStatus(statusText, statusClass) {
-    const shareDisplayCode = document.getElementById("shareDisplayCode");
-    if (shareDisplayCode) {
-      shareDisplayCode.classList.remove(
-        "share-code-valid",
-        "share-code-used",
-        "share-code-expired",
-      );
-      shareDisplayCode.classList.add(`share-code-${statusClass}`);
-      const code =
-        this.currentShareCode ||
-        shareDisplayCode.textContent.replace(/\s*\([^)]*\)$/, "");
-      shareDisplayCode.textContent = `${code} (${statusText})`;
-    }
-
-    const statusIndicator = document.getElementById("shareCodeStatusIndicator");
-    if (statusIndicator) {
-      statusIndicator.className = `share-code-status-indicator status-${statusClass}`;
-      statusIndicator.textContent = statusText;
     }
   }
 
@@ -1151,20 +982,6 @@ export class SyncManagerUI {
         shareDisplayCode.textContent = shareCode;
       }
 
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.GENERATE_QR, {
-          detail: {
-            shareCode: shareCode,
-            role:
-              this.core.syncClient?.role ||
-              this.roleConfig.VIEWER ||
-              "viewer",
-            isShareCode: true,
-          },
-        }),
-      );
-
-      this.qrManager?.startQRCodeCountdown?.(300, "shareQRCountdown");
     } catch (error) {
       Logger.error("產生新分享代碼失敗:", error);
       throw error;

@@ -569,6 +569,7 @@ class PanelPageManager {
       logger: this.panelLogger,
       experimentActionHandler: this.experimentActionHandler,
       experimentFlowManager: this.experimentFlowManager,
+      experimentSystemManager: this.experimentSystemManager,
       experimentSyncCore: this.experimentSyncCore,
       syncClient: this.syncManager.core?.syncClient,
       powerControl: this.powerControl,
@@ -696,19 +697,20 @@ class PanelPageManager {
    * @private
    */
   async _handleSequenceCompletedForUnitProgression() {
-    const flowManager = this.experimentFlowManager;
+    const systemManager = this.experimentSystemManager;
     const powerOptions = this._getPowerOptionsForCurrentCombination();
+    const beforeProgress = systemManager.getFlowProgressSnapshot();
 
-    if (flowManager.currentUnitIndex >= flowManager.loadedUnits.length - 1) {
+    if (beforeProgress.isLastUnit) {
       Logger.debug("Panel: 所有單元已完成");
       return;
     }
 
     Logger.debug("Panel: 推進到下一個單元");
-    flowManager.nextUnit();
+    systemManager.advanceToNextUnit();
 
-    const nextUnitId = flowManager.loadedUnits[flowManager.currentUnitIndex];
-    const systemManager = this.experimentSystemManager;
+    const afterProgress = systemManager.getFlowProgressSnapshot();
+    const nextUnitId = afterProgress.unitIds[afterProgress.currentUnitIndex];
     const allUnits = systemManager.state.scriptData.units || [];
     const nextUnit = allUnits.find((unit) => unit.unit_id === nextUnitId);
 
@@ -721,8 +723,7 @@ class PanelPageManager {
       includeStartup: false,
       includeShutdown: powerOptions.includeShutdown,
       isFirstUnit: false,
-      isLastUnit:
-        flowManager.currentUnitIndex >= flowManager.loadedUnits.length - 1,
+      isLastUnit: afterProgress.isLastUnit,
     });
     this._notifyButtonManagerForActions(nextUnit);
 

@@ -746,6 +746,18 @@ class BoardPageManager {
    */
   async init() {
     await this.boardUIManager.renderUnifiedUI();
+    if (this.experimentSystemManager && this.scriptData?.units) {
+      await this.experimentSystemManager.initializeUI(
+        {
+          combinationSelector: "#combinationSelectorContainer",
+          unitPanel: "#unitsPanelContainer",
+          experimentControls: "#experimentControlsContainer",
+        },
+        this.scriptData,
+      );
+    } else {
+      Logger.warn("Board: 略過統一 UI 初始化（ExperimentSystemManager 或 scriptData 未就緒）");
+    }
     this.boardUIManager.renderGestureTypesReference();
     this.setupParticipantNameListener();
     this.setupRemoteEventListeners();
@@ -2361,7 +2373,13 @@ class BoardPageManager {
       is_running: true,
     });
 
-    const flowStarted = await this.experimentFlowManager.startExperiment();
+    const systemManager = this.experimentSystemManager;
+    if (!systemManager?.startExperiment) {
+      Logger.warn("ExperimentSystemManager 未就緒，無法啟動實驗");
+      return false;
+    }
+
+    const flowStarted = await systemManager.startExperiment();
     if (!flowStarted) {
       Logger.warn("實驗流程啟動失敗");
       return false;
@@ -2377,7 +2395,13 @@ class BoardPageManager {
   }
 
   async stopExperiment() {
-    if (!this.experimentFlowManager?.isRunning) {
+    const systemManager = this.experimentSystemManager;
+    if (!systemManager?.isExperimentRunning) {
+      Logger.warn("ExperimentSystemManager 未就緒，無法停止實驗");
+      return;
+    }
+
+    if (!systemManager.isExperimentRunning()) {
       return;
     }
 
@@ -2447,7 +2471,7 @@ class BoardPageManager {
       this.timerManager.stopExperimentTimer();
     }
 
-    this.experimentFlowManager.stopExperiment();
+    systemManager.stopFlowExperiment();
 
   }
 
@@ -2456,12 +2480,12 @@ class BoardPageManager {
    */
   togglePauseExperiment() {
     if (!this.experimentRunning) return;
-    const fm = this.experimentFlowManager;
-    if (fm.isPaused) {
-      fm.resumeExperiment();
-    } else {
-      fm.pauseExperiment();
+    const systemManager = this.experimentSystemManager;
+    if (!systemManager?.togglePauseExperiment) {
+      Logger.warn("ExperimentSystemManager 未就緒，無法切換暫停");
+      return;
     }
+    systemManager.togglePauseExperiment();
   }
 
   /** 設定受試者名稱監聽器 */

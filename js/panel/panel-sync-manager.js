@@ -4,7 +4,6 @@
  * 負責處理面板頁面的同步狀態更新事件，包括實驗控制和UI同步
  */
 import {
-  LOG_SOURCES,
   SYNC_EVENTS,
   SYNC_DATA_TYPES,
 } from "../constants/index.js";
@@ -13,7 +12,6 @@ import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
 class PanelSyncManager {
   constructor({
     logger = null,
-    panelExperiment = null,
     syncClient = null,
     experimentSyncCore = null,
     experimentFlowManager = null,
@@ -23,7 +21,6 @@ class PanelSyncManager {
     powerControl = null,
   } = {}) {
     this.logger = logger;
-    this.panelExperiment = panelExperiment;
     this.syncClient = syncClient;
     this.experimentSyncCore = experimentSyncCore;
     this.experimentFlowManager = experimentFlowManager;
@@ -32,7 +29,6 @@ class PanelSyncManager {
     this.experimentCombinationManager = experimentCombinationManager;
     this.powerControl = powerControl;
     this.initialized = false;
-    this.modules = {};
     this._remoteStartInProgress = false;
     this._remoteExperimentActive = false;
   }
@@ -72,9 +68,6 @@ class PanelSyncManager {
     try {
       Logger.debug("PanelSyncManager 初始化開始");
 
-      // 設定模組引用
-      this.setupModuleReferences();
-
       // 設定同步事件監聽器
       this.setupSyncEventListeners();
 
@@ -86,17 +79,6 @@ class PanelSyncManager {
     } catch (error) {
       Logger.error("PanelSyncManager 初始化失敗:", error);
     }
-  }
-
-  /**
-   * 設定模組引用
-   */
-  setupModuleReferences() {
-    this.modules = {
-      logger: this.logger,
-      panelExperiment: this.panelExperiment,
-      boardPageManager: null,
-    };
   }
 
   /**
@@ -162,120 +144,23 @@ class PanelSyncManager {
    * 處理同步的實驗開始狀態
    */
   async handleSyncExperimentStart(syncData) {
-    // FlowManager 尚未就緒（初始化期間的 session restore 訊息）→ 安全忽略
-    if (!this.experimentFlowManager) {
-      Logger.debug("[PanelSync] FlowManager 未就緒，忽略 EXPERIMENT_STARTED");
+    if (!this.experimentSystemManager) {
+      Logger.warn("找不到有效的實驗管理器");
       return;
     }
-    Logger.debug("[PanelSync] handleSyncExperimentStart 被呼叫", {
-      clientId: syncData.clientId,
-      experimentId: syncData.experimentId,
-      _sessionRestore: syncData._sessionRestore,
-      isRunning: this.experimentFlowManager?.isRunning,
-    });
-    // 更新面板的實驗資訊
-    const expIdInput = document.getElementById("experimentIdInput");
-    const participantInput = document.getElementById("participantNameInput");
-
-    if (expIdInput && syncData.experimentId) {
-      expIdInput.value = syncData.experimentId;
-    }
-    if (participantInput && syncData.participantName) {
-      participantInput.value = syncData.participantName;
-    }
-
-    // 檢查是否在 board.html
-    if (this.modules.boardPageManager) {
-      const isRunning =
-        this.modules.boardPageManager.experimentRunning ||
-        this.modules.boardPageManager.state?.running ||
-        false;
-
-      if (!isRunning) {
-        try {
-          this.modules.boardPageManager.startExperiment();
-        } catch (error) {
-          Logger.error("boardPageManager.startExperiment() 失敗:", error);
-        }
+    if (!this.experimentSystemManager.isExperimentRunning?.()) {
+      this._remoteExperimentActive = true;
+      this._setDeferCompletion(true);
+      this._remoteStartInProgress = true;
+      try {
+        await this.experimentSystemManager.handleSyncExperimentStart?.(syncData);
+      } catch (error) {
+        Logger.error("experimentSystemManager.handleSyncExperimentStart() 失敗:", error);
+      } finally {
+        setTimeout(() => {
+          this._remoteStartInProgress = false;
+        }, 500);
       }
-    }
-    // 在 index.html（panel）端或其他環境，直接使用 FlowManager
-    else if (this.experimentFlowManager) {
-      const isRunning = this.experimentFlowManager.isRunning || false;
-
-      if (!isRunning) {
-        this._remoteExperimentActive = true;
-        this._setDeferCompletion(true);
-        this._remoteStartInProgress = true;
-        try {
-          // 檢查遠端組合是否與本機相同
-          const currentCombo = this._getExperimentCombo();
-          const remoteComboId = syncData.combinationId;
-          const localComboId = currentCombo?.combinationId;
-
-          Logger.debug("[PanelSync] 組合一致性檢查:", {
-            remoteComboId,
-            localComboId,
-            isSame: remoteComboId === localComboId,
-          });
-
-          // 若同步資料包含 combinationId，先套用組合確保有單元可載入
-          if (
-            syncData.combinationId &&
-            this.experimentSystemManager?.selectCombination
-          ) {
-            if (
-              !currentCombo ||
-              currentCombo.combinationId !== syncData.combinationId
-            ) {
-              Logger.info(
-                `[PanelSync] 組合不一致，同步遠端組合: ${syncData.combinationId}`,
-              );
-              await this.experimentSystemManager
-                .selectCombination(syncData.combinationId)
-                .catch((err) =>
-                  Logger.warn("[PanelSync] 設定遠端組合失敗:", err),
-                );
-            } else {
-              Logger.debug("[PanelSync] 組合已匹配，無需同步");
-            }
-          }
-          // 呼叫 FlowManager 啟動實驗
-          // FlowManager 會自動發出所有必要的事件和廣播
-          this.experimentFlowManager.startExperiment();
-        } catch (error) {
-          Logger.error("experimentFlowManager.startExperiment() 失敗:", error);
-        } finally {
-          setTimeout(() => {
-            this._remoteStartInProgress = false;
-          }, 500);
-        }
-      } else {
-        Logger.debug("[PanelSync] 實驗已在進行中，忽略遠端開始請求");
-      }
-    } else {
-      Logger.warn("找不到有效的實驗管理器");
-    }
-
-    // 記錄這個同步事件到日誌
-    if (this.modules.logger) {
-      const clientId = localStorage.getItem("sync_client_id") || "unknown";
-      const sourceClientId = syncData.clientId || "unknown";
-      const sourceType = syncData.source || "unknown";
-      this.modules.logger.logAction(
-        `[同步] 實驗開始訊號來自 ${sourceType} (${sourceClientId})`,
-        null,
-        "handleSyncExperimentStart",
-        false,
-        false,
-        false,
-        null,
-        {
-          client_id: clientId,
-          source_client_id: sourceClientId,
-          source_type: sourceType,
-        },
-      );
     }
   }
 
@@ -283,48 +168,20 @@ class PanelSyncManager {
    * 處理同步的實驗暫停狀態
    */
   handleSyncExperimentPaused(syncData) {
-    if (!this.experimentFlowManager) return;
-    if (!this._isExperimentRunningForSync()) {
-      Logger.debug("[PanelSync] 實驗未進行，忽略暫停同步", {
-        clientId: syncData?.clientId,
-        _sessionRestore: syncData?._sessionRestore,
-      });
-      return;
-    }
-    this.callExperimentMethod("pauseExperiment", "暫停實驗失敗");
+    return this.experimentSystemManager?.handleSyncExperimentPaused?.(syncData);
   }
 
   /**
    * 處理同步的實驗還原狀態
    */
   handleSyncExperimentResumed(syncData) {
-    if (!this.experimentFlowManager) return;
-    if (!this._isExperimentRunningForSync()) {
-      Logger.debug("[PanelSync] 實驗未進行，忽略恢復同步", {
-        clientId: syncData?.clientId,
-        _sessionRestore: syncData?._sessionRestore,
-      });
-      return;
-    }
-    this.callExperimentMethod("resumeExperiment", "還原實驗失敗");
-  }
-
-  _isExperimentRunningForSync() {
-    if (this.modules.boardPageManager) {
-      return (
-        this.modules.boardPageManager.experimentRunning ||
-        this.modules.boardPageManager.state?.running ||
-        false
-      );
-    }
-    return this.experimentFlowManager?.isRunning || false;
+    return this.experimentSystemManager?.handleSyncExperimentResumed?.(syncData);
   }
 
   /**
    * 處理同步的實驗停止狀態
    */
   handleSyncExperimentStopped(syncData) {
-    if (!this.experimentFlowManager) return;
     const myId = this.syncClient?.clientId;
     if (myId && syncData?.clientId === myId) {
       Logger.debug("[PanelSync] EXPERIMENT_STOPPED 來自本機，忽略", {
@@ -335,45 +192,7 @@ class PanelSyncManager {
     }
     this._remoteExperimentActive = false;
     this._setDeferCompletion(false);
-    this.callExperimentMethod("stopExperiment", "停止實驗失敗", false);
-  }
-
-  /**
-   * 通用實驗方法調用器
-   */
-  callExperimentMethod(methodName, errorMessage, ...args) {
-    if (this.modules.boardPageManager?.[methodName]) {
-      try {
-        this.modules.boardPageManager[methodName](...args);
-      } catch (error) {
-        Logger.error(`${errorMessage}:`, error);
-      }
-    } else if (this.modules.panelExperiment?.[methodName]) {
-      try {
-        this.modules.panelExperiment[methodName](...args);
-      } catch (error) {
-        Logger.error(`panelExperiment.${methodName}() 失敗:`, error);
-      }
-    } else if (this.experimentFlowManager) {
-      const fm = this.experimentFlowManager;
-      const flowMethodMap = {
-        pauseExperiment: "pauseExperiment",
-        resumeExperiment: "resumeExperiment",
-        stopExperiment: "stopExperiment",
-      };
-      const flowMethod = flowMethodMap[methodName];
-      if (flowMethod && typeof fm[flowMethod] === "function") {
-        try {
-          fm[flowMethod](...args);
-        } catch (error) {
-          Logger.error(`experimentFlowManager.${flowMethod}() 失敗:`, error);
-        }
-      } else {
-        Logger.warn(`找不到有效的實驗管理器來呼叫 ${methodName}`);
-      }
-    } else {
-      Logger.warn(`找不到有效的實驗管理器來呼叫 ${methodName}`);
-    }
+    return this.experimentSystemManager?.handleSyncExperimentStopped?.(syncData);
   }
 
   /**
@@ -462,37 +281,18 @@ class PanelSyncManager {
    * 處理同步的實驗ID更新
    */
   handleSyncExperimentIdUpdate(syncData) {
-    const { experimentId } = syncData;
-    if (!experimentId) return;
-
-    const currentId = this.experimentSystemManager?.getExperimentId?.();
-    if (currentId !== experimentId) {
-      this.experimentSystemManager?.setExperimentId?.(
-        experimentId,
-        LOG_SOURCES.REMOTE_SYNC,
-        {
-          registerToHub: false,
-          broadcast: false,
-          reapplyCombination: true,
-        },
-      );
-    }
+    return this.experimentSystemManager?.handleSyncExperimentIdUpdate?.(
+      syncData,
+    );
   }
 
   /**
    * 處理同步的受試者名稱更新（從 board 端收到）
    */
   handleSyncParticipantNameUpdate(syncData) {
-    const { participantName } = syncData;
-    if (!participantName) return;
-    if (this.experimentSystemManager?.updateParticipantNameUi) {
-      this.experimentSystemManager.updateParticipantNameUi(participantName);
-      return;
-    }
-    const input = document.getElementById("participantNameInput");
-    if (input && input.value.trim() !== participantName) {
-      input.value = participantName;
-    }
+    return this.experimentSystemManager?.handleSyncParticipantNameUpdate?.(
+      syncData,
+    );
   }
 
 }
