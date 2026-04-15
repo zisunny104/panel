@@ -598,7 +598,7 @@ class ExperimentLogManager {
       logEntry.c_id = clientId;
     }
     this._addLog(logEntry);
-    Logger.debug("記錄: 按鈕動作", logEntry);
+    Logger.debug("記錄: 動作", logEntry);
   }
 
   /**
@@ -1015,8 +1015,9 @@ class ExperimentLogManager {
    * @param {string} button - 按鈕ID (如 B5, B7 等)
    * @param {string} buttonFunction - 按鈕功能 (如 7, 9 等)
    * @param {string} clientId - 客戶端ID
+   * @param {string} actionId - 對應的 action ID
    */
-  logButtonAction(button, buttonFunction, clientId) {
+  logButtonAction(button, buttonFunction, clientId, actionId = "") {
     const experimentId = this._getCurrentExperimentId();
 
     const logEntry = {
@@ -1028,6 +1029,10 @@ class ExperimentLogManager {
       function: buttonFunction,
       c_id: clientId,
     };
+
+    if (actionId) {
+      logEntry.action_id = actionId;
+    }
 
     this._addLog(logEntry);
     Logger.debug("記錄: 按鈕動作", logEntry);

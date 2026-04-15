@@ -972,6 +972,16 @@
     background: #dc3545;
 }
 
+.sync-session-action-row .sync-close-channel-btn {
+    background: #e76f51;
+}
+
+.sync-session-action-row .sync-close-channel-btn:hover {
+    background: #d15f45;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(231, 111, 81, 0.3);
+}
+
 .sync-session-action-row .sync-disconnect-btn:hover {
     background: #c82333;
     transform: translateY(-2px);
@@ -1590,7 +1600,8 @@
     .sync-share-toggle-btn,
     .sync-disconnect-btn,
     .sync-clear-session-btn,
-    .sync-manage-sessions-btn {
+    .sync-manage-sessions-btn,
+    .sync-close-channel-btn {
         width: 100%;
         padding: 12px 16px;
         font-size: 13px;

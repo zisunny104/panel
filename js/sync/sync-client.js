@@ -296,10 +296,41 @@ class SyncClient {
           );
         }, 0);
       }
+
+      // ================= 電源狀態恢復邏輯 =================
+      // 當工作階段有儲存電源狀態時，派發事件讓 PowerControl 進行恢復
+      // 但若工作階段沒有實驗狀態，則視為尚未進入實驗流程，電源應回到預設關閉
+      const lastState = data?.state;
+      if (lastState && typeof lastState.powerState === "boolean") {
+        const hasExperimentState = Boolean(experimentState?.type);
+        const powerState = hasExperimentState ? lastState.powerState : false;
+        const isPowerVideoPlaying = hasExperimentState
+          ? typeof lastState.isPowerVideoPlaying === "boolean"
+            ? lastState.isPowerVideoPlaying
+            : false
+          : false;
+
+        document.dispatchEvent(
+          new CustomEvent("syncPowerState", {
+            detail: {
+              powerState,
+              isPowerVideoPlaying,
+              clientId: lastState.clientId,
+              // _sessionRestore 標誌用於通知 PowerControl 跳過 anti-echo 檢查
+              // 允許工作階段恢復時的自我事件通過處理，避免狀態被誤判為重複
+              _sessionRestore: true,
+            },
+          }),
+        );
+
+        if (!hasExperimentState) {
+          Logger.debug("工作階段未含實驗狀態，電源已重置為預設關閉");
+        }
+      }
     });
   }
 
-  // ==================== 會話管理 ====================
+  // ==================== 工作階段管理 ====================
 
   /**
    * 建立新的工作階段
@@ -483,6 +514,70 @@ class SyncClient {
     });
 
     return true;
+  }
+
+  /**
+   * 關閉公開頻道（中斷所有連線）
+   * @param {string} sessionId - 公開頻道 sessionId（可選）
+   * @returns {Promise<Object>}
+   */
+  async closePublicChannel(sessionId = null) {
+    const targetSessionId = sessionId || this.sessionId;
+    if (!targetSessionId || !targetSessionId.startsWith("__CH_")) {
+      throw new Error("目前不在公開頻道");
+    }
+
+    await this.checkServerHealth();
+    if (!this.serverOnline) {
+      throw new Error("伺服器離線，無法關閉頻道");
+    }
+
+    const response = await fetch(`${this.apiBaseUrl}/sync/channel/close`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: targetSessionId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.data || {};
+  }
+
+  /**
+   * 關閉指定工作階段
+   * @param {string} sessionId - 工作階段 ID
+   * @returns {Promise<Object>}
+   */
+  async closeSession(sessionId = null) {
+    const targetSessionId = sessionId || this.sessionId;
+    if (!targetSessionId) {
+      throw new Error("目前沒有可關閉的工作階段");
+    }
+
+    await this.checkServerHealth();
+    if (!this.serverOnline) {
+      throw new Error("伺服器離線，無法關閉工作階段");
+    }
+
+    const response = await fetch(
+      `${this.apiBaseUrl}/sync/session/${encodeURIComponent(targetSessionId)}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.data || {};
   }
 
   /**

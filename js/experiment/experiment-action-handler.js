@@ -22,6 +22,7 @@ class ExperimentActionHandler {
   static EVENT = {
     ACTION_VALIDATED: "action:validated",
     ACTION_COMPLETED: "action:completed",
+    ACTION_ENTERED: "action:entered",
     ACTION_FAILED: "action:failed",
     GESTURE_DETECTED: "action:gesture_detected",
     SEQUENCE_COMPLETED: "action:sequence_completed",
@@ -29,6 +30,8 @@ class ExperimentActionHandler {
     REMOTE_ACTION: "action:remote_action",
     ERROR: "action:error",
   };
+
+  static COMPLETION_COOLDOWN_MS = 3000;
 
   constructor(config = {}) {
     // 配置
@@ -212,6 +215,17 @@ class ExperimentActionHandler {
 
   /**
    * 處理正確動作
+   *
+   * 改進的時序邏輯：
+   * 1. 發出 ACTION_COMPLETED（當前步驟完成）
+   * 2. 推進索引到下一步
+   * 3. 發出 ACTION_ENTERED（進入新步驟）
+   *
+   * 各端的職責：
+   * - Board（透過 SYNC 接收 ACTION_COMPLETED）：標記完成的步驟為綠色
+   * - Panel（監聽 ACTION_ENTERED 事件）：立即更新顯示下一步的媒體
+   *
+   * 無需額外的自動推進機制
    */
   handleCorrectAction(actionId, actionData = {}) {
     const validation = this.validateAction(actionId, actionData);
@@ -233,13 +247,13 @@ class ExperimentActionHandler {
     // 標記為完成
     const normalizedActionId = this._getActionId(action) || actionId;
     this.completedActions.add(normalizedActionId);
-    this.currentActionIndex++;
 
     Logger.info("動作完成", {
       actionId: normalizedActionId,
       progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`,
     });
 
+    // [1] 發出已完成事件（在索引推進前）
     this.emit(ExperimentActionHandler.EVENT.ACTION_COMPLETED, {
       actionId: normalizedActionId,
       action,
@@ -247,15 +261,24 @@ class ExperimentActionHandler {
     });
 
     this._broadcastButtonAction(action, actionData);
+    this._scheduleCompletionBroadcast(action, actionData);
 
-    // 檢查序列是否完成
+    // [2] 推進到下一步
+    this.currentActionIndex++;
+
+    // [3] 檢查序列是否完成
     if (this.currentActionIndex >= this.currentActionSequence.length) {
       this.handleSequenceCompleted();
     } else {
-      // 啟用自動推進（如果配置）
-      if (this.config.enableAutoProgress) {
-        this.scheduleAutoProgress();
-      }
+      // [4] 發出進入新步驟的事件
+      const nextAction = this.getCurrentAction();
+      const nextActionId = this._getActionId(nextAction);
+
+      this.emit(ExperimentActionHandler.EVENT.ACTION_ENTERED, {
+        actionId: nextActionId,
+        action: nextAction,
+        progress: this.getProgress(),
+      });
     }
 
     // 遠端同步
@@ -299,6 +322,7 @@ class ExperimentActionHandler {
 
   /**
    * 完成目前動作（不進行驗證）
+   * 同樣使用改進的時序邏輯
    */
   completeCurrentAction(actionData = {}) {
     const currentAction = this.getCurrentAction();
@@ -318,13 +342,13 @@ class ExperimentActionHandler {
 
     // 標記為完成
     this.completedActions.add(normalizedActionId);
-    this.currentActionIndex++;
 
     Logger.info("動作已完成（跳過）", {
       actionId: normalizedActionId,
       progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`,
     });
 
+    // [1] 發出已完成事件（在索引推進前）
     this.emit(ExperimentActionHandler.EVENT.ACTION_COMPLETED, {
       actionId: normalizedActionId,
       action: currentAction,
@@ -333,15 +357,26 @@ class ExperimentActionHandler {
     });
 
     this._broadcastButtonAction(currentAction, actionData);
+    if (!actionData?.buttonId) {
+      this._broadcastActionCompleted(normalizedActionId);
+    }
 
-    // 檢查序列是否完成
+    // [2] 推進到下一步
+    this.currentActionIndex++;
+
+    // [3] 檢查序列是否完成
     if (this.currentActionIndex >= this.currentActionSequence.length) {
       this.handleSequenceCompleted();
     } else {
-      // 啟用自動推進（如果配置）
-      if (this.config.enableAutoProgress) {
-        this.scheduleAutoProgress();
-      }
+      // [4] 發出進入新步驟的事件
+      const nextAction = this.getCurrentAction();
+      const nextActionId = this._getActionId(nextAction);
+
+      this.emit(ExperimentActionHandler.EVENT.ACTION_ENTERED, {
+        actionId: nextActionId,
+        action: nextAction,
+        progress: this.getProgress(),
+      });
     }
 
     // 遠端同步
@@ -383,6 +418,84 @@ class ExperimentActionHandler {
       function: actionData.functionName || actionData.function,
       experimentId,
     };
+
+    document.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
+        detail: payload,
+      }),
+    );
+  }
+
+  _getCompletionBroadcastTarget(action, actionData) {
+    if (!action) return null;
+
+    const currentActionId = this._getActionId(action);
+    const interactionKey =
+      actionData.functionName || actionData.function || actionData.buttonId;
+    const nextActionIdFromInteraction = interactionKey
+      ? action?.interactions?.[interactionKey]?.next_action_id
+      : null;
+    const nextAction = this.getNextAction?.();
+    const nextActionId =
+      nextActionIdFromInteraction || this._getActionId(nextAction);
+
+    const targetActionId = nextActionId || currentActionId;
+    if (!targetActionId) return null;
+
+    const isFirstAction = this.currentActionIndex === 0;
+    const currentStepId = this.actionToStepMap?.get(currentActionId)?.step_id;
+    const nextStepId = this.actionToStepMap?.get(targetActionId)?.step_id;
+    const isSameStep =
+      currentStepId && nextStepId && currentStepId === nextStepId;
+    const shouldDelay = !isFirstAction && currentStepId && nextStepId && !isSameStep;
+
+    return {
+      actionId: targetActionId,
+      delayMs: shouldDelay ? ExperimentActionHandler.COMPLETION_COOLDOWN_MS : 0,
+    };
+  }
+
+  _scheduleCompletionBroadcast(action, actionData) {
+    if (!actionData?.buttonId) return;
+
+    const target = this._getCompletionBroadcastTarget(action, actionData);
+    if (!target) return;
+
+    if (target.delayMs > 0) {
+      setTimeout(() => {
+        this._broadcastActionCompleted(target.actionId);
+      }, target.delayMs);
+      return;
+    }
+
+    this._broadcastActionCompleted(target.actionId);
+  }
+
+  /**
+   * 廣播 action 完成（用於無按鈕的自動跳過）
+   * Schema: {type, clientId, timestamp, actionId, experimentId}
+   */
+  _broadcastActionCompleted(actionId) {
+    if (!actionId) return;
+
+    const experimentId =
+      this.dependencies.experimentSystemManager?.getExperimentId?.() || "";
+    const clientId = this.dependencies.syncClient?.clientId;
+    if (!clientId) {
+      Logger.warn("ExperimentActionHandler: syncClient 不可用，跳過 action 完成廣播");
+      return;
+    }
+
+    const payload = {
+      type: SYNC_DATA_TYPES.ACTION_COMPLETED,
+      clientId,
+      timestamp: Date.now(),
+      actionId,
+    };
+
+    if (experimentId) {
+      payload.experimentId = experimentId;
+    }
 
     document.dispatchEvent(
       new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {

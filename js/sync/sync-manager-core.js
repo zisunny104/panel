@@ -218,6 +218,32 @@ export class SyncManagerCore {
     }
   }
 
+  /**
+   * 關閉公開頻道（中斷所有連線）
+   * @param {string} sessionId
+   * @returns {Promise<Object>}
+   */
+  async closePublicChannel(sessionId) {
+    return this.syncClient.closePublicChannel(sessionId);
+  }
+
+  async closeSession(sessionId) {
+    return this.syncClient.closeSession(sessionId);
+  }
+
+  async closeCurrentSession(sessionId) {
+    const resolvedSessionId = sessionId || this.getSessionId();
+    if (!resolvedSessionId) {
+      throw new Error("目前沒有可關閉的工作階段");
+    }
+
+    if (resolvedSessionId.startsWith("__CH_")) {
+      return this.closePublicChannel(resolvedSessionId);
+    }
+
+    return this.closeSession(resolvedSessionId);
+  }
+
   async restoreSession(
     sessionId,
     clientId,

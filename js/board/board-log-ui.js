@@ -25,6 +25,11 @@ class ExperimentLogUI {
     this._lastLoadAt = 0;
     this._loadDebounceMs = 800;
     this._loadTimer = null;
+    this._refreshQueued = false;
+    this._refreshQueuedImmediate = false;
+    this._hasRequestedInitialLoad = false;
+    this._initialLoadObserver = null;
+    this._initialLoadFallbackTimer = null;
     this._allExperiments = [];
     this.logCountFilter = { min: 0, max: null, maxAvailable: 0 };
     this.durationFilter = { min: 0, max: null, maxAvailable: 0 };
@@ -78,8 +83,8 @@ class ExperimentLogUI {
     this.initializeExperimentLogsList();
 
     if (document.getElementById("experimentLogsContainer")) {
-      Logger.debug("[ExperimentLogUI.initialize] experimentLogsContainer 存在，呼叫 loadExperimentLogs()");
-      this.loadExperimentLogs();
+      Logger.debug("[ExperimentLogUI.initialize] experimentLogsContainer 存在，排程延後載入 loadExperimentLogs()");
+      this.scheduleInitialLogLoad();
     } else {
       Logger.debug("[ExperimentLogUI.initialize] experimentLogsContainer 不存在，跳過 loadExperimentLogs()");
     }
@@ -102,6 +107,12 @@ class ExperimentLogUI {
       <div class="logs-header">
         <h3>實驗日誌</h3>
         <div class="logs-status">
+          <button id="copyCurrentLogsBtn" data-action="copy-current-logs" title="複製即時日誌" aria-label="複製即時日誌">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
           <button id="syncLogsNowBtn" class="is-hidden" data-action="sync-now" title="立即同步日誌" aria-label="立即同步日誌">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -220,12 +231,89 @@ class ExperimentLogUI {
 
       <div class="form-group">
         <div id="experimentLogsContainer">
-          <div class="logs-list-loading">載入中...</div>
+          <div class="logs-list-loading logs-list-loading-skeleton" role="status" aria-live="polite">
+            <div class="logs-list-loading-header">
+              <div class="skeleton-line w-30"></div>
+              <div class="skeleton-line w-15"></div>
+            </div>
+            <div class="logs-skeleton-list">
+              <div class="logs-skeleton-item">
+                <div class="skeleton-line w-70"></div>
+                <div class="skeleton-line w-40"></div>
+              </div>
+              <div class="logs-skeleton-item">
+                <div class="skeleton-line w-80"></div>
+                <div class="skeleton-line w-45"></div>
+              </div>
+              <div class="logs-skeleton-item">
+                <div class="skeleton-line w-65"></div>
+                <div class="skeleton-line w-35"></div>
+              </div>
+            </div>
+            <div class="logs-loading-caption">正在準備實驗日誌...</div>
+          </div>
         </div>
       </div>
     `;
 
     this._bindLogListActions();
+  }
+
+  _runWhenIdle(task, timeoutMs = 1200) {
+    if (typeof task !== "function") return;
+
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(() => task(), { timeout: timeoutMs });
+      return;
+    }
+
+    setTimeout(() => task(), 300);
+  }
+
+  scheduleInitialLogLoad() {
+    if (this._hasRequestedInitialLoad) return;
+
+    const container = document.getElementById("experimentLogsContainer");
+    if (!container) return;
+
+    const triggerLoad = () => {
+      if (this._hasRequestedInitialLoad) return;
+      this._hasRequestedInitialLoad = true;
+
+      if (this._initialLoadObserver) {
+        this._initialLoadObserver.disconnect();
+        this._initialLoadObserver = null;
+      }
+      if (this._initialLoadFallbackTimer) {
+        clearTimeout(this._initialLoadFallbackTimer);
+        this._initialLoadFallbackTimer = null;
+      }
+
+      this._runWhenIdle(() => {
+        this.requestExperimentLogsRefresh({
+          immediate: true,
+          reason: "initial_load_visible",
+        });
+      });
+    };
+
+    if (typeof window.IntersectionObserver === "function") {
+      this._initialLoadObserver = new IntersectionObserver(
+        (entries) => {
+          const visible = entries.some((entry) => entry.isIntersecting);
+          if (visible) {
+            triggerLoad();
+          }
+        },
+        { root: null, threshold: 0.05 },
+      );
+
+      this._initialLoadObserver.observe(container);
+      this._initialLoadFallbackTimer = setTimeout(triggerLoad, 2500);
+      return;
+    }
+
+    this._initialLoadFallbackTimer = setTimeout(triggerLoad, 800);
   }
 
   _bindCurrentLogActions() {
@@ -239,10 +327,52 @@ class ExperimentLogUI {
       const action = target.dataset.action;
       if (action === "sync-now") {
         this.boardPageManager?.syncLogsNow?.();
+        return;
+      }
+      if (action === "copy-current-logs") {
+        this.copyCurrentLogsToClipboard(target);
       }
     });
 
     this._currentLogActionsBound = true;
+  }
+
+  async copyCurrentLogsToClipboard(triggerEl = null) {
+    const entries = Array.from(
+      document.querySelectorAll("#experimentLogContainer .current-log-entry"),
+    );
+    if (entries.length === 0) {
+      Logger.debug("目前沒有可複製的即時日誌");
+      return false;
+    }
+
+    const summary = document.querySelector(
+      "#experimentLogContainer .logs-summary",
+    );
+    const lines = entries
+      .map((entry) => entry.textContent?.trim())
+      .filter(Boolean);
+    if (summary?.textContent?.trim()) {
+      lines.push(summary.textContent.trim());
+    }
+
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      if (triggerEl instanceof HTMLElement) {
+        triggerEl.classList.add("copied");
+        const originalTitle = triggerEl.title;
+        triggerEl.title = "已複製";
+        setTimeout(() => {
+          triggerEl.classList.remove("copied");
+          triggerEl.title = originalTitle || "複製即時日誌";
+        }, 1200);
+      }
+      Logger.debug(`已複製即時日誌 (${lines.length} 行)`);
+      return true;
+    } catch (error) {
+      Logger.error("複製即時日誌失敗:", error);
+      return false;
+    }
   }
 
   _bindLogListActions() {
@@ -258,7 +388,19 @@ class ExperimentLogUI {
 
       switch (action) {
         case "refresh-logs":
-          this.loadExperimentLogs();
+          if (this._initialLoadObserver) {
+            this._initialLoadObserver.disconnect();
+            this._initialLoadObserver = null;
+          }
+          if (this._initialLoadFallbackTimer) {
+            clearTimeout(this._initialLoadFallbackTimer);
+            this._initialLoadFallbackTimer = null;
+          }
+          this._hasRequestedInitialLoad = true;
+          this.requestExperimentLogsRefresh({
+            immediate: true,
+            reason: "manual_refresh",
+          });
           break;
         case "toggle-filter":
           this.toggleLogFilter();
@@ -406,15 +548,24 @@ class ExperimentLogUI {
     } finally {
       this._isLoadingList = false;
       this._lastLoadAt = Date.now();
+
+      if (this._refreshQueued) {
+        const shouldRefreshImmediately = this._refreshQueuedImmediate;
+        this._refreshQueued = false;
+        this._refreshQueuedImmediate = false;
+        this.requestExperimentLogsRefresh({
+          immediate: shouldRefreshImmediately,
+          reason: "queued_after_load",
+        });
+      }
     }
   }
 
   _scheduleLogListReload() {
-    if (this._loadTimer) return;
-    this._loadTimer = setTimeout(() => {
-      this._loadTimer = null;
-      this.loadExperimentLogs();
-    }, this._loadDebounceMs);
+    this.requestExperimentLogsRefresh({
+      immediate: false,
+      reason: "deferred_reload",
+    });
   }
 
   /**
@@ -447,92 +598,97 @@ class ExperimentLogUI {
 
       Logger.debug(`找到 ${files.length} 個檔案`);
 
-      for (const filename of files) {
-        if (!filename.endsWith(".jsonl")) continue;
+      const jsonlFiles = files.filter((filename) =>
+        filename.endsWith(".jsonl"),
+      );
+      const apiUrl = this._getApiUrl();
 
-        try {
-          // 透過 API 讀取檔案內容
-          const apiUrl = this._getApiUrl();
-          const response = await fetch(
-            `${apiUrl}/experiment-logs/read/${filename}`,
-          );
+      // 受控並行讀取，避免逐檔串行造成等待過長。
+      const concurrency = 4;
+      for (let i = 0; i < jsonlFiles.length; i += concurrency) {
+        const batch = jsonlFiles.slice(i, i + concurrency);
+        const batchResults = await Promise.all(
+          batch.map(async (filename) => {
+            try {
+              const response = await fetch(
+                `${apiUrl}/experiment-logs/read/${filename}`,
+              );
 
-          if (!response.ok) {
-            Logger.debug(`無法讀取檔案: ${filename}`);
-            continue;
-          }
+              if (!response.ok) {
+                Logger.debug(`無法讀取檔案: ${filename}`);
+                return null;
+              }
 
-          const result = await response.json();
-          if (!result.success || !result.content) {
-            Logger.debug(`檔案 ${filename} 讀取失敗: ${result.error}`);
-            continue;
-          }
+              const result = await response.json();
+              if (!result.success || !result.content) {
+                Logger.debug(`檔案 ${filename} 讀取失敗: ${result.error}`);
+                return null;
+              }
 
-          const logs = this.parseJSONL(result.content);
+              const logs = this.parseJSONL(result.content);
+              if (logs.length === 0) {
+                Logger.debug(`檔案 ${filename} 無有效日誌`);
+                return null;
+              }
 
-          if (logs.length === 0) {
-            Logger.debug(`檔案 ${filename} 無有效日誌`);
-            continue;
-          }
+              const match = filename.match(/^(.+?)(?:_\d+)?\.jsonl$/);
+              const experimentId = match
+                ? match[1]
+                : filename.replace(".jsonl", "");
 
-          // 從檔名解析實驗 ID（移除 _timestamp 後綴）
-          const match = filename.match(/^(.+?)(?:_\d+)?\.jsonl$/);
-          const experimentId = match
-            ? match[1]
-            : filename.replace(".jsonl", "");
+              const expStartLog = logs.find(
+                (log) => log.type === LOG_TYPES.EXP_START,
+              );
+              const participantName = expStartLog?.participant || "n/a";
+              const combinationName = expStartLog?.combo_name || "n/a";
 
-          // 從日誌中找受試者名稱和實驗組合（容錯處理）
-          const expStartLog = logs.find(
-            (log) => log.type === LOG_TYPES.EXP_START,
-          );
-          const participantName = expStartLog?.participant || "n/a";
-          const combinationName = expStartLog?.combo_name || "n/a";
+              Logger.debug(`成功載入: ${filename} (${logs.length} 條記錄)`);
 
-          experiments.push({
-            experimentId,
-            participantName,
-            combinationName,
-            filename: filename,
-            filePath: filename, // 只存檔案名稱，實際讀取透過 API
-            logCount: logs.length,
-            startTime: logs[0]?.ts || Date.now(),
-            endTime: logs[logs.length - 1]?.ts || Date.now(),
-            durationSeconds: Math.max(
-              0,
-              Math.round(
-                ((logs[logs.length - 1]?.ts || 0) - (logs[0]?.ts || 0)) /
-                  1000,
-              ),
-            ),
-            logs,
-            // 用於實際操作的 ID
-            actualExperimentId: experimentId,
-          });
+              return {
+                experimentId,
+                participantName,
+                combinationName,
+                filename,
+                filePath: filename,
+                logCount: logs.length,
+                startTime: logs[0]?.ts || Date.now(),
+                endTime: logs[logs.length - 1]?.ts || Date.now(),
+                durationSeconds: Math.max(
+                  0,
+                  Math.round(
+                    ((logs[logs.length - 1]?.ts || 0) - (logs[0]?.ts || 0)) /
+                      1000,
+                  ),
+                ),
+                logs,
+                actualExperimentId: experimentId,
+              };
+            } catch (error) {
+              Logger.debug(`解析檔案 ${filename} 失敗:`, error.message);
+              const match = filename.match(/^(.+?)(?:_\d+)?\.jsonl$/);
+              const experimentId = match
+                ? match[1]
+                : filename.replace(".jsonl", "");
 
-          Logger.debug(`成功載入: ${filename} (${logs.length} 條記錄)`);
-        } catch (error) {
-          Logger.debug(`解析檔案 ${filename} 失敗:`, error.message);
-          // 即使解析失敗，也嘗試顯示基本資訊
-          const match = filename.match(/^(.+?)(?:_\d+)?\.jsonl$/);
-          const experimentId = match
-            ? match[1]
-            : filename.replace(".jsonl", "");
+              return {
+                experimentId,
+                participantName: "n/a",
+                combinationName: "n/a",
+                filename,
+                filePath: filename,
+                logCount: 0,
+                startTime: Date.now(),
+                endTime: Date.now(),
+                durationSeconds: 0,
+                logs: [],
+                actualExperimentId: experimentId,
+                error: error.message,
+              };
+            }
+          }),
+        );
 
-          experiments.push({
-            experimentId,
-            participantName: "n/a",
-            combinationName: "n/a",
-            filename: filename,
-            filePath: filename, // 只存檔案名稱
-            logCount: 0,
-            startTime: Date.now(),
-            endTime: Date.now(),
-            durationSeconds: 0,
-            logs: [],
-            actualExperimentId: experimentId,
-            error: error.message,
-          });
-        }
+        experiments.push(...batchResults.filter(Boolean));
       }
 
       // 按開始時間排序（最新的在前）
@@ -841,7 +997,7 @@ class ExperimentLogUI {
       Logger.debug(`已刪除日誌：${experiment.filename}`);
 
       // 重新載入列表
-      this.loadExperimentLogs();
+      this.requestExperimentLogsRefresh({ immediate: true, reason: "delete-log" });
     } catch (error) {
       Logger.error("刪除日誌失敗:", error);
     }
@@ -972,7 +1128,7 @@ class ExperimentLogUI {
       Logger.debug(`已批次刪除 ${deletedCount}/${logIds.length} 個日誌`);
 
       this.selectedLogs.clear();
-      this.loadExperimentLogs(); // 重新載入列表
+      this.requestExperimentLogsRefresh({ immediate: true, reason: "delete-selected" });
     } catch (error) {
       Logger.error("批次刪除失敗:", error);
     }
@@ -1003,21 +1159,30 @@ class ExperimentLogUI {
               return;
             }
             // 自動更新日誌列表
-            this.loadExperimentLogs();
+            this.requestExperimentLogsRefresh({
+              immediate: false,
+              reason: "broadcast_logs_synced",
+            });
             break;
           case "experimentDeleted":
             Logger.debug(
               `[ExperimentLogUI] 偵測到實驗被刪除 (分頁 ${senderTabId})，重新載入列表`,
             );
             // 自動重新載入列表
-            this.loadExperimentLogs();
+            this.requestExperimentLogsRefresh({
+              immediate: true,
+              reason: "broadcast_deleted",
+            });
             break;
           case "logsCleared":
             Logger.debug(
               `[ExperimentLogUI] 偵測到日誌被清空 (分頁 ${senderTabId})，重新載入列表`,
             );
             // 自動重新載入列表
-            this.loadExperimentLogs();
+            this.requestExperimentLogsRefresh({
+              immediate: true,
+              reason: "broadcast_cleared",
+            });
             break;
         }
       };
@@ -1038,6 +1203,48 @@ class ExperimentLogUI {
       this.broadcastChannel.close();
       this.broadcastChannel = null;
     }
+  }
+
+  requestExperimentLogsRefresh({ immediate = false, reason = "unknown" } = {}) {
+    if (immediate) {
+      if (this._loadTimer) {
+        clearTimeout(this._loadTimer);
+        this._loadTimer = null;
+      }
+      this._refreshQueued = false;
+      this._refreshQueuedImmediate = false;
+
+      if (this._isLoadingList) {
+        this._refreshQueued = true;
+        this._refreshQueuedImmediate = true;
+        return;
+      }
+
+      this._hasRequestedInitialLoad = true;
+      this.loadExperimentLogs();
+      return;
+    }
+
+    this._refreshQueued = true;
+
+    if (this._loadTimer) {
+      return;
+    }
+
+    this._loadTimer = setTimeout(() => {
+      this._loadTimer = null;
+      if (this._isLoadingList) {
+        this._refreshQueued = true;
+        this._refreshQueuedImmediate = false;
+        return;
+      }
+
+      this._hasRequestedInitialLoad = true;
+      this._refreshQueued = false;
+      this._refreshQueuedImmediate = false;
+      Logger.debug(`[ExperimentLogUI] 觸發延後刷新 (${reason})`);
+      this.loadExperimentLogs();
+    }, this._loadDebounceMs);
   }
 
   destroy() {

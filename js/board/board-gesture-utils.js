@@ -173,28 +173,34 @@ export const createBoardGestureUtils = function (deps) {
         currentCard.classList.add("gesture-card-inactive");
       }
 
+      const scrollToExperimentControls = () => {
+        const experimentControls = document.getElementById(
+          "experimentControlsContainer",
+        );
+        if (experimentControls) {
+          experimentControls.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+
+        const fallbackSection = document.querySelector(
+          ".left-panel .input-section",
+        );
+        if (fallbackSection) {
+          fallbackSection.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }
+      };
+
+      // 最後一步完成後，不論日誌是否 flush 成功，都要回到實驗控制區。
+      setTimeout(scrollToExperimentControls, 300);
+
       if (experimentLogManager) {
         experimentLogManager
           .flushAll()
           .then(() => {
             Logger.info("所有日誌已發送完成");
-
-            const firstCard = document.getElementById("gesture-card-0");
-            if (firstCard) {
-              firstCard.scrollIntoView({ behavior: "smooth", block: "center" });
-
-              setTimeout(() => {
-                const experimentSection = document.querySelector(
-                  ".left-panel .input-section",
-                );
-                if (experimentSection) {
-                  experimentSection.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  });
-                }
-              }, 300);
-            }
           })
           .catch((error) => {
             Logger.error("日誌發送失敗", error);

@@ -159,7 +159,7 @@ class PanelSyncManager {
       _sessionRestore: syncData._sessionRestore,
       isRunning: this.experimentFlowManager?.isRunning,
     });
-    // 更新面板的實驗資訊（使用 camelCase 欄位名稱，與 board 廣播一致）
+    // 更新面板的實驗資訊
     const expIdInput = document.getElementById("experimentIdInput");
     const participantInput = document.getElementById("participantNameInput");
 
@@ -308,6 +308,14 @@ class PanelSyncManager {
    * 處理同步的實驗停止狀態
    */
   handleSyncExperimentStopped(syncData) {
+    const myId = this.syncClient?.clientId;
+    if (myId && syncData?.clientId === myId) {
+      Logger.debug("[PanelSync] EXPERIMENT_STOPPED 來自本機，忽略", {
+        clientId: syncData?.clientId,
+        timestamp: syncData?.timestamp,
+      });
+      return;
+    }
     this._remoteExperimentActive = false;
     this._setDeferCompletion(false);
     this.callExperimentMethod("stopExperiment", "停止實驗失敗", false);
@@ -404,9 +412,15 @@ class PanelSyncManager {
     });
 
     // 廣播實驗停止
-    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
+    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (stopData = {}) => {
       this._remoteExperimentActive = false;
       this._setDeferCompletion(false);
+      if (stopData.broadcast === false) {
+        Logger.debug("[PanelSync] STOPPED 標記為本機收尾，不廣播到其他裝置", {
+          reason: stopData.reason,
+        });
+        return;
+      }
       if (!this._canBroadcast()) return;
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
@@ -471,6 +485,30 @@ class PanelSyncManager {
    */
   async handleSyncActionCompleted(syncData) {
     const { actionId, clientId } = syncData;
+    const currentExperimentId =
+      this.experimentSystemManager?.getExperimentId?.() ||
+      document.getElementById("experimentIdInput")?.value?.trim() ||
+      "";
+
+    if (
+      syncData.experimentId &&
+      currentExperimentId &&
+      syncData.experimentId !== currentExperimentId
+    ) {
+      Logger.debug("[PanelSync] 忽略不同 experimentId 的 ACTION_COMPLETED", {
+        actionId,
+        remoteExperimentId: syncData.experimentId,
+        currentExperimentId,
+      });
+      return;
+    }
+
+    if (syncData._sessionRestore && !this.experimentFlowManager?.isRunning) {
+      Logger.debug("[PanelSync] 忽略 session restore 的 ACTION_COMPLETED（未啟動實驗）", {
+        actionId,
+      });
+      return;
+    }
 
     Logger.debug("[PanelSync] handleSyncActionCompleted 被呼叫", {
       actionId,
@@ -527,7 +565,17 @@ class PanelSyncManager {
       }
     }
 
-    // 非電源 action 且尚未開機時，先強制開機再推進 action
+    // ================= 遠端推進時的自動開機邏輯 =================
+    // 當 Board 端遠端推進 action 到 Panel 時的自動開機
+    // 場景：Panel 已啟動實驗但尚未開機，收到遠端 action 推進
+    // 行為：自動開啟電源再進行 action
+    // 原因：
+    //   - 機台硬體通常需要電源才能執行 action（馬達驅動、感測器啟動等）
+    //   - 不自動開機會導致遠端 action 無法真正執行
+    // 限制：
+    //   - 只在「實驗已啟動但電源未開」時觸發（避免完全冷啟時自動開機）
+    //   - 排除電源相關 action（POWER_ON/OFF 有個別邏輯）
+    // 註：第一次來時，實驗本身尚未啟動，此邏輯不會觸發
     if (
       !this.powerControl?.isPowerOn &&
       actionId !== ACTION_IDS.POWER_ON &&
@@ -550,6 +598,11 @@ class PanelSyncManager {
       }
 
       this.powerControl.setPowerState(desiredState, "sync");
+      this.experimentActionHandler?.handleRemoteAction?.({
+        actionId,
+        status: "completed",
+        source: clientId,
+      });
       return;
     }
 

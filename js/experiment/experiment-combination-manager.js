@@ -42,6 +42,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
     this.isInitialized = false;
     this.readyPromise = null; // Promise to wait for initialization
     this.eventListeners = new Map();
+    this._selectionSignature = null;
     this.dependencies = {
       hubManager: null,
       syncManager: null,
@@ -114,9 +115,28 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
       return false;
     }
 
+    const normalizedExperimentId = experimentId || "";
+    const nextUnits = this.getCombinationUnitIds(combination, experimentId);
+    const nextSignature = JSON.stringify({
+      experimentId: normalizedExperimentId,
+      combinationId: combination.combinationId || "",
+      unitIds: nextUnits,
+      powerOptions: combination.powerOptions || null,
+    });
+    if (this._selectionSignature === nextSignature) {
+      this.currentCombination = combination;
+      this.loadedUnits = nextUnits;
+      Logger.debug("組合狀態未變更，略過重複設定", {
+        combinationName: combination.combinationName,
+        experimentId: normalizedExperimentId,
+      });
+      return true;
+    }
+
     const oldCombination = this.currentCombination;
     this.currentCombination = combination;
-    this.loadedUnits = this.getCombinationUnitIds(combination, experimentId);
+    this.loadedUnits = nextUnits;
+    this._selectionSignature = nextSignature;
 
     if (this.config.cacheEnabled && !options.skipCache) {
       this.saveToCache(combination);
@@ -490,6 +510,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
   reset() {
     this.currentCombination = null;
     this.loadedUnits = [];
+    this._selectionSignature = null;
     this.clearCache();
     Logger.debug("ExperimentCombinationManager 已重置");
   }
@@ -506,6 +527,12 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
         this.currentCombination,
         newExperimentId,
       );
+      this._selectionSignature = JSON.stringify({
+        experimentId: newExperimentId || "",
+        combinationId: this.currentCombination.combinationId || "",
+        unitIds: this.loadedUnits,
+        powerOptions: this.currentCombination.powerOptions || null,
+      });
 
       // 觸發組合重新選擇事件，讓 UI 更新排序
       this.emit(ExperimentCombinationManager.EVENT.COMBINATION_SELECTED, {

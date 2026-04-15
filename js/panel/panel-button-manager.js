@@ -607,8 +607,11 @@ class ButtonManager {
         this.isCooldownActive = false;
       }
 
-      // 冷卻結束後，進入下一步（僅在 FlowManager 有有效單元時）
-      if (flowManager?.getCurrentUnit?.()) {
+      // 冷卻結束後，只有在不是關機動作時才推進下一步
+      if (
+        flowManager?.getCurrentUnit?.() &&
+        currentAction?.actionId !== ACTION_IDS.POWER_OFF
+      ) {
         flowManager.nextStep();
       }
     }, 3000);

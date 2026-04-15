@@ -475,22 +475,37 @@ class ExperimentSystemManager {
    */
   async _reinitializeCombinationForNewExperimentId(experimentId) {
     try {
-      // 取消全選
-      const unitList = document.querySelector(this.state.containers.unitPanel);
-      if (unitList) {
-        unitList
-          .querySelectorAll("input[type=\"checkbox\"]")
-          .forEach((checkbox) => {
-            checkbox.checked = false;
-          });
-        Logger.debug("已清除所有單元選擇");
+      const currentCombo =
+        this.state.currentCombination ||
+        this.combinationManager.getCurrentCombination?.() ||
+        null;
+      const currentUnitIds =
+        this.combinationManager.getCombinationUnitIds(
+          currentCombo,
+          experimentId,
+        ) || [];
+
+      if (!currentCombo) {
+        Logger.debug("沒有目前組合，僅更新實驗ID後略過組合重繪");
+        return;
       }
 
-      // 這樣當使用者再次選擇組合時，會使用新的實驗 ID
-      // 如果需要自動應用預設組合，可以在這裡呼叫
-      Logger.debug("準備使用新實驗 ID 載入組合資訊:", experimentId);
+      this.state.currentCombination = {
+        ...currentCombo,
+        powerOptions: this._normalizePowerOptions(currentCombo.powerOptions),
+      };
+      this.state.currentUnitIds = [...currentUnitIds];
 
-      // 觸發面板重新產生的事件
+      Logger.debug("準備使用新實驗 ID 重繪組合資訊:", {
+        experimentId,
+        combinationId: currentCombo.combinationId,
+        unitIds: currentUnitIds,
+      });
+
+      // 直接重新套回 UI，避免先清空造成接收端短暫空白或漏選
+      this._updateUIForCombination(currentCombo, currentUnitIds);
+
+      // 保留事件，讓面板層可視情況做額外刷新
       window.dispatchEvent(
         new CustomEvent("experimentSystem:shouldRefreshPanel", {
           detail: { experimentId },
@@ -886,20 +901,8 @@ class ExperimentSystemManager {
     const experimentId = this.getExperimentId();
 
     if (unitIds.length === 0) {
-      this.state.currentUnitIds = [];
-      const customCombination = this._buildCustomCombination(
-        [],
-        baseCombo || currentCombo,
-        powerOptions,
-      );
-      return this.combinationManager.setCombination(
-        customCombination,
-        experimentId,
-        {
-          skipCache: true,
-          skipBroadcast: options.skipBroadcast === true,
-        },
-      );
+      Logger.warn("忽略空白單元選擇，保留目前單元列表");
+      return false;
     }
 
     const orderUnchanged = this._isSameUnitOrder(unitIds, currentUnitIds);

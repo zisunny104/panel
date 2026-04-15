@@ -59,20 +59,39 @@ class MediaManager {
     Object.assign(this, deps);
   }
 
+  _isLowPowerDevice() {
+    if (typeof navigator === "undefined") return false;
+
+    const hardwareConcurrency = navigator.hardwareConcurrency || 0;
+    const hasTouchInput = navigator.maxTouchPoints > 1;
+    return (hardwareConcurrency > 0 && hardwareConcurrency <= 4) || hasTouchInput;
+  }
+
   /**
    * 安排基本媒體資源的預載
    */
   scheduleEssentialPreload() {
-    // 等待 DOM 完全載入後，再延遲 1 秒開始預載
+    const startPreload = () => {
+      const runPreload = () => this.preloadAllMedia();
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(runPreload, { timeout: 3000 });
+      } else {
+        setTimeout(runPreload, 0);
+      }
+    };
+
+    const initialDelay = this._isLowPowerDevice() ? 2500 : 1000;
+
+    // 等待 DOM 完全載入後，再延遲開始預載，避免搶占首屏資源
     if (document.readyState === "complete") {
       setTimeout(() => {
-        this.preloadAllMedia();
-      }, 1000);
+        startPreload();
+      }, initialDelay);
     } else {
       window.addEventListener("load", () => {
         setTimeout(() => {
-          this.preloadAllMedia();
-        }, 1000);
+          startPreload();
+        }, initialDelay);
       });
     }
   }
@@ -126,16 +145,34 @@ class MediaManager {
     // 停止首頁循環
     this.stopHomePageLoop();
 
-    // 清空媒體區域
-    this.mediaArea.innerHTML = "";
     this.mediaArea.classList.remove("hide-media-content");
+
+    const previousMediaElements = Array.from(this.mediaArea.children).filter(
+      (element) => !element.hasAttribute("data-preload"),
+    );
+
+    const originalOnStart = options.onStart;
+    const mediaOptions = {
+      ...options,
+      onStart: (element) => {
+        previousMediaElements.forEach((previousElement) => {
+          if (previousElement !== element) {
+            previousElement.remove();
+          }
+        });
+        element.style.opacity = "1";
+        if (typeof originalOnStart === "function") {
+          originalOnStart(element);
+        }
+      },
+    };
 
     let mediaElement;
 
     // 根據檔案類型建立相應元素
     if (src.endsWith(".mp4") || src.endsWith(".webm") || src.endsWith(".ogg")) {
       mediaElement = document.createElement("video");
-      this.setupVideoElement(mediaElement, src, options);
+      this.setupVideoElement(mediaElement, src, mediaOptions);
     } else if (
       src.endsWith(".jpg") ||
       src.endsWith(".jpeg") ||
@@ -144,13 +181,16 @@ class MediaManager {
       src.endsWith(".webp")
     ) {
       mediaElement = document.createElement("img");
-      this.setupImageElement(mediaElement, src, options);
+      this.setupImageElement(mediaElement, src, mediaOptions);
     } else {
       Logger.error(`不支援的媒體格式: ${src}`);
       this.mediaArea.innerHTML =
         "<div class=\"media-error-message\">不支援的媒體格式</div>";
       return null;
     }
+
+    mediaElement.style.opacity = "0";
+    mediaElement.style.transition = "opacity 120ms ease";
 
     this.mediaArea.appendChild(mediaElement);
 
@@ -278,6 +318,10 @@ class MediaManager {
     // 確保媒體載入完成時音量正確設定
     video.addEventListener("canplay", () => {
       video.volume = this.mediaVolume;
+      if (!video._mediaStartNotified && options.onStart) {
+        video._mediaStartNotified = true;
+        options.onStart(video);
+      }
     });
 
     // 嘗試播放
@@ -290,8 +334,6 @@ class MediaManager {
         }
       });
     }, 0);
-
-    if (options.onStart) options.onStart(video);
   }
 
   /**
@@ -333,13 +375,18 @@ class MediaManager {
   playMediaInArea(src, options = {}) {
     if (!this.mediaArea) return;
 
-    this.mediaArea.innerHTML = "";
+    const previousMediaElements = Array.from(this.mediaArea.children).filter(
+      (element) => !element.hasAttribute("data-preload"),
+    );
+
     this.mediaArea.classList.remove("hide-media-content");
 
     const video = document.createElement("video");
     video.src = src;
     video.style.width = "100%";
     video.style.height = "100%";
+    video.style.opacity = "0";
+    video.style.transition = "opacity 120ms ease";
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
     video.setAttribute("preload", "auto");
@@ -349,11 +396,22 @@ class MediaManager {
     video.autoplay = true;
 
     this.mediaArea.appendChild(video);
+    let mediaShown = false;
+
+    const showMedia = () => {
+      if (mediaShown) return;
+      mediaShown = true;
+      previousMediaElements.forEach((previousElement) => previousElement.remove());
+      video.style.opacity = "1";
+      if (typeof options.onStart === "function") {
+        options.onStart(video);
+      }
+    };
+
+    video.addEventListener("canplay", showMedia);
     setTimeout(() => {
       video.play().catch(() => {});
     }, 0);
-
-    if (options.onStart) options.onStart(video);
 
     video.addEventListener("ended", () => {
       if (options.onEnded) options.onEnded();
@@ -732,6 +790,7 @@ class MediaManager {
 
     this.isPreloading = true;
     const startTime = performance.now();
+    const batchSize = this._isLowPowerDevice() ? 1 : 2;
 
     try {
       // 只預先載入基本資源
@@ -741,7 +800,6 @@ class MediaManager {
       const sortedFiles = this.sortMediaByPriority(essentialFiles);
 
       // 批次處理，避免阻塞主線程
-      const batchSize = 2; // 每次只處理2個檔案
       const batches = [];
       for (let i = 0; i < sortedFiles.length; i += batchSize) {
         batches.push(sortedFiles.slice(i, i + batchSize));
@@ -891,6 +949,7 @@ class MediaManager {
 
     this.isPreloading = true;
     const startTime = performance.now();
+    const batchSize = this._isLowPowerDevice() ? 1 : 2;
 
     try {
       // 收集目前組合的媒體檔案
@@ -922,7 +981,6 @@ class MediaManager {
       const sortedFiles = this.sortMediaByPriority(newFiles);
 
       // 批次處理
-      const batchSize = 2;
       const batches = [];
       for (let i = 0; i < sortedFiles.length; i += batchSize) {
         batches.push(sortedFiles.slice(i, i + batchSize));

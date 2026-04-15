@@ -214,15 +214,28 @@ class ExperimentUIManager {
     );
     if (comboContainer) {
       // 將所有互動元素設為 disabled
-      comboContainer
-        .querySelectorAll("button,input,li,select")
-        .forEach((el) => {
-          try {
-            el.disabled = !!locked;
-            if (locked) el.classList.add("experiment-disabled");
-            else el.classList.remove("experiment-disabled");
-          } catch (e) {}
-        });
+        comboContainer
+          .querySelectorAll("button,input,li,select")
+          .forEach((el) => {
+            try {
+              const isPermaDisabled =
+                el?.dataset?.permaDisabled === "true" ||
+                el?.id === "includeStartup" ||
+                el?.id === "includeShutdown";
+              if (locked) {
+                el.disabled = true;
+                el.classList.add("experiment-disabled");
+                return;
+              }
+              if (isPermaDisabled) {
+                el.disabled = true;
+                el.classList.add("experiment-disabled");
+                return;
+              }
+              el.disabled = false;
+              el.classList.remove("experiment-disabled");
+            } catch (e) {}
+          });
     }
 
     // 若有需要，也可以發出事件
@@ -1113,7 +1126,7 @@ class ExperimentUIManager {
                 ? `
               <li class="power-option-card startup-card">
                 <label class="unit-checkbox">
-                  <input type="checkbox" id="includeStartup" checked disabled>
+                  <input type="checkbox" id="includeStartup" checked disabled data-perma-disabled="true">
                 </label>
                 <div class="unit-sort">
                   <div class="power-option-title">機器開機</div>
@@ -1156,7 +1169,7 @@ class ExperimentUIManager {
                 ? `
               <li class="power-option-card shutdown-card">
                 <label class="unit-checkbox">
-                  <input type="checkbox" id="includeShutdown" checked disabled>
+                  <input type="checkbox" id="includeShutdown" checked disabled data-perma-disabled="true">
                 </label>
                 <div class="unit-sort">
                   <div class="power-option-title">機器關機</div>

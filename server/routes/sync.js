@@ -13,8 +13,37 @@ import { query, execute } from "../database/connection.js";
 
 // 本檔使用的角色常數，避免在多處硬編碼
 const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
+const PUBLIC_CHANNEL_PREFIX = "__CH_";
+const VALID_CHANNELS = ["A", "B", "C"];
 
 const router = express.Router();
+
+function closeSessionEverywhere(
+  app,
+  resolvedSessionId,
+  { removeDatabaseSession = false } = {},
+) {
+  const connectionManager = app?.locals?.connectionManager;
+  const sessionManager = app?.locals?.sessionManager;
+
+  if (!connectionManager || !sessionManager) {
+    throw new Error("WebSocket 系統尚未初始化");
+  }
+
+  const wsIds = connectionManager.getConnectionIdsBySessionId(resolvedSessionId);
+  wsIds.forEach((id) => connectionManager.unregister(id));
+  sessionManager.clearSession(resolvedSessionId);
+
+  let dbDeleted = true;
+
+  if (removeDatabaseSession) {
+    execute(`DELETE FROM share_codes WHERE session_id = ?`, [resolvedSessionId]);
+    const deleted = execute(`DELETE FROM sessions WHERE session_id = ?`, [resolvedSessionId]);
+    dbDeleted = deleted.changes > 0;
+  }
+
+  return { closedCount: wsIds.length, dbDeleted };
+}
 
 /**
  * POST /api/sync/session
@@ -428,12 +457,11 @@ router.delete("/session/:sessionId", (req, res) => {
   const { sessionId } = req.params;
 
   try {
-    // 刪除工作階段（SessionService 會連帶刪除相關的分享代碼）
-    const deleted = execute(`DELETE FROM sessions WHERE session_id = ?`, [
-      sessionId,
-    ]);
+    const result = closeSessionEverywhere(req.app, sessionId, {
+      removeDatabaseSession: true,
+    });
 
-    if (deleted.changes === 0) {
+    if (!result.dbDeleted) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
         success: false,
         error: ERROR_CODES.SESSION_NOT_FOUND,
@@ -441,11 +469,12 @@ router.delete("/session/:sessionId", (req, res) => {
       });
     }
 
-    // 同時刪除相關的分享代碼
-    execute(`DELETE FROM share_codes WHERE session_id = ?`, [sessionId]);
-
     res.status(HTTP_STATUS.OK).json({
       success: true,
+      data: {
+        sessionId,
+        closedCount: result.closedCount,
+      },
       message: "工作階段已刪除",
     });
   } catch (error) {
@@ -636,8 +665,6 @@ router.post("/channel", (req, res) => {
     clientId: existingClientId,
   } = req.body;
 
-  const VALID_CHANNELS = ["A", "B", "C"];
-
   if (!channelName || !VALID_CHANNELS.includes(channelName.toUpperCase())) {
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
       success: false,
@@ -651,7 +678,7 @@ router.post("/channel", (req, res) => {
     : ROLE.OPERATOR;
 
   // 公開頻道的 sessionId 使用固定前綴，不存入 DB（純記憶體工作階段）
-  const sessionId = `__CH_${channelName.toUpperCase()}__`;
+  const sessionId = `${PUBLIC_CHANNEL_PREFIX}${channelName.toUpperCase()}__`;
   const clientId = existingClientId || generateClientId();
 
   Logger.event(
@@ -669,6 +696,74 @@ router.post("/channel", (req, res) => {
       channelName: channelName.toUpperCase(),
     },
   });
+});
+
+/**
+ * POST /api/sync/channel/close
+ * 關閉公開頻道所有連線
+ *
+ * Request body: { channelName?: "A"|"B"|"C", sessionId?: string }
+ * Response: { sessionId, closedCount }
+ */
+router.post("/channel/close", (req, res) => {
+  const { channelName, sessionId } = req.body || {};
+
+  let resolvedSessionId = sessionId;
+  if (!resolvedSessionId && channelName) {
+    const upper = String(channelName).toUpperCase();
+    if (!VALID_CHANNELS.includes(upper)) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: "INVALID_CHANNEL",
+        message: `頻道名稱無效，可用頻道: ${VALID_CHANNELS.join(", ")}`,
+      });
+    }
+    resolvedSessionId = `${PUBLIC_CHANNEL_PREFIX}${upper}__`;
+  }
+
+  if (!resolvedSessionId || !resolvedSessionId.startsWith(PUBLIC_CHANNEL_PREFIX)) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      error: "INVALID_CHANNEL",
+      message: "缺少有效的公開頻道 sessionId",
+    });
+  }
+
+  const connectionManager = req.app.locals.connectionManager;
+  const sessionManager = req.app.locals.sessionManager;
+
+  if (!connectionManager || !sessionManager) {
+    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+      success: false,
+      error: "SERVER_NOT_READY",
+      message: "WebSocket 系統尚未初始化",
+    });
+  }
+
+  try {
+    const result = closeSessionEverywhere(req.app, resolvedSessionId);
+
+    Logger.event(
+      "red",
+      "!",
+      `公開頻道已關閉 | session=${resolvedSessionId} | 斷線 ${result.closedCount} 筆`,
+    );
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      data: {
+        sessionId: resolvedSessionId,
+        closedCount: result.closedCount,
+      },
+    });
+  } catch (error) {
+    Logger.error("關閉公開頻道失敗:", error.message);
+    res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+      success: false,
+      error: "CHANNEL_CLOSE_FAILED",
+      message: "關閉公開頻道失敗",
+    });
+  }
 });
 
 export default router;

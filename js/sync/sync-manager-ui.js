@@ -310,6 +310,9 @@ export class SyncManagerUI {
               </div>
             </div>
             <div class="sync-session-action-row">
+              <button id="closePublicChannelBtn" class="sync-close-channel-btn" style="display: none;">
+                關閉目前工作階段
+              </button>
               <button id="disconnectBtn" class="sync-disconnect-btn">
                 退出工作階段
               </button>
@@ -634,6 +637,15 @@ export class SyncManagerUI {
       if (disconnectBtn) {
         this.addDOMListener(disconnectBtn, "click", () => {
           this.handleDisconnect();
+        });
+      }
+
+      const closePublicChannelBtn = document.getElementById(
+        "closePublicChannelBtn",
+      );
+      if (closePublicChannelBtn) {
+        this.addDOMListener(closePublicChannelBtn, "click", () => {
+          this.handleCloseCurrentSession();
         });
       }
 
@@ -989,6 +1001,63 @@ export class SyncManagerUI {
     }
   }
 
+  async handleCloseCurrentSession() {
+    const sessionId = this.core.currentSessionId || this.core.getSessionId();
+    if (!sessionId) {
+      this.showStatus("error", "未連線到任何工作階段");
+      return;
+    }
+
+    const isPublicChannel = sessionId.startsWith("__CH_");
+    const confirmMessage = isPublicChannel
+      ? "確定要關閉目前公開頻道嗎？所有連線將被中斷。"
+      : "確定要關閉目前工作階段嗎？所有連線將被中斷。";
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      this.showStatus(
+        "info",
+        isPublicChannel
+          ? "正在關閉公開頻道..."
+          : "正在關閉目前工作階段...",
+      );
+
+      const result = await this.core.closeCurrentSession(sessionId);
+
+      // 關閉公開頻道後，同步清除本機快取，避免斷線後自動還原回同一個工作階段
+      if (this.core.syncClient) {
+        await this.core.syncClient.disconnect();
+      }
+      this.core.currentSessionId = null;
+      this.core.currentShareCode = null;
+      this.core.currentRole = null;
+
+      this.showStatus(
+        "success",
+        `${isPublicChannel ? "公開頻道" : "工作階段"}已關閉（已斷線 ${result.closedCount || 0} 筆）`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      this.updateIndicator();
+      this.updateUIState();
+    } catch (error) {
+      Logger.error("Close current session error:", error);
+      this.showStatus(
+        "error",
+        "關閉工作階段失敗",
+        error && error.message,
+      );
+    }
+  }
+
+  async handleClosePublicChannel() {
+    return this.handleCloseCurrentSession();
+  }
+
   async initializeShareCode() {
     Logger.debug("開始初始化分享代碼和 QR Code ");
 
@@ -1266,6 +1335,14 @@ export class SyncManagerUI {
       );
       if (shareRow) {
         shareRow.style.display = isPublicChannel ? "none" : "";
+      }
+
+      const closePublicChannelBtn = document.getElementById(
+        "closePublicChannelBtn",
+      );
+      if (closePublicChannelBtn) {
+        closePublicChannelBtn.style.display = sessionId ? "" : "none";
+        closePublicChannelBtn.textContent = "關閉目前工作階段";
       }
     } catch (error) {
       Logger.warn("updateConnectedSessionInfo 錯誤:", error);

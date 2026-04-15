@@ -378,6 +378,17 @@ class PanelPageManager {
     });
 
     this.experimentActionHandler.on(
+      ExperimentActionHandler.EVENT.ACTION_ENTERED,
+      (data) => {
+        Logger.debug("Panel: 新步驟已進入，更新媒體顯示", {
+          actionId: data.actionId,
+        });
+        // 令 ButtonManager 更新媒體顯示並重刷下一個動作的高亮
+        this.buttonManager?.updateMediaForCurrentAction?.();
+      },
+    );
+
+    this.experimentActionHandler.on(
       ExperimentActionHandler.EVENT.SEQUENCE_COMPLETED,
       async () => {
         Logger.debug("Panel: ActionHandler 序列完成，檢查是否推進下一個單元");
@@ -420,6 +431,11 @@ class PanelPageManager {
     const unitIds = data.units;
     const powerOptions = this._getPowerOptionsForCurrentCombination();
 
+    // 若包含關機步驟，延後流程完成，避免未關機就結束
+    this.experimentFlowManager?.setDeferCompletion?.(
+      Boolean(powerOptions.includeShutdown),
+    );
+
     if (powerOptions.includeStartup) {
       this.powerControl?.ensurePowerOffForExperimentStart();
     }
@@ -456,7 +472,6 @@ class PanelPageManager {
       isLastUnit: unitIds.length === 1,
     });
     this._notifyButtonManagerForActions(firstUnitToLoad);
-    this.powerControl?.syncPowerActionWithState();
     this.panelUIManager.setExperimentPanelButtonColor("running");
 
     Logger.debug("實驗開始處理完成，已載入動作序列並通知管理器");
@@ -530,6 +545,12 @@ class PanelPageManager {
 
     actionHandler.actionToStepMap = actionToStepMap;
 
+    if (includeStartup && isFirstUnit) {
+      this.powerControl?.syncPowerActionWithState();
+    }
+
+    this.buttonManager?.updateMediaForCurrentAction?.();
+
     Logger.debug("動作序列已載入到 ActionHandler", {
       unitId: unit.unit_id,
       actionCount: actions.length,
@@ -582,9 +603,10 @@ class PanelPageManager {
       action: action,
     }));
 
-    this.buttonManager.emit("experiment:actions-loaded", {
+    // 直接同步通知一次，避免初始化時事件監聽器尚未完成綁定而漏掉刷新
+    this.buttonManager.handleExperimentActionsLoaded?.({
       actions: actionData,
-      unit: unit,
+      unit,
     });
 
     Logger.debug(`已通知 ButtonManager 載入 ${allActions.length} 個動作`);
@@ -702,7 +724,6 @@ class PanelPageManager {
         flowManager.currentUnitIndex >= flowManager.loadedUnits.length - 1,
     });
     this._notifyButtonManagerForActions(nextUnit);
-    this.powerControl?.syncPowerActionWithState();
 
     Logger.debug("Panel: 已推進到下一個單元並載入動作序列", {
       nextUnitId,
@@ -729,7 +750,6 @@ const initializePanel = async () => {
 };
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initializePanel);
   document.addEventListener("DOMContentLoaded", initializePanel);
 
 } else {

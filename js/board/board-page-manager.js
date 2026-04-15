@@ -419,9 +419,10 @@ class BoardPageManager {
    * 初始化其餘元件（在管理器初始化之後）
    */
   initializeRemainingComponents() {
-    this.scenariosData = null;
-    this.scriptData = null;
-    this.gesturesData = null;
+    // 保留 modules_init 階段已載入的資料，避免重複載入造成啟動成本上升。
+    this.scenariosData = this.scenariosData || null;
+    this.scriptData = this.scriptData || null;
+    this.gesturesData = this.gesturesData || null;
     this.currentUnit = this.currentUnit || null;
     this.currentStep = this.currentStep || 0;
     this.currentCombination = this.currentCombination || null;
@@ -433,8 +434,8 @@ class BoardPageManager {
     this.lastSavedParticipantName = "";
     this.pendingExperimentIdUpdate = null;
     this.pendingParticipantNameUpdate = null;
-    this.actionsMap = new Map();
-    this.actionToStepMap = new Map();
+    this.actionsMap = this.actionsMap || new Map();
+    this.actionToStepMap = this.actionToStepMap || new Map();
     this.currentActionSequence = [];
     this.currentActionIndex = 0;
     this.completedActions = new Set();
@@ -442,6 +443,7 @@ class BoardPageManager {
     this.processedRemoteActions = new Map();
     // 避免遠端 action 短時間內重複處理
     this.remoteActionDedupeWindow = 500;
+    this.experimentStartedAt = 0;
     this.boardUIManager = new BoardUIManager(this);
     this.boardUIManager.init();
     Logger.debug("BoardUIManager 已初始化");
@@ -539,6 +541,7 @@ class BoardPageManager {
 
     // 同步 experimentRunning 旗標，避免 _autoStartExperimentIfNeeded 重複觸發
     this.experimentRunning = true;
+    this.experimentStartedAt = Date.now();
 
     // 初始化日誌管理器與即時日誌 UI（統一由 flowStarted 驅動）
     if (this.experimentLogManager) {
@@ -666,6 +669,7 @@ class BoardPageManager {
 
     // 同步 experimentRunning 旗標
     this.experimentRunning = false;
+    this.experimentStartedAt = 0;
 
     // 停止日誌記錄並準備匯出
     if (this.experimentLogManager) {
@@ -810,6 +814,25 @@ class BoardPageManager {
           : generateExperimentId();
       }
 
+      const unitIds = this.experimentCombinationManager.getCombinationUnitIds(
+        combination,
+        experimentId,
+      );
+      const normalizedPowerOptions = combination?.powerOptions || {};
+      const loadSignature = JSON.stringify({
+        experimentId,
+        combinationId: combination?.combinationId || "",
+        unitIds,
+        powerOptions: normalizedPowerOptions,
+      });
+      if (this._lastCombinationLoadSignature === loadSignature) {
+        Logger.debug("loadScriptForCombination: 組合內容未變更，略過重建", {
+          experimentId,
+          combinationId: combination?.combinationId,
+        });
+        return true;
+      }
+
       Logger.debug("loadScriptForCombination: 實驗ID確認完成", {
         experimentId,
       });
@@ -825,10 +848,6 @@ class BoardPageManager {
       };
 
       // 建立單元序列（統一使用 CombinationManager 管理排序邏輯）
-      const unitIds = this.experimentCombinationManager.getCombinationUnitIds(
-        combination,
-        experimentId,
-      );
       Logger.debug("loadScriptForCombination: 單元序列模式", { unitIds });
 
       const confirmGesture = this.scenariosData?.gesture_list?.find(
@@ -1188,6 +1207,7 @@ class BoardPageManager {
       }
 
       this.currentCombination = script;
+      this._lastCombinationLoadSignature = loadSignature;
       Logger.debug("loadScriptForCombination: 呼叫 renderUnitDetail()");
       this.renderUnitDetail();
     } catch (error) {
@@ -1782,6 +1802,10 @@ class BoardPageManager {
   ) {
     if (!buttonElement) return;
 
+    const stepId =
+      this.experimentActionHandler?.actionToStepMap?.get(actionId)?.step_id ||
+      null;
+
     buttonElement.setAttribute("data-completed", "true");
     buttonElement.style.background = "#c8e6c9";
     buttonElement.style.borderColor = "#4caf50";
@@ -1790,7 +1814,7 @@ class BoardPageManager {
     this._scrollActionCardIntoView(buttonElement);
 
     if (!isRemote && this.experimentLogManager) {
-      this.experimentLogManager.logAction(actionId, gestureIndex, null);
+      this.experimentLogManager.logAction(actionId, gestureIndex, stepId);
     }
 
     if (!isRemote && actionId) {
@@ -2315,16 +2339,20 @@ class BoardPageManager {
 
     this.logAction("experiment_started", experimentData);
 
-    const firstGestureCard = document.getElementById("gesture-card-0");
-    if (firstGestureCard) {
-      firstGestureCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (this.gestureUtils?.activateGestureStep) {
+      this.gestureUtils.activateGestureStep(0);
+    } else {
+      const firstGestureCard = document.getElementById("gesture-card-0");
+      if (firstGestureCard) {
+        firstGestureCard.scrollIntoView({ behavior: "smooth", block: "start" });
 
-      firstGestureCard.classList.remove("gesture-card-inactive");
-      firstGestureCard.classList.add(
-        "gesture-card-active",
-        "gesture-card-current",
-      );
+        firstGestureCard.classList.remove("gesture-card-inactive");
+        firstGestureCard.classList.add(
+          "gesture-card-active",
+          "gesture-card-current",
+        );
 
+      }
     }
 
     experimentSyncManager.registerExperimentStateToHub({
@@ -2639,7 +2667,56 @@ class BoardPageManager {
    * 若實驗管理中的手勢序列對應的步驟中有相同的 action，則更新狀態
    */
   handleRemoteActionCompleted(syncData) {
-    const { actionId, source, clientId, timestamp, gestureIndex } = syncData;
+    const {
+      actionId,
+      source,
+      clientId,
+      timestamp,
+      gestureIndex,
+      experimentId,
+    } = syncData;
+
+    const currentExperimentId =
+      document.getElementById("experimentIdInput")?.value?.trim() ||
+      this.experimentId ||
+      "";
+
+    if (!this.experimentRunning) {
+      Logger.debug("忽略遠端 ACTION_COMPLETED：實驗尚未開始", {
+        actionId,
+        experimentId,
+        timestamp,
+      });
+      return;
+    }
+
+    if (experimentId && currentExperimentId && experimentId !== currentExperimentId) {
+      Logger.debug("忽略遠端 ACTION_COMPLETED：experimentId 不一致", {
+        actionId,
+        remoteExperimentId: experimentId,
+        currentExperimentId,
+      });
+      return;
+    }
+
+    const ts =
+      typeof timestamp === "number"
+        ? timestamp
+        : typeof timestamp === "string"
+          ? Date.parse(timestamp)
+          : NaN;
+    if (
+      Number.isFinite(ts) &&
+      this.experimentStartedAt > 0 &&
+      ts < this.experimentStartedAt - 2000
+    ) {
+      Logger.debug("忽略過舊的遠端 ACTION_COMPLETED", {
+        actionId,
+        timestamp,
+        experimentStartedAt: this.experimentStartedAt,
+      });
+      return;
+    }
 
     // 接收遠端 action 完成
 
@@ -2656,6 +2733,20 @@ class BoardPageManager {
     );
     if (actionButton) {
       this._markActionCompleted(actionButton, actionId, gestureIndex, true);
+
+      const resolvedGestureIndex =
+        gestureIndex ?? actionButton.getAttribute("data-gesture-index");
+      if (resolvedGestureIndex !== null && resolvedGestureIndex !== undefined) {
+        const idx = parseInt(resolvedGestureIndex, 10);
+        if (!Number.isNaN(idx)) {
+          this.gestureUtils?.activateGestureStep(idx);
+        }
+      }
+
+      actionButton.classList.add("remote-action-completed");
+      setTimeout(() => {
+        actionButton.classList.remove("remote-action-completed");
+      }, 2000);
     }
 
     // 在實驗進行中時，檢查是否有對應的步驟
@@ -2704,7 +2795,6 @@ class BoardPageManager {
       actionId,
       function: buttonFunction,
       clientId,
-      timestamp,
     } = data;
 
     const currentExperimentId =
@@ -2732,17 +2822,13 @@ class BoardPageManager {
         button,
         buttonFunction,
         clientId,
+        actionId,
       );
     }
 
     // 如果目前實驗ID相符，執行相應的 UI 更新
     if (experimentId === currentExperimentId && this.experimentRunning) {
-      // 使用 action_id 標記對應的卡片
-      this.showRemoteActionFeedback(
-        actionId,
-        { button, function: buttonFunction },
-        timestamp,
-      );
+      // action 完成標記由 ACTION_COMPLETED 事件驅動
     }
   }
 
@@ -2942,30 +3028,27 @@ class BoardPageManager {
     let highlightedCard = null;
     let gestureIndex = null;
 
-    actionCards.forEach((card) => {
-      const cardAction = card.getAttribute("data-action-id");
-      const cardGestureIdx = card.getAttribute("data-gesture-index");
+    highlightedCard = document.querySelector(
+      `.gesture-action-button[data-action-id="${targetActionId}"]`,
+    );
+    if (highlightedCard) {
+      gestureIndex = highlightedCard.getAttribute("data-gesture-index");
 
-      if (cardAction === targetActionId) {
-        highlightedCard = card;
-        gestureIndex = cardGestureIdx;
+      this._markActionCompleted(highlightedCard, targetActionId, gestureIndex, true);
 
-        this._markActionCompleted(card, targetActionId, gestureIndex, true);
-
-        if (gestureIndex !== null) {
-          const idx = parseInt(gestureIndex, 10);
-          if (!Number.isNaN(idx)) {
-            this.gestureUtils?.activateGestureStep(idx);
-          }
+      if (gestureIndex !== null) {
+        const idx = parseInt(gestureIndex, 10);
+        if (!Number.isNaN(idx)) {
+          this.gestureUtils?.activateGestureStep(idx);
         }
-
-        card.classList.add("remote-action-completed");
-
-        setTimeout(() => {
-          card.classList.remove("remote-action-completed");
-        }, 2000);
       }
-    });
+
+      highlightedCard.classList.add("remote-action-completed");
+
+      setTimeout(() => {
+        highlightedCard.classList.remove("remote-action-completed");
+      }, 2000);
+    }
 
     if (!highlightedCard) {
       Logger.warn(`找不到對應的卡片 (action_id: ${targetActionId})`);
@@ -3360,7 +3443,9 @@ class BoardPageManager {
     }
   }
 }
+
 const boardPageManager = new BoardPageManager();
+window.boardPageManager = boardPageManager;
 
 const initializeBoard = async () => {
   try {

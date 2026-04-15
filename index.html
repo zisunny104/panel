@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' data: https://unpkg.com https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src 'self' wss: https: https://unpkg.com https://cdn.jsdelivr.net https://cloudflareinsights.com; img-src 'self' data:;">
+        content="default-src 'self' data: https://unpkg.com https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src 'self' wss: https: https://unpkg.com https://cdn.jsdelivr.net https://cloudflareinsights.com; img-src 'self' data:;">
     <title>機台面板 | 碩論進行中</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
 
@@ -13,7 +13,7 @@
     <link rel="preload" as="image" href="assets/ui/panel.webp" type="image/webp">
 
     <!-- 主要樣式 -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css" data-versioned>
     <!-- QR Code 函式庫 -->
     <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
     <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -353,15 +353,18 @@
 
     <!-- ===== 核心基礎 ===== -->
     <!-- Logger（必須最先載入） -->
-    <script type="module" src="js/core/console-manager.js"></script>
-    <!-- WS 協議常數（Server/Client 共用，載入後暴露為 window.WS_PROTOCOL） -->
-    <script type="module" src="shared/ws-protocol-constants.js"></script>
-    <!-- 常數入口（暴露 window.SYNC_EVENTS / window.SYNC_DATA_TYPES / window.ACTION_CONSTANTS） -->
-    <script type="module" src="js/constants/index.js"></script>
+    <script type="module">
+        import { bootstrapPage } from "./js/core/app-bootstrap.js";
 
-    <!-- ===== 面板頁面管理器 ===== -->
-    <!-- 頁面入口：動態載入並協調所有其他模組（Data, Sync, UI, Experiment） -->
-    <script type="module" src="js/panel/panel-page-manager.js"></script>
+        bootstrapPage({
+            entryModules: [
+                "./js/core/console-manager.js",
+                "./shared/ws-protocol-constants.js",
+                "./js/constants/index.js",
+                "./js/panel/panel-page-manager.js",
+            ],
+        });
+    </script>
 </body>
 
 </html>

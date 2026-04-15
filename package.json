@@ -1,16 +1,17 @@
 {
     "type": "module",
     "name": "panel",
-    "version": "2.4.aa637d3",
+    "version": "2.4.d3fdddb",
     "description": "機台操作面板與實驗設定",
     "main": "index.html",
     "scripts": {
+        "start": "node server/index.js",
+        "dev": "node server/index.js",
+        "server": "node server/index.js",
         "version:update": "node scripts/update-version.js all",
         "version:status": "node scripts/update-version.js status",
         "version:hash": "node scripts/update-version.js hash",
         "version:version": "node scripts/update-version.js version",
-        "server": "cd server && node index.js",
-        "dev": "npm run server",
         "lint": "eslint \"js/**/*.js\" --fix"
     },
     "keywords": [
@@ -25,9 +26,16 @@
         "type": "git",
         "url": "."
     },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "ws": "^8.19.0"
+    },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "eslint": "^10.2.0",
-        "globals": "^17.3.0"
+        "globals": "^17.3.0",
+        "nodemon": "^3.1.9"
     }
 }

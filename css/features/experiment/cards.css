@@ -369,6 +369,20 @@
     min-width: 0;
 }
 
+.gesture-action-button[data-completed="true"] {
+    background: #c8e6c9;
+    border-color: #4caf50;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+}
+
+.gesture-action-button[data-completed="true"] .action-id {
+    color: #2e7d32;
+}
+
+.gesture-action-button[data-completed="true"] .action-name {
+    color: #1b5e20;
+}
+
 .gesture-action-button .action-id {
     font-size: 9px;
     color: #667eea;

@@ -35,6 +35,7 @@ class PowerControl {
     this.isPowerOn = false;
     this.isPowerVideoPlaying = false;
     this._suppressPowerActionCompletionUntil = 0;
+    this._syncRestoreMediaTimer = null;
     this.powerOnBtn = document.getElementById("powerOnBtn");
     this.powerOffBtn = document.getElementById("powerOffBtn");
     this.emergencyStopBtn = document.getElementById("emergencyStopBtn");
@@ -82,6 +83,44 @@ class PowerControl {
       mediaManager.mediaArea.innerHTML = "";
       mediaManager.mediaArea.classList.remove("loading");
     }
+  }
+
+  _mediaAreaHasRenderableContent() {
+    const mediaArea = this.panelMediaManager?.mediaArea;
+    if (!mediaArea) return false;
+    return mediaArea.childElementCount > 0;
+  }
+
+  _ensureMediaFallbackIfNeeded() {
+    if (!this.isPowerOn) return;
+    const mediaManager = this.panelMediaManager;
+    if (!mediaManager) return;
+    if (this._mediaAreaHasRenderableContent()) return;
+
+    Logger.debug("偵測到電源已開啟但媒體區為空，套用首頁媒體 fallback");
+    mediaManager.playHomePageLoop(true);
+  }
+
+  _refreshMediaAfterSyncRestore() {
+    const flowManager = this.experimentFlowManager;
+    if (!flowManager?.isRunning) return;
+
+    const buttonManager = this.buttonManager;
+    if (buttonManager) {
+      buttonManager.updateMediaForCurrentAction();
+      this._ensureMediaFallbackIfNeeded();
+      return;
+    }
+
+    if (this._syncRestoreMediaTimer) return;
+    this._syncRestoreMediaTimer = setTimeout(() => {
+      this._syncRestoreMediaTimer = null;
+      const manager = this.buttonManager;
+      if (manager && this.experimentFlowManager?.isRunning) {
+        manager.updateMediaForCurrentAction();
+        this._ensureMediaFallbackIfNeeded();
+      }
+    }, 150);
   }
 
   /**
@@ -315,7 +354,7 @@ class PowerControl {
   _stopExperimentForShutdown() {
     const flowManager = this.experimentFlowManager;
     if (flowManager?.isRunning) {
-      flowManager.stopExperiment("power_off");
+      flowManager.stopExperiment("power_off", { broadcast: false });
     }
   }
 
@@ -594,7 +633,14 @@ class PowerControl {
     window.addEventListener(SYNC_EVENTS.STATE_UPDATE, (e) => {
       if (!e.detail) return;
       const myId = this.syncClient?.clientId;
-      if (myId && e.detail.clientId === myId) return;
+      // ================= Anti-Echo 檢查（工作階段恢復例外）=================
+      // 通常忽略本機發出的事件（clientId 一致），避免無限迴圈
+      // 例外：當 _sessionRestore = true 時，允許本機事件通過
+      // 原因：工作階段恢復時需要派發本機的 clientId 事件來恢復狀態
+      //      若完全拒絕就會導致狀態無法恢復
+      if (myId && e.detail.clientId === myId && !e.detail._sessionRestore) {
+        return;
+      }
       if (e.detail.powerState !== undefined) {
         this.applyRemotePowerState(e.detail);
       }
@@ -695,6 +741,7 @@ class PowerControl {
     // 快速開機：跳過或中斷開機影片
     this.isPowerOn = true;
     this.isPowerVideoPlaying = false;
+    this._updatePowerKnobUI(false);
 
     if (mediaManager) {
       mediaManager.stopHomePageLoop();
@@ -803,10 +850,38 @@ class PowerControl {
    */
   handleSyncPowerState(data) {
     try {
+      if (typeof data?.powerState !== "boolean") {
+        return;
+      }
       this.isPowerOn = data.powerState;
-      this.isPowerVideoPlaying = data.isPowerVideoPlaying;
+      const isSessionRestore = data?._sessionRestore === true;
+      // ================= 工作階段恢復時的動畫狀態處理 =================
+      // 工作階段恢復時強制 isPowerVideoPlaying = false 的原因：
+      // 1. 工作階段快照中的 isPowerVideoPlaying 不可靠（為瞬間狀態）
+      // 2. 如果恢復時仍保留動畫狀態，可能會卡在「開機中」狀態
+      // 3. 直接恢復為最終狀態（ON 或 OFF），避免重播開機動畫造成 UI 不一致
+      //
+      // 非工作階段恢復時保留原來的 isPowerVideoPlaying 值，用於同步遠端的動畫狀態
+      this.isPowerVideoPlaying = isSessionRestore
+        ? false
+        : typeof data.isPowerVideoPlaying === "boolean"
+          ? data.isPowerVideoPlaying
+          : false;
 
       this.updatePowerUIWithoutSync();
+
+      const flowManager = this.experimentFlowManager;
+      const mediaManager = this.panelMediaManager;
+      if (flowManager?.isRunning) {
+        this._refreshMediaAfterSyncRestore();
+      } else if (mediaManager) {
+        if (this.isPowerOn) {
+          mediaManager.playHomePageLoop(true);
+        } else {
+          mediaManager.stopHomePageLoop();
+          this._clearMediaArea();
+        }
+      }
     } catch (error) {
       Logger.error("處理電源狀態同步時發生錯誤:", error);
     }
@@ -819,6 +894,7 @@ class PowerControl {
    */
   updatePowerUIWithoutSync() {
     this._updatePowerKnobUI(false);
+    this.updateMediaAreaPowerIndicator();
   }
 
   /**
@@ -858,6 +934,8 @@ class PowerControl {
       if (buttonManager) {
         buttonManager.updateMediaForCurrentAction();
       }
+
+      this._ensureMediaFallbackIfNeeded();
 
       if (logger?.logAction) {
         logger.logAction(

@@ -14,7 +14,7 @@
     <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 
     <!-- 主要樣式 -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css" data-versioned>
 </head>
 
 <body class="board-page">
@@ -87,23 +87,19 @@
 
     <!-- ===== 核心基礎設施 ===== -->
     <!-- Logger（必須最先載入） -->
-    <script type="module" src="js/core/console-manager.js"></script>
-    <!-- WS 協定常數（Server/Client 共用，載入後暴露為 window.WS_PROTOCOL） -->
-    <script type="module" src="shared/ws-protocol-constants.js"></script>
-    <!-- 常數入口（暴露 window.SYNC_EVENTS / window.SYNC_DATA_TYPES / window.ACTION_CONSTANTS） -->
-    <script type="module" src="js/constants/index.js"></script>
+    <script type="module">
+        import { bootstrapPage } from "./js/core/app-bootstrap.js";
 
-    <!-- 頁面入口：動態載入並協調所有其他模組 -->
-    <script type="module" src="js/board/board-page-manager.js"></script>
-
-    <!-- ===== 實驗模擬工具（開發/測試用，生產環境可刪除） ===== -->
-    <!--
-        ExperimentSimulator - 模擬用戶操作的獨立工具
-        用途：簡化測試流程，不修改主項目代碼
-        使用：window.simulateExperiment() 或 window.simulateExperiment({ options })
-        刪除：安全刪除，無依賴或後門
-    -->
-    <script type="module" src="js/board/experiment-simulator.js"></script>
+        bootstrapPage({
+            entryModules: [
+                "./js/core/console-manager.js",
+                "./shared/ws-protocol-constants.js",
+                "./js/constants/index.js",
+                "./js/board/board-page-manager.js",
+                "./js/board/experiment-simulator.js",
+            ],
+        });
+    </script>
 </body>
 
 </html>

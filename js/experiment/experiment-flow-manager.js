@@ -370,11 +370,13 @@ class ExperimentFlowManager {
   /**
    * 停止實驗
    */
-  stopExperiment(reason = "manual") {
+  stopExperiment(reason = "manual", options = {}) {
     if (!this.isRunning) {
       Logger.warn("實驗未進行，無法停止");
       return false;
     }
+
+    const broadcast = options.broadcast !== false;
 
     Logger.info("停止實驗", { reason });
 
@@ -391,6 +393,7 @@ class ExperimentFlowManager {
 
     const stopData = {
       reason,
+      broadcast,
       currentUnit: this.currentUnitIndex,
       currentStep: this.currentStepIndex,
       completedUnits: this.completedUnits.size,
