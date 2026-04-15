@@ -5,7 +5,7 @@
  * 提供狀態快照還原與多裝置同步支援。
  */
 
-import { LOG_SOURCES, SYNC_EVENTS } from "../constants/index.js";
+import { RECORD_SOURCES, SYNC_EVENTS } from "../constants/index.js";
 import { generateExperimentId } from "../core/random-utils.js";
 
 class ExperimentStateManager {
@@ -67,7 +67,7 @@ class ExperimentStateManager {
           if (_debounceTimer) clearTimeout(_debounceTimer);
           _debounceTimer = setTimeout(() => {
             if (newId !== this.experimentId) {
-              this.setExperimentId(newId, LOG_SOURCES.LOCAL_INPUT);
+              this.setExperimentId(newId, RECORD_SOURCES.LOCAL_INPUT);
             }
             _debounceTimer = null;
           }, DEBOUNCE_MS);
@@ -81,7 +81,7 @@ class ExperimentStateManager {
             _debounceTimer = null;
           }
           if (newId !== this.experimentId) {
-            this.setExperimentId(newId, LOG_SOURCES.LOCAL_INPUT);
+            this.setExperimentId(newId, RECORD_SOURCES.LOCAL_INPUT);
           }
         });
       }
@@ -125,7 +125,7 @@ class ExperimentStateManager {
         const { experimentId } = event.detail || {};
         if (!experimentId) return;
         this.setExperimentId &&
-          this.setExperimentId(experimentId, LOG_SOURCES.LOCAL_INITIALIZE);
+          this.setExperimentId(experimentId, RECORD_SOURCES.LOCAL_INITIALIZE);
       },
     );
 
@@ -138,7 +138,7 @@ class ExperimentStateManager {
       SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
       (event) => {
         const { experimentId } = event.detail;
-        this.setExperimentId && this.setExperimentId(experimentId, LOG_SOURCES.HUB_SYNC);
+        this.setExperimentId && this.setExperimentId(experimentId, RECORD_SOURCES.HUB_SYNC);
       },
     );
 
@@ -152,7 +152,7 @@ class ExperimentStateManager {
   applyHubState(state) {
     if (state.experimentId !== undefined) {
       this.setExperimentId &&
-        this.setExperimentId(state.experimentId, LOG_SOURCES.HUB_SYNC);
+        this.setExperimentId(state.experimentId, RECORD_SOURCES.HUB_SYNC);
     }
     if (state.participantName !== undefined) {
       this.setParticipantName &&
@@ -177,7 +177,7 @@ class ExperimentStateManager {
     }
   }
 
-  setExperimentId(experimentId, source = LOG_SOURCES.LOCAL_INPUT) {
+  setExperimentId(experimentId, source = RECORD_SOURCES.LOCAL_INPUT) {
     if (this.experimentId !== experimentId) {
       const oldId = this.experimentId;
       this.experimentId = experimentId;
@@ -369,7 +369,7 @@ class ExperimentStateManager {
 
   generateExperimentId() {
     const newId = generateExperimentId();
-    this.setExperimentId && this.setExperimentId(newId, LOG_SOURCES.LOCAL_GENERATE);
+    this.setExperimentId && this.setExperimentId(newId, RECORD_SOURCES.LOCAL_GENERATE);
 
     if (this.experimentHubManager?.isInSyncMode?.()) {
       Logger &&

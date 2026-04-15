@@ -8,6 +8,7 @@ import {
   SYNC_DATA_TYPES,
 } from "../constants/index.js";
 import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
+import { dispatchSessionRestoreEvents } from "../core/session-restore-events.js";
 
 class PanelSyncManager {
   constructor({
@@ -93,6 +94,11 @@ class PanelSyncManager {
   }
 
   setupSyncEventListeners() {
+    // 工作階段快照由使用端解讀：將可恢復的狀態轉成一般同步事件
+    window.addEventListener(SYNC_EVENTS.SESSION_STATE, (event) => {
+      dispatchSessionRestoreEvents(event.detail, { includePowerState: true });
+    });
+
     // 監聽同步狀態更新事件
     window.addEventListener(SYNC_EVENTS.STATE_UPDATE, (event) => {
       const state = event.detail;

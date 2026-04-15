@@ -3,7 +3,7 @@
  * 統一定義所有日誌類型，避免硬寫字符串散落各地
  */
 
-export const LOG_TYPES = {
+export const RECORD_TYPES = {
   // 實驗級事件
   EXP_START: "exp_start",
   EXP_END: "exp_end",
@@ -23,16 +23,16 @@ export const LOG_TYPES = {
 /**
  * 日誌類型的中文標籤
  */
-export const LOG_TYPE_LABELS = {
-  [LOG_TYPES.EXP_START]: "實驗開始",
-  [LOG_TYPES.EXP_END]: "實驗結束",
-  [LOG_TYPES.EXP_PAUSE]: "實驗暫停",
-  [LOG_TYPES.EXP_RESUME]: "實驗繼續",
-  [LOG_TYPES.GESTURE_STEP_START]: "步驟開始",
-  [LOG_TYPES.GESTURE_STEP_END]: "步驟結束",
-  [LOG_TYPES.GESTURE_STEP_PAUSE]: "步驟暫停",
-  [LOG_TYPES.GESTURE_ATTEMPT]: "手勢嘗試",
-  [LOG_TYPES.ACTION]: "動作",
+export const RECORD_TYPE_LABELS = {
+  [RECORD_TYPES.EXP_START]: "實驗開始",
+  [RECORD_TYPES.EXP_END]: "實驗結束",
+  [RECORD_TYPES.EXP_PAUSE]: "實驗暫停",
+  [RECORD_TYPES.EXP_RESUME]: "實驗繼續",
+  [RECORD_TYPES.GESTURE_STEP_START]: "步驟開始",
+  [RECORD_TYPES.GESTURE_STEP_END]: "步驟結束",
+  [RECORD_TYPES.GESTURE_STEP_PAUSE]: "步驟暫停",
+  [RECORD_TYPES.GESTURE_ATTEMPT]: "手勢嘗試",
+  [RECORD_TYPES.ACTION]: "動作",
 };
 
 /**

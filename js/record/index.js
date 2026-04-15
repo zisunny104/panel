@@ -1,10 +1,14 @@
-export { default as RecordService } from "./record-service.js";
-export { recordPanel } from "./record-panel.js";
+/**
+ * record/index.js - 紀錄模組公開 API
+ *
+ * 統一入口，提供 RecordManager、RecordView 及所有子模組的命名匯出。
+ */
 
-export { recordStore } from "./core/record-store.js";
-export { recordRuntimeWriter } from "./core/record-runtime-writer.js";
-
-export { recordFilterPanel } from "./ui/record-filter-panel.js";
-export { recordListPanel } from "./ui/record-list-panel.js";
-export { recordModalPanel } from "./ui/record-modal-panel.js";
-export { recordStatsReport } from "./ui/record-stats-report.js";
+export { default as RecordManager, ExperimentLogManager } from "./record-manager.js";
+export { recordView } from "./record-view.js";
+export { recordStore } from "./record-store.js";
+export { recordRuntime } from "./record-runtime.js";
+export { recordViewFilter } from "./record-view-filter.js";
+export { recordViewList } from "./record-view-list.js";
+export { recordViewModal } from "./record-view-modal.js";
+export { recordViewStats } from "./record-view-stats.js";

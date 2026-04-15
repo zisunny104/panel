@@ -1302,7 +1302,7 @@ async handleAuth(wsConnectionId, data, ws) {
 
 - ✅ 統一所有廣播 timestamp 為 Date.now() 毫秒格式
 - ✅ 統一 Pause/Resume/Stop 為 type 直接值（移除 type + event 混合結構）
-- ✅ 所有廣播添加 clientId 和調整欄位順序
+- ✅ 所有廣播新增 clientId 和調整欄位順序
 - ✅ 移除冗餘的 experimentSyncCore.broadcastButtonAction()
 - ✅ 涵蓋檔案：experiment-sync-manager.js、panel-button-manager.js、experiment-action-handler.js、panel-experiment-power.js、board-gesture-utils.js、experiment-combination-manager.js、panel-sync-manager.js、board-page-manager.js、board-sync-manager.js、panel-power-control.js、experiment-ui-manager.js、experiment-hub-manager.js、experiment-system-manager.js
 

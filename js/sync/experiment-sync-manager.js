@@ -29,7 +29,7 @@ class ExperimentSyncCore {
   async _onRemoteStateUpdate(detail) {
     if (!detail) return;
     window.dispatchEvent(
-      new CustomEvent(SYNC_EVENTS.REMOTE_STATE, { detail }),
+      new CustomEvent(SYNC_EVENTS.STATE_BROADCAST, { detail }),
     );
   }
 

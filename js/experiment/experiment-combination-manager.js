@@ -79,9 +79,9 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
         }
 
         if (!this.currentCombination) {
-          Logger.debug("開始應用預設組合...");
+          Logger.debug("開始套用預設組合...");
           await this.applyDefaultCombination();
-          Logger.debug("預設組合應用完成");
+          Logger.debug("預設組合套用完成");
         }
 
         this.isInitialized = true;

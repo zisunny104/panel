@@ -10,6 +10,7 @@ import SyncConfirmDialogManager from "./sync-confirm-dialog.js";
 import { SYNC_EVENTS } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { IndicatorManager } from "./indicator-manager.js";
+import { createSyncSessionStore } from "../core/sync-session-store.js";
 
 class SyncManager {
   static ROLE = {
@@ -117,9 +118,11 @@ class SyncManager {
     this.experimentHubManager = null;
     this.indicatorManager =
       config.indicatorManager || new IndicatorManager();
+    this.sessionStore = config.sessionStore || createSyncSessionStore();
     this.core = new SyncManagerCore({
       roleConfig: SyncManager.ROLE,
       pageConfig: SyncManager.PAGE,
+      sessionStore: this.sessionStore,
     });
     this.indicatorManager?.updateDependencies?.({
       getStatus: () => this.core.syncClient?.getStatusText?.() || "idle",
@@ -205,13 +208,11 @@ class SyncManager {
 
     this.setupEventListeners();
 
-    // 標記初始化流程已啟動（在異步心跳檢測前設置，避免競態條件）
-    this.initialized = true;
-
     // 初始化時執行一次心跳檢測並設定初始狀態
     this.core
       .checkServerHealth()
       .then((online) => {
+        this.initialized = true;
         this.serverOnline = online;
         Logger.debug("伺服器心跳檢測完成", { online });
 
@@ -233,6 +234,7 @@ class SyncManager {
         );
       })
       .catch((error) => {
+        this.initialized = true;
         Logger.warn("伺服器心跳檢測失敗", error);
         // 即使心跳檢測失敗，也觸發初始化完成事件
         window.dispatchEvent(
@@ -293,10 +295,11 @@ class SyncManager {
 
   async attemptSessionRestore() {
     try {
-      const sessionId = sessionStorage.getItem("sync_sessionId");
-      const clientId = sessionStorage.getItem("sync_clientId");
-      const role =
-        sessionStorage.getItem("sync_role") || SyncManager.ROLE.VIEWER;
+      const {
+        sessionId,
+        clientId,
+        role,
+      } = this.core.syncClient.getStoredSessionInfo();
 
       if (!sessionId || !clientId) {
         Logger.debug("沒有已儲存的工作階段，採用本機行為", {
@@ -372,11 +375,8 @@ class SyncManager {
         }
       } catch (error) {
         Logger.warn("工作階段還原失敗", error);
-        // 清除無效的工作階段資訊
-        localStorage.removeItem("sync_session_id");
-        sessionStorage.removeItem("sync_sessionId");
-        sessionStorage.removeItem("sync_clientId");
-        sessionStorage.removeItem("sync_role");
+        // 統一交由 SyncClient 管理所有工作階段儲存鍵清理
+        this.core.syncClient.clearState();
         return false; // 本機模式
       }
     } catch (error) {

@@ -201,7 +201,7 @@
     font-weight: 700;
 }
 
-.action-card.remote-action-completed {
+.action-card.sync-action-completed {
     background-color: #fff3cd;
     border-color: #ffc107;
     animation: actionCardFlash 0.6s ease;

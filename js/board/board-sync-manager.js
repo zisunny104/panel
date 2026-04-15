@@ -4,8 +4,31 @@
  * 將實驗的開始、暫停、停止狀態及所有操作同步到同一工作階段的其他裝置
  */
 
-import { dispatchRemoteSync } from "./board-sync-dispatcher.js";
-import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { RECORD_SOURCES, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+
+function dispatchBroadcastState(detail) {
+  if (!detail) return;
+
+  if (detail.type === SYNC_DATA_TYPES.COMBINATION_SELECTED) {
+    window.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.COMBINATION_SELECTED, {
+        detail: {
+          ...detail,
+          source: RECORD_SOURCES.SYNC_BROADCAST,
+        },
+      }),
+    );
+    return;
+  }
+
+  if (detail.type === SYNC_DATA_TYPES.GESTURE_MARKED) {
+    window.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.GESTURE_MARKED, {
+        detail,
+      }),
+    );
+  }
+}
 
 // board-side adapter: thin layer that maps DOM/events <-> experimentSyncCore
 class ExperimentSyncAdapter {
@@ -53,10 +76,10 @@ class ExperimentSyncAdapter {
   }
 
   _bindCoreEvents() {
-    // ExperimentSyncCore 收到遠端狀態後，會重新派發為 REMOTE_STATE 事件
-    window.addEventListener(SYNC_EVENTS.REMOTE_STATE, (e) => {
+    // ExperimentSyncCore 收到同步狀態後，會重新派發為 STATE_BROADCAST 事件
+    window.addEventListener(SYNC_EVENTS.STATE_BROADCAST, (e) => {
       const detail = e.detail;
-      dispatchRemoteSync(detail);
+      dispatchBroadcastState(detail);
     });
   }
 

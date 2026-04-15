@@ -38,6 +38,7 @@ class WebSocketClient {
     this.clientId = null;
     this.sessionId = null;
     this.role = null;
+    this.clientType = null;
     this.isAuthenticated = false;
     this.reconnectAttempts = 0;
 
@@ -109,6 +110,10 @@ class WebSocketClient {
     this.sessionId = authData.sessionId || savedData.sessionId;
     this.clientId = authData.clientId || savedData.clientId;
     this.role = authData.role || savedData.role || this.roleConfig.VIEWER;
+    this.clientType =
+      authData.clientType ||
+      savedData.clientType ||
+      this.detectClientType();
 
     // 3. 檢查必要欄位
     if (!this.sessionId) {
@@ -268,6 +273,7 @@ class WebSocketClient {
       sessionId: this.sessionId,
       clientId: this.clientId,
       role: this.role,
+      clientType: this.clientType,
     });
 
     this.send({
@@ -276,6 +282,7 @@ class WebSocketClient {
         sessionId: this.sessionId,
         clientId: this.clientId,
         role: this.role,
+        clientType: this.clientType,
       },
     });
   }
@@ -677,7 +684,13 @@ class WebSocketClient {
       sessionId: this.sessionId,
       clientId: this.clientId,
       role: this.role,
+      clientType: this.clientType,
     });
+  }
+
+  detectClientType() {
+    const path = (window.location.pathname || "").toLowerCase();
+    return path.includes("board.html") ? "board" : "panel";
   }
 
   /**

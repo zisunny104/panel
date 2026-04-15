@@ -487,7 +487,7 @@ class PowerControl {
   }
 
   /**
-   * 禁用所有控制按鈕（開機動畫播放期間）
+   * 停用所有控制按鈕（開機動畫播放期間）
    * @private
    */
   disableAllButtons() {

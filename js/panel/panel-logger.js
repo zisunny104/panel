@@ -7,7 +7,7 @@
  * 無同步連線時，兩端日誌可依 ts 時間戳直接合併排序
  */
 import { Logger } from "../core/console-manager.js";
-import { LOG_TYPES } from "../constants/index.js";
+import { RECORD_TYPES } from "../constants/index.js";
 import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
 
 class PanelLogger {
@@ -124,7 +124,7 @@ class PanelLogger {
 
     const logEntry = {
       ts,
-      type: LOG_TYPES.ACTION,
+      type: RECORD_TYPES.ACTION,
       exp_id: expId,
       a_id: buttonId || functionName || null,
       src: "panel",
@@ -149,7 +149,7 @@ class PanelLogger {
     const expId = experimentId || this._getExpId();
     const logEntry = {
       ts: this._getTs(),
-      type: LOG_TYPES.EXP_START,
+      type: RECORD_TYPES.EXP_START,
       exp_id: expId,
       src: "panel",
     };
@@ -165,7 +165,7 @@ class PanelLogger {
   logExperimentEnd(experimentId) {
     const logEntry = {
       ts: this._getTs(),
-      type: LOG_TYPES.EXP_END,
+      type: RECORD_TYPES.EXP_END,
       exp_id: experimentId || this._getExpId(),
       src: "panel",
     };
@@ -179,7 +179,7 @@ class PanelLogger {
   logExperimentPause() {
     const logEntry = {
       ts: this._getTs(),
-      type: LOG_TYPES.EXP_PAUSE,
+      type: RECORD_TYPES.EXP_PAUSE,
       exp_id: this._getExpId(),
       src: "panel",
     };
@@ -193,7 +193,7 @@ class PanelLogger {
   logExperimentResume() {
     const logEntry = {
       ts: this._getTs(),
-      type: LOG_TYPES.EXP_RESUME,
+      type: RECORD_TYPES.EXP_RESUME,
       exp_id: this._getExpId(),
       src: "panel",
     };

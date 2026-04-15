@@ -85,15 +85,8 @@ export const SYNC_EVENTS = {
   // 本機 DOM 事件（dispatched on document，僅限頁面內部使用，非 WebSocket 同步）
   EXPERIMENT_STATE_CHANGE_LOCAL: "experiment_state_change_local",
 
-  // 遠端實驗橋接事件（board-sync-manager ↔ board-page-manager）
-  REMOTE_EXPERIMENT_STARTED: "remote_experiment_started",
-  REMOTE_EXPERIMENT_PAUSED: "remote_experiment_paused",
-  REMOTE_EXPERIMENT_RESUMED: "remote_experiment_resumed",
-  REMOTE_EXPERIMENT_STOPPED: "remote_experiment_stopped",
-  REMOTE_EXPERIMENT_ACTION: "remote_experiment_action",
-  REMOTE_PANEL_STATE_UPDATE: "remote_panel_state_update",
-  REMOTE_SYNC_EVENT: "remote_sync_event",
-  REMOTE_STATE: "remote_state",
+  // 同步狀態廣播事件（由 ExperimentSyncCore 派發，使用端直接監聽）
+  STATE_BROADCAST: "state_broadcast",
 
   // 同步資料事件（來自遠端裝置的狀態同步）
   COMBINATION_SELECTED: "combination_selected",
@@ -145,8 +138,8 @@ export const SYNC_DATA_TYPES = {
   // 實驗狀態變化
   EXPERIMENT_STATE_CHANGE: "experiment_state_change",
 
-  // 內部中繼事件（由 ExperimentSyncCore 派發，Board 端接收）
-  REMOTE_STATE: "remote_state",
+  // 內部中繼資料類型（由 ExperimentSyncCore 派發，使用端接收）
+  STATE_BROADCAST: "state_broadcast",
 };
 
 /**

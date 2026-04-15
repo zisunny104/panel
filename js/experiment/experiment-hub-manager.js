@@ -5,7 +5,7 @@
  * 處理與中樞伺服器的通訊和事件通知，支援多裝置協同實驗。
  */
 
-import { LOG_SOURCES, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { RECORD_SOURCES, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
 import { generateExperimentId } from "../core/random-utils.js";
 import { Logger } from "../core/console-manager.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
@@ -182,7 +182,7 @@ class ExperimentHubManager {
   /**
    * 設定實驗 ID
    */
-  setExperimentId(id, source = LOG_SOURCES.LOCAL_INPUT, options = {}) {
+  setExperimentId(id, source = RECORD_SOURCES.LOCAL_INPUT, options = {}) {
     const oldId = this.ids.experiment;
     this.ids.experiment = id;
 
@@ -199,8 +199,8 @@ class ExperimentHubManager {
       if (
         this.isHubMode() &&
         this.connection.connected &&
-        source !== LOG_SOURCES.REMOTE_SYNC &&
-        source !== LOG_SOURCES.HUB_SYNC
+        source !== RECORD_SOURCES.SYNC_BROADCAST &&
+        source !== RECORD_SOURCES.HUB_SYNC
       ) {
         this.syncExperimentIdToHub(id, source);
       }
@@ -251,7 +251,7 @@ class ExperimentHubManager {
    */
   generateExperimentId() {
     const id = generateExperimentId();
-    this.setExperimentId(id, LOG_SOURCES.LOCAL_GENERATE);
+    this.setExperimentId(id, RECORD_SOURCES.LOCAL_GENERATE);
     return id;
   }
 
@@ -633,7 +633,7 @@ class ExperimentHubManager {
     ws.on(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
       Logger.debug("收到實驗 ID 更新", data);
       if (data.clientId !== this.getClientId()) {
-        this.setExperimentId(data.experimentId, LOG_SOURCES.REMOTE_SYNC, { silent: false });
+        this.setExperimentId(data.experimentId, RECORD_SOURCES.SYNC_BROADCAST, { silent: false });
         this.emit(ExperimentHubManager.EVENT.MESSAGE_RECEIVED, {
           type: SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
           data,

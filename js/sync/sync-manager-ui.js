@@ -494,12 +494,6 @@ export class SyncManagerUI {
               this.core.syncClient.saveRole(newRole);
             }
 
-            try {
-              localStorage.setItem("sync_preferred_role", newRole);
-            } catch (error) {
-              Logger.warn("無法儲存角色到快取:", error);
-            }
-
             this.updateConnectedSessionInfo();
 
             this.showStatus(
@@ -766,26 +760,12 @@ export class SyncManagerUI {
       return;
     }
 
-    const savedRole = localStorage.getItem("sync_preferred_role");
     const activeRoleBtn = this.controlPanel.querySelector(
       ".sync-ch-role-btn.active",
     );
     let role = activeRoleBtn
       ? activeRoleBtn.dataset.role
       : this.roleConfig.OPERATOR;
-
-    if (savedRole) {
-      role = savedRole;
-      const chRoleBtns =
-        this.controlPanel.querySelectorAll(".sync-ch-role-btn");
-      chRoleBtns.forEach((btn) => {
-        if (btn.dataset.role === savedRole) {
-          btn.classList.add("active");
-        } else {
-          btn.classList.remove("active");
-        }
-      });
-    }
 
     this.showStatus("info", "加入中...");
 
@@ -848,8 +828,6 @@ export class SyncManagerUI {
 
     try {
       this.showStatus("info", "正在退出工作階段...");
-
-      localStorage.removeItem("sync_session_backup");
 
       if (this.core.syncClient) {
         await this.core.syncClient.disconnect();

@@ -4,11 +4,11 @@
  */
 
 import {
-  LOG_TYPES,
-  LOG_TYPE_LABELS,
+  RECORD_TYPES,
+  RECORD_TYPE_LABELS,
   GESTURE_ATTEMPT_TYPES,
   GESTURE_ATTEMPT_TYPE_LABELS,
-} from "./log-types-constants.js";
+} from "./record-types-constants.js";
 
 import {
   SYNC_EVENTS,
@@ -18,14 +18,14 @@ import {
   getAllSyncEvents,
 } from "./sync-events-constants.js";
 
-import { LOG_SOURCES } from "./log-source-constants.js";
+import { RECORD_SOURCES } from "./record-source-constants.js";
 
 import { ACTION_IDS, ACTION_BUTTONS, ACTION_CONSTANTS } from "./action-constants.js";
 import { POWER_BUTTON_STATES } from "./power-constants.js";
 
 export {
-  LOG_TYPES,
-  LOG_TYPE_LABELS,
+  RECORD_TYPES,
+  RECORD_TYPE_LABELS,
   GESTURE_ATTEMPT_TYPES,
   GESTURE_ATTEMPT_TYPE_LABELS,
   SYNC_EVENTS,
@@ -33,9 +33,10 @@ export {
   getEventName,
   isSyncEvent,
   getAllSyncEvents,
-  LOG_SOURCES,
+  RECORD_SOURCES,
   ACTION_IDS,
   ACTION_BUTTONS,
   ACTION_CONSTANTS,
   POWER_BUTTON_STATES,
 };
+

@@ -929,7 +929,7 @@ class ButtonManager {
       return aIndex - bIndex;
     });
 
-    // 應用高亮
+    // 套用高亮
     matchedButtons.forEach((item, index) => {
       if (item.btn.classList.contains("experiment-disabled")) {
         Logger.debug(`按鈕 ${item.buttonId} 已被鎖定，不顯示高亮`);

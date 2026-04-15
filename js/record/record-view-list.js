@@ -1,13 +1,14 @@
 /**
- * LogListPanel - 實驗日誌列表渲染
+ * recordViewList - 實驗日誌列表渲染 mixin
  *
  * 負責列表顯示、選取狀態與批次按鈕控制。
+ * 作為 mixin 混入 RecordView。
  */
 
-export const logListPanel = {
+export const recordViewList = {
   /**
    * 顯示實驗日誌列表
-   * @param {Array} experiments - 實驗日誌清單
+   * @param {Array} experiments
    */
   displayExperimentLogs(experiments) {
     this.currentExperiments = experiments;
@@ -18,12 +19,7 @@ export const logListPanel = {
     this._updateLogFilterBounds(experiments);
 
     const container = document.getElementById("experimentLogsContainer");
-    if (!container) {
-      Logger.warn("experimentLogsContainer 元素不存在，無法顯示日誌列表");
-      return;
-    }
-
-    container.innerHTML = "";
+    if (!container) return;
 
     if (experiments.length === 0) {
       container.innerHTML = `
@@ -39,9 +35,7 @@ export const logListPanel = {
           </div>
           <div class="no-logs-text">目前沒有任何實驗日誌</div>
           <div class="no-logs-hint">請確保已啟動伺服器並有進行過實驗</div>
-        </div>
-      `;
-      Logger.debug("顯示空日誌列表提示");
+        </div>`;
       return;
     }
 
@@ -52,59 +46,40 @@ export const logListPanel = {
         <div class="log-filter-summary">
           <span>沒有符合篩選條件的日誌</span>
           <button class="btn-secondary" data-action="reset-filter">清除篩選</button>
-        </div>
-      `;
-      Logger.debug("顯示空篩選結果提示");
+        </div>`;
       return;
     }
 
-    Logger.debug(
-      `顯示 ${filteredExperiments.length} / ${experiments.length} 個實驗日誌`,
-    );
-
     const filterSummary = this._isLogFilterActive()
-      ? `
-        <div class="log-filter-summary">
-          <span>${this._buildLogFilterSummaryText(filteredExperiments.length, experiments.length)}</span>
-          <div class="log-filter-summary-actions">
-            <button class="btn-secondary" data-action="select-filtered">全選篩選內容</button>
-            <button class="btn-secondary" data-action="reset-filter">清除篩選</button>
-          </div>
-        </div>
-      `
+      ? `<div class="log-filter-summary">
+           <span>${this._buildLogFilterSummaryText(filteredExperiments.length, experiments.length)}</span>
+           <div class="log-filter-summary-actions">
+             <button class="btn-secondary" data-action="select-filtered">全選篩選內容</button>
+             <button class="btn-secondary" data-action="reset-filter">清除篩選</button>
+           </div>
+         </div>`
       : "";
 
-    const logItemsHtml = filteredExperiments
-      .map((exp) => this._renderLogItem(exp))
-      .join("");
-
-    container.innerHTML =
-      filterSummary + `
-        <div class="logs-list" role="list">
-          ${logItemsHtml}
-        </div>
-      `;
+    container.innerHTML = filterSummary + `
+      <div class="logs-list" role="list">
+        ${filteredExperiments.map((exp) => this._renderLogItem(exp)).join("")}
+      </div>`;
 
     this.updateDeleteButton();
   },
 
   /**
-   * 渲染單筆日誌項目
-   * @param {Object} exp - 實驗日誌資料
+   * 產生單一實驗日誌項目的 HTML
+   * @param {Object} exp - 實驗物件（含 filename、experimentId、logCount 等）
    * @returns {string} HTML 字串
    */
   _renderLogItem(exp) {
-    const filename =
-      exp.filename ||
+    const filename = exp.filename ||
       `${exp.experimentId}_${exp.participantName}_experiment_log.jsonl`;
-    const logDate = exp.startTime
-      ? this.timeSyncManager.formatDate(exp.startTime)
-      : "";
+    const logDate = exp.startTime ? this.timeSyncManager?.formatDate(exp.startTime) : "";
 
     return `
-      <div class="log-item" data-log-id="${
-        exp.actualExperimentId || exp.experimentId
-      }">
+      <div class="log-item" data-log-id="${exp.actualExperimentId || exp.experimentId}">
         <div class="log-checkbox">
           <input type="checkbox" id="log-${exp.filename}" data-log-id="${exp.filename}">
           <label for="log-${exp.filename}"></label>
@@ -112,9 +87,9 @@ export const logListPanel = {
         <div class="log-details">
           <div class="log-filename">${filename}</div>
           <div class="log-meta">
-              <span class="log-size">${exp.logCount} 條記錄</span>
-              ${logDate ? `<span class=\"log-date\">${logDate}</span>` : ""}
-            </div>
+            <span class="log-size">${exp.logCount} 條記錄</span>
+            ${logDate ? `<span class="log-date">${logDate}</span>` : ""}
+          </div>
         </div>
         <div class="log-actions">
           <button class="btn btn-info btn-icon-only" data-action="view-log" data-log-id="${exp.filename}" title="檢視">
@@ -139,41 +114,29 @@ export const logListPanel = {
             </svg>
           </button>
         </div>
-      </div>
-    `;
+      </div>`;
   },
 
   /**
-   * 切換日誌選取狀態
-   * @param {string} logId - 日誌檔案識別
+   * 切換指定日誌的選取狀態
+   * @param {string} logId - 日誌 filename
    */
   toggleLogSelection(logId) {
-    if (this.selectedLogs.has(logId)) {
-      this.selectedLogs.delete(logId);
-    } else {
-      this.selectedLogs.add(logId);
-    }
+    if (this.selectedLogs.has(logId)) this.selectedLogs.delete(logId);
+    else this.selectedLogs.add(logId);
     this.updateDeleteButton();
   },
 
-  /**
-   * 更新批次操作按鈕狀態
-   */
+  /** 根據目前選取數量更新批次刪除與下載按鈕的顯示狀態 */
   updateDeleteButton() {
-    const deleteSelectedBtn = document.getElementById("deleteSelectedLogsBtn");
-    const downloadSelectedBtn = document.getElementById(
-      "downloadSelectedLogsBtn",
-    );
     const count = this.selectedLogs.size;
-
-    if (deleteSelectedBtn) {
-      deleteSelectedBtn.classList.toggle("is-hidden", count === 0);
-      deleteSelectedBtn.title =
-        count > 0 ? `刪除選取項目 (${count})` : "刪除選取項目";
-      deleteSelectedBtn.setAttribute("aria-label", deleteSelectedBtn.title);
+    const deleteBtn = document.getElementById("deleteSelectedLogsBtn");
+    const downloadBtn = document.getElementById("downloadSelectedLogsBtn");
+    if (deleteBtn) {
+      deleteBtn.classList.toggle("is-hidden", count === 0);
+      deleteBtn.title = count > 0 ? `刪除選取項目 (${count})` : "刪除選取項目";
+      deleteBtn.setAttribute("aria-label", deleteBtn.title);
     }
-    if (downloadSelectedBtn) {
-      downloadSelectedBtn.classList.toggle("is-hidden", count === 0);
-    }
+    if (downloadBtn) downloadBtn.classList.toggle("is-hidden", count === 0);
   },
 };

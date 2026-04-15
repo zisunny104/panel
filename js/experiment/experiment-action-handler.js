@@ -27,7 +27,7 @@ class ExperimentActionHandler {
     GESTURE_DETECTED: "action:gesture_detected",
     SEQUENCE_COMPLETED: "action:sequence_completed",
     AUTO_PROGRESS: "action:auto_progress",
-    REMOTE_ACTION: "action:remote_action",
+    SYNC_ACTION: "action:sync_action",
     ERROR: "action:error",
   };
 
@@ -217,7 +217,7 @@ class ExperimentActionHandler {
    * 處理正確動作
    *
    * 改進的時序邏輯：
-   * 1. 發出 ACTION_COMPLETED（當前步驟完成）
+   * 1. 發出 ACTION_COMPLETED（目前步驟完成）
    * 2. 推進索引到下一步
    * 3. 發出 ACTION_ENTERED（進入新步驟）
    *
@@ -795,7 +795,7 @@ class ExperimentActionHandler {
 
     Logger.debug("收到遠端動作", { actionId, status, source });
 
-    this.emit(ExperimentActionHandler.EVENT.REMOTE_ACTION, {
+    this.emit(ExperimentActionHandler.EVENT.SYNC_ACTION, {
       actionId,
       status,
       source,

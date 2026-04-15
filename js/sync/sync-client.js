@@ -24,6 +24,7 @@ class SyncClient {
     };
     // API 端點配置
     this.apiBaseUrl = config.apiBaseUrl || this.getDefaultApiUrl();
+    this.clientType = this.detectClientType();
 
     // WebSocket 客戶端（延遲初始化）
     this.wsClient = null;
@@ -44,8 +45,9 @@ class SyncClient {
     this.initialized = false;
     this.sessionInvalid = false;
     this.connectionAttempted = false;
+    this.sessionStore = config.sessionStore || null;
 
-    // 從 sessionStorage 載入狀態
+    // 從外部注入的工作階段儲存器載入狀態（若有）
     this.loadState();
 
     // 心跳檢測定時器
@@ -144,6 +146,11 @@ class SyncClient {
       basePath += "/";
     }
     return basePath + "api";
+  }
+
+  detectClientType() {
+    const path = (window.location.pathname || "").toLowerCase();
+    return path.includes("board.html") ? "board" : "panel";
   }
 
   /**
@@ -281,52 +288,6 @@ class SyncClient {
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.SESSION_STATE, { detail: data }),
       );
-
-      // 若工作階段中儲存有實驗狀態，重新派發為 STATE_UPDATE 以觸發各頁面的恢復邏輯
-      // （例：Board 重連時自動恢復進行中的實驗）
-      const experimentState = data?.experimentState;
-      if (experimentState?.type) {
-        Logger.debug("工作階段含有實驗狀態，觸發恢復事件", experimentState);
-        // 延遲一個 tick，確保所有模組（FlowManager、SyncManager 等）已就緒
-        setTimeout(() => {
-          window.dispatchEvent(
-            new CustomEvent(SYNC_EVENTS.STATE_UPDATE, {
-              detail: { ...experimentState, _sessionRestore: true },
-            }),
-          );
-        }, 0);
-      }
-
-      // ================= 電源狀態恢復邏輯 =================
-      // 當工作階段有儲存電源狀態時，派發事件讓 PowerControl 進行恢復
-      // 但若工作階段沒有實驗狀態，則視為尚未進入實驗流程，電源應回到預設關閉
-      const lastState = data?.state;
-      if (lastState && typeof lastState.powerState === "boolean") {
-        const hasExperimentState = Boolean(experimentState?.type);
-        const powerState = hasExperimentState ? lastState.powerState : false;
-        const isPowerVideoPlaying = hasExperimentState
-          ? typeof lastState.isPowerVideoPlaying === "boolean"
-            ? lastState.isPowerVideoPlaying
-            : false
-          : false;
-
-        document.dispatchEvent(
-          new CustomEvent("syncPowerState", {
-            detail: {
-              powerState,
-              isPowerVideoPlaying,
-              clientId: lastState.clientId,
-              // _sessionRestore 標誌用於通知 PowerControl 跳過 anti-echo 檢查
-              // 允許工作階段恢復時的自我事件通過處理，避免狀態被誤判為重複
-              _sessionRestore: true,
-            },
-          }),
-        );
-
-        if (!hasExperimentState) {
-          Logger.debug("工作階段未含實驗狀態，電源已重置為預設關閉");
-        }
-      }
     });
   }
 
@@ -371,6 +332,7 @@ class SyncClient {
       sessionId: this.sessionId,
       clientId: this.clientId,
       role: this.role,
+      clientType: this.clientType,
     });
 
     return { sessionId: data.data.sessionId };
@@ -443,7 +405,12 @@ class SyncClient {
     const response = await fetch(`${this.apiBaseUrl}/sync/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shareCode, role: resolvedRole, clientId: this.clientId }),
+      body: JSON.stringify({
+        shareCode,
+        role: resolvedRole,
+        clientId: this.clientId,
+        clientType: this.clientType,
+      }),
     });
 
     if (!response.ok) {
@@ -462,10 +429,15 @@ class SyncClient {
       sessionId: this.sessionId,
       clientId: this.clientId,
       role: this.role,
+      clientType: this.clientType,
     });
 
     if (data.data.state) {
-      this.triggerStateUpdate(data.data.state);
+      window.dispatchEvent(
+        new CustomEvent(SYNC_EVENTS.SESSION_STATE, {
+          detail: { state: data.data.state, source: "join_response" },
+        }),
+      );
     }
 
     return true;
@@ -492,7 +464,12 @@ class SyncClient {
     const response = await fetch(`${this.apiBaseUrl}/sync/channel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channelName, role: resolvedRole, clientId: this.clientId }),
+      body: JSON.stringify({
+        channelName,
+        role: resolvedRole,
+        clientId: this.clientId,
+        clientType: this.clientType,
+      }),
     });
 
     if (!response.ok) {
@@ -511,6 +488,7 @@ class SyncClient {
       sessionId: this.sessionId,
       clientId: this.clientId,
       role: this.role,
+      clientType: this.clientType,
     });
 
     return true;
@@ -643,6 +621,7 @@ class SyncClient {
         sessionId: this.sessionId,
         clientId: this.clientId,
         role: this.role,
+        clientType: this.clientType,
       });
     }
 
@@ -783,44 +762,53 @@ class SyncClient {
   // ==================== 狀態管理 ====================
 
   /**
-   * 儲存狀態到 sessionStorage
+   * 儲存狀態到外部儲存器
    */
   saveState() {
-    sessionStorage.setItem("sync_sessionId", this.sessionId || "");
-    sessionStorage.setItem("sync_clientId", this.clientId || "");
-    sessionStorage.setItem(
-      "sync_role",
-      this.role || this.roleConfig.LOCAL,
-    );
-    Logger.debug("狀態已儲存至 sessionStorage");
+    if (!this.sessionStore || typeof this.sessionStore.save !== "function") {
+      return;
+    }
+
+    try {
+      this.sessionStore.save({
+        sessionId: this.sessionId,
+        clientId: this.clientId,
+        role: this.role || this.roleConfig.LOCAL,
+      });
+    } catch (error) {
+      Logger.warn("外部儲存器儲存狀態失敗:", error);
+    }
   }
 
   /**
-   * 儲存角色到 sessionStorage
+   * 儲存角色到外部儲存器
    * @param {string} role - 角色
    */
   saveRole(role) {
     try {
       this.role = role;
-      sessionStorage.setItem("sync_role", role);
-      Logger.debug("角色已儲存至 sessionStorage:", role);
+      this.saveState();
     } catch (error) {
       Logger.error("儲存角色失敗:", error);
     }
   }
 
   /**
-   * 從 sessionStorage 載入狀態
+   * 從外部儲存器載入狀態
    */
   loadState() {
+    if (!this.sessionStore || typeof this.sessionStore.load !== "function") {
+      return;
+    }
+
     try {
-      this.sessionId = sessionStorage.getItem("sync_sessionId") || null;
-      this.clientId = sessionStorage.getItem("sync_clientId") || null;
-      this.role =
-        sessionStorage.getItem("sync_role") || this.roleConfig.LOCAL;
+      const state = this.sessionStore.load() || {};
+      this.sessionId = state.sessionId || null;
+      this.clientId = state.clientId || null;
+      this.role = state.role || this.roleConfig.LOCAL;
 
       if (this.sessionId && this.clientId) {
-        Logger.debug("從 sessionStorage 載入狀態:", {
+        Logger.debug("已從外部儲存器載入同步狀態:", {
           sessionId: this.sessionId,
           clientId: this.clientId,
           role: this.role,
@@ -832,20 +820,20 @@ class SyncClient {
   }
 
   /**
-   * 清除 sessionStorage 狀態
+   * 清除外部儲存器狀態
    */
   clearState() {
     try {
-      sessionStorage.removeItem("sync_sessionId");
-      sessionStorage.removeItem("sync_clientId");
-      sessionStorage.removeItem("sync_role");
+      if (this.sessionStore && typeof this.sessionStore.clear === "function") {
+        this.sessionStore.clear();
+      }
 
       this.sessionId = null;
       this.clientId = null;
       this.role = this.roleConfig.LOCAL;
       this.connectionAttempted = false;
 
-      Logger.debug("已清除 sessionStorage 狀態");
+      Logger.debug("同步狀態已重置");
     } catch (error) {
       Logger.error("清除狀態失敗:", error);
     }
@@ -969,6 +957,18 @@ class SyncClient {
    */
   getSessionId() {
     return this.sessionId;
+  }
+
+  /**
+   * 取得目前儲存的工作階段資訊
+   * @returns {{sessionId:string|null, clientId:string|null, role:string}}
+   */
+  getStoredSessionInfo() {
+    return {
+      sessionId: this.sessionId,
+      clientId: this.clientId,
+      role: this.role || this.roleConfig.LOCAL,
+    };
   }
 
   /**

@@ -235,7 +235,7 @@ class ConfigManager {
   }
 
   /**
-   * 更新單個用戶設定值（由 panel-ui-manager 調用）
+   * 更新單個使用者設定值（由 panel-ui-manager 調用）
    * 假設 panel-ui-manager 已更新 DOM，此方法僅更新內存和 localStorage
    * @param {string} key - 設定鍵名
    * @param {any} value - 設定值
@@ -244,7 +244,7 @@ class ConfigManager {
     // 更新內存中的設定
     this.userSettings[key] = value;
 
-    // 立即保存到 localStorage
+    // 立即儲存到 localStorage
     localStorage.setItem("userSettings", JSON.stringify(this.userSettings));
   }
 

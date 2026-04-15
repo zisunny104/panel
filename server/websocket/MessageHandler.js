@@ -11,6 +11,10 @@
 import SessionService from "../services/SessionService.js";
 import ShareCodeService from "../services/ShareCodeService.js";
 import Logger from "../utils/logger.js";
+import {
+  findOperatorConflict,
+  normalizeClientType,
+} from "../utils/sync-role-guard.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 
 // 本檔使用的角色常數，避免硬編碼字串
@@ -82,7 +86,7 @@ export class MessageHandler {
    * @param {WebSocket} ws - WebSocket 連線
    */
   async handleAuth(wsConnectionId, data, ws) {
-    const { sessionId, clientId, role = ROLE.VIEWER } = data;
+    const { sessionId, clientId, role = ROLE.VIEWER, clientType } = data;
 
     // 驗證必要欄位
     if (!sessionId || !clientId) {
@@ -91,6 +95,10 @@ export class MessageHandler {
 
     // 判斷是否為公開頻道
     const isPublicChannel = sessionId.startsWith(PUBLIC_CHANNEL_PREFIX);
+    const resolvedRole = [ROLE.OPERATOR, ROLE.VIEWER].includes(role)
+      ? role
+      : ROLE.VIEWER;
+    const normalizedClientType = normalizeClientType(clientType);
 
     try {
       if (isPublicChannel) {
@@ -114,6 +122,24 @@ export class MessageHandler {
         }
       }
 
+      if (resolvedRole === ROLE.OPERATOR) {
+        if (!normalizedClientType) {
+          throw new Error("認證失敗: 操作者必須提供 clientType (panel 或 board)");
+        }
+
+        const conflict = findOperatorConflict(
+          this.sessionManager,
+          sessionId,
+          normalizedClientType,
+          clientId,
+        );
+        if (conflict) {
+          throw new Error(
+            `認證失敗: ${normalizedClientType} 操作者已存在 (${conflict.clientId})`,
+          );
+        }
+      }
+
       // 在 ConnectionManager 中認證連線（會自動處理重新連線）
       const isReconnect = this.connectionManager.authenticate(
         wsConnectionId,
@@ -123,7 +149,8 @@ export class MessageHandler {
 
       // 加入工作階段（如果是重新連線，會更新 metadata）
       const sessionInfo = this.sessionManager.addClient(sessionId, clientId, {
-        role,
+        role: resolvedRole,
+        clientType: normalizedClientType,
         isReconnect,
       });
 
@@ -136,7 +163,8 @@ export class MessageHandler {
       this.sendResponse(ws, WS_PROTOCOL.S2C.AUTH_SUCCESS, {
         sessionId,
         clientId,
-        role,
+        role: resolvedRole,
+        clientType: normalizedClientType,
         sessionInfo,
         isReconnect,
         isPublicChannel,
@@ -145,14 +173,15 @@ export class MessageHandler {
       // 只在首次加入時廣播（重新連線不廣播，避免重複通知）
       if (!isReconnect) {
         this.broadcastManager.broadcastClientJoined(sessionId, clientId, {
-          role,
+          role: resolvedRole,
+          clientType: normalizedClientType,
         });
       } else {
         this.broadcastManager.broadcastToRoom(
           sessionId,
           {
             type: WS_PROTOCOL.S2C.CLIENT_RECONNECTED,
-            data: { clientId, role },
+            data: { clientId, role: resolvedRole, clientType: normalizedClientType },
           },
           { excludeClientId: clientId },
         );

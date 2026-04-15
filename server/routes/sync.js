@@ -10,6 +10,10 @@ import { HTTP_STATUS, ERROR_CODES } from "../config/constants.js";
 import { SHARE_CODE_CONSTANTS } from "../config/constants.js";
 import Logger from "../utils/logger.js";
 import { query, execute } from "../database/connection.js";
+import {
+  findOperatorConflict,
+  normalizeClientType,
+} from "../utils/sync-role-guard.js";
 
 // 本檔使用的角色常數，避免在多處硬編碼
 const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
@@ -170,7 +174,7 @@ router.post("/generate_share_code", (req, res) => {
  * Response: { sessionId, clientId, role }
  */
 router.post("/join", (req, res) => {
-  const { shareCode, role, clientId } = req.body;
+  const { shareCode, role, clientId, clientType } = req.body;
 
   console.log(
     `[Join] 使用者請求加入工作階段 - 分享代碼: ${shareCode}, 角色: ${role}, 客戶端ID: ${clientId}`,
@@ -209,13 +213,44 @@ router.post("/join", (req, res) => {
         });
     }
 
+    const resolvedRole = [ROLE.OPERATOR, ROLE.VIEWER].includes(role)
+      ? role
+      : ROLE.VIEWER;
+    const normalizedClientType = normalizeClientType(clientType);
+
+    if (resolvedRole === ROLE.OPERATOR && !normalizedClientType) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: "INVALID_CLIENT_TYPE",
+        message: "操作者加入時必須指定 clientType 為 panel 或 board",
+      });
+    }
+
     // 使用提供的clientId或產生新的
     const finalClientId = clientId || generateClientId();
     console.log(
       `[Join] 分享代碼驗證成功 - 工作階段ID: ${validation.session_id}, 客戶端ID: ${finalClientId}`,
     );
 
-    // 標記分享代碼為已使用
+    if (resolvedRole === ROLE.OPERATOR) {
+      const sessionManager = req.app?.locals?.sessionManager;
+      const conflict = findOperatorConflict(
+        sessionManager,
+        validation.session_id,
+        normalizedClientType,
+        finalClientId,
+      );
+
+      if (conflict) {
+        return res.status(HTTP_STATUS.CONFLICT).json({
+          success: false,
+          error: "OPERATOR_SLOT_OCCUPIED",
+          message: `此工作階段的 ${normalizedClientType} 操作者已存在`,
+        });
+      }
+    }
+
+    // 標記分享代碼為已使用（通過角色檢查後才標記）
     ShareCodeService.markAsUsed(shareCode, finalClientId);
     console.log(`[Join] 分享代碼已標記為已使用 - 代碼: ${shareCode}`);
 
@@ -223,14 +258,15 @@ router.post("/join", (req, res) => {
     SessionService.updateLastActive(validation.session_id);
 
     console.log(
-      `[Join] 加入成功 - 工作階段ID: ${validation.session_id}, 角色: ${role || ROLE.VIEWER}`,
+      `[Join] 加入成功 - 工作階段ID: ${validation.session_id}, 角色: ${resolvedRole}`,
     );
     res.status(HTTP_STATUS.OK).json({
       success: true,
       data: {
         sessionId: validation.session_id,
         clientId: finalClientId,
-        role: role || ROLE.VIEWER,
+        role: resolvedRole,
+        clientType: normalizedClientType,
       },
     });
   } catch (error) {
@@ -663,6 +699,7 @@ router.post("/channel", (req, res) => {
     channelName,
     role = ROLE.OPERATOR,
     clientId: existingClientId,
+    clientType,
   } = req.body;
 
   if (!channelName || !VALID_CHANNELS.includes(channelName.toUpperCase())) {
@@ -676,10 +713,37 @@ router.post("/channel", (req, res) => {
   const validRole = [ROLE.OPERATOR, ROLE.VIEWER].includes(role)
     ? role
     : ROLE.OPERATOR;
+  const normalizedClientType = normalizeClientType(clientType);
+
+  if (validRole === ROLE.OPERATOR && !normalizedClientType) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      error: "INVALID_CLIENT_TYPE",
+      message: "操作者加入公開頻道時必須指定 clientType 為 panel 或 board",
+    });
+  }
 
   // 公開頻道的 sessionId 使用固定前綴，不存入 DB（純記憶體工作階段）
   const sessionId = `${PUBLIC_CHANNEL_PREFIX}${channelName.toUpperCase()}__`;
   const clientId = existingClientId || generateClientId();
+
+  if (validRole === ROLE.OPERATOR) {
+    const sessionManager = req.app?.locals?.sessionManager;
+    const conflict = findOperatorConflict(
+      sessionManager,
+      sessionId,
+      normalizedClientType,
+      clientId,
+    );
+
+    if (conflict) {
+      return res.status(HTTP_STATUS.CONFLICT).json({
+        success: false,
+        error: "OPERATOR_SLOT_OCCUPIED",
+        message: `此公開頻道的 ${normalizedClientType} 操作者已存在`,
+      });
+    }
+  }
 
   Logger.event(
     "cyan",
@@ -693,6 +757,7 @@ router.post("/channel", (req, res) => {
       sessionId,
       clientId,
       role: validRole,
+      clientType: normalizedClientType,
       channelName: channelName.toUpperCase(),
     },
   });

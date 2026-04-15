@@ -5,28 +5,11 @@
 */
 
 import { buildActionSequenceFromUnits, loadUnitsFromScenarios } from "../core/data-loader.js";
-import { MediaManager } from "./panel-media-manager.js";
-import { PowerControl } from "./panel-power-control.js";
-import { PanelLogger } from "./panel-logger.js";
-import { ExperimentSyncCore } from "../sync/experiment-sync-manager.js";
-import { PanelUIManager } from "./panel-ui-manager.js";
 import { ButtonManager } from "./panel-button-manager.js";
-import { PanelSyncManager } from "./panel-sync-manager.js";
-import { ConfigManager } from "../core/config.js";
-import { experimentSyncManager } from "../board/board-sync-manager.js";
-import { ExperimentHubManager } from "../experiment/experiment-hub-manager.js";
-import { ExperimentCombinationManager } from "../experiment/experiment-combination-manager.js";
 import { ExperimentFlowManager } from "../experiment/experiment-flow-manager.js";
-import { ExperimentSystemManager } from "../experiment/experiment-system-manager.js";
-import { ExperimentStateManager } from "../experiment/experiment-state-manager.js";
-import { ExperimentTimerManager } from "../experiment/experiment-timer.js";
 import { ExperimentActionHandler } from "../experiment/experiment-action-handler.js";
 import { ACTION_IDS } from "../constants/index.js";
-import {
-  initExperimentFlowManager,
-  initExperimentUIManager,
-} from "../experiment/experiment-init-utils.js";
-import { SyncManager } from "../sync/sync-manager.js";
+import { initializePanelManagers } from "./panel-init.js";
 import "../experiment/experiment-timer.js";
 import "../sync/sync-confirm-dialog.js";
 
@@ -121,191 +104,33 @@ class PanelPageManager {
    * 完成腳本載入後建立實驗模組並初始化 UI
    */
   async onInitializationComplete() {
+    const initStart = performance.now();
     Logger.debug("所有腳本載入完成，開始初始化面板與實驗模組");
 
-    const logInitDuration = (label, start) => {
-      const duration = performance.now() - start;
-      Logger.debug(`${label} (<orange>${duration.toFixed(0)} ms</orange>)`);
-    };
+    const managerInitStart = performance.now();
+    await initializePanelManagers(this);
+    Logger.debug(
+      `Panel: 管理器初始化完成 (<orange>${(performance.now() - managerInitStart).toFixed(0)} ms</orange>)`,
+    );
 
-    const configStart = performance.now();
-    this.configManager = new ConfigManager();
-    await this.configManager.loadConfigSettings();
-    logInitDuration("ConfigManager 已初始化", configStart);
+    const uiDataInitStart = performance.now();
+    await this._initializeExperimentUIAndData();
+    Logger.debug(
+      `Panel: UI 與資料初始化完成 (<orange>${(performance.now() - uiDataInitStart).toFixed(0)} ms</orange>)`,
+    );
 
-    const panelUIStart = performance.now();
-    this.panelUIManager = new PanelUIManager({
-      configManager: this.configManager,
-    });
-    logInitDuration("PanelUIManager 已初始化", panelUIStart);
-    this.configManager?.updateDependencies?.({ panelUIManager: this.panelUIManager });
+    const runtimeInitStart = performance.now();
+    this._initializePanelRuntimeBindings();
+    Logger.debug(
+      `Panel: 執行期綁定完成 (<orange>${(performance.now() - runtimeInitStart).toFixed(0)} ms</orange>)`,
+    );
 
-    const powerStart = performance.now();
-    this.powerControl = new PowerControl();
-    logInitDuration("PowerControl 已初始化", powerStart);
+    Logger.debug(
+      `Panel: ExperimentSystemManager UI 初始化完成 (<orange>${(performance.now() - initStart).toFixed(0)} ms</orange>)`,
+    );
+  }
 
-    const mediaStart = performance.now();
-    this.panelMediaManager = new MediaManager({
-      panelUIManager: this.panelUIManager,
-      powerControl: this.powerControl,
-      experimentFlowManager: this.experimentFlowManager,
-      configManager: this.configManager,
-    });
-    logInitDuration("PanelMediaManager 已初始化", mediaStart);
-    this.panelUIManager.updateDependencies({
-      panelMediaManager: this.panelMediaManager,
-    });
-
-    const syncStart = performance.now();
-    this.syncManager = new SyncManager();
-    logInitDuration("SyncManager 已初始化", syncStart);
-    this.panelMediaManager.updateDependencies({
-      syncClient: this.syncManager.core?.syncClient,
-      timeSyncManager: this.syncManager.core?.timeSyncManager,
-    });
-
-    const loggerStart = performance.now();
-    this.panelLogger = new PanelLogger({
-      timeSyncManager: this.syncManager.core?.timeSyncManager,
-      syncClient: this.syncManager.core?.syncClient,
-      syncManager: this.syncManager,
-      panelMediaManager: this.panelMediaManager,
-    });
-    logInitDuration("PanelLogger 已初始化", loggerStart);
-    this.panelUIManager.updateDependencies({
-      logger: this.panelLogger,
-    });
-    this.panelMediaManager.updateDependencies({
-      logger: this.panelLogger,
-    });
-
-    const syncCoreStart = performance.now();
-    this.experimentSyncCore = new ExperimentSyncCore();
-    this.experimentSyncCore.updateDependencies({
-      syncManager: this.syncManager,
-      syncClient: this.syncManager?.core?.syncClient,
-    });
-    experimentSyncManager.updateDependencies({
-      syncManager: this.syncManager,
-      syncClient: this.syncManager.core?.syncClient,
-      experimentSyncCore: this.experimentSyncCore,
-    });
-    logInitDuration("ExperimentSyncCore 已初始化", syncCoreStart);
-
-    const panelSyncStart = performance.now();
-    this.panelSyncManager = new PanelSyncManager({
-      logger: this.panelLogger,
-      experimentSyncCore: this.experimentSyncCore,
-      syncClient: this.syncManager.core?.syncClient,
-      experimentFlowManager: this.experimentFlowManager,
-      experimentSystemManager: this.experimentSystemManager,
-      experimentActionHandler: this.experimentActionHandler,
-      experimentCombinationManager: this.experimentCombinationManager,
-      powerControl: this.powerControl,
-    });
-    await this.panelSyncManager.initialize();
-    logInitDuration("PanelSyncManager 已初始化", panelSyncStart);
-
-    const hubStart = performance.now();
-    this.experimentHubManager = new ExperimentHubManager({
-      syncManager: this.syncManager,
-      syncClient: this.syncManager?.core?.syncClient,
-      experimentSyncCore: this.experimentSyncCore,
-      roleConfig: SyncManager.ROLE,
-    });
-    this.syncManager.updateDependencies({
-      experimentHubManager: this.experimentHubManager,
-    });
-    logInitDuration("ExperimentHubManager 已初始化", hubStart);
-
-    const stateStart = performance.now();
-    this.experimentStateManager = new ExperimentStateManager({
-      timeSyncManager: this.syncManager?.core?.timeSyncManager,
-      experimentHubManager: this.experimentHubManager,
-    });
-    logInitDuration("ExperimentStateManager 已初始化", stateStart);
-
-    const combinationStart = performance.now();
-    this.experimentCombinationManager = new ExperimentCombinationManager();
-    this.experimentCombinationManager.updateDependencies({
-      hubManager: this.experimentHubManager,
-      syncManager: this.syncManager,
-      syncClient: this.syncManager?.core?.syncClient,
-      experimentSyncCore: this.experimentSyncCore,
-    });
-    logInitDuration("ExperimentCombinationManager 已初始化", combinationStart);
-    this.panelMediaManager.updateDependencies({
-      experimentCombinationManager: this.experimentCombinationManager,
-    });
-
-    if (!this.timerManager) {
-      this.timerManager = new ExperimentTimerManager({
-        timeSyncManager: this.syncManager?.core?.timeSyncManager,
-        experimentLogManager: null,
-        getCurrentCombination: () =>
-          this.experimentCombinationManager?.getCurrentCombination?.() || null,
-      });
-    }
-
-    const flowStart = performance.now();
-    this.experimentFlowManager = initExperimentFlowManager({
-      combinationManager: this.experimentCombinationManager,
-      hubManager: this.experimentHubManager,
-      actionHandler: this.experimentActionHandler,
-    });
-    logInitDuration("ExperimentFlowManager 已初始化", flowStart);
-    this.panelMediaManager.updateDependencies({
-      experimentFlowManager: this.experimentFlowManager,
-    });
-
-    const uiStart = performance.now();
-    this.syncManager.updateDependencies({
-      experimentHubManager: this.experimentHubManager,
-    });
-    this.uiManager = initExperimentUIManager({
-      timerManager: this.timerManager,
-      flowManager: this.experimentFlowManager,
-      combinationManager: this.experimentCombinationManager,
-      hubManager: this.experimentHubManager,
-      syncManager: this.syncManager,
-      syncClient: this.syncManager?.core?.syncClient,
-      experimentSyncCore: this.experimentSyncCore,
-      panelUIManager: this.panelUIManager,
-    });
-    logInitDuration("ExperimentUIManager 已初始化", uiStart);
-    this.panelUIManager.updateDependencies({
-      uiManager: this.uiManager,
-    });
-
-    const systemStart = performance.now();
-    this.experimentSystemManager = new ExperimentSystemManager({
-      combinationManager: this.experimentCombinationManager,
-      uiManager: this.uiManager,
-      hubManager: this.experimentHubManager,
-      flowManager: this.experimentFlowManager,
-      timerManager: this.timerManager,
-      pageManager: this,
-      experimentLogManager: null,
-    });
-    await this.experimentSystemManager.initialize();
-    logInitDuration("ExperimentSystemManager 已初始化", systemStart);
-
-    this.experimentActionHandler = this.experimentSystemManager.actionHandler;
-    if (!this.experimentActionHandler) {
-      throw new Error("ExperimentActionHandler 未初始化");
-    }
-    this.experimentActionHandler.disableAutoProgress();
-    this.panelSyncManager.updateDependencies({
-      experimentFlowManager: this.experimentFlowManager,
-      experimentSystemManager: this.experimentSystemManager,
-      experimentActionHandler: this.experimentActionHandler,
-      experimentCombinationManager: this.experimentCombinationManager,
-    });
-    this.panelLogger.updateDependencies({
-      experimentFlowManager: this.experimentFlowManager,
-      experimentActionHandler: this.experimentActionHandler,
-    });
-
+  async _initializeExperimentUIAndData() {
     const scriptData = await loadUnitsFromScenarios();
     this.experimentFlowManager.updateDependencies({
       unitsData: scriptData.units,
@@ -319,10 +144,21 @@ class PanelPageManager {
       },
       scriptData,
     );
+  }
+
+  _initializePanelRuntimeBindings() {
     this._setupExperimentEventListeners();
     this._bindPanelPageEvents();
     this._initializeButtonManager();
-    this.powerControl.updateDependencies({
+    this.powerControl.updateDependencies(this._buildPowerControlDependencies());
+    this.panelLogger.updateDependencies({
+      buttonManager: this.buttonManager,
+    });
+    this.panelUIManager.setupExperimentPanelButtonColor();
+  }
+
+  _buildPowerControlDependencies() {
+    return {
       panelLogger: this.panelLogger,
       experimentActionHandler: this.experimentActionHandler,
       experimentFlowManager: this.experimentFlowManager,
@@ -332,14 +168,7 @@ class PanelPageManager {
       syncClient: this.syncManager.core?.syncClient,
       panelMediaManager: this.panelMediaManager,
       buttonManager: this.buttonManager,
-    });
-    this.panelLogger.updateDependencies({
-      buttonManager: this.buttonManager,
-    });
-    this.panelUIManager.setupExperimentPanelButtonColor();
-
-
-    Logger.debug("Panel: ExperimentSystemManager UI 初始化完成");
+    };
   }
 
   /**
@@ -671,7 +500,7 @@ class PanelPageManager {
   /**
    * 處理 ExperimentSystemManager 的實驗系統停止通知
    * @private
-   * 用於後處理邏輯（日誌保存、同步通知等）
+   * 用於後處理邏輯（日誌儲存、同步通知等）
    */
   async _handleExperimentSystemFlowStopped(data = {}) {
     Logger.info("Panel: 處理實驗系統停止後續邏輯", data);

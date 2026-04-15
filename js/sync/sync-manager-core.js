@@ -37,6 +37,7 @@ export class SyncManagerCore {
     this.syncClient = config.syncClient || new SyncClient({
       roleConfig: this.roleConfig,
       timeSyncManager: this.timeSyncManager,
+      sessionStore: config.sessionStore || null,
     });
   }
 
@@ -116,8 +117,6 @@ export class SyncManagerCore {
 
       setTimeout(() => this.processOfflineQueue(), 1000);
 
-      setTimeout(() => this.syncCurrentStateToHub(), 1500);
-
       return result;
     } catch (error) {
       Logger.error("工作階段建立失敗", error);
@@ -176,8 +175,6 @@ export class SyncManagerCore {
       );
 
       setTimeout(() => this.processOfflineQueue(), 1000);
-
-      setTimeout(() => this.syncCurrentStateFromHub(), 1500);
 
       return true;
     } catch (error) {
@@ -551,49 +548,6 @@ export class SyncManagerCore {
 
   async checkServerHealth() {
     return await this.syncClient.checkServerHealth();
-  }
-
-  syncCurrentStateToHub() {
-    try {
-      const stateData = {
-        type: SYNC_DATA_TYPES.SESSION_STATE_UPDATE,
-        experimentId: document.getElementById("experimentIdInput")?.value || "",
-        participantName:
-          document.getElementById("participantNameInput")?.value || "",
-        timestamp: new Date().toISOString(),
-      };
-
-      if (stateData.participantName) {
-        this.syncState(stateData);
-        Logger.debug("工作階段建立後已同步狀態到中樞:", stateData);
-      }
-    } catch (error) {
-      Logger.warn("同步工作階段狀態失敗:", error);
-    }
-  }
-
-  syncCurrentStateFromHub() {
-    try {
-      Logger.debug("加入工作階段後，開始同步中樞資料");
-      Logger.debug("需要初始化的項目: 實驗ID、受試者名稱、實驗組合、實驗狀態");
-
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.SESSION_JOINED, {
-          detail: {
-            sessionId: this.currentSessionId || this.syncClient.sessionId,
-            shouldSyncFromHub: true,
-            syncItems: [
-              "experimentId",
-              "participantName",
-              "combination",
-              "experimentState",
-            ],
-          },
-        }),
-      );
-    } catch (error) {
-      Logger.warn("同步中樞資料失敗:", error);
-    }
   }
 
   cleanup() {

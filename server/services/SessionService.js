@@ -152,7 +152,7 @@ class SessionService {
       if (experimentTypes.includes(update.type)) {
         data.experimentState = { ...update };
       }
-      // 保存最近一筆狀態
+      // 儲存最近一筆狀態
       data.lastState = { ...update };
 
       execute(

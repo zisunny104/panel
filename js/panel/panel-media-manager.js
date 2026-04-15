@@ -111,8 +111,8 @@ class MediaManager {
       }
     });
 
-    // 監聽遠端同步狀態事件 (來自other devices的組合選擇)
-    window.addEventListener(SYNC_EVENTS.REMOTE_STATE, (event) => {
+    // 監聽同步狀態廣播事件 (來自其他裝置的組合選擇)
+    window.addEventListener(SYNC_EVENTS.STATE_BROADCAST, (event) => {
       const detail = event.detail;
       // 檢查類型是否為組合選擇，並避免處理自己發送的事件
       if (detail.type === SYNC_DATA_TYPES.COMBINATION_SELECTED &&
@@ -392,7 +392,7 @@ class MediaManager {
     video.setAttribute("preload", "auto");
     video.controls = options.controls || false;
     video.muted = options.muted ?? true;
-    video.volume = this.mediaVolume; // 應用媒體音量設定
+    video.volume = this.mediaVolume; // 套用媒體音量設定
     video.autoplay = true;
 
     this.mediaArea.appendChild(video);
@@ -1245,7 +1245,7 @@ class MediaManager {
     const storedVolume =
       configSettings.mediaVolume ?? localStorage.getItem("mediaVolume") ?? 70; // 預設 70%
 
-    // 將百分比轉換為小數並應用
+    // 將百分比轉換為小數並套用
     this.setMediaVolume(parseInt(storedVolume) / 100);
   }
 

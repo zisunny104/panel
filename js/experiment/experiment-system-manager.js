@@ -5,7 +5,7 @@
  * 事件串接與狀態同步，確保各模組正確互動與資料一致性。
  */
 
-import { LOG_SOURCES, SYNC_EVENTS } from "../constants/index.js";
+import { RECORD_SOURCES, SYNC_EVENTS } from "../constants/index.js";
 import { experimentSyncManager } from "../board/board-sync-manager.js";
 import { generateExperimentId } from "../core/random-utils.js";
 import ExperimentActionHandler from "./experiment-action-handler.js";
@@ -600,7 +600,7 @@ class ExperimentSystemManager {
   }
 
   _handleRemoteCombinationSelected(detail) {
-    if (!detail || detail.source !== LOG_SOURCES.REMOTE_SYNC) {
+    if (!detail || detail.source !== RECORD_SOURCES.SYNC_BROADCAST) {
       return;
     }
 
@@ -1212,7 +1212,7 @@ class ExperimentSystemManager {
     const currentId = this.getExperimentId();
     if (currentId === experimentId) return false;
 
-    await this.setExperimentId(experimentId, LOG_SOURCES.REMOTE_SYNC, {
+    await this.setExperimentId(experimentId, RECORD_SOURCES.SYNC_BROADCAST, {
       registerToHub: false,
       broadcast: false,
       reapplyCombination: true,
@@ -1350,7 +1350,7 @@ class ExperimentSystemManager {
    * @param {boolean} options.broadcast - 是否廣播（預設 true）
    * @param {boolean} options.reapplyCombination - 是否重新套用組合排序（預設 true）
    */
-  async setExperimentId(newId, source = LOG_SOURCES.LOCAL_GENERATE, options = {}) {
+  async setExperimentId(newId, source = RECORD_SOURCES.LOCAL_GENERATE, options = {}) {
     const {
       registerToHub = undefined,
       broadcast = true,
@@ -1387,8 +1387,8 @@ class ExperimentSystemManager {
     const shouldRegister =
       registerToHub === true &&
       isSync &&
-      source !== LOG_SOURCES.REMOTE_SYNC &&
-      source !== LOG_SOURCES.HUB_SYNC;
+      source !== RECORD_SOURCES.SYNC_BROADCAST &&
+      source !== RECORD_SOURCES.HUB_SYNC;
     if (shouldRegister) {
       try {
         await experimentSyncManager.registerExperimentIdToHub(newId);
@@ -1520,7 +1520,7 @@ class ExperimentSystemManager {
         if (hubId && currentId && hubId !== currentId) {
           // 中樞有不同ID，同步到中樞的ID
           Logger.debug(`同步到中樞ID: ${hubId}`);
-          await this.setExperimentId(hubId, LOG_SOURCES.HUB_SYNC, { broadcast: false, reapplyCombination: true });
+          await this.setExperimentId(hubId, RECORD_SOURCES.HUB_SYNC, { broadcast: false, reapplyCombination: true });
           return hubId;
         }
       } catch (error) {
@@ -1530,7 +1530,7 @@ class ExperimentSystemManager {
 
     // 產生新 ID
     const newId = generateExperimentId();
-    await this.setExperimentId(newId, LOG_SOURCES.LOCAL_GENERATE);
+    await this.setExperimentId(newId, RECORD_SOURCES.LOCAL_GENERATE);
     Logger.debug("新實驗ID已產生:", newId);
     return newId;
   }
@@ -1584,7 +1584,7 @@ class ExperimentSystemManager {
     // 套用（不重複廣播，避免初始化時的雜訊）
     await this.setExperimentId(
       experimentId,
-      LOG_SOURCES.LOCAL_INITIALIZE,
+      RECORD_SOURCES.LOCAL_INITIALIZE,
       {
         broadcast: isSync,
         reapplyCombination: false, // initializeUI 已處理
@@ -1612,7 +1612,7 @@ class ExperimentSystemManager {
         return;
       }
       Logger.debug("使用者手動變更實驗ID:", newVal);
-      await this.setExperimentId(newVal, LOG_SOURCES.LOCAL_INPUT);
+      await this.setExperimentId(newVal, RECORD_SOURCES.LOCAL_INPUT);
     });
   }
 
