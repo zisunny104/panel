@@ -5,7 +5,7 @@
  * 透過 BroadcastChannel 接收 RecordManager 的日誌更新事件。
  *
  * 依賴（透過 updateDependencies 注入）：
- *   logManager      → RecordManager 實例
+ *   recordManager      → RecordManager 實例
  *   timeSyncManager → 時間同步管理器
  *   config          → 全域設定物件
  *   getGesturesData → () => Object  手勢資料字典
@@ -21,9 +21,9 @@ import { recordViewStats } from "./record-view-stats.js";
 
 class RecordView {
   constructor() {
-    this.currentExperiments = [];
-    this.selectedLogs = new Set();
-    this.logManager = null;
+    this.currentRecords = [];
+    this.selectedRecords = new Set();
+    this.recordManager = null;
     this.timeSyncManager = null;
     this.config = null;
     this.getGesturesData = null;
@@ -39,15 +39,15 @@ class RecordView {
     this._hasRequestedInitialLoad = false;
     this._initialLoadObserver = null;
     this._initialLoadFallbackTimer = null;
-    this._allExperiments = [];
+    this._allRecords = [];
     this._filterUiReady = false;
-    this.logFilterPopover = null;
-    this._logListActionsBound = false;
-    this._currentLogActionsBound = false;
+    this.recordFilterPopover = null;
+    this._recordListActionsBound = false;
+    this._currentRecordActionsBound = false;
     this._initialized = false;
     this._logModal = null;
 
-    this.logCountFilter = { min: 0, max: null, maxAvailable: 0 };
+    this.recordCountFilter = { min: 0, max: null, maxAvailable: 0 };
     this.durationFilter = { min: 0, max: null, maxAvailable: 0 };
     this.timeFilter = { min: null, max: null, minAvailable: null, maxAvailable: null };
 
@@ -57,7 +57,7 @@ class RecordView {
   /**
    * 注入或更新執行期依賴
    * @param {Object}   [deps]
-   * @param {Object}   [deps.logManager]      - RecordManager 實例
+   * @param {Object}   [deps.recordManager]      - RecordManager 實例
    * @param {Object}   [deps.timeSyncManager] - 時間同步管理器
    * @param {Object}   [deps.config]          - 全域設定物件
    * @param {Function} [deps.getGesturesData] - `() => Object` 取得手勢資料字典
@@ -71,96 +71,96 @@ class RecordView {
   // ─── 初始化 ────────────────────────────────────────────────────────────────
 
   /**
-   * 初始化 UI 容器與日誌列表（需 logManager 已注入才會生效）
+   * 初始化 UI 容器與日誌列表（需 recordManager 已注入才會生效）
    */
   initialize() {
     if (this._initialized) return;
 
-    if (!this.logManager) {
-      Logger.debug("[RecordView.initialize] logManager 尚未就緒，稍後初始化");
+    if (!this.recordManager) {
+      Logger.debug("[RecordView.initialize] recordManager 尚未就緒，稍後初始化");
       return;
     }
 
-    this.initializeExperimentLogContainer();
-    this.initializeExperimentLogsList();
+    this.initializeRecordContainer();
+    this.initializeRecordList();
 
-    if (document.getElementById("experimentLogsContainer")) {
-      this.scheduleInitialLogLoad();
+    if (document.getElementById("recordEntriesContainer")) {
+      this.scheduleInitialRecordLoad();
     }
 
     this._initialized = true;
     Logger.debug("[RecordView.initialize] 完成");
   }
 
-  initializeExperimentLogContainer() {
-    const container = document.getElementById("experimentLogContainer");
+  initializeRecordContainer() {
+    const container = document.getElementById("recordContainer");
     if (!container) return;
 
     container.className = "experiment-ui-card";
     container.innerHTML = `
-      <div class="logs-header">
+      <div class="records-header">
         <h3>實驗日誌</h3>
-        <div class="logs-status">
-          <button id="copyCurrentLogsBtn" data-action="copy-current-logs" title="複製即時日誌" aria-label="複製即時日誌">
+        <div class="records-status">
+          <button id="copyCurrentRecordsBtn" data-action="copy-current-records" title="複製即時日誌" aria-label="複製即時日誌">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
-          <button id="syncLogsNowBtn" class="is-hidden" data-action="sync-now" title="立即同步日誌" aria-label="立即同步日誌">
+          <button id="syncRecordsNowBtn" class="is-hidden" data-action="sync-now" title="立即同步日誌" aria-label="立即同步日誌">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7,11 12,6 17,11"></polyline>
               <line x1="12" y1="6" x2="12" y2="18"></line>
             </svg>
           </button>
-          <span class="status-indicator idle">等待開始</span>
+          <span class="record-status-indicator idle">等待開始</span>
         </div>
       </div>
-      <div class="logs-content">
-        <div class="no-current-logs">
-          <div class="no-logs-icon">
+      <div class="records-live-content">
+        <div class="no-current-records">
+          <div class="no-records-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-4"></path>
               <path d="M9 11V9a3 3 0 0 1 6 0v2"></path>
               <circle cx="12" cy="16" r="1"></circle>
             </svg>
           </div>
-          <div class="no-logs-text">尚未開始實驗</div>
-          <div class="no-logs-hint">實驗開始後，此處將顯示即時日誌</div>
+          <div class="no-records-text">尚未開始實驗</div>
+          <div class="no-records-hint">實驗開始後，此處將顯示即時日誌</div>
         </div>
       </div>`;
 
-    this._bindCurrentLogActions();
+    this._bindCurrentRecordActions();
   }
 
-  initializeExperimentLogsList() {
-    const container = document.getElementById("experimentLogsList");
+  initializeRecordList() {
+    const container = document.getElementById("recordsList");
     if (!container) return;
 
     const filterBlocks = [
       this._renderFilterBlock({
-        title: "記錄數", minValueId: "logFilterMinValue", maxValueId: "logFilterMaxValue",
-        minRangeId: "logFilterMinRange", maxRangeId: "logFilterMaxRange",
-        slidersId: "logFilterCountSliders", minValue: 0, maxValue: 0,
+        title: "記錄數", minValueId: "recordFilterMinValue", maxValueId: "recordFilterMaxValue",
+        minRangeId: "recordFilterMinRange", maxRangeId: "recordFilterMaxRange",
+        slidersId: "recordFilterCountSliders", minValue: 0, maxValue: 0,
       }),
       this._renderFilterBlock({
-        title: "實驗耗時", minValueId: "logFilterDurationMinValue", maxValueId: "logFilterDurationMaxValue",
-        minRangeId: "logFilterDurationMinRange", maxRangeId: "logFilterDurationMaxRange",
-        slidersId: "logFilterDurationSliders", minValue: "0秒", maxValue: "0秒",
+        title: "實驗耗時", minValueId: "recordFilterDurationMinValue", maxValueId: "recordFilterDurationMaxValue",
+        minRangeId: "recordFilterDurationMinRange", maxRangeId: "recordFilterDurationMaxRange",
+        slidersId: "recordFilterDurationSliders", minValue: "0秒", maxValue: "0秒",
       }),
       this._renderFilterBlock({
-        title: "實驗時間", minValueId: "logFilterTimeMinValue", maxValueId: "logFilterTimeMaxValue",
-        minRangeId: "logFilterTimeMinRange", maxRangeId: "logFilterTimeMaxRange",
-        slidersId: "logFilterTimeSliders", minValue: "--", maxValue: "--",
+        title: "實驗時間", minValueId: "recordFilterTimeMinValue", maxValueId: "recordFilterTimeMaxValue",
+        minRangeId: "recordFilterTimeMinRange", maxRangeId: "recordFilterTimeMaxRange",
+        slidersId: "recordFilterTimeSliders", minValue: "--", maxValue: "--",
       }),
     ].join("");
 
     container.innerHTML = `
-      <div class="logs-section-header">
+      <div class="records-section-header">
         <h2>實驗日誌列表</h2>
-        <div class="logs-list-header">
-          <button id="refreshLogsBtn" class="btn-secondary" data-action="refresh-logs" title="重新整理" aria-label="重新整理">
+        <div class="records-list-header">
+          <button id="refreshRecordsBtn" class="btn-secondary" data-action="refresh-records" title="重新整理" aria-label="重新整理">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
               <path d="M21 3v5h-5"></path>
@@ -168,19 +168,19 @@ class RecordView {
               <path d="M3 21v-5h5"></path>
             </svg>
           </button>
-          <button id="logFilterToggleBtn" class="btn-secondary" data-action="toggle-filter" title="篩選" aria-label="篩選">
+          <button id="recordFilterToggleBtn" class="btn-secondary" data-action="toggle-filter" title="篩選" aria-label="篩選">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
               <path d="M3 4h18"></path><path d="M6 10h12"></path><path d="M10 16h4"></path>
             </svg>
           </button>
-          <button id="downloadSelectedLogsBtn" class="btn-secondary is-hidden" data-action="download-selected" title="下載選取" aria-label="下載選取">
+          <button id="downloadSelectedRecordsBtn" class="btn-secondary is-hidden" data-action="download-selected" title="下載選取" aria-label="下載選取">
             <svg class="svg-icon svg-md" viewBox="0 0 24 24">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7,10 12,15 17,10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
           </button>
-          <button id="deleteSelectedLogsBtn" class="btn-danger is-hidden" data-action="delete-selected" title="刪除選取" aria-label="刪除選取">
+          <button id="deleteSelectedRecordsBtn" class="btn-danger is-hidden" data-action="delete-selected" title="刪除選取" aria-label="刪除選取">
             <svg class="svg-icon svg-md" viewBox="0 0 24 24">
               <polyline points="3,6 5,6 21,6"></polyline>
               <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"></path>
@@ -191,41 +191,41 @@ class RecordView {
         </div>
       </div>
 
-      <div id="logFilterPopover" class="log-filter-popover is-hidden" aria-hidden="true">
+      <div id="recordFilterPopover" class="record-filter-popover is-hidden" aria-hidden="true">
         ${filterBlocks}
-        <div class="log-filter-actions">
+        <div class="record-filter-actions">
           <button class="btn-secondary" data-action="reset-filter">重置</button>
           <button class="btn-primary" data-action="apply-filter">套用</button>
         </div>
       </div>
 
       <div class="form-group">
-        <div id="experimentLogsContainer">
-          <div class="logs-list-loading logs-list-loading-skeleton" role="status" aria-live="polite">
-            <div class="logs-list-loading-header">
+        <div id="recordEntriesContainer">
+          <div class="records-list-loading records-list-loading-skeleton" role="status" aria-live="polite">
+            <div class="records-list-loading-header">
               <div class="skeleton-line w-30"></div>
               <div class="skeleton-line w-15"></div>
             </div>
-            <div class="logs-skeleton-list">
-              <div class="logs-skeleton-item">
+            <div class="records-skeleton-list">
+              <div class="records-skeleton-item">
                 <div class="skeleton-line w-70"></div>
                 <div class="skeleton-line w-40"></div>
               </div>
-              <div class="logs-skeleton-item">
+              <div class="records-skeleton-item">
                 <div class="skeleton-line w-80"></div>
                 <div class="skeleton-line w-45"></div>
               </div>
-              <div class="logs-skeleton-item">
+              <div class="records-skeleton-item">
                 <div class="skeleton-line w-65"></div>
                 <div class="skeleton-line w-35"></div>
               </div>
             </div>
-            <div class="logs-loading-caption">正在準備實驗日誌...</div>
+            <div class="records-loading-caption">正在準備實驗日誌...</div>
           </div>
         </div>
       </div>`;
 
-    this._bindLogListActions();
+    this._bindRecordListActions();
   }
 
   // ─── 即時日誌顯示 ──────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ class RecordView {
    * @param {Array} logs - 完整日誌陣列
    */
   updateLiveDisplay(logs) {
-    const logsContent = document.querySelector("#experimentLogContainer .logs-content");
+    const logsContent = document.querySelector("#recordContainer .records-live-content");
     if (!logsContent) return;
 
     const recentLogs = logs.slice(-20);
@@ -269,22 +269,22 @@ class RecordView {
       if (log.a_id) detailParts.push(`[${log.a_id}]`);
 
       const details = detailParts.join(" ");
-      return `<div class="current-log-entry">
-        <span class="log-time">[${time}]</span>
-        <span class="log-type">${typeLabel}</span>
-        ${details ? `<span class="log-details">${details}</span>` : ""}
+      return `<div class="current-record-entry">
+        <span class="record-time">[${time}]</span>
+        <span class="record-type">${typeLabel}</span>
+        ${details ? `<span class="record-details">${details}</span>` : ""}
       </div>`;
     }).join("");
 
     logsContent.innerHTML = `
-      <div class="current-log-entries">${entriesHtml}</div>
-      <div class="logs-summary">共 ${logs.length} 筆記錄</div>`;
+      <div class="current-record-entries">${entriesHtml}</div>
+      <div class="records-summary">共 ${logs.length} 筆記錄</div>`;
     logsContent.scrollTop = logsContent.scrollHeight;
 
-    const statusIndicator = logsContent.closest("#experimentLogContainer")?.querySelector(".status-indicator");
+    const statusIndicator = logsContent.closest("#recordContainer")?.querySelector(".record-status-indicator");
     if (statusIndicator) {
       const isPaused = document.querySelector("#pauseExperimentBtn")?.dataset.isPaused === "true";
-      statusIndicator.className = `status-indicator ${isPaused ? "paused" : "running"}`;
+      statusIndicator.className = `record-status-indicator ${isPaused ? "paused" : "running"}`;
       statusIndicator.textContent = `${isPaused ? "已暫停" : "進行中"} · ${logs.length} 筆`;
     }
 
@@ -296,20 +296,20 @@ class RecordView {
    * @param {number} totalLogs
    */
   showCompletionDisplay(totalLogs) {
-    const logsContent = document.querySelector("#experimentLogContainer .logs-content");
+    const logsContent = document.querySelector("#recordContainer .records-live-content");
     if (!logsContent) return;
 
     logsContent.innerHTML = `
-      <div class="current-log-entries">
-        <div class="current-log-entry log-completion">
-          <span class="log-type">完成</span>
-          <span class="log-details">實驗已結束，日誌已儲存 (共 ${totalLogs} 筆記錄)</span>
+      <div class="current-record-entries">
+        <div class="current-record-entry record-completion">
+          <span class="record-type">完成</span>
+          <span class="record-details">實驗已結束，日誌已儲存 (共 ${totalLogs} 筆記錄)</span>
         </div>
       </div>`;
 
-    const statusIndicator = logsContent.closest("#experimentLogContainer")?.querySelector(".status-indicator");
+    const statusIndicator = logsContent.closest("#recordContainer")?.querySelector(".record-status-indicator");
     if (statusIndicator) {
-      statusIndicator.className = "status-indicator completed";
+      statusIndicator.className = "record-status-indicator completed";
       statusIndicator.textContent = `已完成 · ${totalLogs} 筆`;
     }
 
@@ -322,25 +322,25 @@ class RecordView {
    * 重置即時日誌到等待狀態
    */
   resetLiveDisplayToIdle() {
-    const logsContent = document.querySelector("#experimentLogContainer .logs-content");
+    const logsContent = document.querySelector("#recordContainer .records-live-content");
     if (!logsContent) return;
 
     logsContent.innerHTML = `
-      <div class="no-current-logs">
-        <div class="no-logs-icon">
+      <div class="no-current-records">
+        <div class="no-records-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-4"></path>
             <path d="M9 11V9a3 3 0 0 1 6 0v2"></path>
             <circle cx="12" cy="16" r="1"></circle>
           </svg>
         </div>
-        <div class="no-logs-text">尚未開始實驗</div>
-        <div class="no-logs-hint">實驗開始後，此處將顯示即時日誌</div>
+        <div class="no-records-text">尚未開始實驗</div>
+        <div class="no-records-hint">實驗開始後，此處將顯示即時日誌</div>
       </div>`;
 
-    const statusIndicator = logsContent.closest("#experimentLogContainer")?.querySelector(".status-indicator");
+    const statusIndicator = logsContent.closest("#recordContainer")?.querySelector(".record-status-indicator");
     if (statusIndicator) {
-      statusIndicator.className = "status-indicator idle";
+      statusIndicator.className = "record-status-indicator idle";
       statusIndicator.textContent = "等待開始";
     }
 
@@ -353,7 +353,7 @@ class RecordView {
    * @param {number} logCount
    */
   updateSyncButtonState(state, logCount = 0) {
-    const btn = document.getElementById("syncLogsNowBtn");
+    const btn = document.getElementById("syncRecordsNowBtn");
     if (!btn) return;
     switch (state) {
       case "show":
@@ -377,9 +377,9 @@ class RecordView {
 
   // ─── 事件綁定 ──────────────────────────────────────────────────────────────
 
-  _bindCurrentLogActions() {
-    if (this._currentLogActionsBound) return;
-    const container = document.getElementById("experimentLogContainer");
+  _bindCurrentRecordActions() {
+    if (this._currentRecordActionsBound) return;
+    const container = document.getElementById("recordContainer");
     if (!container) return;
 
     container.addEventListener("click", (event) => {
@@ -388,57 +388,57 @@ class RecordView {
       const action = target.dataset.action;
 
       if (action === "sync-now") {
-        // 優先使用注入的回呼；否則直接呼叫 logManager
+        // 優先使用注入的回呼；否則直接呼叫 recordManager
         if (this.syncLogsNow) this.syncLogsNow();
-        else this.logManager?.flushAll?.();
+        else this.recordManager?.flushAll?.();
         return;
       }
-      if (action === "copy-current-logs") {
-        this.copyCurrentLogsToClipboard(target);
+      if (action === "copy-current-records") {
+        this.copyCurrentRecordsToClipboard(target);
       }
     });
 
-    this._currentLogActionsBound = true;
+    this._currentRecordActionsBound = true;
   }
 
-  _bindLogListActions() {
-    if (this._logListActionsBound) return;
-    const container = document.getElementById("experimentLogsList");
+  _bindRecordListActions() {
+    if (this._recordListActionsBound) return;
+    const container = document.getElementById("recordsList");
     if (!container) return;
 
     container.addEventListener("click", (event) => {
       const target = event.target.closest("[data-action]");
       if (!target) return;
       const action = target.dataset.action;
-      const logId = target.dataset.logId;
+      const recordId = target.dataset.recordId;
 
       switch (action) {
-        case "refresh-logs":
+        case "refresh-records":
           this._initialLoadObserver?.disconnect();
           this._initialLoadObserver = null;
           clearTimeout(this._initialLoadFallbackTimer);
           this._initialLoadFallbackTimer = null;
           this._hasRequestedInitialLoad = true;
-          this.requestExperimentLogsRefresh({ immediate: true, reason: "manual_refresh" });
+          this.requestRecordListRefresh({ immediate: true, reason: "manual_refresh" });
           break;
-        case "toggle-filter": this.toggleLogFilter(); break;
-        case "download-selected": this.downloadSelectedLogs(); break;
-        case "delete-selected": this.deleteSelectedLogs(); break;
-        case "apply-filter": this.applyLogFilter(); break;
-        case "reset-filter": this.resetLogFilter(); break;
-        case "select-filtered": this.selectFilteredLogs(); break;
-        case "view-log": if (logId) this.viewLogDetails(logId); break;
-        case "download-log": if (logId) this.downloadLogById(logId); break;
-        case "delete-log": if (logId) this.deleteLogById(logId); break;
+        case "toggle-filter": this.toggleRecordFilter(); break;
+        case "download-selected": this.downloadSelectedRecords(); break;
+        case "delete-selected": this.deleteSelectedRecords(); break;
+        case "apply-filter": this.applyRecordFilter(); break;
+        case "reset-filter": this.resetRecordFilter(); break;
+        case "select-filtered": this.selectFilteredRecords(); break;
+        case "view-record": if (recordId) this.viewRecordDetails(recordId); break;
+        case "download-record": if (recordId) this.downloadRecordById(recordId); break;
+        case "delete-record": if (recordId) this.deleteRecordById(recordId); break;
       }
     });
 
     container.addEventListener("change", (event) => {
-      const checkbox = event.target.closest("input[data-log-id]");
-      if (checkbox) this.toggleLogSelection(checkbox.dataset.logId);
+      const checkbox = event.target.closest("input[data-record-id]");
+      if (checkbox) this.toggleRecordSelection(checkbox.dataset.recordId);
     });
 
-    this._logListActionsBound = true;
+    this._recordListActionsBound = true;
   }
 
   // ─── 日誌列表載入 ──────────────────────────────────────────────────────────
@@ -446,9 +446,9 @@ class RecordView {
   /**
    * 排程初始日誌載入：容器進入視窗後觸發，或最晚 2.5 秒後 fallback 觸發
    */
-  scheduleInitialLogLoad() {
+  scheduleInitialRecordLoad() {
     if (this._hasRequestedInitialLoad) return;
-    const container = document.getElementById("experimentLogsContainer");
+    const container = document.getElementById("recordEntriesContainer");
     if (!container) return;
 
     const triggerLoad = () => {
@@ -458,7 +458,7 @@ class RecordView {
       this._initialLoadObserver = null;
       clearTimeout(this._initialLoadFallbackTimer);
       this._initialLoadFallbackTimer = null;
-      this._runWhenIdle(() => this.requestExperimentLogsRefresh({ immediate: true, reason: "initial_load_visible" }));
+      this._runWhenIdle(() => this.requestRecordListRefresh({ immediate: true, reason: "initial_load_visible" }));
     };
 
     if (typeof window.IntersectionObserver === "function") {
@@ -488,7 +488,7 @@ class RecordView {
    * @param {boolean} [options.immediate=false] - 是否立即執行（跳過防抖）
    * @param {string}  [options.reason]          - 觸發原因（用於 debug log）
    */
-  requestExperimentLogsRefresh({ immediate = false, reason = "unknown" } = {}) {
+  requestRecordListRefresh({ immediate = false, reason = "unknown" } = {}) {
     if (immediate) {
       clearTimeout(this._loadTimer);
       this._loadTimer = null;
@@ -502,7 +502,7 @@ class RecordView {
       }
 
       this._hasRequestedInitialLoad = true;
-      this.loadExperimentLogs();
+      this.loadRecordList();
       return;
     }
 
@@ -520,7 +520,7 @@ class RecordView {
       this._refreshQueued = false;
       this._refreshQueuedImmediate = false;
       Logger.debug(`[RecordView] 觸發延後刷新 (${reason})`);
-      this.loadExperimentLogs();
+      this.loadRecordList();
     }, this._loadDebounceMs);
   }
 
@@ -528,34 +528,34 @@ class RecordView {
    * 載入並顯示實驗日誌列表，包含防重入與防抖保護
    * @returns {Promise<void>}
    */
-  async loadExperimentLogs() {
+  async loadRecordList() {
     const now = Date.now();
     if (this._isLoadingList) { this._scheduleLogListReload(); return; }
     if (now - this._lastLoadAt < this._loadDebounceMs) { this._scheduleLogListReload(); return; }
 
     this._isLoadingList = true;
-    const container = document.getElementById("experimentLogsContainer");
+    const container = document.getElementById("recordEntriesContainer");
     if (!container) { this._isLoadingList = false; return; }
 
     container.innerHTML = `
-      <div class="logs-loading">
+      <div class="records-loading">
         <div class="loading-spinner"></div>
-        <div class="loading-text">載入實驗日誌中...</div>
+        <div class="records-loading-text">載入實驗日誌中...</div>
       </div>`;
 
     try {
-      const logsDir = await this.getLogsDirectory();
-      const experiments = await this.loadExperimentLogsFromDirectory(logsDir);
+      const logsDir = await this.getRecordsDirectory();
+      const experiments = await this.loadRecordListFromDirectory(logsDir);
 
       // 重新載入時重置篩選條件
-      this.logCountFilter.min = 0; this.logCountFilter.max = null;
+      this.recordCountFilter.min = 0; this.recordCountFilter.max = null;
       this.durationFilter.min = 0; this.durationFilter.max = null;
       this.timeFilter.min = null; this.timeFilter.max = null;
 
-      this.displayExperimentLogs(experiments);
+      this.displayRecordList(experiments);
     } catch (error) {
       Logger.error("載入日誌列表失敗:", error);
-      this.displayExperimentLogs([]);
+      this.displayRecordList([]);
     } finally {
       this._isLoadingList = false;
       this._lastLoadAt = Date.now();
@@ -564,16 +564,16 @@ class RecordView {
         const shouldImmediate = this._refreshQueuedImmediate;
         this._refreshQueued = false;
         this._refreshQueuedImmediate = false;
-        this.requestExperimentLogsRefresh({ immediate: shouldImmediate, reason: "queued_after_load" });
+        this.requestRecordListRefresh({ immediate: shouldImmediate, reason: "queued_after_load" });
       }
     }
   }
 
   _scheduleLogListReload() {
-    this.requestExperimentLogsRefresh({ immediate: false, reason: "deferred_reload" });
+    this.requestRecordListRefresh({ immediate: false, reason: "deferred_reload" });
   }
 
-  async getLogsDirectory() {
+  async getRecordsDirectory() {
     return this.config?.experiment?.logsDirectory ?? "runtime/experiment-data";
   }
 
@@ -582,7 +582,7 @@ class RecordView {
    * @param {string} dirPath - 日誌目錄路徑
    * @returns {Promise<Array>} 解析後的實驗物件陣列，依開始時間降序排列
    */
-  async loadExperimentLogsFromDirectory(dirPath) {
+  async loadRecordListFromDirectory(dirPath) {
     const experiments = [];
     try {
       const files = await this.listFilesInDirectory(dirPath);
@@ -595,7 +595,7 @@ class RecordView {
         const results = await Promise.all(
           batch.map(async (filename) => {
             try {
-              const response = await fetch(`${apiUrl}/experiment-logs/read/${filename}`);
+              const response = await fetch(`${apiUrl}/record/read/${filename}`);
               if (!response.ok) return null;
               const result = await response.json();
               if (!result.success || !result.content) return null;
@@ -651,7 +651,7 @@ class RecordView {
    */
   async listFilesInDirectory(_dirPath) {
     try {
-      const response = await fetch(`${this._getApiUrl()}/experiment-logs/list`);
+      const response = await fetch(`${this._getApiUrl()}/record/list`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.files) {
@@ -681,32 +681,32 @@ class RecordView {
 
   /**
    * 開啟指定實驗日誌的詳細視窗（含統計與 JSONL 預覽）
-   * @param {string} logId - 實驗 ID 或 filename
+  * @param {string} recordId - 實驗 ID 或 filename
    */
-  async viewLogDetails(logId) {
-    const experiment = this.currentExperiments.find(
-      (exp) => exp.filename === logId || exp.actualExperimentId === logId || exp.experimentId === logId,
+  async viewRecordDetails(recordId) {
+    const experiment = this.currentRecords.find(
+      (exp) => exp.filename === recordId || exp.actualExperimentId === recordId || exp.experimentId === recordId,
     );
     if (!experiment?.logs?.length) {
-      Logger.warn(`找不到實驗 ${logId} 的日誌資料`);
+      Logger.warn(`找不到實驗 ${recordId} 的日誌資料`);
       return;
     }
 
-    const stats = this.calculateLogStatistics(experiment.logs);
+    const stats = this.calculateRecordStatistics(experiment.logs);
     const jsonlContent = experiment.logs.map((e) => JSON.stringify(e)).join("\n");
-    this.showLogViewModal(logId, stats, jsonlContent);
+    this.showRecordViewModal(recordId, stats, jsonlContent);
   }
 
   /**
    * 透過 API 下載指定實驗的 .jsonl 檔案
-   * @param {string} logId - 實驗 ID 或 filename
+  * @param {string} recordId - 實驗 ID 或 filename
    */
-  async downloadLogById(logId) {
-    const experiment = this._findExperiment(logId);
-    if (!experiment?.filename) { Logger.warn(`找不到實驗 ${logId}`); return; }
+  async downloadRecordById(recordId) {
+    const experiment = this._findRecord(recordId);
+    if (!experiment?.filename) { Logger.warn(`找不到實驗 ${recordId}`); return; }
 
     try {
-      const response = await fetch(`${this._getApiUrl()}/experiment-logs/read/${experiment.filename}`);
+      const response = await fetch(`${this._getApiUrl()}/record/read/${experiment.filename}`);
       if (!response.ok) throw new Error(`API 回傳錯誤: ${response.status}`);
       const result = await response.json();
       if (!result.success || !result.content) throw new Error(result.error || "無法讀取");
@@ -719,20 +719,20 @@ class RecordView {
 
   /**
    * 透過 API 刪除指定實驗的 .jsonl 檔案
-   * @param {string} logId - 實驗 ID 或 filename
+  * @param {string} recordId - 實驗 ID 或 filename
    */
-  async deleteLogById(logId) {
-    const experiment = this._findExperiment(logId);
-    if (!experiment?.filename) { Logger.warn(`找不到實驗 ${logId}`); return; }
+  async deleteRecordById(recordId) {
+    const experiment = this._findRecord(recordId);
+    if (!experiment?.filename) { Logger.warn(`找不到實驗 ${recordId}`); return; }
 
     try {
       const response = await fetch(
-        `${this._getApiUrl()}/experiment-logs/delete/${experiment.filename}`,
+        `${this._getApiUrl()}/record/delete/${experiment.filename}`,
         { method: "DELETE" },
       );
       const result = await response.json();
       if (!result.success) throw new Error(result.error || "刪除失敗");
-      this.requestExperimentLogsRefresh({ immediate: true, reason: "delete-log" });
+      this.requestRecordListRefresh({ immediate: true, reason: "delete-record" });
     } catch (error) {
       Logger.error("刪除日誌失敗:", error);
     }
@@ -742,50 +742,50 @@ class RecordView {
    * 批次下載所有已選取的實驗日誌（合併為一個 .txt 檔案）
    * @returns {Promise<void>}
    */
-  async downloadSelectedLogs() {
-    if (this.selectedLogs.size === 0) return;
+  async downloadSelectedRecords() {
+    if (this.selectedRecords.size === 0) return;
     const apiUrl = this._getApiUrl();
     let allContent = "";
     let successCount = 0;
 
-    for (const logId of this.selectedLogs) {
-      const experiment = this._findExperiment(logId);
+    for (const recordId of this.selectedRecords) {
+      const experiment = this._findRecord(recordId);
       if (!experiment?.filename) continue;
       try {
-        const response = await fetch(`${apiUrl}/experiment-logs/read/${experiment.filename}`);
+        const response = await fetch(`${apiUrl}/record/read/${experiment.filename}`);
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.content) {
-            allContent += `\n=== Experiment: ${logId} (${experiment.filename}) ===\n${result.content}\n`;
+            allContent += `\n=== Experiment: ${recordId} (${experiment.filename}) ===\n${result.content}\n`;
             successCount++;
           }
         }
       } catch (error) {
-        Logger.warn(`下載日誌 ${logId} 失敗:`, error.message);
+        Logger.warn(`下載日誌 ${recordId} 失敗:`, error.message);
       }
     }
 
     if (!allContent) { Logger.warn("沒有可下載的日誌資料"); return; }
     const filename = `experiment_logs_batch_${new Date().toISOString().split("T")[0]}.txt`;
     this._downloadBlob(allContent, filename, "text/plain");
-    Logger.debug(`已批次下載 ${successCount}/${this.selectedLogs.size} 個日誌`);
+    Logger.debug(`已批次下載 ${successCount}/${this.selectedRecords.size} 個日誌`);
   }
 
   /**
    * 批次刪除所有已選取的實驗日誌
    * @returns {Promise<void>}
    */
-  async deleteSelectedLogs() {
-    if (this.selectedLogs.size === 0) return;
+  async deleteSelectedRecords() {
+    if (this.selectedRecords.size === 0) return;
     const apiUrl = this._getApiUrl();
     let deletedCount = 0;
 
-    for (const logId of this.selectedLogs) {
-      const experiment = this._findExperiment(logId);
+    for (const recordId of this.selectedRecords) {
+      const experiment = this._findRecord(recordId);
       if (!experiment?.filename) continue;
       try {
         const response = await fetch(
-          `${apiUrl}/experiment-logs/delete/${experiment.filename}`,
+          `${apiUrl}/record/delete/${experiment.filename}`,
           { method: "DELETE" },
         );
         if (response.ok) {
@@ -793,13 +793,13 @@ class RecordView {
           if (result.success) deletedCount++;
         }
       } catch (error) {
-        Logger.warn(`刪除日誌 ${logId} 失敗:`, error.message);
+        Logger.warn(`刪除日誌 ${recordId} 失敗:`, error.message);
       }
     }
 
-    Logger.debug(`已批次刪除 ${deletedCount}/${this.selectedLogs.size} 個日誌`);
-    this.selectedLogs.clear();
-    this.requestExperimentLogsRefresh({ immediate: true, reason: "delete-selected" });
+    Logger.debug(`已批次刪除 ${deletedCount}/${this.selectedRecords.size} 個日誌`);
+    this.selectedRecords.clear();
+    this.requestRecordListRefresh({ immediate: true, reason: "delete-selected" });
   }
 
   /**
@@ -815,7 +815,7 @@ class RecordView {
     const safeFilename = filename.endsWith(".jsonl") ? filename : `${filename}.jsonl`;
     try {
       const resp = await fetch(
-        `${this._getApiUrl()}/experiment-logs/update-participant/${encodeURIComponent(safeFilename)}`,
+        `${this._getApiUrl()}/record/update-participant/${encodeURIComponent(safeFilename)}`,
         { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ participant: newName }) },
       );
       const result = await resp.json();
@@ -833,7 +833,7 @@ class RecordView {
       show("modal-participant-cancel-btn", "none");
 
       // 更新快取
-      const cached = this.currentExperiments.find(
+      const cached = this.currentRecords.find(
         (e) => e.filename === filename || e.filename === safeFilename,
       );
       if (cached) {
@@ -847,13 +847,13 @@ class RecordView {
     }
   }
 
-  async copyCurrentLogsToClipboard(triggerEl = null) {
+  async copyCurrentRecordsToClipboard(triggerEl = null) {
     const entries = Array.from(
-      document.querySelectorAll("#experimentLogContainer .current-log-entry"),
+      document.querySelectorAll("#recordContainer .current-record-entry"),
     );
     if (entries.length === 0) return false;
 
-    const summary = document.querySelector("#experimentLogContainer .logs-summary");
+    const summary = document.querySelector("#recordContainer .records-summary");
     const lines = entries.map((e) => e.textContent?.trim()).filter(Boolean);
     if (summary?.textContent?.trim()) lines.push(summary.textContent.trim());
 
@@ -876,19 +876,19 @@ class RecordView {
 
   _initBroadcastChannel() {
     try {
-      this.broadcastChannel = new BroadcastChannel("ExperimentLogsChannel");
+      this.broadcastChannel = new BroadcastChannel("ExperimentRecordsChannel");
       this.broadcastChannel.onmessage = (event) => {
         const { type, data } = event.data;
         switch (type) {
-          case "logsSynced":
+          case "recordsSynced":
             if (data?.source && data.source !== "experiment_completion" && data.source !== "runtime_saved") return;
-            this.requestExperimentLogsRefresh({ immediate: false, reason: "broadcast_logs_synced" });
+            this.requestRecordListRefresh({ immediate: false, reason: "broadcast_records_synced" });
             break;
           case "experimentDeleted":
-            this.requestExperimentLogsRefresh({ immediate: true, reason: "broadcast_deleted" });
+            this.requestRecordListRefresh({ immediate: true, reason: "broadcast_deleted" });
             break;
-          case "logsCleared":
-            this.requestExperimentLogsRefresh({ immediate: true, reason: "broadcast_cleared" });
+          case "recordsCleared":
+            this.requestRecordListRefresh({ immediate: true, reason: "broadcast_cleared" });
             break;
         }
       };
@@ -906,9 +906,9 @@ class RecordView {
 
   // ─── 輔助方法 ──────────────────────────────────────────────────────────────
 
-  _findExperiment(logId) {
-    return this.currentExperiments.find(
-      (exp) => exp.filename === logId || exp.actualExperimentId === logId || exp.experimentId === logId,
+  _findRecord(recordId) {
+    return this.currentRecords.find(
+      (exp) => exp.filename === recordId || exp.actualExperimentId === recordId || exp.experimentId === recordId,
     );
   }
 

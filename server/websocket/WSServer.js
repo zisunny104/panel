@@ -69,7 +69,7 @@ export class WSServer {
           socket.destroy();
         }
       } catch (error) {
-        console.error("WebSocket 升級錯誤:", error.message);
+        Logger.error("WebSocket 升級錯誤:", error.message);
         socket.destroy();
       }
     });
@@ -84,15 +84,6 @@ export class WSServer {
         // 提取客戶端資訊
         const clientInfo = this.extractClientInfo(request);
 
-        const now = new Date();
-        const timestamp = `${now.getFullYear()}-${String(
-          now.getMonth() + 1,
-        ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(
-          now.getHours(),
-        ).padStart(2, "0")}:${String(now.getMinutes()).padStart(
-          2,
-          "0",
-        )}:${String(now.getSeconds()).padStart(2, "0")}`;
         Logger.event("green", ">", `新連線 | IP: ${clientInfo.ipAddress}`);
 
         // 註冊連線到 ConnectionManager
@@ -161,7 +152,7 @@ export class WSServer {
         // 發送連線成功訊息
         this.sendConnectionSuccess(ws, wsConnectionId);
       } catch (error) {
-        console.error("處理 WebSocket 連線失敗:", error.message);
+        Logger.error("處理 WebSocket 連線失敗:", error.message);
         ws.close(1011, "Internal server error");
       }
     });
@@ -194,7 +185,7 @@ export class WSServer {
       // 委託給 MessageHandler 處理
       this.messageHandler.handle(wsConnectionId, message, ws);
     } catch (error) {
-      console.error(`解析訊息失敗 [${wsConnectionId}]:`, error.message);
+      Logger.error(`解析訊息失敗 [${wsConnectionId}]:`, error.message);
 
       // 發送錯誤回應
       this.sendError(ws, "INVALID_MESSAGE", "訊息格式錯誤");
@@ -208,19 +199,7 @@ export class WSServer {
    * @param {string} reason - 關閉原因
    */
   handleClose(wsConnectionId, code, reason) {
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}-${String(
-      now.getMonth() + 1,
-    ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(
-      now.getHours(),
-    ).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-      now.getSeconds(),
-    ).padStart(2, "0")}`;
-    console.log(
-      `[${timestamp}] [WebSocket] 連線關閉 [${wsConnectionId}]: ${code} - ${reason}`,
-    );
-
-    // 從 ConnectionManager 移除
+    Logger.debug(`連線關閉 [${wsConnectionId}]: ${code} - ${reason}`);
     this.connectionManager.unregister(wsConnectionId);
   }
 
@@ -230,7 +209,7 @@ export class WSServer {
    * @param {Error} error - 錯誤對象
    */
   handleError(wsConnectionId, error) {
-    console.error(`WebSocket 錯誤 [${wsConnectionId}]:`, error.message);
+    Logger.error(`WebSocket 錯誤 [${wsConnectionId}]:`, error.message);
   }
 
   /**

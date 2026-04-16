@@ -61,13 +61,13 @@ class PanelUIManager {
     this.powerSwitchArea = null;
     this.powerLightArea = null;
     this.panelBottomRow = null;
-    this.pendingMediaVolume = null;
     this._resizeHandler = () => {
       if (this.currentOpenPanel === "settings") {
         this.alignPanelToButton("settings");
       }
     };
     this._resizeHandlerBound = false;
+    this._resetButtonBound = false;
 
     this.initialize();
   }
@@ -82,6 +82,7 @@ class PanelUIManager {
   initialize() {
     this.initializeDOMReferences();
     this.initializePanels();
+    this.closeAllPanels();
     this.setupEventListeners();
     this.initializeUIState();
     this.loadInitialSettings();
@@ -273,9 +274,10 @@ class PanelUIManager {
    * 關閉所有打開的面板
    */
   closeAllPanels() {
-    if (this.currentOpenPanel) {
-      this.closePanel(this.currentOpenPanel);
-    }
+    Object.values(this.panels).forEach((panel) => {
+      this.hideElement(panel?.element);
+    });
+    this.currentOpenPanel = null;
   }
 
   // 根據實驗狀態切換 experimentPanelButton 底色
@@ -776,7 +778,6 @@ class PanelUIManager {
    */
   loadInitialSettings() {
     document.getElementById("refCard")?.classList.add("is-hidden");
-    document.getElementById("settingsPanel")?.classList.add("is-hidden");
   }
 
   /**
@@ -967,7 +968,9 @@ class PanelUIManager {
    */
   setupResetButton() {
     const resetSettingsBtn = document.getElementById("resetSettingsBtn");
-    if (!resetSettingsBtn) return;
+    if (!resetSettingsBtn || this._resetButtonBound) return;
+
+    this._resetButtonBound = true;
 
     resetSettingsBtn.addEventListener("click", async () => {
       const configManager = this.configManager;
@@ -980,38 +983,6 @@ class PanelUIManager {
     });
   }
 
-  /**
-   * 從 DOM 控制項載入設定值
-   */
-  loadControlsFromDOM() {
-    const scaleRange = document.getElementById("scaleRange");
-    const topSpacerRange = document.getElementById("topSpacerRange");
-    const bottomSpacerRange = document.getElementById("bottomSpacerRange");
-    const powerScaleRange = document.getElementById("powerScaleRange");
-
-    if (scaleRange) this.updateScale(scaleRange.value);
-    if (topSpacerRange) this.updateTopSpacer(topSpacerRange.value);
-    if (bottomSpacerRange) this.updateBottomSpacer(bottomSpacerRange.value);
-    if (powerScaleRange) this.updatePowerScale(powerScaleRange.value);
-
-    const toggleButtonLabels = document.getElementById("toggleButtonLabels");
-    const toggleButtonColors = document.getElementById("toggleButtonColors");
-    const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
-    const toggleMediaAreaMarker = document.getElementById(
-      "toggleMediaAreaMarker",
-    );
-    const toggleMediaContent = document.getElementById("toggleMediaContent");
-
-    if (toggleButtonLabels)
-      this.updateButtonLabelVisibility(toggleButtonLabels.checked);
-    if (toggleButtonColors)
-      this.updateButtonColorVisibility(toggleButtonColors.checked);
-    if (toggleTouchVisuals) this.updateTouchVisuals(toggleTouchVisuals.checked);
-    if (toggleMediaAreaMarker)
-      this.updateMediaAreaMarkerVisibility(toggleMediaAreaMarker.checked);
-    if (toggleMediaContent)
-      this.updateMediaContentVisibility(toggleMediaContent.checked);
-  }
 }
 
 // ES6 模組匯出

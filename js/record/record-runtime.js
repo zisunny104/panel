@@ -11,17 +11,17 @@ export const recordRuntime = {
    * @returns {Promise<boolean>}
    */
   async _saveToRuntimeFolder() {
-    if (this.logs.length === 0) {
+    if (this.records.length === 0) {
       Logger.debug("沒有日誌需要儲存");
       return false;
     }
 
     try {
-      const jsonlContent = this.logs.map((log) => JSON.stringify(log)).join("\n");
+      const jsonlContent = this.records.map((record) => JSON.stringify(record)).join("\n");
       const filename = `${this.experimentId}_${Date.now()}.jsonl`;
       const apiUrl = this._getApiUrl();
 
-      const response = await fetch(`${apiUrl}/experiment-logs/save`, {
+      const response = await fetch(`${apiUrl}/record/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename, content: jsonlContent }),

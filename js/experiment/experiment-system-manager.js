@@ -6,7 +6,7 @@
  */
 
 import { RECORD_SOURCES, SYNC_EVENTS } from "../constants/index.js";
-import { experimentSyncManager } from "../board/board-sync-manager.js";
+import { experimentSyncManager } from "../board/board-experiment-sync.js";
 import { generateExperimentId } from "../core/random-utils.js";
 import ExperimentActionHandler from "./experiment-action-handler.js";
 import ExperimentFlowManager from "./experiment-flow-manager.js";
@@ -25,7 +25,7 @@ class ExperimentSystemManager {
     this.timerManager = config.timerManager;
     this.pageManager = config.pageManager || null;
     this.actionHandler = config.actionHandler || null;
-    this.experimentLogManager = config.experimentLogManager || null;
+    this.recordManager = config.recordManager || null;
 
     this.state = {
       initialized: false,
@@ -49,6 +49,7 @@ class ExperimentSystemManager {
     };
 
     this.listeners = new Map();
+    this._unsubscribers = [];
     this._comboSignatureCache = null;
 
     Logger.debug("ExperimentSystemManager 已建立");
@@ -102,6 +103,19 @@ class ExperimentSystemManager {
       }
       throw error;
     }
+  }
+
+  /**
+   * 清理所有事件監聽器，供重新初始化或銷毀時使用
+   */
+  cleanup() {
+    this._unsubscribers.forEach((unsub) => {
+      try { unsub(); } catch (e) {
+        Logger.warn("ExperimentSystemManager cleanup 失敗:", e);
+      }
+    });
+    this._unsubscribers = [];
+    this.state.initialized = false;
   }
 
   /**
@@ -356,62 +370,59 @@ class ExperimentSystemManager {
   }
 
   /**
-  * 設定事件監聽器
+   * 設定事件監聽器，所有訂閱均收入 _unsubscribers 供 cleanup() 使用
    * @private
    */
   _setupEventListeners() {
-    // 監聽組合選擇事件
-    this.combinationManager.on("combination:selected", (data) => {
+    const sub = (fn) => this._unsubscribers.push(fn);
+
+    sub(this.combinationManager.on("combination:selected", (data) => {
       this._handleCombinationSelected(data);
-    });
+    }));
 
-    // 監聽組合載入事件
-    this.combinationManager.on("combination:loaded", (data) => {
-      this._handleCombinationLoaded(data);
-    });
-
-    this.flowManager.on(ExperimentFlowManager.EVENT.STARTED, (data) => {
+    sub(this.flowManager.on(ExperimentFlowManager.EVENT.STARTED, (data) => {
       this._handleFlowStarted(data);
-    });
+    }));
 
-    this.flowManager.on(ExperimentFlowManager.EVENT.PAUSED, (data) => {
+    sub(this.flowManager.on(ExperimentFlowManager.EVENT.PAUSED, (data) => {
       this._handleFlowPaused(data);
-    });
+    }));
 
-    this.flowManager.on(ExperimentFlowManager.EVENT.RESUMED, (data) => {
+    sub(this.flowManager.on(ExperimentFlowManager.EVENT.RESUMED, (data) => {
       this._handleFlowResumed(data);
-    });
+    }));
 
-    this.flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
+    sub(this.flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
       this._handleFlowStopped(data);
-    });
+    }));
 
-    this.flowManager.on(ExperimentFlowManager.EVENT.COMPLETED, (data) => {
+    sub(this.flowManager.on(ExperimentFlowManager.EVENT.COMPLETED, (data) => {
       this._handleFlowStopped({
         reason: data?.reason || "completed",
         completedUnits: data?.completedUnits,
         timestamp: data?.timestamp,
       });
-    });
+    }));
 
-    window.addEventListener("panel:experiment:opened", () => {
-      this.refreshPanelUi();
-    });
+    const onPanelOpened = () => this.refreshPanelUi();
+    window.addEventListener("panel:experiment:opened", onPanelOpened);
+    sub(() => window.removeEventListener("panel:experiment:opened", onPanelOpened));
 
-    this.hubManager.on(ExperimentHubManager.EVENT.ID_CHANGED, (data) => {
+    sub(this.hubManager.on(ExperimentHubManager.EVENT.ID_CHANGED, (data) => {
       this._handleHubIdChanged(data);
-    });
+    }));
 
-    this.uiManager.on("experiment-controls-rendered", () => {
+    sub(this.uiManager.on("experiment-controls-rendered", () => {
       this._bindExperimentIdInputListener();
-    });
-    this.uiManager.on("experiment-controls-rendered-delayed", () => {
-      this._bindExperimentIdInputListener();
-    });
+    }));
 
-    window.addEventListener(SYNC_EVENTS.COMBINATION_SELECTED, (event) => {
-      this._handleRemoteCombinationSelected(event?.detail);
-    });
+    sub(this.uiManager.on("experiment-controls-rendered-delayed", () => {
+      this._bindExperimentIdInputListener();
+    }));
+
+    const onCombinationSelected = (event) => this._handleRemoteCombinationSelected(event?.detail);
+    window.addEventListener(SYNC_EVENTS.COMBINATION_SELECTED, onCombinationSelected);
+    sub(() => window.removeEventListener(SYNC_EVENTS.COMBINATION_SELECTED, onCombinationSelected));
   }
 
   /**
@@ -630,10 +641,6 @@ class ExperimentSystemManager {
       skipBroadcast: true,
       skipCache,
     });
-  }
-
-  _handleCombinationLoaded(data) {
-    Logger.debug("組合載入事件已處理:", data);
   }
 
   /**
@@ -960,7 +967,10 @@ class ExperimentSystemManager {
   }
 
   _normalizePowerOptions(options = {}) {
-    return { includeStartup: true, includeShutdown: true };
+    return {
+      includeStartup: options.includeStartup ?? true,
+      includeShutdown: options.includeShutdown ?? true,
+    };
   }
 
   _isSamePowerOptions(a = {}, b = {}) {
@@ -1404,8 +1414,8 @@ class ExperimentSystemManager {
     }
 
     // 通知日誌管理器
-    if (this.experimentLogManager?.setExperimentId) {
-      this.experimentLogManager.setExperimentId(newId, source);
+    if (this.recordManager?.setExperimentId) {
+      this.recordManager.setExperimentId(newId, source);
     }
 
     // 重新計算組合排序

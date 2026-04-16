@@ -6,6 +6,7 @@
 import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
 import { SyncClient } from "./sync-client.js";
 import { TimeSyncManager } from "../core/time-sync-manager.js";
+import { Logger } from "../core/console-manager.js";
 
 export class SyncManagerCore {
   // 離線佇列大小限制
@@ -67,7 +68,7 @@ export class SyncManagerCore {
     }
   }
 
-  generateQRContent(
+  generateShareUrl(
     code,
     role = this.roleConfig.VIEWER,
     target = this.pageConfig.PANEL,
@@ -78,19 +79,10 @@ export class SyncManagerCore {
     }
 
     const encodedCode = encodeURIComponent(code);
-    let qrUrl;
     if (target === this.pageConfig.BOARD) {
-      qrUrl = `${url}board.html?join=${encodedCode}&role=${encodeURIComponent(
-        role,
-      )}`;
-    } else {
-      qrUrl = `${url}index.html?shareCode=${encodedCode}&role=${encodeURIComponent(
-        role,
-      )}`;
+      return `${url}board.html?join=${encodedCode}&role=${encodeURIComponent(role)}`;
     }
-
-    Logger.debug("產生的 QR URL:", qrUrl);
-    return qrUrl;
+    return `${url}index.html?shareCode=${encodedCode}&role=${encodeURIComponent(role)}`;
   }
 
   async createSession(createCode) {
@@ -241,45 +233,8 @@ export class SyncManagerCore {
     return this.closeSession(resolvedSessionId);
   }
 
-  async restoreSession(
-    sessionId,
-    clientId,
-    role = this.roleConfig.VIEWER,
-  ) {
-    try {
-      const result = await this.syncClient.restoreSession(
-        sessionId,
-        clientId,
-        role,
-      );
-      this.currentRole = role;
-      if (result && result.shareCode) {
-        this.currentShareCode = result.shareCode;
-      }
-
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.SESSION_RESTORED, {
-          detail: {
-            sessionId: sessionId,
-            clientId: clientId,
-            role: role,
-            shareCode: result?.shareCode,
-          },
-        }),
-      );
-
-      return result;
-    } catch (error) {
-      throw error;
-    }
-  }
-
   async getShareCodeInfo(shareCode) {
-    try {
-      return await this.syncClient.getShareCodeInfo(shareCode);
-    } catch (error) {
-      throw error;
-    }
+    return this.syncClient.getShareCodeInfo(shareCode);
   }
 
   getStatusText() {
@@ -429,17 +384,7 @@ export class SyncManagerCore {
     const startTime = Date.now();
     Logger.debug(`開始處理離線佇列，共 ${this.offlineQueue.length} 個項目`);
 
-    const sortedItems = [...this.offlineQueue].sort((a, b) => {
-      const timeA = a.state.timestamp || a.addedAt || 0;
-      const timeB = b.state.timestamp || b.addedAt || 0;
-      return timeA - timeB;
-    });
-
-    const timeCorrections = this._analyzeTimeCorrections(sortedItems);
-    if (timeCorrections.hasIssues) {
-      Logger.debug("偵測到時間戳問題，但繼續處理:", timeCorrections);
-    }
-
+    const sortedItems = this.offlineQueue;
     this.offlineQueue = [];
     let successCount = 0;
     let failCount = 0;
@@ -494,60 +439,8 @@ export class SyncManagerCore {
     );
   }
 
-  _analyzeTimeCorrections(sortedItems) {
-    const corrections = {
-      hasIssues: false,
-      duplicateTimestamps: [],
-      timeJumps: [],
-      totalItems: sortedItems.length,
-    };
-
-    if (sortedItems.length < 2) return corrections;
-
-    let lastTimestamp = null;
-    const timestampCounts = new Map();
-
-    for (let i = 0; i < sortedItems.length; i++) {
-      const item = sortedItems[i];
-      const timestamp = item.state.timestamp || item.addedAt || 0;
-
-      if (!timestampCounts.has(timestamp)) {
-        timestampCounts.set(timestamp, 0);
-      }
-      timestampCounts.set(timestamp, timestampCounts.get(timestamp) + 1);
-
-      if (timestampCounts.get(timestamp) > 1) {
-        corrections.duplicateTimestamps.push({
-          timestamp,
-          count: timestampCounts.get(timestamp),
-          types: [item.state.type],
-        });
-        corrections.hasIssues = true;
-      }
-
-      if (lastTimestamp !== null && timestamp - lastTimestamp < -1000) {
-        corrections.timeJumps.push({
-          index: i,
-          from: lastTimestamp,
-          to: timestamp,
-          jump: timestamp - lastTimestamp,
-          type: item.state.type,
-        });
-        corrections.hasIssues = true;
-      }
-
-      lastTimestamp = timestamp;
-    }
-
-    return corrections;
-  }
-
-  async checkConnection() {
-    await this.syncClient.checkServerHealth();
-  }
-
   async checkServerHealth() {
-    return await this.syncClient.checkServerHealth();
+    return this.syncClient.checkServerHealth();
   }
 
   cleanup() {

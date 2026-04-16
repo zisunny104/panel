@@ -1,19 +1,17 @@
 import { MediaManager } from "./panel-media-manager.js";
 import { PowerControl } from "./panel-power-control.js";
 import { PanelLogger } from "./panel-logger.js";
-import { ExperimentSyncCore } from "../sync/experiment-sync-manager.js";
+import { ExperimentSyncCore } from "../sync/experiment-sync-core.js";
 import { PanelUIManager } from "./panel-ui-manager.js";
 import { PanelSyncManager } from "./panel-sync-manager.js";
 import { ConfigManager } from "../core/config.js";
-import { experimentSyncManager } from "../board/board-sync-manager.js";
+import { experimentSyncManager } from "../board/board-experiment-sync.js";
 import { ExperimentHubManager } from "../experiment/experiment-hub-manager.js";
 import { ExperimentCombinationManager } from "../experiment/experiment-combination-manager.js";
 import { ExperimentStateManager } from "../experiment/experiment-state-manager.js";
 import { ExperimentTimerManager } from "../experiment/experiment-timer.js";
-import {
-  initExperimentFlowManager,
-  initExperimentUIManager,
-} from "../experiment/experiment-init-utils.js";
+import { ExperimentFlowManager } from "../experiment/experiment-flow-manager.js";
+import { ExperimentUIManager } from "../experiment/experiment-ui-manager.js";
 import { SyncManager } from "../sync/sync-manager.js";
 import { ExperimentSystemManager } from "../experiment/experiment-system-manager.js";
 
@@ -99,9 +97,7 @@ export async function initializePanelManagers(page) {
     syncClient: page.syncManager.core?.syncClient,
     experimentFlowManager: page.experimentFlowManager,
     experimentSystemManager: page.experimentSystemManager,
-    experimentActionHandler: page.experimentActionHandler,
     experimentCombinationManager: page.experimentCombinationManager,
-    powerControl: page.powerControl,
   });
   await page.panelSyncManager.initialize();
   logInitDuration("PanelSyncManager 已初始化", panelSyncStart);
@@ -142,7 +138,7 @@ export async function initializePanelManagers(page) {
     const timerStart = performance.now();
     page.timerManager = new ExperimentTimerManager({
       timeSyncManager: page.syncManager?.core?.timeSyncManager,
-      experimentLogManager: null,
+      recordManager: null,
       getCurrentCombination: () =>
         page.experimentCombinationManager?.getCurrentCombination?.() || null,
     });
@@ -150,23 +146,19 @@ export async function initializePanelManagers(page) {
   }
 
   const flowStart = performance.now();
-  page.experimentFlowManager = initExperimentFlowManager({
-    combinationManager: page.experimentCombinationManager,
-    hubManager: page.experimentHubManager,
-    actionHandler: page.experimentActionHandler,
-  });
+  page.experimentFlowManager = new ExperimentFlowManager();
+  page.experimentFlowManager.injectCombinationManager(page.experimentCombinationManager);
+  page.experimentFlowManager.injectHubManager(page.experimentHubManager);
   logInitDuration("ExperimentFlowManager 已初始化", flowStart);
   page.panelMediaManager.updateDependencies({
     experimentFlowManager: page.experimentFlowManager,
   });
 
   const uiStart = performance.now();
-  page.syncManager.updateDependencies({
-    experimentHubManager: page.experimentHubManager,
-  });
-  page.uiManager = initExperimentUIManager({
-    timerManager: page.timerManager,
-    flowManager: page.experimentFlowManager,
+  page.uiManager = new ExperimentUIManager({ timerManager: page.timerManager });
+  page.uiManager.initialize();
+  page.uiManager.injectFlowManager(page.experimentFlowManager);
+  page.uiManager.updateDependencies({
     combinationManager: page.experimentCombinationManager,
     hubManager: page.experimentHubManager,
     syncManager: page.syncManager,
@@ -174,12 +166,14 @@ export async function initializePanelManagers(page) {
     experimentSyncCore: page.experimentSyncCore,
     panelUIManager: page.panelUIManager,
   });
+  page.uiManager.bindStateManagerInputs(page.experimentStateManager);
   logInitDuration("ExperimentUIManager 已初始化", uiStart);
   page.panelUIManager.updateDependencies({
     uiManager: page.uiManager,
   });
 
   const systemStart = performance.now();
+  page.experimentSystemManager?.cleanup();
   page.experimentSystemManager = new ExperimentSystemManager({
     combinationManager: page.experimentCombinationManager,
     uiManager: page.uiManager,
@@ -187,7 +181,7 @@ export async function initializePanelManagers(page) {
     flowManager: page.experimentFlowManager,
     timerManager: page.timerManager,
     pageManager: page,
-    experimentLogManager: null,
+    recordManager: null,
   });
   await page.experimentSystemManager.initialize();
   logInitDuration("ExperimentSystemManager 已初始化", systemStart);
@@ -201,7 +195,6 @@ export async function initializePanelManagers(page) {
   page.panelSyncManager.updateDependencies({
     experimentFlowManager: page.experimentFlowManager,
     experimentSystemManager: page.experimentSystemManager,
-    experimentActionHandler: page.experimentActionHandler,
     experimentCombinationManager: page.experimentCombinationManager,
   });
   page.panelLogger.updateDependencies({

@@ -196,7 +196,7 @@ class BoardSyncIO {
       `.gesture-action-button[data-action-id="${actionId}"]`,
     );
     if (actionButton) {
-      page._cancelActionCompletion(actionButton, actionId, gestureIndex, false);
+      page._cancelActionCompletion(actionButton, actionId, gestureIndex);
     }
   }
 
@@ -227,8 +227,8 @@ class BoardSyncIO {
       page.processedRemoteActions.set(actionId, now);
     }
 
-    if (page.experimentLogManager) {
-      page.experimentLogManager.logButtonAction(
+    if (page.recordManager) {
+      page.recordManager.logButtonAction(
         button,
         buttonFunction,
         clientId,

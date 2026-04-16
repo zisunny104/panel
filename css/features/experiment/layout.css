@@ -92,8 +92,7 @@
 }
 
 /* 主要實驗區塊：保守設定 min-height 以降低 CLS */
-#experimentLogContainer,
-#experimentLogsContainer,
+#recordContainer,
 #combinationSelectorContainer,
 #unitsPanelContainer,
 #experimentControlsContainer,

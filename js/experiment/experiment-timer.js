@@ -15,7 +15,7 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
 
     this.timeSyncManager =
       options.timeSyncManager || new TimeSyncManager();
-    this.experimentLogManager = options.experimentLogManager || null;
+    this.recordManager = options.recordManager || null;
     this.getCurrentCombination = options.getCurrentCombination || null;
 
     this.timerStates = {};
@@ -142,11 +142,11 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
       if (this.currentActiveIndex === idx) {
         this.currentActiveIndex = null;
       }
-      if (this.experimentLogManager && this.getCurrentCombination) {
+      if (this.recordManager && this.getCurrentCombination) {
         const currentCombination = this.getCurrentCombination();
         const currentGesture = currentCombination?.gestures?.[idx];
         if (currentGesture?.step_id) {
-          this.experimentLogManager.logGestureStepPause(
+          this.recordManager.logGestureStepPause(
             idx,
             currentGesture.step_id,
           );
@@ -184,11 +184,11 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
         }
       }, 10);
 
-      if (this.experimentLogManager && this.getCurrentCombination) {
+      if (this.recordManager && this.getCurrentCombination) {
         const currentCombination = this.getCurrentCombination();
         const currentGesture = currentCombination?.gestures?.[idx];
         if (currentGesture?.step_id) {
-          this.experimentLogManager.logGestureStepStart(
+          this.recordManager.logGestureStepStart(
             idx,
             currentGesture.step_id,
           );

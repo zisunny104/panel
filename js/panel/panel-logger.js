@@ -2,7 +2,7 @@
  * PanelLogger - 操作日誌記錄功能模塊
  *
  * 負責操作日誌記錄、顯示和管理
- * 日誌格式與 Board 端 ExperimentLogManager 對齊：
+ * 日誌格式與 Board 端 RecordManager 對齊：
  *   { ts, type, exp_id, a_id, src, msg, ... }
  * 無同步連線時，兩端日誌可依 ts 時間戳直接合併排序
  */
@@ -36,6 +36,8 @@ class PanelLogger {
     this.loggerOutput = null;
     this.logContent = null;
     this.loggerFabButton = null;
+    this._flowEventsBound = false;
+    this._flowEventUnsubscribers = [];
 
     this.initializeDOMElements();
   }
@@ -209,28 +211,51 @@ class PanelLogger {
    * @param {ExperimentFlowManager} flowManager
    */
   bindExperimentEvents(flowManager) {
-    if (!flowManager) return;
+    if (!flowManager) return () => {};
 
-    flowManager.on(ExperimentFlowManager.EVENT.STARTED, () => {
+    if (this._flowEventsBound) {
+      Logger.warn("PanelLogger: 實驗生命週期事件已綁定，跳過重複設定");
+      return () => this.unbindExperimentEvents();
+    }
+
+    this._flowEventsBound = true;
+    const unsubscribers = [];
+
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.STARTED, () => {
       const expId = this._getExpId();
       const participantName =
         document.getElementById("participantNameInput")?.value?.trim() || "";
       this.logExperimentStart(expId, participantName);
-    });
+    }));
 
-    flowManager.on(ExperimentFlowManager.EVENT.PAUSED, () => {
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.PAUSED, () => {
       this.logExperimentPause();
-    });
+    }));
 
-    flowManager.on(ExperimentFlowManager.EVENT.RESUMED, () => {
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.RESUMED, () => {
       this.logExperimentResume();
-    });
+    }));
 
-    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
       this.logExperimentEnd();
-    });
+    }));
+
+    this._flowEventUnsubscribers = unsubscribers;
 
     Logger.debug("PanelLogger: 已綁定實驗生命週期事件");
+    return () => this.unbindExperimentEvents();
+  }
+
+  unbindExperimentEvents() {
+    this._flowEventUnsubscribers.forEach((unsubscribe) => {
+      try {
+        unsubscribe?.();
+      } catch (error) {
+        Logger.warn("PanelLogger: 解除實驗生命週期事件失敗", error);
+      }
+    });
+    this._flowEventUnsubscribers = [];
+    this._flowEventsBound = false;
   }
 
   // ==================== 顯示層 ====================

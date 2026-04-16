@@ -199,25 +199,6 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
     return [...this.loadedUnits];
   }
 
-  /**
-   * 產生隨機組合
-   */
-  generateRandomCombination(seed = null) {
-    const combinations = this.getAvailableCombinations();
-    if (combinations.length === 0) return null;
-
-    if (!seed) {
-      // 無種子時使用原生隨機
-      const randomIndex = Math.floor(Math.random() * combinations.length);
-      return combinations[randomIndex];
-    }
-
-    // 有種子時使用 random-utils 確保可重現性
-    const seededRandom = createSeededRandom(seed);
-    const randomIndex = Math.floor(seededRandom() * combinations.length);
-    return combinations[randomIndex];
-  }
-
   // ==================== 資料載入 ====================
 
   /**

@@ -77,35 +77,7 @@ router.post("/session", (req, res) => {
       },
     });
   } catch (error) {
-    console.error("建立工作階段失敗:", error.message);
-    res.status(HTTP_STATUS.INTERNAL_ERROR).json({
-      success: false,
-      error: ERROR_CODES.DATABASE_ERROR,
-      message: "建立工作階段失敗",
-    });
-  }
-});
-
-/**
- * POST /api/sync/create_session
- * 建立新的工作階段（僅建立，不產生分享代碼）
- *
- * Request body: {} (可選的clientId，若無則自動產生)
- * Response: { sessionId, clientId, created_at }
- */
-router.post("/create_session", (req, res) => {
-  try {
-    // 產生新的clientId（分頁級，每次重新整理產生）
-    const clientId = generateClientId();
-
-    const session = SessionService.createSession(clientId);
-
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      data: session,
-    });
-  } catch (error) {
-    console.error("建立工作階段失敗:", error.message);
+    Logger.error("建立工作階段失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -157,7 +129,7 @@ router.post("/generate_share_code", (req, res) => {
       },
     });
   } catch (error) {
-    console.error("產生分享代碼失敗:", error.message);
+    Logger.error("產生分享代碼失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -176,12 +148,9 @@ router.post("/generate_share_code", (req, res) => {
 router.post("/join", (req, res) => {
   const { shareCode, role, clientId, clientType } = req.body;
 
-  console.log(
-    `[Join] 使用者請求加入工作階段 - 分享代碼: ${shareCode}, 角色: ${role}, 客戶端ID: ${clientId}`,
-  );
+  Logger.debug(`[Join] 加入請求 - 代碼: ${shareCode}, 角色: ${role}, 客戶端ID: ${clientId}`);
 
   if (!shareCode) {
-    console.warn("[Join] 分享代碼缺失");
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
       success: false,
       error: ERROR_CODES.INVALID_SHARE_CODE,
@@ -190,14 +159,10 @@ router.post("/join", (req, res) => {
   }
 
   try {
-    // 驗證分享代碼
-    console.log(`[Join] 開始驗證分享代碼: ${shareCode}`);
     const validation = ShareCodeService.validateCode(shareCode);
 
     if (validation.error) {
-      console.warn(
-        `[Join] 分享代碼驗證失敗 - 代碼: ${shareCode}, 錯誤: ${validation.error}`,
-      );
+      Logger.warn(`[Join] 分享代碼驗證失敗 - 代碼: ${shareCode}, 錯誤: ${validation.error}`);
       const statusMap = {
         [ERROR_CODES.INVALID_SHARE_CODE]: HTTP_STATUS.BAD_REQUEST,
         [ERROR_CODES.SHARE_CODE_NOT_FOUND]: HTTP_STATUS.NOT_FOUND,
@@ -228,9 +193,6 @@ router.post("/join", (req, res) => {
 
     // 使用提供的clientId或產生新的
     const finalClientId = clientId || generateClientId();
-    console.log(
-      `[Join] 分享代碼驗證成功 - 工作階段ID: ${validation.session_id}, 客戶端ID: ${finalClientId}`,
-    );
 
     if (resolvedRole === ROLE.OPERATOR) {
       const sessionManager = req.app?.locals?.sessionManager;
@@ -252,14 +214,11 @@ router.post("/join", (req, res) => {
 
     // 標記分享代碼為已使用（通過角色檢查後才標記）
     ShareCodeService.markAsUsed(shareCode, finalClientId);
-    console.log(`[Join] 分享代碼已標記為已使用 - 代碼: ${shareCode}`);
 
     // 更新工作階段最後活動時間
     SessionService.updateLastActive(validation.session_id);
 
-    console.log(
-      `[Join] 加入成功 - 工作階段ID: ${validation.session_id}, 角色: ${resolvedRole}`,
-    );
+    Logger.debug(`[Join] 加入成功 | session=${validation.session_id} role=${resolvedRole}`);
     res.status(HTTP_STATUS.OK).json({
       success: true,
       data: {
@@ -270,7 +229,7 @@ router.post("/join", (req, res) => {
       },
     });
   } catch (error) {
-    console.error("加入工作階段失敗:", error.message);
+    Logger.error("加入工作階段失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -322,7 +281,7 @@ router.post("/session/:sessionId/share-code", (req, res) => {
       },
     });
   } catch (error) {
-    console.error("產生分享代碼失敗:", error.message);
+    Logger.error("產生分享代碼失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -366,7 +325,7 @@ router.get("/session/:sessionId/validate", (req, res) => {
       data: { valid: true },
     });
   } catch (error) {
-    console.error("驗證工作階段失敗:", error.message);
+    Logger.error("驗證工作階段失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -418,7 +377,7 @@ router.get("/session/:sessionId/clients", (req, res) => {
       },
     });
   } catch (error) {
-    console.error("取得客戶端列表失敗:", error.message);
+    Logger.error("取得客戶端列表失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -450,7 +409,7 @@ router.get("/session/:sessionId", (req, res) => {
       data: session,
     });
   } catch (error) {
-    console.error("查詢工作階段失敗:", error.message);
+    Logger.error("查詢工作階段失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -474,7 +433,7 @@ router.get("/sessions", (req, res) => {
       data: sessions,
     });
   } catch (error) {
-    console.error("查詢工作階段列表失敗:", error.message);
+    Logger.error("查詢工作階段列表失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -514,7 +473,7 @@ router.delete("/session/:sessionId", (req, res) => {
       message: "工作階段已刪除",
     });
   } catch (error) {
-    console.error("刪除工作階段失敗:", error.message);
+    Logger.error("刪除工作階段失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
@@ -553,53 +512,11 @@ router.post("/sessions/clear", (req, res) => {
       data: { deletedCount: result.changes },
     });
   } catch (error) {
-    console.error("清除所有工作階段失敗:", error.message);
+    Logger.error("清除所有工作階段失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,
       message: "清除所有工作階段失敗",
-    });
-  }
-});
-
-/**
- * POST /api/sync/heartbeat
- * 更新工作階段活動時間（保活）
- *
- * Request body: { sessionId }
- */
-router.post("/heartbeat", (req, res) => {
-  const { sessionId } = req.body;
-
-  if (!sessionId) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      error: ERROR_CODES.INVALID_SESSION_ID,
-      message: "缺少sessionId",
-    });
-  }
-
-  try {
-    const updated = SessionService.updateLastActive(sessionId);
-
-    if (!updated) {
-      return res.status(HTTP_STATUS.NOT_FOUND).json({
-        success: false,
-        error: ERROR_CODES.SESSION_NOT_FOUND,
-        message: "工作階段不存在",
-      });
-    }
-
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: "工作階段已更新",
-    });
-  } catch (error) {
-    console.error("更新工作階段失敗:", error.message);
-    res.status(HTTP_STATUS.INTERNAL_ERROR).json({
-      success: false,
-      error: ERROR_CODES.DATABASE_ERROR,
-      message: "更新工作階段失敗",
     });
   }
 });
@@ -620,15 +537,9 @@ router.get("/share-code/:code", (req, res) => {
   const { code } = req.params;
 
   try {
-    console.log(
-      `[ShareCode] 收到分享代碼查詢請求 - 代碼: ${code}, 長度: ${code.length}`,
-    );
-
     // 步驟 1: 長度驗證
     if (code.length !== SHARE_CODE_CONSTANTS.LENGTH) {
-      console.warn(
-        `[ShareCode] 長度驗證失敗 - 期望: ${SHARE_CODE_CONSTANTS.LENGTH}, 實際: ${code.length}`,
-      );
+      Logger.warn(`[ShareCode] 長度驗證失敗 - 期望: ${SHARE_CODE_CONSTANTS.LENGTH}, 實際: ${code.length}`);
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
         success: false,
         error: ERROR_CODES.INVALID_SHARE_CODE,
@@ -638,15 +549,13 @@ router.get("/share-code/:code", (req, res) => {
 
     // 步驟 2: 校驗碼驗證
     if (!validateChecksum(code)) {
-      console.warn(`[ShareCode] 校驗碼驗證失敗 - 代碼: ${code}`);
+      Logger.warn(`[ShareCode] 校驗碼驗證失敗 - 代碼: ${code}`);
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
         success: false,
         error: ERROR_CODES.INVALID_SHARE_CODE,
         message: "分享代碼校驗失敗",
       });
     }
-
-    console.log(`[ShareCode] 格式驗證通過，準備查詢資料庫 - 代碼: ${code}`);
 
     // 步驟 3 & 4: 取得代碼資訊（資料庫查詢 + 狀態檢查）
     const codeInfo = ShareCodeService.getCodeInfo(code);
@@ -662,10 +571,6 @@ router.get("/share-code/:code", (req, res) => {
       });
     }
 
-    console.log(
-      `[ShareCode] 代碼驗證成功 - 代碼: ${code}, 工作階段ID: ${codeInfo.session_id}, 過期: ${codeInfo.expired}, 已使用: ${codeInfo.used}`,
-    );
-
     // 回傳格式統一為 camelCase
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -678,7 +583,7 @@ router.get("/share-code/:code", (req, res) => {
       },
     });
   } catch (error) {
-    console.error("取得分享代碼資訊失敗:", error.message);
+    Logger.error("取得分享代碼資訊失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       error: ERROR_CODES.DATABASE_ERROR,

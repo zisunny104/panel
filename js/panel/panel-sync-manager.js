@@ -17,21 +17,19 @@ class PanelSyncManager {
     experimentSyncCore = null,
     experimentFlowManager = null,
     experimentSystemManager = null,
-    experimentActionHandler = null,
     experimentCombinationManager = null,
-    powerControl = null,
   } = {}) {
     this.logger = logger;
     this.syncClient = syncClient;
     this.experimentSyncCore = experimentSyncCore;
     this.experimentFlowManager = experimentFlowManager;
     this.experimentSystemManager = experimentSystemManager;
-    this.experimentActionHandler = experimentActionHandler;
     this.experimentCombinationManager = experimentCombinationManager;
-    this.powerControl = powerControl;
     this.initialized = false;
     this._remoteStartInProgress = false;
     this._remoteExperimentActive = false;
+    this._broadcastBound = false;
+    this._broadcastUnsubscribers = [];
   }
 
   updateDependencies(deps = {}) {
@@ -207,10 +205,18 @@ class PanelSyncManager {
    * @param {ExperimentFlowManager} flowManager
    */
   bindExperimentBroadcast(flowManager) {
-    if (!flowManager) return;
+    if (!flowManager) return () => {};
+
+    if (this._broadcastBound) {
+      Logger.warn("PanelSyncManager: 實驗廣播事件已綁定，跳過重複設定");
+      return () => this.unbindExperimentBroadcast();
+    }
+
+    this._broadcastBound = true;
+    const unsubscribers = [];
 
     // 廣播實驗開始
-    flowManager.on(ExperimentFlowManager.EVENT.STARTED, () => {
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.STARTED, () => {
       if (!this._remoteStartInProgress) {
         this._remoteExperimentActive = false;
         this._setDeferCompletion(false);
@@ -231,30 +237,30 @@ class PanelSyncManager {
         combinationName: currentCombo?.combinationName || "",
         })
         .catch((err) => Logger.warn("廣播實驗開始失敗:", err));
-    });
+      }));
 
     // 廣播實驗暫停
-    flowManager.on(ExperimentFlowManager.EVENT.PAUSED, () => {
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.PAUSED, () => {
       if (!this._canBroadcast()) return;
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
         clientId: this.syncClient?.clientId,
         timestamp: Date.now(),
       }).catch((err) => Logger.warn("廣播實驗暫停失敗:", err));
-    });
+    }));
 
     // 廣播實驗繼續
-    flowManager.on(ExperimentFlowManager.EVENT.RESUMED, () => {
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.RESUMED, () => {
       if (!this._canBroadcast()) return;
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
         clientId: this.syncClient?.clientId,
         timestamp: Date.now(),
       }).catch((err) => Logger.warn("廣播實驗繼續失敗:", err));
-    });
+    }));
 
     // 廣播實驗停止
-    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (stopData = {}) => {
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (stopData = {}) => {
       this._remoteExperimentActive = false;
       this._setDeferCompletion(false);
       if (stopData.broadcast === false) {
@@ -269,9 +275,24 @@ class PanelSyncManager {
         clientId: this.syncClient?.clientId,
         timestamp: Date.now(),
       }).catch((err) => Logger.warn("廣播實驗停止失敗:", err));
-    });
+    }));
+
+    this._broadcastUnsubscribers = unsubscribers;
 
     Logger.debug("PanelSyncManager: 已綁定所有實驗狀態廣播");
+    return () => this.unbindExperimentBroadcast();
+  }
+
+  unbindExperimentBroadcast() {
+    this._broadcastUnsubscribers.forEach((unsubscribe) => {
+      try {
+        unsubscribe?.();
+      } catch (error) {
+        Logger.warn("PanelSyncManager: 解除廣播事件失敗", error);
+      }
+    });
+    this._broadcastUnsubscribers = [];
+    this._broadcastBound = false;
   }
 
   _setDeferCompletion(shouldDefer) {

@@ -340,9 +340,9 @@ class ExperimentSimulator {
           const shouldUseButton = !!actionButton;
           if (shouldUseButton) {
             actionButton.click();
-          } else if (bpm?.experimentLogManager) {
+          } else if (bpm?.recordManager) {
             const stepInfo = boardPageManager?.actionToStepMap?.get(actionId);
-            bpm.experimentLogManager.logAction(
+            bpm.recordManager.logAction(
               actionId,
               null,
               stepInfo?.step_id || null,
@@ -433,9 +433,9 @@ class ExperimentSimulator {
             const shouldUseButton = !!actionButton;
             if (shouldUseButton) {
               actionButton.click();
-            } else if (bpm?.experimentLogManager) {
+            } else if (bpm?.recordManager) {
               const stepInfo = boardPageManager?.actionToStepMap?.get(actionId);
-              bpm.experimentLogManager.logAction(
+              bpm.recordManager.logAction(
                 actionId,
                 gestureIndex,
                 stepInfo?.step_id || null,

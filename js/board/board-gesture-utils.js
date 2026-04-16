@@ -12,7 +12,7 @@ export const createBoardGestureUtils = function (deps) {
     timerManager,
     syncClient,
     syncCore,
-    experimentLogManager,
+    recordManager,
   } = deps;
 
   const setActiveGestureCard = function (idx, { forceScroll = false } = {}) {
@@ -74,17 +74,6 @@ export const createBoardGestureUtils = function (deps) {
       document.getElementById(`timer-display-${idx}`)?.textContent ||
       "00:00.000";
 
-    if (pageManager?.gestureStats && pageManager.gestureStats[gestureName]) {
-      if (status === "correct") {
-        pageManager.gestureStats[gestureName].correct++;
-      } else if (status === "uncertain") {
-        pageManager.gestureStats[gestureName].uncertain++;
-      } else if (status === "incorrect") {
-        pageManager.gestureStats[gestureName].incorrect++;
-      }
-      pageManager.renderGestureCountList();
-    }
-
     const gestureMarkPayload = {
       type: SYNC_DATA_TYPES.GESTURE_MARKED,
       clientId: syncClient?.clientId,
@@ -113,13 +102,13 @@ export const createBoardGestureUtils = function (deps) {
       setTimeout(() => card.classList.remove(markedClass), 500);
     }
 
-    if (experimentLogManager) {
+    if (recordManager) {
       const gestureType =
         status === "correct" ? "t" : status === "uncertain" ? "n" : "f";
       const currentGesture = pageManager?.currentCombination?.gestures?.[idx];
       const stepId = currentGesture?.step_id || null;
-      experimentLogManager.logAction("gesture_marked", idx, stepId);
-      experimentLogManager.logGestureAttempt(idx, gestureType, stepId);
+      recordManager.logAction("gesture_marked", idx, stepId);
+      recordManager.logGestureAttempt(idx, gestureType, stepId);
     }
   };
 
@@ -130,11 +119,6 @@ export const createBoardGestureUtils = function (deps) {
 
     if (timerManager?.timerStates?.[idx]?.running) {
       timerManager.toggleIndexedTimer(idx);
-    }
-
-    if (pageManager?.gestureStats && pageManager.gestureStats[gestureName]) {
-      pageManager.gestureStats[gestureName].completed++;
-      pageManager.renderGestureCountList();
     }
 
     const stepCompletedPayload = {
@@ -149,11 +133,11 @@ export const createBoardGestureUtils = function (deps) {
       Logger.warn("同步下一步動作失敗:", error);
     });
 
-    if (experimentLogManager) {
+    if (recordManager) {
       const currentGesture = pageManager?.currentCombination?.gestures?.[idx];
       const stepId = currentGesture?.step_id || null;
-      experimentLogManager.logAction("next_step", idx, stepId);
-      experimentLogManager.logGestureStepEnd(idx, stepId);
+      recordManager.logAction("next_step", idx, stepId);
+      recordManager.logGestureStepEnd(idx, stepId);
     }
 
     const totalGestures = pageManager?.currentCombination?.gestures?.length || 0;
@@ -196,8 +180,8 @@ export const createBoardGestureUtils = function (deps) {
       // 最後一步完成後，不論日誌是否 flush 成功，都要回到實驗控制區。
       setTimeout(scrollToExperimentControls, 300);
 
-      if (experimentLogManager) {
-        experimentLogManager
+      if (recordManager) {
+        recordManager
           .flushAll()
           .then(() => {
             Logger.info("所有日誌已發送完成");

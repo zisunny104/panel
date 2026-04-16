@@ -7,8 +7,7 @@
  * 此檔案聚焦於現行行為與公開 API，說明反映目前實作與責任範圍。
  */
 
-import { loadScenariosData } from "../core/data-loader.js";
-import { SYNC_DATA_TYPES, SYNC_EVENTS } from "../constants/index.js";
+import { SYNC_DATA_TYPES, SYNC_EVENTS, RECORD_SOURCES } from "../constants/index.js";
 import { generateExperimentId } from "../core/random-utils.js";
 
 class ExperimentUIManager {
@@ -115,6 +114,71 @@ class ExperimentUIManager {
 
   updateDependencies(deps = {}) {
     Object.assign(this.dependencies, deps);
+  }
+
+  /**
+   * 綁定實驗 ID 與受試者名稱輸入欄位到 stateManager。
+   * 在 StateManager 與 UIManager 均完成建構後呼叫一次。
+   */
+  bindStateManagerInputs(stateManager) {
+    if (!stateManager) return;
+
+    const experimentIdInput = document.getElementById("experimentIdInput");
+    if (experimentIdInput && !experimentIdInput._stateSyncBound) {
+      experimentIdInput._stateSyncBound = true;
+      let _debounceTimer = null;
+      const DEBOUNCE_MS = 300;
+
+      experimentIdInput.addEventListener("input", (e) => {
+        const newId = e.target.value.trim();
+        if (_debounceTimer) clearTimeout(_debounceTimer);
+        _debounceTimer = setTimeout(() => {
+          if (newId !== stateManager.experimentId) {
+            stateManager.setExperimentId(newId, RECORD_SOURCES.LOCAL_INPUT);
+          }
+          _debounceTimer = null;
+        }, DEBOUNCE_MS);
+      });
+
+      // change 事件立即同步（例如離開欄位時）
+      experimentIdInput.addEventListener("change", (e) => {
+        const newId = e.target.value.trim();
+        if (_debounceTimer) {
+          clearTimeout(_debounceTimer);
+          _debounceTimer = null;
+        }
+        if (newId !== stateManager.experimentId) {
+          stateManager.setExperimentId(newId, RECORD_SOURCES.LOCAL_INPUT);
+        }
+      });
+
+      if (experimentIdInput.value.trim() && !stateManager.experimentId) {
+        stateManager.experimentId = experimentIdInput.value.trim();
+      }
+    }
+
+    const participantNameInput = document.getElementById("participantNameInput");
+    if (participantNameInput && !participantNameInput._stateSyncBound) {
+      participantNameInput._stateSyncBound = true;
+
+      participantNameInput.addEventListener("input", (e) => {
+        const newName = e.target.value.trim();
+        if (newName !== stateManager.participantName) {
+          stateManager.setParticipantName(newName, "input");
+        }
+      });
+
+      participantNameInput.addEventListener("change", (e) => {
+        const newName = e.target.value.trim();
+        if (newName !== stateManager.participantName) {
+          stateManager.setParticipantName(newName, "input");
+        }
+      });
+
+      if (participantNameInput.value.trim() && !stateManager.participantName) {
+        stateManager.participantName = participantNameInput.value.trim();
+      }
+    }
   }
 
   updateSelectAllState() {
@@ -448,8 +512,7 @@ class ExperimentUIManager {
   }
 
   /**
-   * 更新高亮可見性（根據實驗狀態）
-   * 此方法與舊版 updateHighlightVisibility 相容
+   * 根據 visualHintsToggle 狀態更新高亮可見性
    */
   updateHighlightVisibility() {
     const toggle = this.elements.get("visualHintsToggle");
@@ -827,6 +890,8 @@ class ExperimentUIManager {
       this.listeners.set(eventName, []);
     }
     this.listeners.get(eventName).push(handler);
+
+    return () => this.off(eventName, handler);
   }
 
   /**
@@ -1810,71 +1875,6 @@ class ExperimentUIManager {
       Logger.error("初始化 Panel UI 失敗:", error);
     }
   }
-
-  /**
-   * 載入場景數據
-   * @private
-   */
-  async _loadScenariosData() {
-    try {
-      return await loadScenariosData();
-    } catch (error) {
-      Logger.error("載入 scenarios.json 失敗:", error);
-      return null;
-    }
-  }
-
-  /**
-   * 準備單元數據
-   * @private
-   */
-  _prepareUnitsData(scriptData) {
-    if (!scriptData.sections) return [];
-
-    const units = [];
-    scriptData.sections.forEach((section) => {
-      if (section.units && Array.isArray(section.units)) {
-        section.units.forEach((unit) => {
-          units.push({
-            id: unit.unit_id,
-            title: unit.unit_name,
-            stepCount: unit.steps ? unit.steps.length : 0,
-            checked: true, // 預設全選
-          });
-        });
-      }
-    });
-
-    return units;
-  }
-
-  /**
-   * 處理組合選擇
-   * @private
-   */
-  _handleCombinationSelect(combinationId) {
-    Logger.debug("選擇組合:", combinationId);
-
-    const combinationManager = this.dependencies.combinationManager;
-    const hubManager = this.dependencies.hubManager;
-
-    if (combinationManager) {
-      const combination =
-        combinationManager.getCombinationById(combinationId);
-      if (combination) {
-        const experimentId = hubManager?.getExperimentId?.() || null;
-        combinationManager.setCombination(
-          combination,
-          experimentId,
-        );
-      } else {
-        Logger.error("找不到組合:", combinationId);
-      }
-    } else {
-      Logger.error("experimentCombinationManager 不可用");
-    }
-  }
-
 
   /**
    * 處理實驗開始

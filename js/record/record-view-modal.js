@@ -10,16 +10,16 @@ import { UIModal } from "../ui/modal.js";
 export const recordViewModal = {
   /**
    * 開啟實驗日誌詳情 modal（含統計摘要、JSONL 預覽與受試者名稱編輯）
-   * @param {string} logId       - 實驗 ID 或 filename
-   * @param {Object} stats       - 由 calculateLogStatistics() 產生的統計物件
+   * @param {string} recordId    - 實驗 ID 或 filename
+   * @param {Object} stats       - 由 calculateRecordStatistics() 產生的統計物件
    * @param {string} jsonlContent - 原始 JSONL 字串
    */
-  showLogViewModal(logId, stats, jsonlContent) {
+  showRecordViewModal(recordId, stats, jsonlContent) {
     this._logModal?.close();
 
     const durationStr = this.timeSyncManager?.formatDurationText(stats.totalDuration);
     const fmt = (ts) => ts
-      ? this.timeSyncManager?.formatDateTimeWithPreset(ts, "logDetail")
+      ? this.timeSyncManager?.formatDateTimeWithPreset(ts, "recordDetail")
       : "未知";
     const experimentTimeStr = `${fmt(stats.startTime)} — ${fmt(stats.endTime)}`;
     const experimentTimeWithDuration = stats.totalDuration > 0
@@ -29,42 +29,42 @@ export const recordViewModal = {
     const formattedJsonl = this.formatJsonlForDisplay(jsonlContent);
 
     this._logModal = new UIModal({
-      id: "logViewModal",
-      html: this._renderLogViewModal({ logId, stats, experimentTimeWithDuration, formattedJsonl }),
+      id: "recordViewModal",
+      html: this._renderRecordViewModal({ recordId, stats, experimentTimeWithDuration, formattedJsonl }),
     });
     this._logModal.open();
-    this._bindLogModalActions(logId);
+    this._bindRecordModalActions(recordId);
   },
 
-  _renderLogViewModal({ logId, stats, experimentTimeWithDuration, formattedJsonl }) {
+  _renderRecordViewModal({ recordId, stats, experimentTimeWithDuration, formattedJsonl }) {
     return `
-      <div class="modal-overlay active" id="logViewModal">
+      <div class="modal-overlay active" id="recordViewModal">
         <div class="modal-container modal-dialog modal-lg">
           <div class="modal-header">
             <h2 class="modal-title">日誌詳細資訊</h2>
             <button type="button" class="modal-close-btn" data-action="close-modal">×</button>
           </div>
           <div class="modal-body">
-            <div class="log-view-container">
-              ${this._renderMetadataSection({ logId, stats, experimentTimeWithDuration })}
-              ${this._renderJsonlSection({ logId, formattedJsonl })}
+            <div class="record-view-container">
+              ${this._renderMetadataSection({ recordId, stats, experimentTimeWithDuration })}
+              ${this._renderJsonlSection({ recordId, formattedJsonl })}
             </div>
           </div>
           <div class="modal-footer">
             <button class="modal-btn modal-btn-secondary" data-action="close-modal">關閉</button>
-            <button class="modal-btn modal-btn-primary" data-action="download-log" data-log-id="${logId}">下載</button>
+            <button class="modal-btn modal-btn-primary" data-action="download-record" data-record-id="${recordId}">下載</button>
           </div>
         </div>
       </div>`;
   },
 
-  _renderMetadataSection({ logId, stats, experimentTimeWithDuration }) {
+  _renderMetadataSection({ recordId, stats, experimentTimeWithDuration }) {
     return `
       <div class="experiment-metadata-section">
         <h3>實驗基本資料</h3>
         <div class="metadata-grid">
           ${this._renderExperimentIdItem(stats)}
-          ${this._renderParticipantItem(logId, stats)}
+          ${this._renderParticipantItem(recordId, stats)}
           ${this._renderMetadataItem("實驗組合：",
             `<span class="metadata-value">${this.escapeHtml(stats.experimentCombination || "N/A")}</span>`)}
           ${this._renderMetadataItem("實驗時間：",
@@ -97,9 +97,9 @@ export const recordViewModal = {
       </div>`);
   },
 
-  _renderParticipantItem(logId, stats) {
+  _renderParticipantItem(recordId, stats) {
     const participantName = this.escapeHtml(stats.participantName || "");
-    const safeLogId = this.escapeHtml(logId);
+    const safeRecordId = this.escapeHtml(recordId);
     return this._renderMetadataItem("受試者名稱：", `
       <div class="metadata-value-row">
         <span class="metadata-value" id="modal-participant-display">${participantName}</span>
@@ -107,18 +107,18 @@ export const recordViewModal = {
           value="${participantName}" placeholder="輸入受試者名稱" style="display:none;">
         <div class="metadata-actions">
           <button class="btn btn-sm btn-secondary" id="modal-participant-edit-btn" data-action="edit-participant">✏️ 編輯</button>
-          <button class="btn btn-sm btn-primary" id="modal-participant-save-btn" style="display:none;" data-action="save-participant" data-log-id="${safeLogId}">儲存</button>
+          <button class="btn btn-sm btn-primary" id="modal-participant-save-btn" style="display:none;" data-action="save-participant" data-record-id="${safeRecordId}">儲存</button>
           <button class="btn btn-sm btn-secondary" id="modal-participant-cancel-btn" style="display:none;" data-action="cancel-participant">取消</button>
         </div>
       </div>`);
   },
 
-  _renderJsonlSection({ logId, formattedJsonl }) {
+  _renderJsonlSection({ recordId, formattedJsonl }) {
     return `
       <div class="jsonl-section">
         <div class="jsonl-header">
           <h3>JSONL 原始碼</h3>
-          <button class="btn-copy-jsonl" id="jsonl-copy-btn-${logId}" data-action="copy-jsonl" data-log-id="${logId}" title="複製 JSONL 內容">
+          <button class="btn-copy-jsonl" id="jsonl-copy-btn-${recordId}" data-action="copy-jsonl" data-record-id="${recordId}" title="複製 JSONL 內容">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="11" y="11" width="10" height="10" rx="1" ry="1"></rect>
               <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
@@ -126,14 +126,14 @@ export const recordViewModal = {
             複製
           </button>
         </div>
-        <div class="jsonl-content" id="jsonl-content-${logId}">
+        <div class="jsonl-content" id="jsonl-content-${recordId}">
           <pre>${this.escapeHtml(formattedJsonl)}</pre>
         </div>
       </div>`;
   },
 
-  _bindLogModalActions(logId) {
-    const modal = document.getElementById("logViewModal");
+  _bindRecordModalActions(recordId) {
+    const modal = document.getElementById("recordViewModal");
     if (!modal || modal.dataset.bound === "true") return;
     modal.dataset.bound = "true";
 
@@ -141,16 +141,16 @@ export const recordViewModal = {
       const target = event.target.closest("[data-action]");
       if (!target) return;
       const action = target.dataset.action;
-      const targetLogId = target.dataset.logId || logId;
+      const targetRecordId = target.dataset.recordId || recordId;
 
       switch (action) {
         case "close-modal": this._logModal?.close(); break;
-        case "download-log": if (targetLogId) this.downloadLogById(targetLogId); break;
+        case "download-record": if (targetRecordId) this.downloadRecordById(targetRecordId); break;
         case "copy-text": this.copyToClipboard(target.dataset.copyText || "", target); break;
-        case "copy-jsonl": if (targetLogId) this.copyJsonlContent(targetLogId); break;
+        case "copy-jsonl": if (targetRecordId) this.copyJsonlContent(targetRecordId); break;
         case "edit-participant": this._openParticipantEdit(); break;
         case "cancel-participant": this._cancelParticipantEdit(); break;
-        case "save-participant": this._saveParticipantEdit(target.dataset.logId || logId); break;
+        case "save-participant": this._saveParticipantEdit(target.dataset.recordId || recordId); break;
       }
     });
   },
@@ -176,9 +176,9 @@ export const recordViewModal = {
     if (input && display) input.value = display.textContent || "";
   },
 
-  _saveParticipantEdit(logId) {
+  _saveParticipantEdit(recordId) {
     const input = document.getElementById("modal-participant-input");
-    if (input) this.updateParticipantName(logId, input.value);
+    if (input) this.updateParticipantName(recordId, input.value);
   },
 
   /**
@@ -223,12 +223,12 @@ export const recordViewModal = {
 
   /**
    * 複製指定日誌的 JSONL 預覽內容到剪貼簿
-   * @param {string} logId - 實驗 ID 或 filename（用於定位 DOM 元素）
+  * @param {string} recordId - 實驗 ID 或 filename（用於定位 DOM 元素）
    * @returns {Promise<void>}
    */
-  async copyJsonlContent(logId) {
-    const contentEl = document.getElementById(`jsonl-content-${logId}`);
-    const copyBtn = document.getElementById(`jsonl-copy-btn-${logId}`);
+  async copyJsonlContent(recordId) {
+    const contentEl = document.getElementById(`jsonl-content-${recordId}`);
+    const copyBtn = document.getElementById(`jsonl-copy-btn-${recordId}`);
     if (!contentEl || !copyBtn) return;
 
     const text = contentEl.querySelector("pre")?.textContent || "";

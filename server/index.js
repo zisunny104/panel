@@ -17,7 +17,7 @@ import ShareCodeService from "./services/ShareCodeService.js";
 // 匯入路由
 import healthRouter from "./routes/health.js";
 import syncRouter from "./routes/sync.js";
-import experimentLogsRouter from "./routes/experiment-logs.js";
+import recordRouter from "./routes/record.js";
 
 // 匯入 WebSocket 系統
 import { WSServer } from "./websocket/WSServer.js";
@@ -81,7 +81,7 @@ app.use(
 // ===== 路由註冊 =====
 app.use("/api/health", healthRouter);
 app.use("/api/sync", syncRouter);
-app.use("/api/experiment-logs", experimentLogsRouter);
+app.use("/api/record", recordRouter);
 
 // 根路徑
 app.get("/", (req, res) => {
@@ -94,17 +94,17 @@ app.get("/", (req, res) => {
     endpoints: {
       health: "/api/health",
       sync: {
-        create_session: "POST /api/sync/create_session",
+        session: "POST /api/sync/session",
         generate_share_code: "POST /api/sync/generate_share_code",
-        join_by_share_code: "POST /api/sync/join_by_share_code",
+        join: "POST /api/sync/join",
         get_session: "GET /api/sync/session/:sessionId",
-        heartbeat: "POST /api/sync/heartbeat",
+        channel: "POST /api/sync/channel",
       },
-      experimentLogs: {
-        list: "GET /api/experiment-logs/list",
-        save: "POST /api/experiment-logs/save",
-        read: "GET /api/experiment-logs/read/:filename",
-        delete: "DELETE /api/experiment-logs/delete/:filename",
+      record: {
+        list: "GET /api/record/list",
+        save: "POST /api/record/save",
+        read: "GET /api/record/read/:filename",
+        delete: "DELETE /api/record/delete/:filename",
       },
     },
   });

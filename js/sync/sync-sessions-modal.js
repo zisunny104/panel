@@ -1,13 +1,13 @@
 /**
- * SyncManager Sessions - 工作階段管理UI
- * 負責檢視和管理所有工作階段
+ * SyncSessionsModal - 工作階段管理 Modal
+ * 負責以 Modal 形式顯示、檢視和管理所有工作階段
  */
 
 import { UIModal } from "../ui/modal.js";
 import { SYNC_EVENTS } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 
-export class SyncManagerSessions {
+export class SyncSessionsModal {
   constructor(core, config = {}) {
     this.core = core;
     this.syncManager = config.syncManager || null;
@@ -17,8 +17,8 @@ export class SyncManagerSessions {
       VIEWER: "viewer",
     };
     this.indicatorManager = config.indicatorManager || null;
-    this.sessionsPanel = null;
-    this.sessionsModal = null;
+    this.el = null;
+    this.modal = null;
     this.sessionsData = [];
     this.expandedCards = new Set();
     this.selectedSessions = new Set();
@@ -61,11 +61,11 @@ export class SyncManagerSessions {
 
   initialize() {
     window.addEventListener(SYNC_EVENTS.SHOW_SESSIONS, () => {
-      this.showSessionsPanel();
+      this.showModal();
     });
 
     window.addEventListener(SYNC_EVENTS.SESSION_CREATED, () => {
-      if (this.sessionsPanel && document.body.contains(this.sessionsPanel)) {
+      if (this.el && document.body.contains(this.el)) {
         this.refreshSessionsList();
       }
     });
@@ -78,15 +78,15 @@ export class SyncManagerSessions {
         originalError,
       });
 
-      if (this.sessionsPanel && document.body.contains(this.sessionsPanel)) {
+      if (this.el && document.body.contains(this.el)) {
         this.refreshSessionsList();
       }
     });
   }
 
-  async showSessionsPanel() {
-    if (this.sessionsModal) {
-      this.sessionsModal.close();
+  async showModal() {
+    if (this.modal) {
+      this.modal.close();
     }
 
     await this.loadSessionsData();
@@ -129,12 +129,12 @@ export class SyncManagerSessions {
       </div>
     `;
 
-    this.sessionsModal = new UIModal({
+    this.modal = new UIModal({
       id: "syncSessionsPanel",
       html: modalHtml,
     });
-    this.sessionsModal.open();
-    this.sessionsPanel = this.sessionsModal.modalEl;
+    this.modal.open();
+    this.el = this.modal.modalEl;
 
     this.bindEvents();
   }
@@ -160,7 +160,7 @@ export class SyncManagerSessions {
   async refreshSessionsList() {
     try {
       await this.loadSessionsData();
-      const sessionsList = this.sessionsPanel?.querySelector("#sessionsList");
+      const sessionsList = this.el?.querySelector("#sessionsList");
       if (sessionsList) {
         sessionsList.innerHTML = this.renderSessionsList();
       }
@@ -442,27 +442,27 @@ ${indentStr}}</span>`;
   }
 
   bindEvents() {
-    const closeBtn = this.sessionsPanel.querySelector(".modal-close-btn");
+    const closeBtn = this.el.querySelector(".modal-close-btn");
     closeBtn.addEventListener("click", () => {
-      this.sessionsModal?.close();
-      this.sessionsModal = null;
-      this.sessionsPanel = null;
+      this.modal?.close();
+      this.modal = null;
+      this.el = null;
     });
 
-    const refreshBtn = this.sessionsPanel.querySelector("#refreshSessionsBtn");
+    const refreshBtn = this.el.querySelector("#refreshSessionsBtn");
     refreshBtn.addEventListener("click", async () => {
       refreshBtn.disabled = true;
       refreshBtn.textContent = "載入中...";
 
       await this.loadSessionsData();
-      const sessionsList = this.sessionsPanel.querySelector("#sessionsList");
+      const sessionsList = this.el.querySelector("#sessionsList");
       sessionsList.innerHTML = this.renderSessionsList();
 
       refreshBtn.disabled = false;
       refreshBtn.textContent = "重新整理";
     });
 
-    const clearAllBtn = this.sessionsPanel.querySelector(
+    const clearAllBtn = this.el.querySelector(
       "#clearAllSessionsBtn",
     );
     clearAllBtn.addEventListener("click", async () => {
@@ -488,7 +488,7 @@ ${indentStr}}</span>`;
           this.expandedCards.clear();
 
           const sessionsList =
-            this.sessionsPanel.querySelector("#sessionsList");
+            this.el.querySelector("#sessionsList");
           sessionsList.innerHTML = `
             <div class="sync-sessions-empty">
               目前沒有工作階段
@@ -520,7 +520,7 @@ ${indentStr}}</span>`;
       clearAllBtn.textContent = "刪除所有工作階段";
     });
 
-    const stopAllActiveBtn = this.sessionsPanel.querySelector(
+    const stopAllActiveBtn = this.el.querySelector(
       "#stopAllActiveSessionsBtn",
     );
     stopAllActiveBtn.addEventListener("click", async () => {
@@ -570,11 +570,11 @@ ${indentStr}}</span>`;
     });
 
     const selectAllCheckbox =
-      this.sessionsPanel.querySelector("#selectAllSessions");
+      this.el.querySelector("#selectAllSessions");
     selectAllCheckbox.addEventListener("change", (event) => {
       const isChecked = event.target.checked;
       const checkboxes =
-        this.sessionsPanel.querySelectorAll(".session-checkbox");
+        this.el.querySelectorAll(".session-checkbox");
 
       checkboxes.forEach((checkbox) => {
         checkbox.checked = isChecked;
@@ -589,12 +589,12 @@ ${indentStr}}</span>`;
       this.updateBatchOperationButtons();
     });
 
-    const selectNoDataBtn = this.sessionsPanel.querySelector(
+    const selectNoDataBtn = this.el.querySelector(
       "#selectNoDataSessionsBtn",
     );
     selectNoDataBtn.addEventListener("click", () => {
       const checkboxes =
-        this.sessionsPanel.querySelectorAll(".session-checkbox");
+        this.el.querySelectorAll(".session-checkbox");
 
       checkboxes.forEach((checkbox) => {
         const sessionId = checkbox.dataset.sessionId;
@@ -616,12 +616,12 @@ ${indentStr}}</span>`;
       this.updateBatchOperationButtons();
     });
 
-    const selectSingleClientBtn = this.sessionsPanel.querySelector(
+    const selectSingleClientBtn = this.el.querySelector(
       "#selectSingleClientSessionsBtn",
     );
     selectSingleClientBtn.addEventListener("click", () => {
       const checkboxes =
-        this.sessionsPanel.querySelectorAll(".session-checkbox");
+        this.el.querySelectorAll(".session-checkbox");
 
       checkboxes.forEach((checkbox) => {
         const sessionId = checkbox.dataset.sessionId;
@@ -640,7 +640,7 @@ ${indentStr}}</span>`;
       this.updateBatchOperationButtons();
     });
 
-    const downloadSelectedBtn = this.sessionsPanel.querySelector(
+    const downloadSelectedBtn = this.el.querySelector(
       "#downloadSelectedSessionsBtn",
     );
     downloadSelectedBtn.addEventListener("click", () => {
@@ -682,7 +682,7 @@ ${indentStr}}</span>`;
       }
     });
 
-    const deleteSelectedBtn = this.sessionsPanel.querySelector(
+    const deleteSelectedBtn = this.el.querySelector(
       "#deleteSelectedSessionsBtn",
     );
     deleteSelectedBtn.addEventListener("click", async () => {
@@ -765,7 +765,7 @@ ${indentStr}}</span>`;
       this.updateBatchOperationButtons();
     });
 
-    this.sessionsPanel.addEventListener("click", (event) => {
+    this.el.addEventListener("click", (event) => {
       if (event.target.classList.contains("session-checkbox")) {
         const sessionId = event.target.dataset.sessionId;
         if (event.target.checked) {
@@ -811,7 +811,7 @@ ${indentStr}}</span>`;
 
               if (this.sessionsData.length === 0) {
                 const sessionsList =
-                  this.sessionsPanel.querySelector("#sessionsList");
+                  this.el.querySelector("#sessionsList");
                 sessionsList.innerHTML = `
                   <div class="sync-sessions-empty">
                     目前沒有工作階段
@@ -898,13 +898,13 @@ ${indentStr}}</span>`;
 
   updateSelectAllCheckbox() {
     const selectAllCheckbox =
-      this.sessionsPanel?.querySelector("#selectAllSessions");
+      this.el?.querySelector("#selectAllSessions");
     const checkboxes =
-      this.sessionsPanel?.querySelectorAll(".session-checkbox");
+      this.el?.querySelectorAll(".session-checkbox");
 
     if (!selectAllCheckbox || !checkboxes) return;
 
-    const checkedCount = this.sessionsPanel.querySelectorAll(
+    const checkedCount = this.el.querySelectorAll(
       ".session-checkbox:checked",
     ).length;
     const totalCount = checkboxes.length;
@@ -915,10 +915,10 @@ ${indentStr}}</span>`;
   }
 
   updateBatchOperationButtons() {
-    const downloadBtn = this.sessionsPanel?.querySelector(
+    const downloadBtn = this.el?.querySelector(
       "#downloadSelectedSessionsBtn",
     );
-    const deleteBtn = this.sessionsPanel?.querySelector(
+    const deleteBtn = this.el?.querySelector(
       "#deleteSelectedSessionsBtn",
     );
 

@@ -596,15 +596,6 @@ class MediaManager {
   }
 
   /**
-   * 顯示媒體（實驗模式用的別名方法）
-   * @param {string} mediaFile - 媒體檔案路徑
-   * @returns {HTMLElement|null} 建立的媒體元素
-   */
-  displayMedia(mediaFile) {
-    return this.showStepMedia(mediaFile);
-  }
-
-  /**
    * 清空媒體區域
    */
   clearMediaArea() {

@@ -27,8 +27,8 @@ class TimeSyncManager {
     this.dateTimePresets = {
       dateTime: { includeSeconds: true },
       dateTimeShort: { includeSeconds: false },
-      logDetail: { includeSeconds: true },
-      logFilter: { includeSeconds: false },
+      recordDetail: { includeSeconds: true },
+      recordFilter: { includeSeconds: false },
     };
 
     // 時間長度格式（可由 CONFIG.durationTextStyle 覆蓋）
@@ -267,7 +267,7 @@ class TimeSyncManager {
   /**
    * 以預設格式名稱格式化時間
    * @param {number|Date} timestamp - 毫秒級時間戳或 Date 物件
-   * @param {string} preset - 預設名稱（例如 dateTime, dateTimeShort, logDetail, logFilter）
+  * @param {string} preset - 預設名稱（例如 dateTime, dateTimeShort, recordDetail, recordFilter）
    * @param {Object} overrideOptions - 覆蓋預設值的選項
    * @returns {string} 格式化的時間字串
    */

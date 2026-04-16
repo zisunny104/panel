@@ -23,15 +23,15 @@ export const recordViewFilter = {
    */
   _renderFilterBlock({ title, minValueId, maxValueId, minRangeId, maxRangeId, slidersId, minValue, maxValue }) {
     return `
-      <div class="log-filter-block">
-        <div class="log-filter-title">${title}</div>
-        <div class="log-filter-range">
-          <div class="log-filter-values">
+      <div class="record-filter-block">
+        <div class="record-filter-title">${title}</div>
+        <div class="record-filter-range">
+          <div class="record-filter-values">
             <span id="${minValueId}">${minValue}</span>
-            <span class="log-filter-sep">~</span>
+            <span class="record-filter-sep">~</span>
             <span id="${maxValueId}">${maxValue}</span>
           </div>
-          <div class="log-filter-sliders" id="${slidersId}">
+          <div class="record-filter-sliders" id="${slidersId}">
             <input id="${minRangeId}" class="range-min" type="range" min="0" max="0" value="0" step="1">
             <input id="${maxRangeId}" class="range-max" type="range" min="0" max="0" value="0" step="1">
           </div>
@@ -41,55 +41,55 @@ export const recordViewFilter = {
   },
 
   /** 切換篩選面板的開關狀態 */
-  toggleLogFilter() {
-    if (!document.getElementById("logFilterPopover")) return;
-    this._ensureLogFilterBindings();
-    this._ensureLogFilterPopover();
-    this.logFilterPopover?.toggle();
+  toggleRecordFilter() {
+    if (!document.getElementById("recordFilterPopover")) return;
+    this._ensureRecordFilterBindings();
+    this._ensureRecordFilterPopover();
+    this.recordFilterPopover?.toggle();
   },
 
   /** 套用目前篩選條件並重新渲染日誌列表 */
-  applyLogFilter() {
-    this._closeLogFilter();
-    if (this._allExperiments) this.displayExperimentLogs(this._allExperiments);
+  applyRecordFilter() {
+    this._closeRecordFilter();
+    if (this._allRecords) this.displayRecordList(this._allRecords);
   },
 
   /** 全選目前篩選結果中的所有日誌 */
-  selectFilteredLogs() {
-    const filtered = this._applyLogFilters(this._allExperiments || []);
-    filtered.forEach((exp) => {
-      if (!exp?.filename) return;
-      this.selectedLogs.add(exp.filename);
-      const checkbox = document.getElementById(`log-${exp.filename}`);
+  selectFilteredRecords() {
+    const filtered = this._applyRecordFilters(this._allRecords || []);
+    filtered.forEach((record) => {
+      if (!record?.filename) return;
+      this.selectedRecords.add(record.filename);
+      const checkbox = document.getElementById(`record-${record.filename}`);
       if (checkbox) checkbox.checked = true;
     });
     this.updateDeleteButton();
   },
 
   /** 重置所有篩選條件為初始值，並重新渲染日誌列表 */
-  resetLogFilter() {
-    const maxAvailable = this.logCountFilter?.maxAvailable ?? 0;
-    this.logCountFilter.min = 0;
-    this.logCountFilter.max = maxAvailable;
+  resetRecordFilter() {
+    const maxAvailable = this.recordCountFilter?.maxAvailable ?? 0;
+    this.recordCountFilter.min = 0;
+    this.recordCountFilter.max = maxAvailable;
     this.durationFilter.min = 0;
     this.durationFilter.max = this.durationFilter?.maxAvailable ?? 0;
     if (this.timeFilter?.minAvailable !== null) {
       this.timeFilter.min = this.timeFilter.minAvailable;
       this.timeFilter.max = this.timeFilter.maxAvailable;
     }
-    this._updateLogFilterBounds(this._allExperiments || []);
-    this._closeLogFilter();
-    if (this._allExperiments) this.displayExperimentLogs(this._allExperiments);
+    this._updateRecordFilterBounds(this._allRecords || []);
+    this._closeRecordFilter();
+    if (this._allRecords) this.displayRecordList(this._allRecords);
   },
 
   /**
    * 判斷是否有任何篩選條件非預設值（即篩選已啟用）
    * @returns {boolean}
    */
-  _isLogFilterActive() {
-    const maxAvailable = this.logCountFilter?.maxAvailable ?? 0;
-    const min = this.logCountFilter?.min ?? 0;
-    const max = this.logCountFilter?.max ?? maxAvailable;
+  _isRecordFilterActive() {
+    const maxAvailable = this.recordCountFilter?.maxAvailable ?? 0;
+    const min = this.recordCountFilter?.min ?? 0;
+    const max = this.recordCountFilter?.max ?? maxAvailable;
     const durationMax = this.durationFilter?.maxAvailable ?? 0;
     const durationMin = this.durationFilter?.min ?? 0;
     const durationMaxValue = this.durationFilter?.max ?? durationMax;
@@ -111,11 +111,11 @@ export const recordViewFilter = {
    * @param {Array} experiments - 待篩選的實驗物件陣列
    * @returns {Array} 符合條件的實驗陣列
    */
-  _applyLogFilters(experiments) {
+  _applyRecordFilters(experiments) {
     if (!Array.isArray(experiments)) return [];
-    const countMin = this.logCountFilter?.min ?? 0;
-    const countMax = this.logCountFilter?.max ??
-      (Number.isFinite(this.logCountFilter?.maxAvailable) ? this.logCountFilter.maxAvailable : Number.MAX_SAFE_INTEGER);
+    const countMin = this.recordCountFilter?.min ?? 0;
+    const countMax = this.recordCountFilter?.max ??
+      (Number.isFinite(this.recordCountFilter?.maxAvailable) ? this.recordCountFilter.maxAvailable : Number.MAX_SAFE_INTEGER);
     const durationMin = this.durationFilter?.min ?? 0;
     const durationMax = this.durationFilter?.max ??
       (Number.isFinite(this.durationFilter?.maxAvailable) ? this.durationFilter.maxAvailable : Number.MAX_SAFE_INTEGER);
@@ -132,32 +132,32 @@ export const recordViewFilter = {
     });
   },
 
-  _ensureLogFilterBindings() {
+  _ensureRecordFilterBindings() {
     if (this._filterUiReady) return;
-    const minRange = document.getElementById("logFilterMinRange");
-    const maxRange = document.getElementById("logFilterMaxRange");
+    const minRange = document.getElementById("recordFilterMinRange");
+    const maxRange = document.getElementById("recordFilterMaxRange");
     if (!minRange || !maxRange) return;
 
     const bind = (id, type, source) => {
       const el = document.getElementById(id);
-      if (el) el.addEventListener("input", () => this._handleLogFilterRangeInput(type, source));
+      if (el) el.addEventListener("input", () => this._handleRecordFilterRangeInput(type, source));
     };
 
-    bind("logFilterMinRange", "count", "min");
-    bind("logFilterMaxRange", "count", "max");
-    bind("logFilterDurationMinRange", "duration", "min");
-    bind("logFilterDurationMaxRange", "duration", "max");
-    bind("logFilterTimeMinRange", "time", "min");
-    bind("logFilterTimeMaxRange", "time", "max");
+    bind("recordFilterMinRange", "count", "min");
+    bind("recordFilterMaxRange", "count", "max");
+    bind("recordFilterDurationMinRange", "duration", "min");
+    bind("recordFilterDurationMaxRange", "duration", "max");
+    bind("recordFilterTimeMinRange", "time", "min");
+    bind("recordFilterTimeMaxRange", "time", "max");
 
     this._filterUiReady = true;
   },
 
-  _handleLogFilterRangeInput(type, source) {
+  _handleRecordFilterRangeInput(type, source) {
     const configMap = {
-      count: { minId: "logFilterMinRange", maxId: "logFilterMaxRange", filter: this.logCountFilter },
-      duration: { minId: "logFilterDurationMinRange", maxId: "logFilterDurationMaxRange", filter: this.durationFilter },
-      time: { minId: "logFilterTimeMinRange", maxId: "logFilterTimeMaxRange", filter: this.timeFilter },
+      count: { minId: "recordFilterMinRange", maxId: "recordFilterMaxRange", filter: this.recordCountFilter },
+      duration: { minId: "recordFilterDurationMinRange", maxId: "recordFilterDurationMaxRange", filter: this.durationFilter },
+      time: { minId: "recordFilterTimeMinRange", maxId: "recordFilterTimeMaxRange", filter: this.timeFilter },
     };
 
     const config = configMap[type];
@@ -178,14 +178,14 @@ export const recordViewFilter = {
 
     config.filter.min = min;
     config.filter.max = max;
-    this._updateLogFilterValueLabels();
+    this._updateRecordFilterValueLabels();
   },
 
   /**
    * 根據實驗資料更新篩選器的可用範圍與滑桿 DOM 屬性
    * @param {Array} experiments - 完整實驗物件陣列
    */
-  _updateLogFilterBounds(experiments) {
+  _updateRecordFilterBounds(experiments) {
     const maxAvailable = Array.isArray(experiments)
       ? experiments.reduce((max, exp) => Math.max(max, Number(exp?.logCount || 0)), 0)
       : 0;
@@ -203,19 +203,19 @@ export const recordViewFilter = {
         }, { min: null, max: null })
       : { min: null, max: null };
 
-    this.logCountFilter.maxAvailable = maxAvailable;
+    this.recordCountFilter.maxAvailable = maxAvailable;
     this.durationFilter.maxAvailable = maxDuration;
     this.timeFilter.minAvailable = timeBounds.min;
     this.timeFilter.maxAvailable = timeBounds.max;
 
-    if (this.logCountFilter.max === null) this.logCountFilter.max = maxAvailable;
+    if (this.recordCountFilter.max === null) this.recordCountFilter.max = maxAvailable;
     if (this.durationFilter.max === null) this.durationFilter.max = maxDuration;
     if (this.timeFilter.min === null && timeBounds.min !== null) this.timeFilter.min = timeBounds.min;
     if (this.timeFilter.max === null && timeBounds.max !== null) this.timeFilter.max = timeBounds.max;
 
-    if (this.logCountFilter.max > maxAvailable) this.logCountFilter.max = maxAvailable;
+    if (this.recordCountFilter.max > maxAvailable) this.recordCountFilter.max = maxAvailable;
     if (this.durationFilter.max > maxDuration) this.durationFilter.max = maxDuration;
-    if (this.logCountFilter.min > this.logCountFilter.max) this.logCountFilter.min = this.logCountFilter.max;
+    if (this.recordCountFilter.min > this.recordCountFilter.max) this.recordCountFilter.min = this.recordCountFilter.max;
     if (this.durationFilter.min > this.durationFilter.max) this.durationFilter.min = this.durationFilter.max;
     if (this.timeFilter.min !== null && this.timeFilter.max !== null &&
         this.timeFilter.min > this.timeFilter.max) {
@@ -230,39 +230,39 @@ export const recordViewFilter = {
       maxEl.min = String(minVal); maxEl.max = String(maxVal); maxEl.value = String(currentMax ?? maxVal);
     };
 
-    setSlider("logFilterMinRange", "logFilterMaxRange", 0, maxAvailable,
-      this.logCountFilter.min, this.logCountFilter.max);
-    setSlider("logFilterDurationMinRange", "logFilterDurationMaxRange", 0, maxDuration,
+    setSlider("recordFilterMinRange", "recordFilterMaxRange", 0, maxAvailable,
+      this.recordCountFilter.min, this.recordCountFilter.max);
+    setSlider("recordFilterDurationMinRange", "recordFilterDurationMaxRange", 0, maxDuration,
       this.durationFilter.min, this.durationFilter.max);
 
     const minTime = timeBounds.min ?? 0;
     const maxTime = timeBounds.max ?? 0;
-    setSlider("logFilterTimeMinRange", "logFilterTimeMaxRange", minTime, maxTime,
+    setSlider("recordFilterTimeMinRange", "recordFilterTimeMaxRange", minTime, maxTime,
       this.timeFilter.min, this.timeFilter.max);
 
-    this._updateLogFilterValueLabels();
+    this._updateRecordFilterValueLabels();
   },
 
-  _updateLogFilterValueLabels() {
+  _updateRecordFilterValueLabels() {
     const setText = (id, text) => {
       const el = document.getElementById(id);
       if (el) el.textContent = text;
     };
 
-    setText("logFilterMinValue", this.logCountFilter.min ?? 0);
-    setText("logFilterMaxValue", this.logCountFilter.max ?? 0);
-    setText("logFilterDurationMinValue",
+    setText("recordFilterMinValue", this.recordCountFilter.min ?? 0);
+    setText("recordFilterMaxValue", this.recordCountFilter.max ?? 0);
+    setText("recordFilterDurationMinValue",
       this.timeSyncManager?.formatDurationText(this.durationFilter.min ?? 0));
-    setText("logFilterDurationMaxValue",
+    setText("recordFilterDurationMaxValue",
       this.timeSyncManager?.formatDurationText(this.durationFilter.max ?? 0));
-    setText("logFilterTimeMinValue", this._formatFilterDateTime(this.timeFilter.min));
-    setText("logFilterTimeMaxValue", this._formatFilterDateTime(this.timeFilter.max));
+    setText("recordFilterTimeMinValue", this._formatFilterDateTime(this.timeFilter.min));
+    setText("recordFilterTimeMaxValue", this._formatFilterDateTime(this.timeFilter.max));
 
-    this._updateRangeFill("logFilterCountSliders",
-      this.logCountFilter.min, this.logCountFilter.max, 0, this.logCountFilter.maxAvailable);
-    this._updateRangeFill("logFilterDurationSliders",
+    this._updateRangeFill("recordFilterCountSliders",
+      this.recordCountFilter.min, this.recordCountFilter.max, 0, this.recordCountFilter.maxAvailable);
+    this._updateRangeFill("recordFilterDurationSliders",
       this.durationFilter.min, this.durationFilter.max, 0, this.durationFilter.maxAvailable);
-    this._updateRangeFill("logFilterTimeSliders",
+    this._updateRangeFill("recordFilterTimeSliders",
       this.timeFilter.min, this.timeFilter.max,
       this.timeFilter.minAvailable, this.timeFilter.maxAvailable);
   },
@@ -294,7 +294,7 @@ export const recordViewFilter = {
 
   _formatFilterDateTime(value) {
     if (!Number.isFinite(value)) return "--";
-    return this.timeSyncManager?.formatDateTimeWithPreset(value, "logFilter");
+    return this.timeSyncManager?.formatDateTimeWithPreset(value, "recordFilter");
   },
 
   /**
@@ -303,11 +303,11 @@ export const recordViewFilter = {
    * @param {number} totalCount    - 全部數量
    * @returns {string}
    */
-  _buildLogFilterSummaryText(filteredCount, totalCount) {
+  _buildRecordFilterSummaryText(filteredCount, totalCount) {
     const parts = [];
-    if (this.logCountFilter?.min > 0 ||
-        (this.logCountFilter?.maxAvailable > 0 && this.logCountFilter?.max < this.logCountFilter?.maxAvailable)) {
-      parts.push(`記錄數 ${this.logCountFilter.min}~${this.logCountFilter.max}`);
+    if (this.recordCountFilter?.min > 0 ||
+        (this.recordCountFilter?.maxAvailable > 0 && this.recordCountFilter?.max < this.recordCountFilter?.maxAvailable)) {
+      parts.push(`記錄數 ${this.recordCountFilter.min}~${this.recordCountFilter.max}`);
     }
     if (this.durationFilter?.min > 0 ||
         (this.durationFilter?.maxAvailable > 0 && this.durationFilter?.max < this.durationFilter?.maxAvailable)) {
@@ -322,15 +322,15 @@ export const recordViewFilter = {
     return `${label} (${filteredCount}/${totalCount})`;
   },
 
-  _ensureLogFilterPopover() {
-    if (this.logFilterPopover) return;
-    const popoverEl = document.getElementById("logFilterPopover");
-    const anchorEl = document.getElementById("logFilterToggleBtn");
+  _ensureRecordFilterPopover() {
+    if (this.recordFilterPopover) return;
+    const popoverEl = document.getElementById("recordFilterPopover");
+    const anchorEl = document.getElementById("recordFilterToggleBtn");
     if (!popoverEl || !anchorEl) return;
-    this.logFilterPopover = new UIPopover({ popoverEl, anchorEl, placement: "right-start", offset: 8 });
+    this.recordFilterPopover = new UIPopover({ popoverEl, anchorEl, placement: "right-start", offset: 8 });
   },
 
-  _closeLogFilter() {
-    this.logFilterPopover?.close();
+  _closeRecordFilter() {
+    this.recordFilterPopover?.close();
   },
 };

@@ -24,7 +24,7 @@ async function ensureLogDir() {
 }
 
 /**
- * GET /api/experiment-logs/list
+ * GET /api/record/list
  * 列出所有日誌檔案
  */
 router.get("/list", async (req, res) => {
@@ -66,7 +66,7 @@ router.get("/list", async (req, res) => {
 });
 
 /**
- * POST /api/experiment-logs/save
+ * POST /api/record/save
  * 儲存日誌檔案
  */
 router.post("/save", async (req, res) => {
@@ -107,7 +107,7 @@ router.post("/save", async (req, res) => {
 });
 
 /**
- * GET /api/experiment-logs/read/:filename
+ * GET /api/record/read/:filename
  * 讀取日誌檔案
  */
 router.get("/read/:filename", async (req, res) => {
@@ -154,7 +154,7 @@ router.get("/read/:filename", async (req, res) => {
 });
 
 /**
- * PATCH /api/experiment-logs/update-participant/:filename
+ * PATCH /api/record/update-participant/:filename
  * 更新日誌檔案中所有 exp_start / exp_end 的 participant 欄位
  */
 router.patch("/update-participant/:filename", async (req, res) => {
@@ -208,7 +208,7 @@ router.patch("/update-participant/:filename", async (req, res) => {
 });
 
 /**
- * DELETE /api/experiment-logs/delete/:filename
+ * DELETE /api/record/delete/:filename
  * 刪除日誌檔案
  */
 router.delete("/delete/:filename", async (req, res) => {

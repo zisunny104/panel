@@ -14,12 +14,6 @@ export const BoardUIManager = class BoardUIManager {
   constructor(coreManager) {
     this.core = coreManager;
     this.initialized = false;
-    this.participantNameInput = null;
-    this._onParticipantInput = null;
-    this._onParticipantChange = null;
-    this._onDragStart = null;
-    this._onDragEnd = null;
-    this._onDrop = null;
   }
 
   /**
@@ -43,110 +37,13 @@ export const BoardUIManager = class BoardUIManager {
    * 設定 UI 事件監聽器
    */
   setupEventListeners() {
-    this.setupDragAndDrop();
     this.setupPanelToggleButton();
-  }
-
-  /**
-   * 設定拖曳功能
-   */
-  setupDragAndDrop() {
-    this._onDragStart = (e) => {
-      if (e.target.classList.contains("draggable")) {
-        this.core.draggedElement = e.target;
-        e.dataTransfer.effectAllowed = "move";
-      }
-    };
-
-    this._onDragEnd = () => {
-      this.core.draggedElement = null;
-    };
-
-    this._onDrop = (e) => {
-      e.preventDefault();
-    };
-
-    document.addEventListener("dragstart", this._onDragStart);
-    document.addEventListener("dragend", this._onDragEnd);
-    document.addEventListener("drop", this._onDrop);
   }
 
   setupPanelToggleButton() {
     const panelToggleBtn = document.getElementById("panelToggleBtn");
     if (!panelToggleBtn) return;
     panelToggleBtn.addEventListener("click", () => this.toggleLeftPanel());
-  }
-
-  destroy() {
-    if (this.participantNameInput) {
-      if (this._onParticipantInput) {
-        this.participantNameInput.removeEventListener(
-          "input",
-          this._onParticipantInput,
-        );
-      }
-      if (this._onParticipantChange) {
-        this.participantNameInput.removeEventListener(
-          "change",
-          this._onParticipantChange,
-        );
-      }
-    }
-
-    if (this._onDragStart) {
-      document.removeEventListener("dragstart", this._onDragStart);
-    }
-    if (this._onDragEnd) {
-      document.removeEventListener("dragend", this._onDragEnd);
-    }
-    if (this._onDrop) {
-      document.removeEventListener("drop", this._onDrop);
-    }
-    this.participantNameInput = null;
-    this._onParticipantInput = null;
-    this._onParticipantChange = null;
-    this._onDragStart = null;
-    this._onDragEnd = null;
-    this._onDrop = null;
-    this.initialized = false;
-  }
-
-  /**
-   * 處理遠端動作
-   * @param {Object} detail - 遠端動作資料
-   */
-  handleRemoteAction(detail) {
-    Logger.debug("UI 管理器處理遠端動作", detail);
-    switch (detail.action_type) {
-      case "button_press":
-        this.simulateButtonPress(detail.button_id);
-        break;
-      case "gesture_mark":
-        this.updateGestureDisplay(detail);
-        break;
-      default:
-        Logger.debug("未知的遠端動作類型:", detail.action_type);
-    }
-  }
-
-  /**
-   * 模擬按鈕按下
-   * @param {string} buttonId - 按鈕 ID
-   */
-  simulateButtonPress(buttonId) {
-    const button = document.getElementById(buttonId);
-    if (button) {
-      button.click();
-    }
-  }
-
-  /**
-   * 更新手勢顯示
-   * @param {Object} data - 手勢資料
-   */
-  updateGestureDisplay(data) {
-    if (this.core.gestureStats && data.gesture_name) {
-    }
   }
 
   /**
@@ -158,23 +55,6 @@ export const BoardUIManager = class BoardUIManager {
 
     leftPanel.classList.toggle("collapsed");
     toggleBtn.classList.toggle("collapsed");
-  }
-
-  /**
-   * 切換手勢統計詳細資訊的顯示或隱藏
-   */
-  toggleGestureStats() {
-    const detail = document.getElementById("gestureStatsDetail");
-    const toggle = document.getElementById("gestureStatsToggle");
-
-    const isHidden = detail.classList.contains("is-hidden");
-    if (isHidden) {
-      detail.classList.remove("is-hidden");
-      toggle.style.transform = "rotate(180deg)";
-    } else {
-      detail.classList.add("is-hidden");
-      toggle.style.transform = "rotate(0deg)";
-    }
   }
 
   /**

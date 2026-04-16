@@ -660,7 +660,7 @@ export class SyncManagerUI {
           }
 
           try {
-            const shareUrl = this.core.generateQRContent(
+            const shareUrl = this.core.generateShareUrl(
               shareCode,
               this.core.syncClient?.role || this.roleConfig.VIEWER,
             );
@@ -917,10 +917,6 @@ export class SyncManagerUI {
         error && error.message,
       );
     }
-  }
-
-  async handleClosePublicChannel() {
-    return this.handleCloseCurrentSession();
   }
 
   async initializeShareCode() {

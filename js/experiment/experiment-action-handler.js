@@ -39,7 +39,6 @@ class ExperimentActionHandler {
       enableRemoteSync: config.enableRemoteSync !== false,
       enableAutoProgress: config.enableAutoProgress !== false,
       autoProgressDelay: config.autoProgressDelay || 3000,
-      enableGestureValidation: config.enableGestureValidation !== false,
       ...config,
     };
 
@@ -48,10 +47,6 @@ class ExperimentActionHandler {
     this.currentActionIndex = 0;
     this.completedActions = new Set();
     this.actionHistory = [];
-
-    // 手勢狀態
-    this.gestureSequence = [];
-    this.currentGestureIndex = 0;
 
     // 自動推進計時器
     this.autoProgressTimer = null;
@@ -188,17 +183,6 @@ class ExperimentActionHandler {
         expected: currentAction.expected_button || currentActionId,
         actual: actionId,
       };
-    }
-
-    // 如果啟用手勢驗證，檢查手勢序列
-    if (
-      this.config.enableGestureValidation &&
-      this.gestureSequence.length > 0
-    ) {
-      const gestureValid = this.validateGesture(actionId);
-      if (!gestureValid.valid) {
-        return gestureValid;
-      }
     }
 
     this.emit(ExperimentActionHandler.EVENT.ACTION_VALIDATED, {
@@ -511,115 +495,7 @@ class ExperimentActionHandler {
     return [...this.actionHistory];
   }
 
-  /**
-   * 清除動作歷史
-   */
-  clearActionHistory() {
-    this.actionHistory = [];
-  }
-
   // ==================== 手勢處理 ====================
-
-  /**
-   * 設定手勢序列
-   */
-  setGestureSequence(gestures) {
-    if (!Array.isArray(gestures)) {
-      Logger.error("手勢序列必須是陣列");
-      return false;
-    }
-
-    this.gestureSequence = gestures;
-    this.currentGestureIndex = 0;
-
-    Logger.debug("手勢序列已設定", {
-      gestureCount: gestures.length,
-    });
-
-    return true;
-  }
-
-  /**
-   * 處理按鈕點擊手勢
-   */
-  handleButtonClick(buttonId) {
-    Logger.debug("處理按鈕點擊", buttonId);
-
-    this.emit(ExperimentActionHandler.EVENT.GESTURE_DETECTED, {
-      type: "button_click",
-      buttonId,
-      timestamp: Date.now(),
-    });
-
-    return this.handleCorrectAction(buttonId, {
-      gestureType: "button_click",
-    });
-  }
-
-  /**
-   * 處理手勢組合
-   */
-  handleGestureCombination(gestures) {
-    if (!Array.isArray(gestures)) {
-      return false;
-    }
-
-    Logger.debug("處理手勢組合", gestures);
-
-    // 驗證手勢序列
-    for (let i = 0; i < gestures.length; i++) {
-      const valid = this.validateGesture(gestures[i]);
-      if (!valid.valid) {
-        return false;
-      }
-    }
-
-    this.emit(ExperimentActionHandler.EVENT.GESTURE_DETECTED, {
-      type: "gesture_combination",
-      gestures,
-      timestamp: Date.now(),
-    });
-
-    return true;
-  }
-
-  /**
-   * 驗證手勢順序
-   */
-  validateGesture(gestureId) {
-    if (this.gestureSequence.length === 0) {
-      return { valid: true };
-    }
-
-    if (this.currentGestureIndex >= this.gestureSequence.length) {
-      return {
-        valid: false,
-        error: "手勢序列已完成",
-      };
-    }
-
-    const expectedGesture = this.gestureSequence[this.currentGestureIndex];
-
-    if (expectedGesture !== gestureId) {
-      return {
-        valid: false,
-        error: "手勢順序不正確",
-        expected: expectedGesture,
-        actual: gestureId,
-      };
-    }
-
-    this.currentGestureIndex++;
-
-    return { valid: true };
-  }
-
-  /**
-   * 重置手勢序列
-   */
-  resetGestureSequence() {
-    this.currentGestureIndex = 0;
-  }
 
   // ==================== 步驟轉換 ====================
 
@@ -648,29 +524,6 @@ class ExperimentActionHandler {
   }
 
   /**
-   * 設定轉換條件
-   */
-  setTransitionCondition(condition) {
-    this.transitionCondition = condition;
-    Logger.debug("步驟轉換條件已設定");
-  }
-
-  /**
-   * 檢查轉換條件
-   */
-  checkTransitionCondition() {
-    if (!this.transitionCondition) {
-      return true;
-    }
-
-    if (typeof this.transitionCondition === "function") {
-      return this.transitionCondition();
-    }
-
-    return true;
-  }
-
-  /**
    * 處理序列完成
    */
   handleSequenceCompleted() {
@@ -682,21 +535,18 @@ class ExperimentActionHandler {
       history: this.getActionHistory(),
     });
 
-    // 檢查是否需要自動轉換到下一步
-    if (this.checkTransitionCondition()) {
-      // 檢查是否還有下一個單元，避免"沒有目前單元"警告
-      const flowManager = this.flowManager;
-      if (flowManager) {
-        const currentUnitIndex = flowManager.currentUnitIndex;
-        const totalUnits = flowManager.loadedUnits.length;
+    // 檢查是否還有下一個單元，避免"沒有目前單元"警告
+    const flowManager = this.dependencies.flowManager;
+    if (flowManager) {
+      const currentUnitIndex = flowManager.currentUnitIndex;
+      const totalUnits = flowManager.loadedUnits.length;
 
-        // 只有當還有下一個單元時，才嘗試轉換
-        if (currentUnitIndex < totalUnits - 1) {
-          this.executeStepTransition();
-        } else {
-          Logger.debug("所有單元已完成，不執行步驟轉換");
-          // 實驗會由 nextUnit() 中的 completeExperiment() 處理停止
-        }
+      // 只有當還有下一個單元時，才嘗試轉換
+      if (currentUnitIndex < totalUnits - 1) {
+        this.executeStepTransition();
+      } else {
+        Logger.debug("所有單元已完成，不執行步驟轉換");
+        // 實驗會由 nextUnit() 中的 completeExperiment() 處理停止
       }
     }
   }
@@ -928,8 +778,6 @@ class ExperimentActionHandler {
       currentActionIndex: this.currentActionIndex,
       totalActions: this.currentActionSequence.length,
       completedActions: this.completedActions.size,
-      gestureSequence: [...this.gestureSequence],
-      currentGestureIndex: this.currentGestureIndex,
       config: { ...this.config },
     };
   }
@@ -942,8 +790,6 @@ class ExperimentActionHandler {
     this.currentActionIndex = 0;
     this.completedActions.clear();
     this.actionHistory = [];
-    this.gestureSequence = [];
-    this.currentGestureIndex = 0;
     this.clearAutoProgress();
     Logger.debug("ActionHandler 已重置");
   }
@@ -954,7 +800,6 @@ class ExperimentActionHandler {
   destroy() {
     this.reset();
     this.clearListeners();
-    this.transitionCondition = null;
     Logger.debug("ActionHandler 已銷毀");
   }
 }

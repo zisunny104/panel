@@ -303,51 +303,6 @@ export class MessageHandler {
   }
 
   /**
-   * 處理實驗操作訊息
-   * @param {string} wsConnectionId - WebSocket 連線 ID
-   * @param {Object} data - { sessionId, action, ... }
-   * @param {WebSocket} ws - WebSocket 連線
-   */
-  async handleExperimentAction(wsConnectionId, data, ws) {
-    const { sessionId, action, ...actionData } = data;
-
-    // 驗證必要欄位
-    if (!sessionId || !action) {
-      throw new Error("實驗操作失敗: 缺少必要欄位");
-    }
-
-    // 驗證工作階段有效性
-    const session = this._validateSessionAndCleanup(
-      wsConnectionId,
-      sessionId,
-      ws,
-    );
-    if (!session) {
-      return; // 連線已被清理
-    }
-
-    try {
-      // 廣播實驗事件
-      this.broadcastManager.broadcastExperimentEvent(
-        sessionId,
-        action,
-        actionData,
-      );
-
-      // 發送確認回應
-      this.sendResponse(ws, "experiment_action_ack", {
-        sessionId,
-        action,
-        timestamp: Date.now(),
-      });
-
-      console.log(`實驗操作: ${action} (工作階段: ${sessionId})`);
-    } catch (error) {
-      throw new Error(`實驗操作失敗: ${error.message}`);
-    }
-  }
-
-  /**
    * 處理取得工作階段狀態請求
    * @param {string} wsConnectionId - WebSocket 連線 ID
    * @param {Object} data - { sessionId }
@@ -593,20 +548,13 @@ export class MessageHandler {
 
   _resolveExperimentEventType(state) {
     if (!state) return null;
-    if (state.type === "experiment_started") return "started";
-    if (state.type === "experiment_paused") return "paused";
-    if (state.type === "experiment_resumed") return "resumed";
-    if (state.type === "experiment_stopped") return "stopped";
-    if (state.type === "experiment_paused") {
-      return "paused";
-    }
-    if (state.type === "experiment_resumed") {
-      return "resumed";
-    }
-    if (state.type === "experiment_stopped") {
-      return "stopped";
-    }
-    return null;
+    const map = {
+      experiment_started: "started",
+      experiment_paused: "paused",
+      experiment_resumed: "resumed",
+      experiment_stopped: "stopped",
+    };
+    return map[state.type] || null;
   }
 
   /**

@@ -398,8 +398,6 @@ class ButtonManager {
       `處理按鈕動作: ${buttonId} -> ${functionName}, 序列長度: ${actionHandler.currentActionSequence.length}`,
     );
     return this.handleActionBasedExperiment(buttonId, functionName, isRemote);
-
-    return false;
   }
 
   /**
@@ -500,29 +498,7 @@ class ButtonManager {
             actionHandler.currentActionIndex = nextActionIndex;
           }
 
-          // 使用統一的冷卻邏輯計算方法
-          const cooldownState = this._calculateCooldownState(completedAction, nextAction);
-
-          if (cooldownState.shouldCooldown) {
-            Logger.debug(
-              `觸發冷卻效果: ${cooldownState.reason} | ` +
-                `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-                `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
-                `Step Actions: ${cooldownState.stepActions.length} | ` +
-                `下一個Action: ${nextAction?.actionId || "無"}`,
-            );
-            this.triggerStepCompleteEffect();
-          } else {
-            Logger.debug(
-              `跳過冷卻效果: ${cooldownState.reason} | ` +
-                `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-                `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
-                `Step Actions: ${cooldownState.stepActions.length} | ` +
-                `下一個Action: ${nextAction?.actionId || "無"}`,
-            );
-            // 更新媒體顯示
-            this.updateMediaForCurrentAction();
-          }
+          this._applyCooldownOutcome(completedAction, nextAction);
 
           return true;
         }
@@ -533,29 +509,7 @@ class ButtonManager {
 
         const nextAction = actionHandler.getCurrentAction();
 
-        // 使用統一的冷卻邏輯計算方法
-        const cooldownState = this._calculateCooldownState(completedAction, nextAction);
-
-        if (cooldownState.shouldCooldown) {
-          Logger.debug(
-            `觸發冷卻效果: ${cooldownState.reason} | ` +
-              `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-              `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
-              `Step Actions: ${cooldownState.stepActions.length} | ` +
-              `下一個Action: ${nextAction?.actionId || "無"}`,
-          );
-          this.triggerStepCompleteEffect();
-        } else {
-          Logger.debug(
-            `跳過冷卻效果: ${cooldownState.reason} | ` +
-              `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-              `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
-              `Step Actions: ${cooldownState.stepActions.length} | ` +
-              `下一個Action: ${nextAction?.actionId || "無"}`,
-          );
-          // 更新媒體顯示
-          this.updateMediaForCurrentAction();
-        }
+        this._applyCooldownOutcome(completedAction, nextAction);
         return true;
       }
     }
@@ -738,6 +692,27 @@ class ButtonManager {
     return { shouldCooldown, reason, stepInfo, stepActions };
   }
 
+  _applyCooldownOutcome(completedAction, nextAction) {
+    const cooldownState = this._calculateCooldownState(
+      completedAction,
+      nextAction,
+    );
+    const actionSummary =
+      `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
+      `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
+      `Step Actions: ${cooldownState.stepActions.length} | ` +
+      `下一個Action: ${nextAction?.actionId || "無"}`;
+
+    if (cooldownState.shouldCooldown) {
+      Logger.debug(`觸發冷卻效果: ${cooldownState.reason} | ${actionSummary}`);
+      this.triggerStepCompleteEffect();
+      return;
+    }
+
+    Logger.debug(`跳過冷卻效果: ${cooldownState.reason} | ${actionSummary}`);
+    this.updateMediaForCurrentAction();
+  }
+
   /**
    * 檢查按鈕是否符合目前 action 的要求
    */
@@ -829,7 +804,7 @@ class ButtonManager {
     let currentAction = actionHandler.getCurrentAction();
     while (currentAction && !currentAction.action_buttons) {
       if (currentAction.media_file && mediaManager) {
-        mediaManager.displayMedia(currentAction.media_file);
+        mediaManager.showStepMedia(currentAction.media_file);
       } else if (mediaManager) {
         mediaManager.playHomePageLoop(true);
       }
@@ -841,7 +816,7 @@ class ButtonManager {
       // 檢查電源狀態
       if (isPowerOn) {
         if (currentAction.media_file && mediaManager) {
-          mediaManager.displayMedia(currentAction.media_file);
+          mediaManager.showStepMedia(currentAction.media_file);
         } else if (mediaManager) {
           mediaManager.playHomePageLoop(true);
         }

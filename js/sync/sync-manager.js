@@ -1,11 +1,11 @@
 /**
  * SyncManager - 多裝置同步管理器主入口
  *
- * 整合核心、UI、QR、Sessions 四個模組
+ * 整合核心、UI、Sessions 三個模組
  */
 import { SyncManagerCore } from "./sync-manager-core.js";
 import { SyncManagerUI } from "./sync-manager-ui.js";
-import { SyncManagerSessions } from "./sync-manager-sessions.js";
+import { SyncSessionsModal } from "./sync-sessions-modal.js";
 import SyncConfirmDialogManager from "./sync-confirm-dialog.js";
 import { SYNC_EVENTS } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
@@ -133,7 +133,7 @@ class SyncManager {
       syncClientProvider: () => this.core.syncClient,
       indicatorManager: this.indicatorManager,
     });
-    this.sessions = new SyncManagerSessions(this.core, {
+    this.sessions = new SyncSessionsModal(this.core, {
       syncManager: SyncManager,
       roleConfig: SyncManager.ROLE,
       timeSyncManager: this.core?.timeSyncManager,
@@ -249,9 +249,9 @@ class SyncManager {
         );
       });
 
-    // 當工作階段加入時，初始化 QR 和 Sessions 模組（動態進入同步）
+    // 當工作階段加入時，動態初始化 Sessions 模組
     const sessionJoinedDynamicHandler = () => {
-      Logger.debug("工作階段已加入，初始化 QR 和 Sessions 模組");
+      Logger.debug("工作階段已加入，初始化 Sessions 模組");
 
       // 如果之前在本機模式，現在需要動態初始化 Sessions
       if (!this.isSyncMode) {
@@ -578,7 +578,7 @@ class SyncManager {
 
     this.isCheckingConnection = true;
     try {
-      await this.core.checkConnection();
+      await this.core.checkServerHealth();
       // 只有在同步模式且 UI 已初始化時才更新指示器
       if (this.isSyncMode && this.ui?.initialized) {
         this.ui.updateIndicator();

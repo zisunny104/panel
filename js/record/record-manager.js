@@ -30,9 +30,10 @@ class RecordManager {
    * @param {Object} [options.stateManager]   - 實驗狀態管理器（用於監聽實驗 ID 變更）
    */
   constructor({ timeSyncManager = null, stateManager = null } = {}) {
-    // 日誌狀態
-    this.logs = [];
-    this.pendingLogs = [];
+    // 記錄狀態
+    this.records = [];
+    this.pendingRecords = [];
+    this._persistedRecordRefs = new WeakSet();
     this.experimentId = null;
     this.participantName = null;
     this.experimentStartTime = null;
@@ -42,7 +43,7 @@ class RecordManager {
     // 設定
     this.syncEnabled = false;
     this.bufferSize = 10;
-    this.maxPendingLogs = 100;
+    this.maxPendingRecords = 100;
 
     // 注入的依賴
     this.timeSyncManager = timeSyncManager;
@@ -55,9 +56,9 @@ class RecordManager {
 
     // IndexedDB
     this.db = null;
-    this.dbName = "ExperimentLogsDB";
+    this.dbName = "ExperimentRecordsDB";
     this.dbVersion = 1;
-    this.pendingLogsStore = "pendingLogs";
+    this.pendingRecordsStore = "pendingRecords";
 
     // 多分頁同步
     this.broadcastChannel = null;
@@ -148,8 +149,9 @@ class RecordManager {
     try {
       this.setExperimentId(experimentId, "initialize");
       this.participantName = participantName || `受試者_${experimentId}`;
-      this.logs = [];
-      this.pendingLogs = [];
+      this.records = [];
+      this.pendingRecords = [];
+      this._persistedRecordRefs = new WeakSet();
       this.experimentStartTime = null;
       this._lastFlushAllExperimentId = null;
       this._flushAllInProgress = false;
@@ -183,8 +185,6 @@ class RecordManager {
       detail: { experimentId, source },
     }));
   }
-
-  setInternalExperimentId(experimentId) { this.experimentId = experimentId; }
 
   // ─── 公開 API：日誌記錄 ────────────────────────────────────────────────────
 
@@ -389,12 +389,6 @@ class RecordManager {
     this._addLog(logEntry);
   }
 
-  getLogs() { return [...this.logs]; }
-
-  getLogsAsJSONL() {
-    return this.logs.map((log) => JSON.stringify(log)).join("\n");
-  }
-
   // ─── 儲存 ──────────────────────────────────────────────────────────────────
 
   /**
@@ -402,12 +396,12 @@ class RecordManager {
    * @returns {Promise<boolean>} 是否有日誌被寫入
    */
   async flushPendingLogs() {
-    if (this.pendingLogs.length === 0) return false;
-    Logger.info(`立即 flush ${this.pendingLogs.length} 條日誌到 IndexedDB`);
+    if (this.pendingRecords.length === 0) return false;
+    const flushedCount = this.pendingRecords.length;
+    Logger.info(`立即 flush ${flushedCount} 筆暫存記錄`);
     try {
-      await this._savePendingLogsToIndexedDB();
-      this.pendingLogs = [];
-      this._broadcastMessage("logsFlushed", { count: this.logs.length, timestamp: Date.now() });
+      this.pendingRecords = [];
+      this._broadcastMessage("recordsFlushed", { count: flushedCount, timestamp: Date.now() });
       return true;
     } catch (error) {
       Logger.error("flush 日誌失敗:", error);
@@ -427,17 +421,30 @@ class RecordManager {
 
     this._flushAllInProgress = true;
     try {
-      if (this.pendingLogs.length > 0) {
-        await this._savePendingLogsToIndexedDB();
-        this.pendingLogs = [];
-      }
+      await this.flushPendingLogs();
 
+      const savedRecordCount = this.records.length;
       const savedToRuntime = await this._saveToRuntimeFolder();
       if (savedToRuntime) {
         await this._removeLogsByExperimentIdFromIndexedDB(this._getCurrentExperimentId());
+        if (currentExperimentId) {
+          this.records = this.records.filter(
+            (record) => record.exp_id !== currentExperimentId && record.experimentId !== currentExperimentId,
+          );
+          this.pendingRecords = this.pendingRecords.filter(
+            (record) => record.exp_id !== currentExperimentId && record.experimentId !== currentExperimentId,
+          );
+        } else {
+          this.records = [];
+          this.pendingRecords = [];
+        }
+        this._broadcastMessage("recordsSynced", {
+          count: savedRecordCount,
+          source: "runtime_saved",
+        });
       }
 
-      this.view?.showCompletionDisplay(this.logs.length);
+      this.view?.showCompletionDisplay(savedRecordCount);
 
       if (currentExperimentId) this._lastFlushAllExperimentId = currentExperimentId;
     } catch (error) {
@@ -449,8 +456,9 @@ class RecordManager {
 
   /** 清空記憶體日誌與 IndexedDB（用於實驗重置） */
   clear() {
-    this.logs = [];
-    this.pendingLogs = [];
+    this.records = [];
+    this.pendingRecords = [];
+    this._persistedRecordRefs = new WeakSet();
     this._clearIndexedDB();
     Logger.info("日誌已清空");
   }
@@ -464,8 +472,9 @@ class RecordManager {
       try {
         const req = indexedDB.deleteDatabase(this.dbName);
         req.onsuccess = () => {
-          this.logs = [];
-          this.pendingLogs = [];
+          this.records = [];
+          this.pendingRecords = [];
+          this._persistedRecordRefs = new WeakSet();
           this.db = null;
           const keys = [
             "loggerMinimized", "sync_session_backup", "sync_session_id",
@@ -501,68 +510,46 @@ class RecordManager {
   }
 
   _addLog(logEntry) {
-    this.logs.push(logEntry);
-    this.pendingLogs.push(logEntry);
+    this.records.push(logEntry);
+    this.pendingRecords.push(logEntry);
     this._saveLogToIndexedDB(logEntry);
-    this._broadcastMessage("logAdded", { logCount: this.pendingLogs.length });
+    this._broadcastMessage("recordAdded", { recordCount: this.pendingRecords.length });
 
     // 防止記憶體溢出
-    if (this.pendingLogs.length > this.maxPendingLogs) {
-      this.pendingLogs.shift();
+    if (this.pendingRecords.length > this.maxPendingRecords) {
+      this.pendingRecords.shift();
     }
 
     // 達到緩衝上限時批次寫入
-    if (this.pendingLogs.length >= this.bufferSize) {
+    if (this.pendingRecords.length >= this.bufferSize) {
       this._flushLogs();
     }
 
     // 通知 View 更新即時顯示
-    this.view?.updateLiveDisplay(this.logs);
+    this.view?.updateLiveDisplay(this.records);
   }
 
   async _flushLogs() {
-    if (this.pendingLogs.length === 0) return;
+    if (this.pendingRecords.length === 0) return;
     try {
-      await this._savePendingLogsToIndexedDB();
-      this.pendingLogs = [];
+      await this.flushPendingLogs();
     } catch (error) {
       Logger.error("寫入 IndexedDB 失敗:", error);
     }
-  }
-
-  async _savePendingLogsToIndexedDB() {
-    if (!this.db || this.pendingLogs.length === 0) return;
-
-    const transaction = this.db.transaction([this.pendingLogsStore], "readwrite");
-    const store = transaction.objectStore(this.pendingLogsStore);
-
-    await Promise.all(
-      this.pendingLogs.map((log) => new Promise((resolve) => {
-        const req = store.add({ ...log, savedAt: Date.now() });
-        req.onsuccess = () => resolve();
-        req.onerror = () => resolve(); // 不中斷其他日誌的儲存
-      })),
-    );
-
-    this._broadcastMessage("logsSynced", {
-      count: this.pendingLogs.length,
-      source: "buffer_flush",
-    });
   }
 
   // ─── BroadcastChannel ──────────────────────────────────────────────────────
 
   _initBroadcastChannel() {
     try {
-      this.broadcastChannel = new BroadcastChannel("ExperimentLogsChannel");
+      this.broadcastChannel = new BroadcastChannel("ExperimentRecordsChannel");
       this.broadcastChannel.onmessage = (event) => {
         const { type, senderTabId } = event.data;
         if (senderTabId === this.tabId) return;
 
-        if (type === "logsSynced" || type === "logAdded") {
-          this._restorePendingLogsFromIndexedDB();
-        } else if (type === "logsCleared") {
-          this.pendingLogs = [];
+        if (type === "recordsCleared") {
+          this.records = [];
+          this.pendingRecords = [];
         }
       };
     } catch (error) {
@@ -587,5 +574,3 @@ Object.assign(RecordManager.prototype, recordStore, recordRuntime);
 
 export default RecordManager;
 export { RecordManager };
-// 向後相容別名
-export { RecordManager as ExperimentLogManager };

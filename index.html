@@ -90,7 +90,7 @@
     </div>
 
     <!-- 設定面板 -->
-    <div class="settings-panel" id="settingsPanel">
+    <div class="settings-panel is-hidden" id="settingsPanel">
         <div class="settings-panel-header">
             <strong>設定面板</strong>
             <button id="closeSettingsPanel" class="circle-close-btn" title="關閉">
@@ -170,11 +170,9 @@
 
             <!-- 媒體控制區 -->
             <div class="control-group">媒體控制</div>
-            <div class="control-group">
+            <div class="control-group power-button-grid">
                 <button id="powerOnBtn" class="media-power-btn power-on">開機</button>
                 <button id="quickPowerOnBtn" class="media-power-btn quick-power">快速開機</button>
-            </div>
-            <div class="control-group">
                 <button id="powerOffBtn" class="media-power-btn power-off">關機</button>
                 <button id="emergencyStopBtn" class="media-power-btn emergency-stop">緊急停止</button>
             </div>

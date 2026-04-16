@@ -15,7 +15,7 @@ import {
   ACTION_BUTTONS,
   SYNC_DATA_TYPES,
 } from "../constants/index.js";
-import { experimentSyncManager } from "./board-sync-manager.js";
+import { experimentSyncManager } from "./board-experiment-sync.js";
 import { BoardSyncIO } from "./board-sync-io.js";
 import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
 import { buildBoardGestureScript } from "../experiment/experiment-script-builder.js";
@@ -26,7 +26,7 @@ import { initializeBoardManagers } from "./board-init.js";
 class BoardPageManager {
   constructor() {
     this.initStages = {
-      SCRIPTS_LOADING: "scripts_loading",
+      DEPENDENCY_READY: "dependency_ready",
       MODULES_INIT: "modules_init",
       COMPONENTS_INIT: "components_init",
       COMPLETE: "complete",
@@ -35,18 +35,17 @@ class BoardPageManager {
     this.currentStage = null;
     this.stageStartTime = null;
     this._listenersSetup = false; // 防止事件監聽器重複設定
-    this._gestureHandlersBound = false;
     this._contentAreaListeners = null;
     this._exportGestureBound = false;
 
     this.timerManager = null;
     this.gestureUtils = null;
     this.syncManager = null;
-    this.experimentLogManager = null;
+    this.recordManager = null;
     this.experimentStateManager = null;
     this.syncIO = null;
-
-    this.config = {};
+    this._lastCombinationLoadSignature = null;
+    this._lastCombinationRenderSignature = null;
   }
 
   /**
@@ -73,6 +72,15 @@ class BoardPageManager {
     this.stageStartTime = null;
   }
 
+  async _runInitStage(stage, task) {
+    this.startStage(stage);
+    try {
+      await task();
+    } finally {
+      this.endStage();
+    }
+  }
+
   /**
    * 初始化 Board 頁面（載入腳本並初始化模組）
    */
@@ -81,20 +89,17 @@ class BoardPageManager {
     try {
       Logger.debug("BoardPageManager 開始初始化");
 
-      //載入腳本
-      this.startStage(this.initStages.SCRIPTS_LOADING);
-      await this.loadAllScripts();
-      this.endStage();
+      await this._runInitStage(this.initStages.DEPENDENCY_READY, async () => {
+        await this.prepareDependencies();
+      });
 
-      //初始化模組
-      this.startStage(this.initStages.MODULES_INIT);
-      await this.initializeModules();
-      this.endStage();
+      await this._runInitStage(this.initStages.MODULES_INIT, async () => {
+        await this.initializeModules();
+      });
 
-      //初始化其他元件
-      this.startStage(this.initStages.COMPONENTS_INIT);
-      await this.initializeOtherComponents();
-      this.endStage();
+      await this._runInitStage(this.initStages.COMPONENTS_INIT, async () => {
+        this.initializeRemainingComponents();
+      });
 
       // 完成
       this.currentStage = this.initStages.COMPLETE;
@@ -107,17 +112,12 @@ class BoardPageManager {
         error,
       );
       // 即使失敗也嘗試繼續基本功能
-      await this.initializeOtherComponents().catch((e) => {
+      try {
+        this.initializeRemainingComponents();
+      } catch (e) {
         Logger.error("初始化其他元件失敗:", e);
-      });
+      }
     }
-  }
-
-  /**
-   * 載入所有腳本
-   */
-  async loadAllScripts() {
-    await this.loadDependencies();
   }
 
   /**
@@ -126,98 +126,16 @@ class BoardPageManager {
   async initializeModules() {
     // 先載入 scenarioData，以便在 SystemManager 初始化時可用
     await this.loadScenarioData();
-    await this.initializeManagersSimplified();
-  }
-
-  /**
-   * 初始化其他元件
-   */
-  async initializeOtherComponents() {
-    this.initializeRemainingComponents();
+    await initializeBoardManagers(this);
   }
 
   /**
    * 載入實驗頁面所需的依賴腳本
    */
-  async loadDependencies() {
-    const dependencies = [
-      // 核心基礎設施
-      { src: "js/core/console-manager.js", isModule: true },
-      { src: "js/core/config.js", isModule: true },
-      { src: "js/core/websocket-client.js", isModule: true },
-      { src: "js/core/time-sync-manager.js", isModule: true },
-      { src: "js/experiment/experiment-state-manager.js", isModule: true },
-
-      // 同步系統
-      { src: "js/sync/sync-client.js", isModule: true },
-      { src: "js/experiment/experiment-hub-manager.js", isModule: true },
-
-      // 核心工具
-      { src: "js/constants/action-constants.js", isModule: true },
-      { src: "js/core/data-loader.js", isModule: true },
-      { src: "js/core/random-utils.js", isModule: true },
-
-      // 實驗模組架構
-      {
-        src: "js/experiment/experiment-combination-manager.js",
-        isModule: true,
-      },
-      { src: "js/experiment/experiment-flow-manager.js", isModule: true },
-      { src: "js/experiment/experiment-action-handler.js", isModule: true },
-      { src: "js/experiment/experiment-ui-manager.js", isModule: true },
-
-      // 實驗系統管理器
-      { src: "js/experiment/experiment-system-manager.js", isModule: true },
-
-      // 計時器管理
-      { src: "js/experiment/experiment-timer.js", isModule: true },
-
-      // Board 專用模組
-      { src: "js/board/board-ui-manager.js", isModule: true },
-      { src: "js/board/board-gesture-utils.js", isModule: true },
-
-      // 同步與對話框（experiment-sync-manager 必須在 board-sync-manager 之前，確保 ExperimentSyncCore 先建立）
-      { src: "js/sync/experiment-sync-manager.js", isModule: true },
-      { src: "js/board/board-sync-manager.js", isModule: true },
-      { src: "js/sync/sync-confirm-dialog.js", isModule: true },
-      { src: "js/constants/sync-events-constants.js", isModule: true },
-      { src: "js/sync/sync-manager.js", isModule: true },
-    ];
-
-    // 並行載入所有腳本以提升效能
-    const promises = dependencies.map((dep) =>
-      this.loadScript(dep.src, dep.isModule),
-    );
-    await Promise.all(promises);
-  }
-
-  /**
-   * 動態載入腳本
-   */
-  loadScript(src, isModule = false) {
-    return new Promise((resolve, reject) => {
-      // 檢查是否已經載入
-      if (document.querySelector(`script[src="${src}"]`)) {
-        resolve();
-        return;
-      }
-
-      const script = document.createElement("script");
-      script.src = src;
-      if (isModule) {
-        script.type = "module";
-      }
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error(`載入腳本失敗: ${src}`));
-      document.head.appendChild(script);
-    });
-  }
-
-  /**
-   * 管理器初始化
-   */
-  async initializeManagersSimplified() {
-    await initializeBoardManagers(this);
+  async prepareDependencies() {
+    // board.html 已透過 module bootstrap + 靜態 import 鏈載入依賴，
+    // 這裡保留初始化階段但不再動態注入 script，避免雙軌載入互相干擾。
+    Logger.debug("Board 依賴由靜態 import 鏈提供，略過動態 script 載入");
   }
 
   /**
@@ -225,27 +143,29 @@ class BoardPageManager {
    */
   initializeRemainingComponents() {
     // 保留 modules_init 階段已載入的資料，避免重複載入造成啟動成本上升。
-    this.scenariosData = this.scenariosData || null;
-    this.scriptData = this.scriptData || null;
-    this.gesturesData = this.gesturesData || null;
-    this.currentUnit = this.currentUnit || null;
-    this.currentStep = this.currentStep || 0;
-    this.currentCombination = this.currentCombination || null;
-    this.currentUnitOrder = this.currentUnitOrder || [];
-    this.sessionId = this.generateSessionId();
-    this.experimentRunning = false;
-    this.gestureStats = {};
-    this.participantName = "";
-    this.lastSavedParticipantName = "";
-    this.pendingExperimentIdUpdate = null;
-    this.pendingParticipantNameUpdate = null;
-    this.actionsMap = this.actionsMap || new Map();
-    this.actionToStepMap = this.actionToStepMap || new Map();
-    this.currentActionSequence = [];
-    this.currentActionIndex = 0;
-    this.completedActions = new Set();
-    this.actionTimings = new Map();
-    this.processedRemoteActions = new Map();
+    Object.assign(this, {
+      scenariosData: this.scenariosData || null,
+      scriptData: this.scriptData || null,
+      gesturesData: this.gesturesData || null,
+      currentUnit: this.currentUnit || null,
+      currentStep: this.currentStep || 0,
+      currentCombination: this.currentCombination || null,
+      currentUnitOrder: this.currentUnitOrder || [],
+      sessionId: this.generateSessionId(),
+      experimentRunning: false,
+      participantName: "",
+      lastSavedParticipantName: "",
+      pendingExperimentIdUpdate: null,
+      pendingParticipantNameUpdate: null,
+      actionsMap: this.actionsMap || new Map(),
+      actionToStepMap: this.actionToStepMap || new Map(),
+      currentActionSequence: [],
+      currentActionIndex: 0,
+      completedActions: new Set(),
+      actionTimings: new Map(),
+      processedRemoteActions: new Map(),
+    });
+    this._lastCombinationRenderSignature = null;
     // 避免遠端 action 短時間內重複處理
     this.remoteActionDedupeWindow = 500;
     this.experimentStartedAt = 0;
@@ -349,15 +269,15 @@ class BoardPageManager {
     this.experimentStartedAt = Date.now();
 
     // 初始化日誌管理器與即時日誌 UI（統一由 flowStarted 驅動）
-    if (this.experimentLogManager) {
+    if (this.recordManager) {
       const experimentIdInput = document.getElementById("experimentIdInput");
       const experimentId = experimentIdInput?.value || data.experimentId || "";
       const participantNameInput = document.getElementById("participantNameInput");
       const participantName =
         participantNameInput?.value?.trim() || this.participantName || "";
 
-      this.experimentLogManager.initialize(experimentId, participantName);
-      this.experimentLogManager.logExperimentStart();
+      this.recordManager.initialize(experimentId, participantName);
+      this.recordManager.logExperimentStart();
       Logger.debug(`日誌管理器已初始化: ID=${experimentId}`);
     }
 
@@ -402,7 +322,7 @@ class BoardPageManager {
    */
   _handleFlowPaused(data) {
     // FlowManager 已自動發出 EXPERIMENT_PAUSED DOM 事件，此處只進行特化 board 操作
-    this.experimentLogManager?.logExperimentPause();
+    this.recordManager?.logExperimentPause();
     experimentSyncManager.registerExperimentStateToHub({
       type: SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
       experimentId:
@@ -427,7 +347,7 @@ class BoardPageManager {
    */
   _handleFlowResumed(data) {
     // FlowManager 已自動發出 EXPERIMENT_RESUMED DOM 事件，此處只進行特化 board 操作
-    this.experimentLogManager?.logExperimentResume();
+    this.recordManager?.logExperimentResume();
     experimentSyncManager.registerExperimentStateToHub({
       type: SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
       experimentId:
@@ -479,11 +399,11 @@ class BoardPageManager {
     this.experimentStartedAt = 0;
 
     // 停止日誌記錄並準備匯出
-    if (this.experimentLogManager) {
+    if (this.recordManager) {
       try {
         // 立即儲存所有待處理的日誌
-        if (typeof this.experimentLogManager.flushPendingLogs === "function") {
-          this.experimentLogManager.flushPendingLogs();
+        if (typeof this.recordManager.flushPendingLogs === "function") {
+          this.recordManager.flushPendingLogs();
         }
 
         Logger.debug("Board: 已清空日誌緩衝區");
@@ -551,23 +471,31 @@ class BoardPageManager {
     return generateExperimentId();
   }
 
+  _syncCombinationDetailRender() {
+    if (!this.boardUIManager?.initialized || !this.currentCombination) return false;
+
+    const signature = this._lastCombinationLoadSignature || JSON.stringify({
+      combinationId: this.currentCombination?.combinationId || "",
+      combinationName: this.currentCombination?.combinationName || "",
+      gestureCount: this.currentCombination?.gestures?.length || 0,
+    });
+
+    if (this._lastCombinationRenderSignature === signature) return true;
+
+    this.boardUIManager.renderUnitDetail();
+    this._lastCombinationRenderSignature = signature;
+    Logger.debug("Board: 右面板手勢序列已同步渲染");
+    return true;
+  }
+
   /**
    * 初始化實驗頁面管理器
    */
   async init() {
     await this.boardUIManager.renderUnifiedUI();
-    if (this.experimentSystemManager && this.scriptData?.units) {
-      await this.experimentSystemManager.initializeUI(
-        {
-          combinationSelector: "#combinationSelectorContainer",
-          unitPanel: "#unitsPanelContainer",
-          experimentControls: "#experimentControlsContainer",
-        },
-        this.scriptData,
-      );
-    } else {
-      Logger.warn("Board: 略過統一 UI 初始化（ExperimentSystemManager 或 scriptData 未就緒）");
-    }
+
+    this._syncCombinationDetailRender();
+
     this.boardUIManager.renderGestureTypesReference();
     this.setupParticipantNameListener();
     if (!this.syncIO) {
@@ -687,8 +615,7 @@ class BoardPageManager {
 
       this.currentCombination = script;
       this._lastCombinationLoadSignature = loadSignature;
-      Logger.debug("loadScriptForCombination: 呼叫 renderUnitDetail()");
-      this.boardUIManager?.renderUnitDetail();
+      this._syncCombinationDetailRender();
     } catch (error) {
       Logger.error("loadScriptForCombination: 載入組合劇本失敗", error);
     }
@@ -707,23 +634,6 @@ class BoardPageManager {
 
       const unitCount = script.unitsSequence ? script.unitsSequence.length : 0;
       document.getElementById("statUnitCount").textContent = unitCount;
-
-      this.gestureStats = {};
-      script.gestures.forEach((g) => {
-        const gestureName = g.name || g.gesture;
-        if (!this.gestureStats[gestureName]) {
-          this.gestureStats[gestureName] = {
-            planned: 0, // 規劃數量（序列中出現次數）
-            completed: 0, // 實際完成次數（點擊下一步）
-            correct: 0, // 正確標記次數
-            uncertain: 0, // 不確定標記次數
-            incorrect: 0, // 錯誤標記次數
-          };
-        }
-        this.gestureStats[gestureName].planned++;
-      });
-
-      this.renderGestureCountList();
 
       if (this.currentActionSequence && this.currentActionSequence.length > 0) {
         const firstAction = this.currentActionSequence[0];
@@ -770,6 +680,22 @@ class BoardPageManager {
       return Number.isNaN(idx) ? null : idx;
     };
 
+    const withTimerCard = (event, handler, options = {}) => {
+      const target = event.target.closest("[data-action]");
+      if (!target || !contentArea.contains(target)) return;
+
+      if (options.skipChildTransition && target.contains(event.relatedTarget)) {
+        return;
+      }
+
+      if (target.dataset.action !== "timer-card") return;
+
+      const idx = parseIndex(target.dataset.gestureIndex);
+      if (idx === null) return;
+
+      handler(idx);
+    };
+
     const onClick = (event) => {
       const target = event.target.closest("[data-action]");
       if (!target || !contentArea.contains(target)) return;
@@ -809,57 +735,25 @@ class BoardPageManager {
     };
 
     const onPointerDown = (event) => {
-      const target = event.target.closest("[data-action]");
-      if (!target || !contentArea.contains(target)) return;
-
-      const action = target.dataset.action;
-      const idx = parseIndex(target.dataset.gestureIndex);
-
-      if (action === "timer-card" && idx !== null) {
+      withTimerCard(event, (idx) => {
         this.timerManager?.longPressStart(idx);
-      }
-
-      if (action === "action-button") {
-        this._startActionRollbackPress(
-          target,
-          target.dataset.actionId,
-          idx,
-        );
-      }
+      });
     };
 
     const onPointerUp = (event) => {
-      const target = event.target.closest("[data-action]");
-      if (!target || !contentArea.contains(target)) return;
-
-      const action = target.dataset.action;
-      const idx = parseIndex(target.dataset.gestureIndex);
-
-      if (action === "timer-card" && idx !== null) {
+      withTimerCard(event, (idx) => {
         this.timerManager?.longPressEnd(idx);
-      }
-
-      if (action === "action-button") {
-        this._endActionRollbackPress(target);
-      }
+      });
     };
 
     const onPointerOut = (event) => {
-      const target = event.target.closest("[data-action]");
-      if (!target || !contentArea.contains(target)) return;
-
-      if (target.contains(event.relatedTarget)) return;
-
-      const action = target.dataset.action;
-      const idx = parseIndex(target.dataset.gestureIndex);
-
-      if (action === "timer-card" && idx !== null) {
-        this.timerManager?.longPressEnd(idx);
-      }
-
-      if (action === "action-button") {
-        this._endActionRollbackPress(target);
-      }
+      withTimerCard(
+        event,
+        (idx) => {
+          this.timerManager?.longPressEnd(idx);
+        },
+        { skipChildTransition: true },
+      );
     };
 
     contentArea.addEventListener("click", onClick);
@@ -878,10 +772,6 @@ class BoardPageManager {
   }
 
   _handleActionButtonClick(buttonElement, actionId, gestureIndex) {
-    if (buttonElement?.getAttribute("data-rollback-fired") === "true") {
-      return;
-    }
-
     if (typeof this.gestureUtils?.activateGestureStep === "function") {
       const idx = Number.isFinite(gestureIndex)
         ? gestureIndex
@@ -892,41 +782,9 @@ class BoardPageManager {
     }
 
     const isCompleted = buttonElement.getAttribute("data-completed") === "true";
-    const now = Date.now();
-    const lastClickTime = parseInt(
-      buttonElement.getAttribute("data-last-click") || "0",
-      10,
-    );
-    const clickDelay = now - lastClickTime;
-
-    buttonElement.setAttribute("data-last-click", now);
-    const isDoubleClick = clickDelay < 300;
-
-    if (isDoubleClick && isCompleted) {
-      this._cancelActionCompletion(buttonElement, actionId, gestureIndex, false);
-    } else if (!isCompleted) {
+    if (!isCompleted) {
       this._markActionCompleted(buttonElement, actionId, gestureIndex, false);
     }
-  }
-
-  _startActionRollbackPress(buttonElement, actionId, gestureIndex) {
-    if (!buttonElement) return;
-    if (buttonElement.getAttribute("data-completed") !== "true") return;
-    if (buttonElement._rollbackTimer) return;
-
-    buttonElement._rollbackTimer = setTimeout(() => {
-      buttonElement.setAttribute("data-rollback-fired", "true");
-      this._cancelActionCompletion(buttonElement, actionId, gestureIndex, false);
-      setTimeout(() => {
-        buttonElement.removeAttribute("data-rollback-fired");
-      }, 600);
-    }, 5000);
-  }
-
-  _endActionRollbackPress(buttonElement) {
-    if (!buttonElement?._rollbackTimer) return;
-    clearTimeout(buttonElement._rollbackTimer);
-    buttonElement._rollbackTimer = null;
   }
 
   _scrollActionCardIntoView(buttonElement) {
@@ -986,8 +844,8 @@ class BoardPageManager {
 
     this._scrollActionCardIntoView(buttonElement);
 
-    if (!isRemote && this.experimentLogManager) {
-      this.experimentLogManager.logAction(actionId, gestureIndex, stepId);
+    if (!isRemote && this.recordManager) {
+      this.recordManager.logAction(actionId, gestureIndex, stepId);
     }
 
     if (!isRemote && actionId) {
@@ -1020,7 +878,6 @@ class BoardPageManager {
     buttonElement,
     actionId,
     gestureIndex,
-    shouldBroadcast = false,
   ) {
     if (!buttonElement) return;
 
@@ -1029,103 +886,13 @@ class BoardPageManager {
     buttonElement.style.borderColor = "#667eea";
     buttonElement.style.boxShadow = "";
 
-    if (this.experimentLogManager) {
-      this.experimentLogManager.logAction(
+    if (this.recordManager) {
+      this.recordManager.logAction(
         `${actionId}_CANCELLED`,
         gestureIndex,
         null,
       );
     }
-
-    void shouldBroadcast;
-  }
-
-  renderGestureCountList() {
-    const listContainer = document.getElementById("gestureCountList");
-    if (!listContainer) return;
-
-    let html = "";
-    const sortedGestures = Object.entries(this.gestureStats).sort(
-      (a, b) => b[1].planned - a[1].planned,
-    );
-
-    if (sortedGestures.length === 0) {
-      html =
-        "<div style=\"color: #999; font-size: 12px; text-align: center; padding: 10px;\">尚無手勢統計記錄</div>";
-    } else {
-      sortedGestures.forEach(([gestureName, stats]) => {
-        const completionRate =
-          stats.planned > 0
-            ? Math.round((stats.completed / stats.planned) * 100)
-            : 0;
-        const hasActivity =
-          stats.completed > 0 ||
-          stats.correct > 0 ||
-          stats.uncertain > 0 ||
-          stats.incorrect > 0;
-
-        html += `
-                    <div style="padding: 10px; background: white; border-radius: 6px; border: 2px solid ${
-                      hasActivity ? "#667eea" : "#e0e0e0"
-                    };">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span style="font-size: 13px; color: #2c3e50; font-weight: 600;">${gestureName}</span>
-                            <span style="font-size: 11px; color: #999;">規劃 ${
-                              stats.planned
-                            } 次</span>
-                        </div>
-
-                        <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-                            <div style="flex: 1; text-align: center; padding: 6px; background: #f0f4ff; border-radius: 4px; border: 1px solid #667eea;">
-                                <div style="font-size: 10px; color: #667eea; margin-bottom: 2px;">完成</div>
-                                <div style="font-size: 16px; font-weight: 700; color: #667eea;">${
-                                  stats.completed
-                                }</div>
-                            </div>
-                            <div style="flex: 1; text-align: center; padding: 6px; background: #f1f8f4; border-radius: 4px; border: 1px solid #4caf50;">
-                                <div style="font-size: 10px; color: #4caf50; margin-bottom: 2px;">正確</div>
-                                <div style="font-size: 16px; font-weight: 700; color: #4caf50;">${
-                                  stats.correct
-                                }</div>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; gap: 8px;">
-                            <div style="flex: 1; text-align: center; padding: 6px; background: #fff8f0; border-radius: 4px; border: 1px solid #ff9800;">
-                                <div style="font-size: 10px; color: #ff9800; margin-bottom: 2px;">△ 不確定</div>
-                                <div style="font-size: 16px; font-weight: 700; color: #ff9800;">${
-                                  stats.uncertain
-                                }</div>
-                            </div>
-                            <div style="flex: 1; text-align: center; padding: 6px; background: #fff5f5; border-radius: 4px; border: 1px solid #f44336;">
-                                <div style="font-size: 10px; color: #f44336; margin-bottom: 2px;">× 錯誤</div>
-                                <div style="font-size: 16px; font-weight: 700; color: #f44336;">${
-                                  stats.incorrect
-                                }</div>
-                            </div>
-                        </div>
-
-                        ${
-                          stats.completed > 0
-                            ? `
-                            <div style="margin-top: 8px; padding: 4px 8px; background: ${
-                              completionRate === 100 ? "#e8f5e9" : "#fff3e0"
-                            }; border-radius: 4px; text-align: center;">
-                                <span style="font-size: 11px; color: ${
-                                  completionRate === 100 ? "#2e7d32" : "#f57c00"
-                                }; font-weight: 600;">
-                                    完成率 ${completionRate}%
-                                </span>
-                            </div>
-                        `
-                            : ""
-                        }
-                    </div>
-                `;
-      });
-    }
-
-    listContainer.innerHTML = html;
   }
 
   /**
@@ -1226,8 +993,8 @@ class BoardPageManager {
     const timingData = this.endActionTiming(actionId);
 
     const stepInfo = this.actionToStepMap.get(actionId);
-    if (this.experimentLogManager?.logAction) {
-      this.experimentLogManager.logAction(actionId, null, stepInfo?.step_id);
+    if (this.recordManager?.logAction) {
+      this.recordManager.logAction(actionId, null, stepInfo?.step_id);
     }
     Logger.debug(`Action完成: ${action.action_name}`, {
       action_id: actionId,
@@ -1253,21 +1020,6 @@ class BoardPageManager {
         this.startActionTiming(nextAction.action_id);
       }
     }
-  }
-
-  /**
-   * 取得action完成進度
-   * @returns {Object} 進度資訊
-   */
-  getActionProgress() {
-    return {
-      completed: this.completedActions.size,
-      total: this.currentActionSequence.length,
-      current_index: this.currentActionIndex,
-      completion_rate: Math.round(
-        (this.completedActions.size / this.currentActionSequence.length) * 100,
-      ),
-    };
   }
 
   handleUnitReorder(arg1, arg2) {
@@ -1331,31 +1083,6 @@ class BoardPageManager {
     }
 
     Logger.warn("handleUnitReorder: unsupported arguments", arg1, arg2);
-  }
-
-  moveUnit(li, direction) {
-    const unitList = document.querySelector(
-      "#unitsPanelContainer .experiment-units-list",
-    );
-    if (!unitList) return;
-
-    const allItems = Array.from(
-      unitList.querySelectorAll("li:not(.power-option-card)"),
-    );
-    const currentIndex = allItems.indexOf(li);
-    const newIndex = currentIndex + direction;
-
-    if (newIndex >= 0 && newIndex < allItems.length) {
-      if (direction > 0) {
-        li.parentNode.insertBefore(allItems[newIndex].nextSibling, li);
-      } else {
-        li.parentNode.insertBefore(li, allItems[newIndex]);
-      }
-
-      this.onUnitSelectionChanged();
-    }
-
-    this.updateUnitButtonStates();
   }
 
   /**
@@ -1599,14 +1326,9 @@ class BoardPageManager {
       end_time: new Date().toISOString(),
     };
 
-    if (this.experimentLogManager) {
-      this.experimentLogManager.logExperimentEnd();
-      this.experimentLogManager.flushAll();
-      const logDownloadBtns = document.getElementById("logDownloadBtns");
-      if (logDownloadBtns) {
-        if (logDownloadBtns.classList.contains("is-hidden"))
-          logDownloadBtns.classList.remove("is-hidden");
-      }
+    if (this.recordManager) {
+      this.recordManager.logExperimentEnd();
+      this.recordManager.flushAll();
     }
 
     this.logAction("experiment_stopped", experimentData);
@@ -1712,85 +1434,6 @@ class BoardPageManager {
 
     btn.addEventListener("click", () => this.exportGestureSequence());
     this._exportGestureBound = true;
-  }
-
-  async syncLogsNow() {
-    try {
-      Logger.debug("=== 立即同步日誌開始 ===");
-
-      const syncStatus = {
-        timestamp: new Date().toISOString(),
-        localLogsFlushResult: null,
-        webSocketQueueStatus: null,
-        errors: [],
-      };
-
-      if (this.experimentLogManager) {
-        try {
-          const localFlushResult =
-            await this.experimentLogManager.flushPendingLogs();
-          syncStatus.localLogsFlushResult = localFlushResult;
-
-          Logger.info(
-            `✓ 本機日誌緩衝區已寫入${localFlushResult ? "（發送 " + this.experimentLogManager.pendingLogs.length + " 筆）" : "（無待發送日誌）"}`,
-            { result: localFlushResult },
-          );
-        } catch (error) {
-          const msg = `本機日誌寫入失敗: ${error.message}`;
-          Logger.error(msg, error);
-          syncStatus.errors.push(msg);
-        }
-      } else {
-        const msg = "experimentLogManager 未初始化";
-        Logger.warn(msg);
-        syncStatus.errors.push(msg);
-      }
-
-      const wsClient = this.syncManager?.core?.syncClient?.wsClient;
-      if (wsClient) {
-        const queueSize = wsClient.messageQueue?.length || 0;
-        const isConnected = wsClient.ws?.readyState === WebSocket.OPEN;
-
-        syncStatus.webSocketQueueStatus = {
-          queueSize: queueSize,
-          isConnected: isConnected,
-          maxSize: 500,
-        };
-
-        Logger.info(
-          `WebSocket 訊息緩衝區狀態: ${isConnected ? "已連接" : "斷開"}, 佇列大小: ${queueSize}`,
-          syncStatus.webSocketQueueStatus,
-        );
-
-        if (queueSize > 0 && !isConnected) {
-          Logger.warn(`WebSocket 已斷開且有 ${queueSize} 條待發送訊息`);
-        }
-      } else {
-        Logger.warn("WebSocket 客戶端未初始化");
-      }
-
-      const syncCompleteEvent = new CustomEvent("logs_synced_now", {
-        detail: {
-          timestamp: syncStatus.timestamp,
-          success: syncStatus.errors.length === 0,
-          localLogsFlushResult: syncStatus.localLogsFlushResult,
-          webSocketQueueStatus: syncStatus.webSocketQueueStatus,
-          errors: syncStatus.errors,
-        },
-      });
-      document.dispatchEvent(syncCompleteEvent);
-
-      Logger.info("=== 立即同步日誌完成 ===", syncStatus);
-
-      if (syncStatus.errors.length > 0) {
-        Logger.warn("同步過程中發生錯誤，但本機操作已完成", syncStatus.errors);
-      }
-
-      return syncStatus;
-    } catch (error) {
-      Logger.error("立即同步日誌發生未預期的錯誤:", error);
-      throw error;
-    }
   }
 
   exportGestureSequence() {

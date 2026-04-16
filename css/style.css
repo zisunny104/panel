@@ -40,17 +40,17 @@
 
 /* ===== 面板功能 ===== */
 @import url('./features/panels/experiment-panel.css');
-@import url('./features/panels/log-panel.css');
+@import url('./features/panels/record-panel.css');
 @import url('./features/panels/maintenance-panel.css');
 
 /* ===== 實驗頁面功能 ===== */
 @import url('./features/experiment/layout.css');
 @import url('./features/experiment/controls.css');
 @import url('./features/experiment/combinations.css');
-@import url('./features/experiment/logs.css');
+@import url('./features/experiment/records.css');
 @import url('./features/experiment/buttons.css');
 @import url('./features/experiment/cards.css');
 @import url('./features/experiment/gestures.css');
 @import url('./features/experiment/stats.css');
 @import url('./features/experiment/units.css');
-@import url('./features/experiment/log-view-modal.css');
+@import url('./features/experiment/record-view-modal.css');

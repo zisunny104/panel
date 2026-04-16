@@ -7,73 +7,6 @@
 
 export const recordStore = {
   /**
-   * 列出所有已儲存的實驗（從 IndexedDB）
-   * @returns {Promise<Array>}
-   */
-  async listExperiments() {
-    try {
-      if (!this.db) {
-        Logger.warn("IndexedDB 尚未初始化");
-        return [];
-      }
-
-      const transaction = this.db.transaction([this.pendingLogsStore], "readonly");
-      const store = transaction.objectStore(this.pendingLogsStore);
-      const request = store.getAll();
-
-      return new Promise((resolve, reject) => {
-        request.onsuccess = (event) => {
-          const allLogs = event.target.result || [];
-          const experimentsMap = new Map();
-
-          allLogs.forEach((log) => {
-            const expId = log.exp_id || "unknown";
-            const participant = log.participant || `受試者_${expId}`;
-
-            if (!experimentsMap.has(expId)) {
-              experimentsMap.set(expId, {
-                experimentId: expId,
-                participantName: participant,
-                startTime: null,
-                endTime: null,
-                logCount: 0,
-                logs: [],
-              });
-            }
-
-            const experiment = experimentsMap.get(expId);
-            experiment.logs.push(log);
-            experiment.logCount++;
-
-            if (log.participant && !experiment.participantName.startsWith("受試者_")) {
-              experiment.participantName = log.participant;
-            }
-            if (log.type === "exp_start" && !experiment.startTime) {
-              experiment.startTime = log.ts;
-            }
-            if (log.type === "exp_end") {
-              experiment.endTime = log.ts;
-            }
-          });
-
-          const experiments = Array.from(experimentsMap.values());
-          experiments.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
-          Logger.debug(`從 IndexedDB 載入 ${experiments.length} 個實驗`);
-          resolve(experiments);
-        };
-
-        request.onerror = (event) => {
-          Logger.error("列出實驗失敗:", event.target.error);
-          reject(event.target.error);
-        };
-      });
-    } catch (error) {
-      Logger.error("listExperiments 發生錯誤:", error);
-      return [];
-    }
-  },
-
-  /**
    * 取得所有日誌（記憶體 + IndexedDB）
    * @returns {Promise<Array>}
    */
@@ -81,25 +14,32 @@ export const recordStore = {
     try {
       if (!this.db) {
         Logger.warn("IndexedDB 尚未初始化，僅回傳記憶體中的日誌");
-        return [...this.logs, ...this.pendingLogs];
+        return [...this.records, ...this.pendingRecords];
       }
 
-      const transaction = this.db.transaction([this.pendingLogsStore], "readonly");
-      const store = transaction.objectStore(this.pendingLogsStore);
+      const transaction = this.db.transaction([this.pendingRecordsStore], "readonly");
+      const store = transaction.objectStore(this.pendingRecordsStore);
       const request = store.getAll();
 
       return new Promise((resolve) => {
         request.onsuccess = (event) => {
           const storedLogs = event.target.result || [];
-          const allLogs = [...this.logs, ...this.pendingLogs, ...storedLogs];
+          const unpersistedLogs = [];
+          const seenRecords = new Set();
+          [...this.records, ...this.pendingRecords].forEach((record) => {
+            if (!record || this._persistedRecordRefs?.has(record) || seenRecords.has(record)) return;
+            seenRecords.add(record);
+            unpersistedLogs.push(record);
+          });
+          const allLogs = [...storedLogs, ...unpersistedLogs];
           allLogs.sort((a, b) => a.ts - b.ts);
           resolve(allLogs);
         };
-        request.onerror = () => resolve([...this.logs, ...this.pendingLogs]);
+        request.onerror = () => resolve([...this.records, ...this.pendingRecords]);
       });
     } catch (error) {
       Logger.error("getAllLogs 發生錯誤:", error);
-      return [...this.logs, ...this.pendingLogs];
+      return [...this.records, ...this.pendingRecords];
     }
   },
 
@@ -115,11 +55,6 @@ export const recordStore = {
     );
   },
 
-  /** 別名 */
-  async getLogsByExperiment(experimentId) {
-    return this.getLogsByExperimentId(experimentId);
-  },
-
   /**
    * 刪除指定實驗的所有日誌
    * @param {string} experimentId
@@ -129,8 +64,8 @@ export const recordStore = {
     try {
       if (!this.db) return false;
 
-      const transaction = this.db.transaction([this.pendingLogsStore], "readwrite");
-      const store = transaction.objectStore(this.pendingLogsStore);
+      const transaction = this.db.transaction([this.pendingRecordsStore], "readwrite");
+      const store = transaction.objectStore(this.pendingRecordsStore);
       const getAllRequest = store.getAll();
 
       return new Promise((resolve, reject) => {
@@ -151,6 +86,8 @@ export const recordStore = {
               if (++deletedCount === logsToDelete.length) {
                 Logger.info(`已刪除實驗 ${experimentId} 的 ${deletedCount} 條日誌`);
                 this._broadcastMessage("experimentDeleted", { experimentId });
+                this.records = this.records.filter((record) => record.exp_id !== experimentId && record.experimentId !== experimentId);
+                this.pendingRecords = this.pendingRecords.filter((record) => record.exp_id !== experimentId && record.experimentId !== experimentId);
                 resolve(true);
               }
             };
@@ -184,13 +121,13 @@ export const recordStore = {
     request.onsuccess = (event) => {
       this.db = event.target.result;
       Logger.debug("IndexedDB 初始化成功");
-      this._restorePendingLogsFromIndexedDB();
+      this._persistBufferedRecordsToIndexedDB();
     };
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      if (!db.objectStoreNames.contains(this.pendingLogsStore)) {
-        const objectStore = db.createObjectStore(this.pendingLogsStore, {
+      if (!db.objectStoreNames.contains(this.pendingRecordsStore)) {
+        const objectStore = db.createObjectStore(this.pendingRecordsStore, {
           keyPath: "id",
           autoIncrement: true,
         });
@@ -199,32 +136,43 @@ export const recordStore = {
     };
   },
 
-  _restorePendingLogsFromIndexedDB() {
+  async _persistBufferedRecordsToIndexedDB() {
     if (!this.db) return;
 
-    const transaction = this.db.transaction([this.pendingLogsStore], "readonly");
-    const store = transaction.objectStore(this.pendingLogsStore);
-    const request = store.getAll();
+    const transaction = this.db.transaction([this.pendingRecordsStore], "readwrite");
+    const store = transaction.objectStore(this.pendingRecordsStore);
 
-    request.onsuccess = (event) => {
-      const storedLogs = event.target.result || [];
-      if (storedLogs.length > 0) {
-        const getLogTime = (log) => log?.ts ?? log?.savedAt ?? log?.timestamp ?? 0;
-        storedLogs.sort((a, b) => getLogTime(a) - getLogTime(b));
-        this.pendingLogs = storedLogs;
-        Logger.debug(`已還原 ${storedLogs.length} 條待發送日誌`);
-      }
-    };
-    request.onerror = (event) => {
-      Logger.error("從 IndexedDB 還原日誌失敗:", event.target.error);
-    };
+    const bufferedRecords = [];
+    const seenRecords = new Set();
+    [...this.records, ...this.pendingRecords].forEach((record) => {
+      if (!record || this._persistedRecordRefs?.has(record) || seenRecords.has(record)) return;
+      seenRecords.add(record);
+      bufferedRecords.push(record);
+    });
+
+    if (bufferedRecords.length === 0) return;
+
+    await Promise.all(
+      bufferedRecords.map((record) => new Promise((resolve) => {
+        const req = store.add({ ...record, savedAt: Date.now() });
+        req.onsuccess = () => {
+          this._persistedRecordRefs?.add(record);
+          resolve();
+        };
+        req.onerror = () => resolve();
+      })),
+    );
   },
 
   _saveLogToIndexedDB(logEntry) {
     if (!this.db) return;
-    const transaction = this.db.transaction([this.pendingLogsStore], "readwrite");
-    const store = transaction.objectStore(this.pendingLogsStore);
-    store.add(logEntry).onerror = (event) => {
+    const transaction = this.db.transaction([this.pendingRecordsStore], "readwrite");
+    const store = transaction.objectStore(this.pendingRecordsStore);
+    const request = store.add({ ...logEntry, savedAt: Date.now() });
+    request.onsuccess = () => {
+      this._persistedRecordRefs?.add(logEntry);
+    };
+    request.onerror = (event) => {
       Logger.error("儲存日誌到 IndexedDB 失敗:", event.target.error);
     };
   },
@@ -235,8 +183,8 @@ export const recordStore = {
    */
   _removeLogsFromIndexedDB(sentLogs) {
     if (!this.db || !sentLogs?.length) return;
-    const transaction = this.db.transaction([this.pendingLogsStore], "readwrite");
-    const store = transaction.objectStore(this.pendingLogsStore);
+    const transaction = this.db.transaction([this.pendingRecordsStore], "readwrite");
+    const store = transaction.objectStore(this.pendingRecordsStore);
     sentLogs.forEach((log) => {
       if (log.id) store.delete(log.id);
     });
@@ -245,8 +193,8 @@ export const recordStore = {
   async _removeLogsByExperimentIdFromIndexedDB(experimentId) {
     if (!this.db || !experimentId) return;
 
-    const transaction = this.db.transaction([this.pendingLogsStore], "readwrite");
-    const store = transaction.objectStore(this.pendingLogsStore);
+    const transaction = this.db.transaction([this.pendingRecordsStore], "readwrite");
+    const store = transaction.objectStore(this.pendingRecordsStore);
     const request = store.getAll();
 
     await new Promise((resolve, reject) => {
@@ -262,6 +210,8 @@ export const recordStore = {
           req.onsuccess = () => {
             if (++deletedCount === logsToDelete.length) {
               Logger.debug(`已清除 IndexedDB 中實驗 ${experimentId} 的 ${deletedCount} 筆日誌`);
+              this.records = this.records.filter((record) => record.exp_id !== experimentId);
+              this.pendingRecords = this.pendingRecords.filter((record) => record.exp_id !== experimentId);
               resolve();
             }
           };
@@ -274,11 +224,11 @@ export const recordStore = {
 
   _clearIndexedDB() {
     if (!this.db) return;
-    const transaction = this.db.transaction([this.pendingLogsStore], "readwrite");
-    const store = transaction.objectStore(this.pendingLogsStore);
+    const transaction = this.db.transaction([this.pendingRecordsStore], "readwrite");
+    const store = transaction.objectStore(this.pendingRecordsStore);
     store.clear().onsuccess = () => {
       Logger.debug("IndexedDB 已清空");
-      this._broadcastMessage("logsCleared", {});
+      this._broadcastMessage("recordsCleared", {});
     };
   },
 };

@@ -324,10 +324,6 @@ class SyncClient {
     this.role = data.data.role;
     this.saveState();
 
-    if (!this.wsClient) {
-      this.initializeSync();
-    }
-
     await this.wsClient.connect({
       sessionId: this.sessionId,
       clientId: this.clientId,

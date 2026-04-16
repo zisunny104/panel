@@ -76,7 +76,7 @@ class WebSocketClient {
   }
 
   /**
-   * 取得 WebSocket 路徑前綴（參考 QR Code 的動態路徑邏輯，完全避免硬編碼）
+   * 取得 WebSocket 路徑前綴（根據目前頁面路徑動態計算，避免硬編碼）
    */
   getWebSocketBasePath() {
     // 根據頁面路徑動態決定 WebSocket 前綴（完全動態，無硬編碼）

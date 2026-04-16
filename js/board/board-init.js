@@ -2,17 +2,15 @@
  * BoardInit - board 管理器初始化協調
  */
 
-import { experimentSyncManager } from "./board-sync-manager.js";
+import { experimentSyncManager } from "./board-experiment-sync.js";
 import { createBoardGestureUtils } from "./board-gesture-utils.js";
-import { RecordManager as ExperimentLogManager, recordView as experimentLogUI } from "../record/index.js";
+import { RecordManager, recordView } from "../record/index.js";
 import { ConfigManager, getSharedConfig } from "../core/config.js";
 import { SyncManager } from "../sync/sync-manager.js";
-import { ExperimentSyncCore } from "../sync/experiment-sync-manager.js";
+import { ExperimentSyncCore } from "../sync/experiment-sync-core.js";
 import { ExperimentCombinationManager } from "../experiment/experiment-combination-manager.js";
-import {
-  initExperimentFlowManager,
-  initExperimentUIManager,
-} from "../experiment/experiment-init-utils.js";
+import { ExperimentFlowManager } from "../experiment/experiment-flow-manager.js";
+import { ExperimentUIManager } from "../experiment/experiment-ui-manager.js";
 import { ExperimentStateManager } from "../experiment/experiment-state-manager.js";
 import { ExperimentHubManager } from "../experiment/experiment-hub-manager.js";
 import { ExperimentSystemManager } from "../experiment/experiment-system-manager.js";
@@ -65,9 +63,7 @@ export async function initializeBoardManagers(page) {
           VIEWER: "viewer",
         },
       });
-    }
-
-    if (page.experimentHubManager?.updateDependencies) {
+    } else if (page.experimentHubManager?.updateDependencies) {
       page.experimentHubManager.updateDependencies({
         syncManager: page.syncManager,
         syncClient: page.syncManager?.core?.syncClient,
@@ -101,10 +97,10 @@ export async function initializeBoardManagers(page) {
 
     if (!page.experimentFlowManager) {
       const flowStart = performance.now();
-      page.experimentFlowManager = initExperimentFlowManager({
-        combinationManager: page.experimentCombinationManager,
-        hubManager: page.experimentHubManager,
-        actionHandler: page.experimentActionHandler,
+      page.experimentFlowManager = new ExperimentFlowManager();
+      page.experimentFlowManager.injectCombinationManager(page.experimentCombinationManager);
+      page.experimentFlowManager.injectHubManager(page.experimentHubManager);
+      page.experimentFlowManager.updateDependencies({
         actionsMap: page.actionsMap || null,
         unitsData: page.unitsData || null,
       });
@@ -118,42 +114,43 @@ export async function initializeBoardManagers(page) {
     });
     logInitDuration("ExperimentStateManager 已初始化", stateStart);
 
-    if (!page.experimentLogManager) {
+    if (!page.recordManager) {
       const logStart = performance.now();
-      page.experimentLogManager = new ExperimentLogManager({
+      page.recordManager = new RecordManager({
         timeSyncManager: page.syncManager?.core?.timeSyncManager,
         stateManager: page.experimentStateManager,
       });
-      page.experimentLogManager.updateDependencies?.({
+      page.recordManager.updateDependencies?.({
         syncClient: page.syncManager?.core?.syncClient,
       });
-      logInitDuration("ExperimentLogManager 已初始化", logStart);
+      logInitDuration("RecordManager 已初始化", logStart);
     }
 
     page.experimentStateManager.updateDependencies({
-      experimentLogManager: page.experimentLogManager,
+      recordManager: page.recordManager,
     });
 
     if (!page.timerManager) {
       page.timerManager = new ExperimentTimerManager({
         timeSyncManager: page.syncManager?.core?.timeSyncManager,
-        experimentLogManager: page.experimentLogManager,
+        recordManager: page.recordManager,
         getCurrentCombination: () => page.currentCombination,
       });
     }
 
     if (!page.uiManager) {
       const uiStart = performance.now();
-      page.uiManager = initExperimentUIManager({
-        timerManager: page.timerManager,
-        flowManager: page.experimentFlowManager,
+      page.uiManager = new ExperimentUIManager({ timerManager: page.timerManager });
+      page.uiManager.initialize();
+      page.uiManager.injectFlowManager(page.experimentFlowManager);
+      page.uiManager.updateDependencies({
         combinationManager: page.experimentCombinationManager,
         hubManager: page.experimentHubManager,
         syncManager: page.syncManager,
         syncClient: page.syncManager?.core?.syncClient,
         experimentSyncCore: page.experimentSyncCore,
-        panelUIManager: null,
       });
+      page.uiManager.bindStateManagerInputs(page.experimentStateManager);
       logInitDuration("ExperimentUIManager 已初始化", uiStart);
     }
 
@@ -164,22 +161,22 @@ export async function initializeBoardManagers(page) {
         syncClient: page.syncManager?.core?.syncClient,
         syncCore: page.experimentSyncCore,
         logger: Logger,
-        experimentLogManager: page.experimentLogManager,
+        recordManager: page.recordManager,
       });
     }
 
-    if (experimentLogUI) {
+    if (recordView) {
       const uiLogStart = performance.now();
-      experimentLogUI.updateDependencies({
-        logManager: page.experimentLogManager,
+      recordView.updateDependencies({
+        recordManager: page.recordManager,
         timeSyncManager: page.syncManager?.core?.timeSyncManager,
         config: getSharedConfig(),
         getGesturesData: () => page.gesturesData,
         getCombination: () => page.currentCombination,
-        syncLogsNow: () => page.experimentLogManager?.flushAll?.(),
+        syncLogsNow: () => page.recordManager?.flushAll?.(),
       });
-      if (!experimentLogUI._initialized) {
-        experimentLogUI.initialize();
+      if (!recordView._initialized) {
+        recordView.initialize();
       }
       logInitDuration("RecordView 已初始化", uiLogStart);
     }
@@ -187,6 +184,7 @@ export async function initializeBoardManagers(page) {
     page._setupEventListeners();
 
     const systemStart = performance.now();
+    page.experimentSystemManager?.cleanup();
     const instance = new ExperimentSystemManager({
       combinationManager: page.experimentCombinationManager,
       uiManager: page.uiManager,
@@ -194,7 +192,7 @@ export async function initializeBoardManagers(page) {
       flowManager: page.experimentFlowManager,
       timerManager: page.timerManager,
       pageManager: page,
-      experimentLogManager: page.experimentLogManager,
+      recordManager: page.recordManager,
     });
     await instance.initialize();
     page.experimentSystemManager = instance;
@@ -202,8 +200,8 @@ export async function initializeBoardManagers(page) {
     logInitDuration("系統管理器已初始化", systemStart);
 
     // 在系統管理器初始化完成後，補充 RecordManager 的執行期 getter
-    page.experimentLogManager.updateDependencies?.({
-      view: experimentLogUI,
+    page.recordManager.updateDependencies?.({
+      view: recordView,
       getGestures: (idx) =>
         page.currentCombination?.gestures?.[idx] ||
         page.experimentSystemManager?.state?.gestures?.[idx],

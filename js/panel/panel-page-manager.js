@@ -16,14 +16,13 @@ import "../sync/sync-confirm-dialog.js";
 class PanelPageManager {
   constructor() {
     this.initStages = {
-      SCRIPTS_LOADING: "scripts_loading",
       MODULES_INIT: "modules_init",
+      COMPONENTS_INIT: "components_init",
       COMPLETE: "complete",
     };
 
     this.currentStage = null;
     this.stageStartTime = null;
-    this._panelPageEventsBound = false;
 
     this.configManager = null;
     this.panelUIManager = null;
@@ -42,6 +41,8 @@ class PanelPageManager {
     this.timerManager = null;
     this.buttonManager = null;
     this.panelLogger = null;
+    this._listenersSetup = false;
+    this._eventUnsubscribers = [];
   }
 
   /**
@@ -68,6 +69,15 @@ class PanelPageManager {
     this.stageStartTime = null;
   }
 
+  async _runInitStage(stage, task) {
+    this.startStage(stage);
+    try {
+      await task();
+    } finally {
+      this.endStage();
+    }
+  }
+
   /**
    * 初始化 Panel 頁面（載入所需腳本並呼叫完成流程）
    */
@@ -76,9 +86,13 @@ class PanelPageManager {
     try {
       Logger.debug("PanelPageManager 開始初始化");
 
-      this.startStage(this.initStages.MODULES_INIT);
-      await this.initializeModules();
-      this.endStage();
+      await this._runInitStage(this.initStages.MODULES_INIT, async () => {
+        await this.initializeModules();
+      });
+
+      await this._runInitStage(this.initStages.COMPONENTS_INIT, async () => {
+        await this.initializeRemainingComponents();
+      });
 
       this.currentStage = this.initStages.COMPLETE;
       Logger.debug(
@@ -94,24 +108,22 @@ class PanelPageManager {
   }
 
   /**
-  * 初始化模組
+   * 初始化面板管理器模組
    */
   async initializeModules() {
-    await this.onInitializationComplete();
-  }
-
-  /**
-   * 完成腳本載入後建立實驗模組並初始化 UI
-   */
-  async onInitializationComplete() {
-    const initStart = performance.now();
-    Logger.debug("所有腳本載入完成，開始初始化面板與實驗模組");
-
     const managerInitStart = performance.now();
     await initializePanelManagers(this);
     Logger.debug(
       `Panel: 管理器初始化完成 (<orange>${(performance.now() - managerInitStart).toFixed(0)} ms</orange>)`,
     );
+  }
+
+  /**
+   * 初始化其餘元件（在管理器初始化之後）
+   */
+  async initializeRemainingComponents() {
+    const initStart = performance.now();
+    Logger.debug("Panel: 開始初始化 UI 與執行期綁定");
 
     const uiDataInitStart = performance.now();
     await this._initializeExperimentUIAndData();
@@ -147,8 +159,8 @@ class PanelPageManager {
   }
 
   _initializePanelRuntimeBindings() {
+    this._teardownExperimentEventListeners();
     this._setupExperimentEventListeners();
-    this._bindPanelPageEvents();
     this._initializeButtonManager();
     this.powerControl.updateDependencies(this._buildPowerControlDependencies());
     this.panelLogger.updateDependencies({
@@ -176,38 +188,52 @@ class PanelPageManager {
    * @private
    */
   _setupExperimentEventListeners() {
+    if (this._listenersSetup) {
+      Logger.warn("Panel: 事件監聽器已設定，跳過重複設定");
+      return;
+    }
+
+    this._listenersSetup = true;
     const flowManager = this.experimentFlowManager;
 
-    flowManager.on(ExperimentFlowManager.EVENT.STARTED, async (data) => {
-      this.panelUIManager?.closeAllPanels();
-      Logger.debug("Panel: 收到實驗開始事件，開始載入動作序列");
-      await this._handleExperimentStarted(data);
-    });
+    this._registerEventUnsubscriber(
+      flowManager.on(ExperimentFlowManager.EVENT.STARTED, async (data) => {
+        this.panelUIManager?.closeAllPanels();
+        Logger.debug("Panel: 收到實驗開始事件，開始載入動作序列");
+        await this._handleExperimentStarted(data);
+      }),
+    );
 
-    this.panelSyncManager.bindExperimentBroadcast(flowManager);
-    this.panelLogger.bindExperimentEvents(flowManager);
+    this._registerEventUnsubscriber(
+      this.panelSyncManager.bindExperimentBroadcast(flowManager),
+    );
+    this._registerEventUnsubscriber(
+      this.panelLogger.bindExperimentEvents(flowManager),
+    );
 
-    flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
-      Logger.debug("Panel: 收到實驗停止事件，清理按鈕狀態");
-      this._handleExperimentStopped();
-      this._handleExperimentSystemFlowStopped(data);
-    });
+    this._registerEventUnsubscriber(
+      flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
+        Logger.debug("Panel: 收到實驗停止事件，清理按鈕狀態");
+        this._handleFlowTermination(data);
+      }),
+    );
 
-    flowManager.on(ExperimentFlowManager.EVENT.COMPLETED, (data) => {
-      const powerOptions = this._getPowerOptionsForCurrentCombination();
-      const reason = powerOptions.includeShutdown ? "power_off" : "completed";
-      Logger.debug("Panel: 收到實驗完成事件，清理按鈕狀態", {
-        reason,
-      });
-      this._handleExperimentStopped();
-      this._handleExperimentSystemFlowStopped({
-        reason,
-        completedUnits: data?.completedUnits,
-        timestamp: data?.timestamp,
-      });
-    });
+    this._registerEventUnsubscriber(
+      flowManager.on(ExperimentFlowManager.EVENT.COMPLETED, (data) => {
+        const powerOptions = this._getPowerOptionsForCurrentCombination();
+        const reason = powerOptions.includeShutdown ? "power_off" : "completed";
+        Logger.debug("Panel: 收到實驗完成事件，清理按鈕狀態", {
+          reason,
+        });
+        this._handleFlowTermination({
+          reason,
+          completedUnits: data?.completedUnits,
+          timestamp: data?.timestamp,
+        });
+      }),
+    );
 
-    this.experimentActionHandler.on(
+    this._registerEventUnsubscriber(this.experimentActionHandler.on(
       ExperimentActionHandler.EVENT.ACTION_ENTERED,
       (data) => {
         Logger.debug("Panel: 新步驟已進入，更新媒體顯示", {
@@ -216,23 +242,40 @@ class PanelPageManager {
         // 令 ButtonManager 更新媒體顯示並重刷下一個動作的高亮
         this.buttonManager?.updateMediaForCurrentAction?.();
       },
-    );
+    ));
 
-    this.experimentActionHandler.on(
+    this._registerEventUnsubscriber(this.experimentActionHandler.on(
       ExperimentActionHandler.EVENT.SEQUENCE_COMPLETED,
       async () => {
         Logger.debug("Panel: ActionHandler 序列完成，檢查是否推進下一個單元");
         await this._handleSequenceCompletedForUnitProgression();
       },
-    );
+    ));
 
     Logger.debug("Panel: 已設定頁面特定的實驗事件監聽器");
   }
 
-  _bindPanelPageEvents() {
-    if (this._panelPageEventsBound) return;
+  _registerEventUnsubscriber(unsubscribe) {
+    if (typeof unsubscribe === "function") {
+      this._eventUnsubscribers.push(unsubscribe);
+    }
+  }
 
-    this._panelPageEventsBound = true;
+  _teardownExperimentEventListeners() {
+    this._eventUnsubscribers.forEach((unsubscribe) => {
+      try {
+        unsubscribe();
+      } catch (error) {
+        Logger.warn("Panel: 解除事件監聽器失敗", error);
+      }
+    });
+    this._eventUnsubscribers = [];
+    this._listenersSetup = false;
+  }
+
+  _handleFlowTermination(data = {}) {
+    this._handleExperimentStopped();
+    this._handleExperimentSystemFlowStopped(data);
   }
 
   _getPowerOptionsForCurrentCombination() {
@@ -564,12 +607,6 @@ class PanelPageManager {
     });
   }
 
-  /**
-   * 更新全選複選框的狀態
-   */
-  updateSelectAllState() {
-    this.uiManager.updateSelectAllState();
-  }
 };
 
 // 自動初始化頁面（當 DOM 完全載入時）

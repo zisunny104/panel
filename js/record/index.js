@@ -4,7 +4,7 @@
  * 統一入口，提供 RecordManager、RecordView 及所有子模組的命名匯出。
  */
 
-export { default as RecordManager, ExperimentLogManager } from "./record-manager.js";
+export { default as RecordManager } from "./record-manager.js";
 export { recordView } from "./record-view.js";
 export { recordStore } from "./record-store.js";
 export { recordRuntime } from "./record-runtime.js";
