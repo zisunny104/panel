@@ -126,6 +126,8 @@ class ConfigManager {
     const powerScaleNumberInput = document.getElementById(
       "powerScaleNumberInput",
     );
+    const stepCooldownRange = document.getElementById("stepCooldownRange");
+    const stepCooldownNumber = document.getElementById("stepCooldownNumber");
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
@@ -168,6 +170,11 @@ class ConfigManager {
         powerScaleNumberInput.value = settings.powerSwitchScale;
       this.panelUIManager?.updatePowerScale?.(settings.powerSwitchScale);
     }
+    if (settings.stepCooldownMs !== undefined && stepCooldownRange) {
+      stepCooldownRange.value = settings.stepCooldownMs;
+      if (stepCooldownNumber) stepCooldownNumber.value = settings.stepCooldownMs;
+      this.panelUIManager?.updateStepCooldown?.(settings.stepCooldownMs);
+    }
     // 按鈕標籤顯示
     if (settings.showButtonLabels !== undefined && toggleButtonLabels)
       toggleButtonLabels.checked = settings.showButtonLabels;
@@ -202,6 +209,7 @@ class ConfigManager {
     const topSpacerRange = document.getElementById("topSpacerRange");
     const bottomSpacerRange = document.getElementById("bottomSpacerRange");
     const powerScaleRange = document.getElementById("powerScaleRange");
+    const stepCooldownRange = document.getElementById("stepCooldownRange");
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
@@ -220,6 +228,7 @@ class ConfigManager {
         ? Number(bottomSpacerRange.value)
         : 3,
       powerSwitchScale: powerScaleRange ? Number(powerScaleRange.value) : 0.9,
+      stepCooldownMs: stepCooldownRange ? Number(stepCooldownRange.value) : 3000,
       showButtonLabels: toggleButtonLabels ? toggleButtonLabels.checked : true,
       showButtonColors: toggleButtonColors ? toggleButtonColors.checked : true,
       showTouchVisuals: toggleTouchVisuals ? toggleTouchVisuals.checked : true,
@@ -266,6 +275,8 @@ class ConfigManager {
     const powerScaleNumberInput = document.getElementById(
       "powerScaleNumberInput",
     );
+    const stepCooldownRange = document.getElementById("stepCooldownRange");
+    const stepCooldownNumber = document.getElementById("stepCooldownNumber");
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
@@ -288,6 +299,8 @@ class ConfigManager {
       bottomSpacerNumberInput,
       powerScaleRange,
       powerScaleNumberInput,
+      stepCooldownRange,
+      stepCooldownNumber,
       toggleButtonLabels,
       toggleButtonColors,
       toggleTouchVisuals,

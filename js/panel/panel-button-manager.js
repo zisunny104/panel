@@ -72,13 +72,14 @@ class ButtonManager {
     // 動作冷卻機制
     this.lastActionTime = 0;
     this.actionCooldown = 200; // 200ms 冷卻時間
-        this.isCooldownActive = false;
+    this.isCooldownActive = false;
+    this.stepCooldownMs = this._resolveStepCooldownMs();
 
     // 實驗動作管理
     this.experimentActions = new Map(); // 儲存實驗動作數據
     this.actionListeners = new Map(); // 事件監聽器儲存
 
-    // 初始化 - 只載入按鈕功能，事件監聽器在數據載入後設置
+    // 初始化 - 只載入按鈕功能，事件監聽器在數據載入後設定
     this.loadButtonFunctions();
   }
 
@@ -116,6 +117,60 @@ class ButtonManager {
 
   _getMediaManager() {
     return this.panelMediaManager;
+  }
+
+  _resolveStepCooldownMs() {
+    const raw = localStorage.getItem("stepCooldownMs");
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return 3000;
+    return Math.max(0, parsed);
+  }
+
+  setStepCooldownMs(value) {
+    const parsed = Number.parseInt(value, 10);
+    this.stepCooldownMs = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+  }
+
+  getStepCooldownMs() {
+    if (!Number.isFinite(this.stepCooldownMs)) {
+      this.stepCooldownMs = this._resolveStepCooldownMs();
+    }
+    return Math.max(0, this.stepCooldownMs);
+  }
+
+  _getActionId(action) {
+    if (!action || typeof action !== "object") return null;
+    return action.actionId || action.action_id || null;
+  }
+
+  _getStepIdForAction(action) {
+    const actionId = this._getActionId(action);
+    if (!actionId) return null;
+    return this._getActionHandler()?.actionToStepMap?.get(actionId)?.step_id || null;
+  }
+
+  _getCurrentAction() {
+    const systemManager = this._getSystemManager();
+    if (systemManager?.getCurrentAction) {
+      return systemManager.getCurrentAction();
+    }
+    return this._getActionHandler()?.getCurrentAction?.() || null;
+  }
+
+  _completeCurrentAction(actionData = {}) {
+    const systemManager = this._getSystemManager();
+    if (systemManager?.completeCurrentAction) {
+      return systemManager.completeCurrentAction(actionData);
+    }
+    return this._getActionHandler()?.completeCurrentAction?.(actionData) || false;
+  }
+
+  _jumpToActionById(actionId) {
+    const systemManager = this._getSystemManager();
+    if (systemManager?.jumpToActionById) {
+      return systemManager.jumpToActionById(actionId);
+    }
+    return { success: false, index: -1, action: null };
   }
 
   _isExperimentRunning(flowManager = this._getFlowManager()) {
@@ -165,10 +220,10 @@ class ButtonManager {
         this.buttonFunctionsMap = data;
       }
 
-      // 數據載入完成後設置事件監聽器
+      // 數據載入完成後設定事件監聽器
       this.setupEventListeners();
 
-      Logger.debug("按鈕功能配置載入完成，事件監聽器已設置");
+      Logger.debug("按鈕功能配置載入完成，事件監聽器已設定");
     } catch (error) {
       Logger.error("載入按鈕功能配置失敗:", error);
     }
@@ -214,7 +269,6 @@ class ButtonManager {
   simulateButtonClick(buttonId, isKeyboardTriggered = false) {
     const logger = this._getLogger();
     const flowManager = this._getFlowManager();
-    const actionHandler = this._getActionHandler();
     const button = document.querySelector(
       `.button-overlay[data-label="${buttonId}"]`,
     );
@@ -313,12 +367,10 @@ class ButtonManager {
     // 實驗模式下檢查是否有對應的動作
     if (this._isExperimentRunning(flowManager)) {
       if (this.checkAndExecuteExperimentAction(buttonId, functionName)) {
-        if (actionHandler && actionHandler.currentActionSequence?.length > 0) {
-          const currentActionIndex = actionHandler.currentActionIndex;
-          const totalActions = actionHandler.currentActionSequence.length;
-          const prevAction = actionHandler.currentActionSequence[
-            Math.max(0, currentActionIndex - 1)
-          ];
+        const totalActions = systemManager?.getActionSequenceLength?.() || 0;
+        if (totalActions > 0) {
+          const currentActionIndex = systemManager?.getCurrentActionIndex?.() || 0;
+          const prevAction = systemManager?.getPreviousAction?.();
           const logMessage = `按鈕 "${buttonId}" → 功能 "${functionName}" | 動作: ${
             prevAction?.actionId || "未知"
           } [${currentActionIndex}/${totalActions}]`;
@@ -388,14 +440,17 @@ class ButtonManager {
     }
 
     // 如果動作序列為空，記錄警告但繼續處理
-    if (actionHandler.currentActionSequence.length === 0) {
+    const totalActions = this._getSystemManager()?.getActionSequenceLength?.()
+      ?? actionHandler.getProgress?.().total
+      ?? 0;
+    if (totalActions === 0) {
       Logger.warn("動作序列為空，無法處理動作");
       return false;
     }
 
     // 處理動作序列邏輯
     Logger.debug(
-      `處理按鈕動作: ${buttonId} -> ${functionName}, 序列長度: ${actionHandler.currentActionSequence.length}`,
+      `處理按鈕動作: ${buttonId} -> ${functionName}, 序列長度: ${totalActions}`,
     );
     return this.handleActionBasedExperiment(buttonId, functionName, isRemote);
   }
@@ -419,7 +474,7 @@ class ButtonManager {
       return false;
     }
 
-    let currentAction = actionHandler.getCurrentAction();
+    let currentAction = this._getCurrentAction();
     if (!currentAction) {
       return false;
     }
@@ -429,12 +484,14 @@ class ButtonManager {
       // 儲存目前 action，檢查是否為 step 最後一個
       const skippedAction = currentAction;
 
-      actionHandler.completeCurrentAction();
-      currentAction = actionHandler.getCurrentAction();
+      this._completeCurrentAction();
+      const nextActionAfterSkip = this._getCurrentAction();
+
+      this._applyCooldownOutcome(skippedAction, nextActionAfterSkip);
+      currentAction = nextActionAfterSkip;
 
       // 如果被跳過的 action 是 step 的最後一個，觸發冷卻效果
       if (skippedAction.isLastActionInStep) {
-        this.triggerStepCompleteEffect();
         return true;
       }
 
@@ -478,25 +535,13 @@ class ButtonManager {
           const completedAction = currentAction;
 
           // 完成目前 action
-          actionHandler.completeCurrentAction(actionData);
+          this._completeCurrentAction(actionData);
 
-          // 查找下一個 action
-          const nextActionIndex =
-            actionHandler.currentActionSequence.findIndex(
-              (action) => action.actionId === nextActionId,
-            );
+          const jumpResult = this._jumpToActionById(nextActionId);
 
-          // 取得下一個 action 物件
-          const nextAction =
-            nextActionIndex !== -1
-              ? actionHandler.currentActionSequence[
-                  nextActionIndex
-                ]
-              : null;
-
-          if (nextActionIndex !== -1) {
-            actionHandler.currentActionIndex = nextActionIndex;
-          }
+          const nextAction = jumpResult.success
+            ? jumpResult.action
+            : this._getCurrentAction();
 
           this._applyCooldownOutcome(completedAction, nextAction);
 
@@ -505,9 +550,9 @@ class ButtonManager {
       } else {
         // 沒有定義互動，直接完成並移到下一個
         const completedAction = currentAction;
-        actionHandler.completeCurrentAction(actionData);
+        this._completeCurrentAction(actionData);
 
-        const nextAction = actionHandler.getCurrentAction();
+        const nextAction = this._getCurrentAction();
 
         this._applyCooldownOutcome(completedAction, nextAction);
         return true;
@@ -520,9 +565,20 @@ class ButtonManager {
   /**
    * 觸發 step 完成的視覺效果
    */
-  triggerStepCompleteEffect() {
-    const actionHandler = this._getActionHandler();
+  triggerStepCompleteEffect(options = {}) {
+    const { advanceStep = false } = options;
     const flowManager = this._getFlowManager();
+    const systemManager = this._getSystemManager();
+    const cooldownMs = this.getStepCooldownMs();
+
+    if (cooldownMs <= 0) {
+      if (advanceStep && systemManager?.advanceToNextStep) {
+        systemManager.advanceToNextStep();
+      }
+      this.updateMediaForCurrentAction();
+      return Promise.resolve();
+    }
+
     // 檢查視覺提示是否開啟
     const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
     const visualsEnabled = toggleTouchVisuals
@@ -530,7 +586,7 @@ class ButtonManager {
       : true;
 
     // 檢查是否還有下一個動作（實驗是否已完成）
-    const nextAction = actionHandler?.getCurrentAction();
+    const nextAction = this._getCurrentAction();
     if (!nextAction) {
       const { currentUnitIndex, totalUnits } = this._getFlowProgressSnapshot(
         flowManager,
@@ -544,19 +600,18 @@ class ButtonManager {
         Logger.debug("最後單元完成，即將顯示電源開關高亮");
         // 最後單元完成時的電源高亮由 nextUnit() 處理
       }
-      return;
-    }
-
-    if (!visualsEnabled) {
-      // 視覺提示關閉，不執行冷卻效果
-      return;
+      return Promise.resolve();
     }
 
     const mediaArea = document.getElementById("mediaArea");
     const powerControl = this._getPowerControl();
+    const showIndicator =
+      visualsEnabled &&
+      mediaArea &&
+      mediaArea.classList.contains("step-complete-indicator");
 
     // 新增冷卻指示效果（亮橘色外框）
-    if (mediaArea && mediaArea.classList.contains("step-complete-indicator")) {
+    if (showIndicator) {
       mediaArea.classList.add("cooldown-indicator");
     }
 
@@ -573,9 +628,10 @@ class ButtonManager {
     this.isCooldownActive = true;
     this.updateMediaForCurrentActionWithoutHighlight();
 
-    // 3 秒後移除冷卻效果並進入下一步
-    setTimeout(() => {
-      if (mediaArea) {
+    // 冷卻結束後，按需求進入下一步
+    return new Promise((resolve) => {
+      setTimeout(() => {
+      if (showIndicator) {
         mediaArea.classList.remove("cooldown-indicator");
       }
 
@@ -584,8 +640,7 @@ class ButtonManager {
         btn.style.pointerEvents = "";
       });
 
-      const actionHandler = this._getActionHandler();
-      const currentAction = actionHandler?.getCurrentAction?.();
+      const currentAction = this._getCurrentAction();
 
       if (currentAction) {
         // 【冷卻結束】現在才高亮下一個按鈕
@@ -596,19 +651,16 @@ class ButtonManager {
         this.isCooldownActive = false;
       }
 
-      // 冷卻結束後，只有在不是關機動作時才推進下一步
-      if (
-        flowManager?.getCurrentUnit?.() &&
-        currentAction?.actionId !== ACTION_IDS.POWER_OFF
-      ) {
-        const systemManager = this._getSystemManager();
+      if (advanceStep && flowManager?.getCurrentUnit?.()) {
         if (!systemManager?.advanceToNextStep) {
           Logger.warn("ExperimentSystemManager 未就緒，跳過 step 推進");
-          return;
+        } else {
+          systemManager.advanceToNextStep();
         }
-        systemManager.advanceToNextStep();
       }
-    }, 3000);
+      resolve();
+      }, cooldownMs);
+    });
   }
 
   /**
@@ -620,76 +672,35 @@ class ButtonManager {
    * @returns {Object} {shouldCooldown, reason, stepInfo, stepActions}
    */
   _calculateCooldownState(completedAction, nextAction) {
-    const actionHandler = this._getActionHandler();
-    const flowManager = this._getFlowManager();
-    // 取得已完成 action 的 step 資訊
-    const stepInfo = actionHandler?.actionToStepMap?.get(
-      completedAction.actionId,
-    );
+    const completedStepId = this._getStepIdForAction(completedAction);
+    const nextStepId = this._getStepIdForAction(nextAction);
 
-    const stepId = stepInfo?.step_id || null;
-    if (stepId === "POWER_STARTUP" || stepId === "POWER_SHUTDOWN") {
+    // 序列邊界（通常是單元最後一步，接著是下一單元第一步）
+    if (!nextAction) {
       return {
-        shouldCooldown: false,
-        reason: "電源步驟不參與冷卻判定",
-        stepInfo,
-        stepActions: [],
+        shouldCooldown: Boolean(completedAction?.isLastActionInStep),
+        shouldAdvanceStep: false,
+        reason: completedAction?.isLastActionInStep
+          ? "單元或序列邊界"
+          : "序列結束但非步驟邊界",
+        completedStepId,
+        nextStepId,
       };
     }
 
-    // 找出同一個 step 中的所有 action
-    const stepActions = stepInfo
-      ? actionHandler.currentActionSequence.filter(
-          (a) =>
-        actionHandler.actionToStepMap?.get(a.actionId)
-              ?.step_id === stepInfo.step_id,
-        )
-      : [];
+    // 同步/本機共用：只要跨 step 都要冷卻
+    const stepChanged =
+      Boolean(completedStepId) &&
+      Boolean(nextStepId) &&
+      completedStepId !== nextStepId;
 
-    // 取得目前 unit 的所有 step
-    const { unitIds, currentUnitIndex } = this._getFlowProgressSnapshot(
-      flowManager,
-    );
-    const currentUnitId = unitIds?.[currentUnitIndex];
-    const allStepsInUnit = new Set();
-
-    if (currentUnitId && actionHandler?.actionToStepMap) {
-      for (const [_actionId, stepData] of actionHandler.actionToStepMap) {
-        if (stepData.unit_id === currentUnitId) {
-          if (
-            stepData.step_id === "POWER_STARTUP" ||
-            stepData.step_id === "POWER_SHUTDOWN"
-          ) {
-            continue;
-          }
-          allStepsInUnit.add(stepData.step_id);
-        }
-      }
-    }
-
-    // 計算 step 在 unit 中的位置
-    const allStepsArray = Array.from(allStepsInUnit);
-    const isFirstStep = allStepsArray.indexOf(stepInfo?.step_id) === 0;
-    const isLastStep =
-      allStepsArray.indexOf(stepInfo?.step_id) === allStepsArray.length - 1;
-
-    // 根據 step 中 action 的數量決定冷卻策略
-    let shouldCooldown = false;
-    let reason = "";
-
-    if (stepActions.length === 1) {
-      // 單個 action 的 step：只有在首尾 step 時才冷卻
-      shouldCooldown = isFirstStep || isLastStep;
-      reason = shouldCooldown
-        ? `單個 action 的 ${isFirstStep ? "首" : "尾"} step 完成`
-        : "單個 action 的中間 step，跳過冷卻";
-    } else if (stepActions.length > 1) {
-      // 多個 action 的 step：進入最後一個 action 時冷卻
-      shouldCooldown = nextAction && nextAction.isLastActionInStep;
-      reason = "進入 step 的最後一個 action";
-    }
-
-    return { shouldCooldown, reason, stepInfo, stepActions };
+    return {
+      shouldCooldown: stepChanged,
+      shouldAdvanceStep: stepChanged,
+      reason: stepChanged ? "跨步驟切換" : "同一步驟內動作",
+      completedStepId,
+      nextStepId,
+    };
   }
 
   _applyCooldownOutcome(completedAction, nextAction) {
@@ -698,18 +709,21 @@ class ButtonManager {
       nextAction,
     );
     const actionSummary =
-      `完成Action: ${completedAction.actionId} (${completedAction.action_name}) | ` +
-      `Step: ${cooldownState.stepInfo?.step_id || "unknown"} | ` +
-      `Step Actions: ${cooldownState.stepActions.length} | ` +
-      `下一個Action: ${nextAction?.actionId || "無"}`;
+      `完成Action: ${this._getActionId(completedAction) || "unknown"} (${completedAction?.action_name || ""}) | ` +
+      `完成Step: ${cooldownState.completedStepId || "unknown"} | ` +
+      `下一個Step: ${cooldownState.nextStepId || "無"} | ` +
+      `下一個Action: ${this._getActionId(nextAction) || "無"}`;
 
     if (cooldownState.shouldCooldown) {
       Logger.debug(`觸發冷卻效果: ${cooldownState.reason} | ${actionSummary}`);
-      this.triggerStepCompleteEffect();
+      this.triggerStepCompleteEffect({
+        advanceStep: cooldownState.shouldAdvanceStep,
+      });
       return;
     }
 
     Logger.debug(`跳過冷卻效果: ${cooldownState.reason} | ${actionSummary}`);
+
     this.updateMediaForCurrentAction();
   }
 
@@ -793,23 +807,22 @@ class ButtonManager {
    */
   _loadAndDisplayMedia() {
     const isPowerOn = this.isPowerOn();
-    const actionHandler = this._getActionHandler();
     const mediaManager = this._getMediaManager();
 
-    if (!actionHandler) {
+    if (!this._getActionHandler() && !this._getSystemManager()?.getCurrentAction) {
       return null;
     }
 
     // 自動跳過沒有 action_buttons 的動作
-    let currentAction = actionHandler.getCurrentAction();
+    let currentAction = this._getCurrentAction();
     while (currentAction && !currentAction.action_buttons) {
       if (currentAction.media_file && mediaManager) {
         mediaManager.showStepMedia(currentAction.media_file);
       } else if (mediaManager) {
         mediaManager.playHomePageLoop(true);
       }
-      actionHandler.completeCurrentAction();
-      currentAction = actionHandler.getCurrentAction();
+      this._completeCurrentAction();
+      currentAction = this._getCurrentAction();
     }
 
     if (currentAction) {
@@ -1045,7 +1058,6 @@ class ButtonManager {
   }
 
   /**
-    if (this.isCooldownActive) return;
    * 檢查機器是否已開機
    */
   isPowerOn() {
@@ -1059,7 +1071,7 @@ class ButtonManager {
   }
 
   // ==========================================
-  // 事件監聽器設置
+  // 事件監聽器設定
   // ==========================================
 
   /**

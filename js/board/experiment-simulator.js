@@ -123,7 +123,7 @@ class ExperimentSimulator {
     if (isPaused) {
       this.state.paused = true;
       this.state.currentStep = "paused";
-      this._log("偵測到實驗已暫停，等待恢復...");
+      this._log("偵測到實驗已暫停，等待繼續...");
       return this._waitForResume();
     }
     return true;
@@ -647,7 +647,7 @@ class ExperimentSimulator {
   }
 
   /**
-   * 停止正在運行的模擬
+   * 停止正在執行的模擬
    */
   stop() {
     this._log("使用者請求停止模擬");

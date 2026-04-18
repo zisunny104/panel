@@ -5,7 +5,15 @@
  * 心跳檢測與分享代碼管理，支援多客戶端協同同步。
  */
 
-import { SYNC_EVENTS } from "../constants/index.js";
+import {
+  SYNC_EVENTS,
+  SYNC_MANAGER_CONSTANTS,
+  SYNC_CLIENT_CONSTANTS,
+  SYNC_PAGE_CONFIG,
+  SYNC_ROLE_CONFIG,
+  SYNC_STATUS_CONFIG,
+  getSyncPagePath,
+} from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 import { WebSocketClient } from "../core/websocket-client.js";
@@ -13,16 +21,14 @@ import { WebSocketClient } from "../core/websocket-client.js";
 class SyncClient {
   /**
    * 建構函數
-   * @param {Object} config - 配置選項
+   * @param {Object} config - 設定選項
    */
   constructor(config = {}) {
     this.roleConfig = {
-      VIEWER: "viewer",
-      OPERATOR: "operator",
-      LOCAL: "local",
+      ...SYNC_ROLE_CONFIG,
       ...config.roleConfig,
     };
-    // API 端點配置
+    // API 端點設定
     this.apiBaseUrl = config.apiBaseUrl || this.getDefaultApiUrl();
     this.clientType = this.detectClientType();
 
@@ -30,7 +36,7 @@ class SyncClient {
     this.wsClient = null;
     this.wsConfig = {
       url: config.wsUrl,
-      storagePrefix: "panel_sync_",
+      storagePrefix: SYNC_CLIENT_CONSTANTS.STORAGE_PREFIX,
       autoReconnect: true,
     };
     this.timeSyncManager = config.timeSyncManager || null;
@@ -52,10 +58,20 @@ class SyncClient {
 
     // 心跳檢測定時器
     this.healthCheckTimer = null;
-    this.healthCheckInterval = 30000; // 從 10000ms 增加到 30000ms (30秒)
-    this.healthCheckMethod = "lightweight";
-    this.lastHealthCheckTime = 0; // 快取最後檢查時刻
-    this.healthCheckCacheTtl = 3000; // 3 秒內回傳快取結果
+    this.healthCheckInterval =
+      SYNC_CLIENT_CONSTANTS.DEFAULT_HEALTH_CHECK_INTERVAL_MS;
+    this.healthCheckMethod =
+      SYNC_CLIENT_CONSTANTS.HEALTH_CHECK_METHOD_LIGHTWEIGHT;
+    this.lastHealthCheckTime = 0;
+    this.healthCheckCacheTtl =
+      SYNC_CLIENT_CONSTANTS.DEFAULT_HEALTH_CHECK_CACHE_TTL_MS;
+    this.healthCheckLoopActive = false;
+    this.healthCheckInProgress = false;
+
+    // 狀態更新節流：同一幀只派發最後一筆，避免 message handler 連續重負載
+    this.pendingStateUpdate = null;
+    this.stateUpdateFlushScheduled = false;
+    this.stateUpdateFlushTimer = null;
 
     // 如果有儲存的 sessionId，代表之前加入過工作階段
     if (this.sessionId) {
@@ -112,7 +128,8 @@ class SyncClient {
     });
     this.setupWebSocketHandlers();
 
-    this.healthCheckMethod = "websocket";
+    this.healthCheckMethod =
+      SYNC_CLIENT_CONSTANTS.HEALTH_CHECK_METHOD_WEBSOCKET;
 
     this.initialized = true;
     const duration = performance.now() - initStart;
@@ -150,16 +167,20 @@ class SyncClient {
 
   detectClientType() {
     const path = (window.location.pathname || "").toLowerCase();
-    return path.includes("board.html") ? "board" : "panel";
+    const boardPath = getSyncPagePath(SYNC_PAGE_CONFIG.BOARD).toLowerCase();
+    return path.includes(boardPath)
+      ? SYNC_PAGE_CONFIG.BOARD
+      : SYNC_PAGE_CONFIG.PANEL;
   }
 
   /**
    * 設定 WebSocket 事件處理器
    */
   setupWebSocketHandlers() {
-    this.wsClient.on("authenticated", (data) => {
+    this.wsClient.on(SYNC_CLIENT_CONSTANTS.EVENT_NAMES.AUTHENTICATED, (data) => {
       Logger.debug("WebSocket 認證成功", data);
       this.connected = true;
+      this.connectionAttempted = false;
       this.sessionId = data.sessionId;
       this.clientId = data.clientId;
       this.role = data.role;
@@ -170,18 +191,20 @@ class SyncClient {
       );
     });
 
-    this.wsClient.on("reconnected", (data) => {
+    this.wsClient.on(SYNC_CLIENT_CONSTANTS.EVENT_NAMES.RECONNECTED, (data) => {
       Logger.debug("WebSocket 重新連接成功", data);
       this.connected = true;
+      this.connectionAttempted = false;
 
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.RECONNECTED, { detail: data }),
       );
     });
 
-    this.wsClient.on("disconnected", (data) => {
+    this.wsClient.on(SYNC_CLIENT_CONSTANTS.EVENT_NAMES.DISCONNECTED, (data) => {
       Logger.info("WebSocket 已斷線", data);
       this.connected = false;
+      this.connectionAttempted = true;
 
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.DISCONNECTED, { detail: data }),
@@ -193,21 +216,21 @@ class SyncClient {
       this.triggerStateUpdate(data.state);
     });
 
-    this.wsClient.on("client_joined", (data) => {
+    this.wsClient.on(WS_PROTOCOL.S2C.CLIENT_JOINED, (data) => {
       Logger.debug("新客戶端加入", data);
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.CLIENT_JOINED, { detail: data }),
       );
     });
 
-    this.wsClient.on("client_left", (data) => {
+    this.wsClient.on(WS_PROTOCOL.S2C.CLIENT_LEFT, (data) => {
       Logger.debug("客戶端退出", data);
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.CLIENT_LEFT, { detail: data }),
       );
     });
 
-    this.wsClient.on("client_reconnected", (data) => {
+    this.wsClient.on(WS_PROTOCOL.S2C.CLIENT_RECONNECTED, (data) => {
       Logger.debug("客戶端重新連接", data);
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.CLIENT_RECONNECTED, {
@@ -216,7 +239,7 @@ class SyncClient {
       );
     });
 
-    this.wsClient.on("server_error", (data) => {
+    this.wsClient.on(SYNC_CLIENT_CONSTANTS.EVENT_NAMES.SERVER_ERROR, (data) => {
       Logger.error("伺服器錯誤", data);
 
       if (data && data.message && data.message.includes("工作階段不存在")) {
@@ -228,7 +251,7 @@ class SyncClient {
         window.dispatchEvent(
           new CustomEvent(SYNC_EVENTS.SESSION_INVALID, {
             detail: {
-              reason: "session_not_found",
+              reason: SYNC_CLIENT_CONSTANTS.SESSION_NOT_FOUND_REASON,
               originalError: data,
             },
           }),
@@ -257,7 +280,7 @@ class SyncClient {
     });
 
     this.wsClient.on(SYNC_EVENTS.EXPERIMENT_RESUMED, (data) => {
-      Logger.debug("收到實驗恢復事件", data);
+      Logger.debug("收到實驗繼續事件", data);
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.EXPERIMENT_RESUMED, {
           detail: data,
@@ -283,7 +306,7 @@ class SyncClient {
       );
     });
 
-    this.wsClient.on("session_state", (data) => {
+    this.wsClient.on(WS_PROTOCOL.S2C.SESSION_STATE, (data) => {
       Logger.debug("收到工作階段狀態", data);
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.SESSION_STATE, { detail: data }),
@@ -300,6 +323,7 @@ class SyncClient {
    */
   async createSession(createCode) {
     this.initializeSync();
+    this.connectionAttempted = true;
 
     await this.checkServerHealth();
     if (!this.serverOnline) {
@@ -392,6 +416,7 @@ class SyncClient {
     }
 
     this.initializeSync();
+    this.connectionAttempted = true;
 
     await this.checkServerHealth();
     if (!this.serverOnline) {
@@ -431,7 +456,10 @@ class SyncClient {
     if (data.data.state) {
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.SESSION_STATE, {
-          detail: { state: data.data.state, source: "join_response" },
+          detail: {
+            state: data.data.state,
+            source: SYNC_CLIENT_CONSTANTS.JOIN_RESPONSE_SOURCE,
+          },
         }),
       );
     }
@@ -451,6 +479,7 @@ class SyncClient {
   ) {
     const resolvedRole = role || this.roleConfig.OPERATOR;
     this.initializeSync();
+    this.connectionAttempted = true;
 
     await this.checkServerHealth();
     if (!this.serverOnline) {
@@ -497,7 +526,12 @@ class SyncClient {
    */
   async closePublicChannel(sessionId = null) {
     const targetSessionId = sessionId || this.sessionId;
-    if (!targetSessionId || !targetSessionId.startsWith("__CH_")) {
+    if (
+      !targetSessionId ||
+      !targetSessionId.startsWith(
+        SYNC_MANAGER_CONSTANTS.PUBLIC_CHANNEL_PREFIX,
+      )
+    ) {
       throw new Error("目前不在公開頻道");
     }
 
@@ -569,13 +603,17 @@ class SyncClient {
       return false;
     }
 
+    this.connectionAttempted = true;
+
     await this.checkServerHealth();
     if (!this.serverOnline) {
       throw new Error("伺服器離線，無法還原工作階段");
     }
 
     // 公開頻道不存在於 DB，跳過 validate 直接重連
-    const isPublicChannel = this.sessionId.startsWith("__CH_");
+    const isPublicChannel = this.sessionId.startsWith(
+      SYNC_MANAGER_CONSTANTS.PUBLIC_CHANNEL_PREFIX,
+    );
     if (!isPublicChannel) {
       const response = await fetch(
         `${this.apiBaseUrl}/sync/session/${this.sessionId}/validate?clientId=${this.clientId}`,
@@ -733,13 +771,56 @@ class SyncClient {
   triggerStateUpdate(state) {
     try {
       const parsedState = typeof state === "string" ? JSON.parse(state) : state;
-      const event = new CustomEvent(SYNC_EVENTS.STATE_UPDATE, {
-        detail: parsedState,
-      });
-      window.dispatchEvent(event);
+
+      // 動作相關事件不能被同幀合併，否則連續 action 完成會被覆蓋遺失
+      const nonCoalescedTypes = new Set([
+        SYNC_EVENTS.ACTION_COMPLETED,
+        SYNC_EVENTS.ACTION_CANCELLED,
+        SYNC_EVENTS.BUTTON_ACTION,
+        SYNC_EVENTS.BUTTON_PRESSED,
+      ]);
+      if (parsedState?.type && nonCoalescedTypes.has(parsedState.type)) {
+        const event = new CustomEvent(SYNC_EVENTS.STATE_UPDATE, {
+          detail: parsedState,
+        });
+        window.dispatchEvent(event);
+        return;
+      }
+
+      this.pendingStateUpdate = parsedState;
+      this.scheduleStateUpdateFlush();
     } catch (error) {
       Logger.error("狀態解析錯誤:", error);
     }
+  }
+
+  /**
+   * 於下一幀派發狀態更新，連續更新時只保留最後一筆
+   */
+  scheduleStateUpdateFlush() {
+    if (this.stateUpdateFlushScheduled) return;
+    this.stateUpdateFlushScheduled = true;
+
+    const flush = () => {
+      this.stateUpdateFlushScheduled = false;
+      this.stateUpdateFlushTimer = null;
+
+      if (!this.pendingStateUpdate) return;
+      const payload = this.pendingStateUpdate;
+      this.pendingStateUpdate = null;
+
+      const event = new CustomEvent(SYNC_EVENTS.STATE_UPDATE, {
+        detail: payload,
+      });
+      window.dispatchEvent(event);
+    };
+
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(flush);
+      return;
+    }
+
+    this.stateUpdateFlushTimer = setTimeout(flush, 0);
   }
 
   /**
@@ -748,6 +829,12 @@ class SyncClient {
   disconnect() {
     Logger.info("斷開連線");
     this.stopHealthCheck();
+    if (this.stateUpdateFlushTimer) {
+      clearTimeout(this.stateUpdateFlushTimer);
+      this.stateUpdateFlushTimer = null;
+    }
+    this.pendingStateUpdate = null;
+    this.stateUpdateFlushScheduled = false;
     if (this.wsClient) {
       this.wsClient.disconnect();
     }
@@ -860,7 +947,6 @@ class SyncClient {
    * @returns {Promise<boolean>}
    */
   async checkServerHealth() {
-    // 快取：3 秒內有相同結果直接回傳，避免重複 HEAD 請求
     const now = Date.now();
     if (now - this.lastHealthCheckTime < this.healthCheckCacheTtl) {
       return this.serverOnline;
@@ -869,7 +955,9 @@ class SyncClient {
     try {
       const response = await fetch(`${this.apiBaseUrl}/health`, {
         method: "HEAD",
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(
+          SYNC_CLIENT_CONSTANTS.DEFAULT_SERVER_HEALTH_TIMEOUT_MS,
+        ),
       });
 
       this.lastHealthCheckTime = Date.now();
@@ -897,7 +985,7 @@ class SyncClient {
 
       return this.serverOnline;
     } catch (error) {
-      this.lastHealthCheckTime = Date.now(); // 失敗也更新快取，避免連續 2 秒 timeout
+      this.lastHealthCheckTime = Date.now();
       const wasOnline = this.serverOnline;
       this.serverOnline = false;
 
@@ -924,23 +1012,49 @@ class SyncClient {
    * 啟動心跳檢測
    */
   startHeartbeatCheck() {
-    if (this.healthCheckTimer) return;
+    if (this.healthCheckLoopActive) return;
 
-    Logger.debug("啟動心跳檢測 (30秒間隔)");
+    const runHealthCheck = async () => {
+      if (!this.healthCheckLoopActive) return;
 
-    this.checkServerHealth();
+      // 避免檢查重疊導致主執行緒尖峰
+      if (this.healthCheckInProgress) {
+        this.healthCheckTimer = setTimeout(
+          runHealthCheck,
+          this.healthCheckInterval,
+        );
+        return;
+      }
 
-    this.healthCheckTimer = setInterval(() => {
-      this.checkServerHealth();
-    }, this.healthCheckInterval);
+      this.healthCheckInProgress = true;
+      try {
+        await this.checkServerHealth();
+      } finally {
+        this.healthCheckInProgress = false;
+      }
+
+      if (!this.healthCheckLoopActive) return;
+      this.healthCheckTimer = setTimeout(
+        runHealthCheck,
+        this.healthCheckInterval,
+      );
+    };
+
+    Logger.debug(
+      `啟動心跳檢測 (${Math.round(this.healthCheckInterval / 1000)}秒間隔)`,
+    );
+    this.healthCheckLoopActive = true;
+
+    void runHealthCheck();
   }
 
   /**
    * 停止心跳檢測定時器
    */
   stopHealthCheck() {
+    this.healthCheckLoopActive = false;
     if (this.healthCheckTimer) {
-      clearInterval(this.healthCheckTimer);
+      clearTimeout(this.healthCheckTimer);
       this.healthCheckTimer = null;
     }
   }
@@ -1009,14 +1123,16 @@ class SyncClient {
     }
 
     if (this.sessionId && !this.connected) {
-      return this.connectionAttempted ? "offline" : "idle";
+      return this.connectionAttempted
+        ? SYNC_STATUS_CONFIG.OFFLINE
+        : SYNC_STATUS_CONFIG.IDLE;
     }
 
     if (this.serverOnline === false && !this.connected) {
-      return "offline";
+      return SYNC_STATUS_CONFIG.OFFLINE;
     }
 
-    return "idle";
+    return SYNC_STATUS_CONFIG.IDLE;
   }
 }
 

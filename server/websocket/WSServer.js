@@ -39,17 +39,17 @@ export class WSServer {
       maxPayload: 10 * 1024 * 1024,
     });
 
-    // 設置 HTTP 升級處理
+    // 設定 HTTP 升級處理
     this.setupUpgradeHandler();
 
-    // 設置 WebSocket 連線處理
+    // 設定 WebSocket 連線處理
     this.setupConnectionHandler();
 
     Logger.success("WebSocket 伺服器已初始化");
   }
 
   /**
-   * 設置 HTTP 升級處理器
+   * 設定 HTTP 升級處理器
    * 將 HTTP 請求升級為 WebSocket 連線
    */
   setupUpgradeHandler() {
@@ -76,7 +76,7 @@ export class WSServer {
   }
 
   /**
-   * 設置 WebSocket 連線處理器
+   * 設定 WebSocket 連線處理器
    */
   setupConnectionHandler() {
     this.wss.on("connection", (ws, request) => {
@@ -89,7 +89,7 @@ export class WSServer {
         // 註冊連線到 ConnectionManager
         const wsConnectionId = this.connectionManager.register(ws, clientInfo);
 
-        // 設置訊息處理（含速率限制檢查，避免大量訊息造成 CPU 峰值）
+        // 設定訊息處理（含速率限制檢查，避免大量訊息造成 CPU 峰值）
         //
         // 行為說明：
         // - 在解析訊息前先呼叫 ConnectionManager.allowMessage() 檢查 token
@@ -134,17 +134,17 @@ export class WSServer {
           this.handleMessage(ws, wsConnectionId, data);
         });
 
-        // 設置關閉處理
+        // 設定關閉處理
         ws.on("close", (code, reason) => {
           this.handleClose(wsConnectionId, code, reason);
         });
 
-        // 設置錯誤處理
+        // 設定錯誤處理
         ws.on("error", (error) => {
           this.handleError(wsConnectionId, error);
         });
 
-        // 設置 Pong 處理（心跳響應）
+        // 設定 Pong 處理（心跳響應）
         ws.on("pong", () => {
           this.connectionManager.updateHeartbeat(wsConnectionId);
         });
@@ -200,7 +200,37 @@ export class WSServer {
    */
   handleClose(wsConnectionId, code, reason) {
     Logger.debug(`連線關閉 [${wsConnectionId}]: ${code} - ${reason}`);
+
+    const connInfo = this.connectionManager?.getConnectionInfo?.(wsConnectionId);
+    const clientId = connInfo?.clientId || null;
+    const sessionId = connInfo?.sessionId || null;
+    const shouldCleanupSessionMember = Boolean(
+      clientId &&
+      sessionId &&
+      this.connectionManager?.isActiveClientConnection?.(wsConnectionId, clientId),
+    );
+
     this.connectionManager.unregister(wsConnectionId);
+
+    if (shouldCleanupSessionMember) {
+      try {
+        const removed = this.messageHandler?.sessionManager?.removeClient?.(
+          sessionId,
+          clientId,
+        );
+
+        if (removed) {
+          this.messageHandler?.broadcastManager?.broadcastClientLeft?.(
+            sessionId,
+            clientId,
+          );
+        }
+      } catch (error) {
+        Logger.warn(
+          `清理工作階段客戶端失敗 [${wsConnectionId}] ${clientId} -> ${sessionId}: ${error.message}`,
+        );
+      }
+    }
   }
 
   /**

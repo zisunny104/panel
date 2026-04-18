@@ -236,6 +236,37 @@ export class ConnectionManager {
   }
 
   /**
+   * 取得連線資訊快照
+   * @param {string} wsConnectionId
+   * @returns {{clientId:string|null, sessionId:string|null}|null}
+   */
+  getConnectionInfo(wsConnectionId) {
+    const connection = this.connections.get(wsConnectionId);
+    if (!connection) {
+      return null;
+    }
+
+    return {
+      clientId: connection.clientId || null,
+      sessionId: connection.sessionId || null,
+    };
+  }
+
+  /**
+   * 判斷 clientId 目前是否仍綁定到指定 wsConnectionId
+   * 用於避免舊連線 close 時誤清掉新連線的 session 成員。
+   * @param {string} wsConnectionId
+   * @param {string} clientId
+   * @returns {boolean}
+   */
+  isActiveClientConnection(wsConnectionId, clientId) {
+    if (!wsConnectionId || !clientId) {
+      return false;
+    }
+    return this.clientIdMap.get(clientId) === wsConnectionId;
+  }
+
+  /**
    * 根據 clientId 取得 WebSocket 連線
    * @param {string} clientId - 客戶端 ID
    * @returns {WebSocket|null}

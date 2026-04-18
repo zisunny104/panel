@@ -117,7 +117,6 @@ export async function initializePanelManagers(page) {
   const stateStart = performance.now();
   page.experimentStateManager = new ExperimentStateManager({
     timeSyncManager: page.syncManager?.core?.timeSyncManager,
-    experimentHubManager: page.experimentHubManager,
   });
   logInitDuration("ExperimentStateManager 已初始化", stateStart);
 
@@ -133,12 +132,17 @@ export async function initializePanelManagers(page) {
   page.panelMediaManager.updateDependencies({
     experimentCombinationManager: page.experimentCombinationManager,
   });
+  page.experimentCombinationManager.on(
+    ExperimentCombinationManager.EVENT.COMBINATION_SELECTED,
+    (data) => page.panelMediaManager.onCombinationSelected(data)
+  );
 
   if (!page.timerManager) {
     const timerStart = performance.now();
     page.timerManager = new ExperimentTimerManager({
       timeSyncManager: page.syncManager?.core?.timeSyncManager,
       recordManager: null,
+      stateManager: page.experimentStateManager,
       getCurrentCombination: () =>
         page.experimentCombinationManager?.getCurrentCombination?.() || null,
     });
@@ -146,9 +150,11 @@ export async function initializePanelManagers(page) {
   }
 
   const flowStart = performance.now();
-  page.experimentFlowManager = new ExperimentFlowManager();
-  page.experimentFlowManager.injectCombinationManager(page.experimentCombinationManager);
-  page.experimentFlowManager.injectHubManager(page.experimentHubManager);
+  page.experimentFlowManager = new ExperimentFlowManager({
+    combinationManager: page.experimentCombinationManager,
+    hubManager: page.experimentHubManager,
+    stateManager: page.experimentStateManager,
+  });
   logInitDuration("ExperimentFlowManager 已初始化", flowStart);
   page.panelMediaManager.updateDependencies({
     experimentFlowManager: page.experimentFlowManager,
@@ -166,7 +172,6 @@ export async function initializePanelManagers(page) {
     experimentSyncCore: page.experimentSyncCore,
     panelUIManager: page.panelUIManager,
   });
-  page.uiManager.bindStateManagerInputs(page.experimentStateManager);
   logInitDuration("ExperimentUIManager 已初始化", uiStart);
   page.panelUIManager.updateDependencies({
     uiManager: page.uiManager,
@@ -186,6 +191,11 @@ export async function initializePanelManagers(page) {
   await page.experimentSystemManager.initialize();
   logInitDuration("ExperimentSystemManager 已初始化", systemStart);
 
+  page.uiManager.updateDependencies({
+    experimentSystemManager: page.experimentSystemManager,
+  });
+  page.uiManager.bindStateManagerInputs(page.experimentStateManager);
+
   page.experimentActionHandler = page.experimentSystemManager.actionHandler;
   if (!page.experimentActionHandler) {
     throw new Error("ExperimentActionHandler 未初始化");
@@ -200,6 +210,7 @@ export async function initializePanelManagers(page) {
   page.panelLogger.updateDependencies({
     experimentFlowManager: page.experimentFlowManager,
     experimentActionHandler: page.experimentActionHandler,
+    experimentSystemManager: page.experimentSystemManager,
   });
 
   logInitDuration("Panel 管理器初始化與依賴注入完成", initStart);

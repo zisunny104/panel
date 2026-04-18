@@ -78,11 +78,17 @@ class PanelLogger {
    * 取得目前實驗 ID
    */
   _getExpId() {
-    return (
-      this.experimentFlowManager?.experimentId ||
-      document.getElementById("experimentIdInput")?.value?.trim() ||
-      ""
-    );
+    const systemId = this.experimentSystemManager?.getExperimentId?.();
+    if (systemId) return systemId;
+
+    const flowId = this.experimentFlowManager?.experimentId;
+    if (flowId) return flowId;
+
+    const input = document.getElementById("experimentIdInput");
+    const inputId = input?.value?.trim();
+    if (inputId) return inputId;
+
+    return "";
   }
 
   /**
@@ -214,7 +220,7 @@ class PanelLogger {
     if (!flowManager) return () => {};
 
     if (this._flowEventsBound) {
-      Logger.warn("PanelLogger: 實驗生命週期事件已綁定，跳過重複設定");
+      Logger.debug("PanelLogger: 實驗生命週期事件已綁定，略過重複綁定");
       return () => this.unbindExperimentEvents();
     }
 
@@ -237,6 +243,10 @@ class PanelLogger {
     }));
 
     unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.STOPPED, () => {
+      this.logExperimentEnd();
+    }));
+
+    unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.COMPLETED, () => {
       this.logExperimentEnd();
     }));
 
@@ -304,16 +314,54 @@ class PanelLogger {
   }
 
   exportLog() {
-    const logData = JSON.stringify(this.logEntries, null, 2);
+    if (this.logEntries.length === 0) {
+      this.logger.warn("沒有日誌內容可匯出");
+      return;
+    }
+
+    const allLogsJsonl = this._toJsonl(this.logEntries);
+    const experimentOnlyLogs = this._getExperimentOnlyLogs(this.logEntries);
+    const experimentOnlyJsonl = this._toJsonl(experimentOnlyLogs);
+
     const now = new Date();
     const pad = (n) => n.toString().padStart(2, "0");
-    const fileName = `panel_log_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
       now.getDate(),
     )}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(
       now.getSeconds(),
-    )}.json`;
+    )}`;
 
-    const blob = new Blob([logData], { type: "application/json" });
+    const rawExperimentId =
+      this._getExpId() ||
+      [...this.logEntries]
+        .reverse()
+        .find((entry) => entry?.exp_id)?.exp_id ||
+      "unknown_experiment";
+    const safeExperimentId = String(rawExperimentId)
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, "-") || "unknown_experiment";
+
+    const allLogFileName = `panel_log_${safeExperimentId}_${timestamp}.jsonl`;
+    const experimentOnlyFileName =
+      `panel_record_${safeExperimentId}_${timestamp}.jsonl`;
+
+    this._downloadJsonl(allLogsJsonl, allLogFileName);
+
+    if (experimentOnlyLogs.length > 0) {
+      this._downloadJsonl(experimentOnlyJsonl, experimentOnlyFileName);
+    }
+
+    this.logAction("日誌已匯出為 JSONL", null, "export_log", false, false, false, null, {
+      exported_all_count: this.logEntries.length,
+      exported_experiment_only_count: experimentOnlyLogs.length,
+      exported_files: experimentOnlyLogs.length > 0
+        ? [allLogFileName, experimentOnlyFileName]
+        : [allLogFileName],
+    });
+  }
+
+  _downloadJsonl(content, fileName) {
+    const blob = new Blob([content], { type: "application/x-ndjson" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -322,8 +370,32 @@ class PanelLogger {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
 
-    this.logAction("日誌已匯出為 JSON 檔案");
+  _toJsonl(entries = []) {
+    return entries
+      .filter((entry) => entry && typeof entry === "object")
+      .map((entry) => JSON.stringify(entry))
+      .join("\n");
+  }
+
+  _getExperimentOnlyLogs(entries = []) {
+    return entries.filter((entry) => {
+      const type = entry?.type;
+      const actionId = entry?.a_id;
+
+      return (
+        type === RECORD_TYPES.EXP_START ||
+        type === RECORD_TYPES.EXP_END ||
+        type === RECORD_TYPES.EXP_PAUSE ||
+        type === RECORD_TYPES.EXP_RESUME ||
+        (
+          type === RECORD_TYPES.ACTION &&
+          Boolean(actionId) &&
+          actionId !== "export_log"
+        )
+      );
+    });
   }
 
   copyLog() {

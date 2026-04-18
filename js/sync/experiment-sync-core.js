@@ -6,7 +6,8 @@
  * 佇列管理由 SyncManagerCore 統一負責。
  */
 
-import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { SYNC_EVENTS, SYNC_DATA_TYPES, SYNC_ROLE_CONFIG } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
 
 class ExperimentSyncCore {
   constructor(config = {}) {
@@ -59,7 +60,7 @@ class ExperimentSyncCore {
   async safeBroadcast(payload) {
     if (!this.canBroadcast()) return false;
     const role = this.syncClient?.getRole?.() || this.syncClient?.role;
-    if (role && role !== "operator") return false;
+    if (role && role !== SYNC_ROLE_CONFIG.OPERATOR) return false;
     return await this.syncState(payload);
   }
 

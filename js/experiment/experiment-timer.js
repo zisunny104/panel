@@ -1,5 +1,5 @@
 /**
-* ExperimentTimerManager - 統一計時器管理器
+* ExperimentTimerManager - 實驗計時器管理器
 *
 * 提供實驗總計時與步驟計時功能。
 */
@@ -8,10 +8,17 @@ import { TimeSyncManager } from "../core/time-sync-manager.js";
 
 export const ExperimentTimerManager = class ExperimentTimerManager {
   constructor(options = {}) {
+    this.stateManager = options.stateManager || null;
+    this._localTimerState = {
+      experimentStartTime: null,
+      experimentElapsedMs: 0,
+      experimentPaused: false,
+    };
+
     this.experimentStartTime = null;
     this.experimentElapsedMs = 0;
-    this.experimentInterval = null;
     this.experimentPaused = false;
+    this.experimentInterval = null;
 
     this.timeSyncManager =
       options.timeSyncManager || new TimeSyncManager();
@@ -25,6 +32,73 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
 
     this.onExperimentTick = null;
     this.onIndexedTick = null;
+  }
+
+  injectStateManager(stateManager) {
+    if (!stateManager) return this;
+
+    const snapshot = this._snapshotTimerState();
+    this.stateManager = stateManager;
+    this.stateManager.experimentStartTime = snapshot.experimentStartTime;
+    this.stateManager.experimentElapsed = snapshot.experimentElapsedMs;
+    this.stateManager.experimentPaused = snapshot.experimentPaused;
+    return this;
+  }
+
+  _getTimerStateStore() {
+    return this.stateManager || this._localTimerState;
+  }
+
+  _snapshotTimerState() {
+    const store = this._getTimerStateStore();
+    return {
+      experimentStartTime: store.experimentStartTime,
+      experimentElapsedMs: this._readExperimentElapsedMs(store),
+      experimentPaused: store.experimentPaused,
+    };
+  }
+
+  _readExperimentElapsedMs(store) {
+    if (store === this.stateManager) {
+      return Number(store.experimentElapsed) || 0;
+    }
+
+    return Number(store.experimentElapsedMs) || 0;
+  }
+
+  _writeExperimentElapsedMs(store, value) {
+    const normalizedValue = Number(value) || 0;
+
+    if (store === this.stateManager) {
+      store.experimentElapsed = normalizedValue;
+      return;
+    }
+
+    store.experimentElapsedMs = normalizedValue;
+  }
+
+  get experimentStartTime() {
+    return this._getTimerStateStore().experimentStartTime;
+  }
+
+  set experimentStartTime(value) {
+    this._getTimerStateStore().experimentStartTime = value;
+  }
+
+  get experimentElapsedMs() {
+    return this._readExperimentElapsedMs(this._getTimerStateStore());
+  }
+
+  set experimentElapsedMs(value) {
+    this._writeExperimentElapsedMs(this._getTimerStateStore(), value);
+  }
+
+  get experimentPaused() {
+    return this._getTimerStateStore().experimentPaused;
+  }
+
+  set experimentPaused(value) {
+    this._getTimerStateStore().experimentPaused = Boolean(value);
   }
 
   // ===== 實驗計時 =====
@@ -59,7 +133,7 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
       this.experimentInterval = null;
     }
 
-    // 暫停所有運行中的手勢時間卡片計時器
+    // 暫停所有執行中的手勢時間卡片計時器
     Object.keys(this.timerStates).forEach((idx) => {
       const state = this.timerStates[idx];
       if (state && state.running) {
@@ -78,9 +152,6 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
     this.experimentStartTime = Date.now() - this.experimentElapsedMs;
     this.experimentPaused = false;
     this.startExperimentTimer();
-
-    // 註：手勢時間卡片計時器不自動恢復
-    // 使用者需要主動點擊手勢卡片以繼續計時
   }
 
   stopExperimentTimer() {
@@ -127,7 +198,8 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
     }
   }
 
-  toggleIndexedTimer(idx) {
+  toggleIndexedTimer(idx, options = {}) {
+    const { logPause = true } = options;
     this._ensureState(idx);
     const state = this.timerStates[idx];
     const card = document.getElementById(`timer-card-${idx}`);
@@ -142,7 +214,7 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
       if (this.currentActiveIndex === idx) {
         this.currentActiveIndex = null;
       }
-      if (this.recordManager && this.getCurrentCombination) {
+      if (logPause && this.recordManager && this.getCurrentCombination) {
         const currentCombination = this.getCurrentCombination();
         const currentGesture = currentCombination?.gestures?.[idx];
         if (currentGesture?.step_id) {
@@ -161,7 +233,7 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
       state.startTime = Date.now();
       this.currentActiveIndex = idx;
 
-      // 按下計時器的短暫邊框回饋（CSS 動畫 400ms，使用 class 避免 inline style）
+      // 按下計時器的短暫邊框回饋
       if (card) {
         card.classList.remove("timer-card-pressed");
         // force reflow so animation retriggers if pressed rapidly

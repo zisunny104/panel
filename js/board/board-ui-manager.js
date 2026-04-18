@@ -464,6 +464,79 @@ export const BoardUIManager = class BoardUIManager {
     }
   }
 
+  // ==========================================
+  // 實驗統計 / 輸入框 / 受試者名稱 API
+  // ==========================================
+
+  /**
+   * 更新實驗統計面板（手勢數、單元數）
+   * @param {Object|null} script - 目前載入的組合劇本
+   */
+  updateStats(script) {
+    const statsPanel = document.getElementById("experimentStats");
+    if (!statsPanel) return;
+
+    if (script?.gestures?.length > 0) {
+      statsPanel.classList.remove("is-hidden");
+      const gestureCountEl = document.getElementById("statGestureCount");
+      const unitCountEl = document.getElementById("statUnitCount");
+      if (gestureCountEl) gestureCountEl.textContent = `${script.gestures.length} 步`;
+      if (unitCountEl) {
+        unitCountEl.textContent = script.unitsSequence
+          ? script.unitsSequence.length
+          : 0;
+      }
+    } else {
+      statsPanel.classList.add("is-hidden");
+    }
+  }
+
+  /**
+   * 讀取目前已勾選且不屬於 startup/shutdown 的單元 checkbox 清單。
+   * @returns {HTMLElement[]} 有效單元的 checkbox 元素陣列
+   */
+  getCheckedValidUnits() {
+    const checkedUnits = document.querySelectorAll(
+      '.unit-checkbox input[type="checkbox"]:checked',
+    );
+    return Array.from(checkedUnits).filter((cb) => {
+      const li = cb.closest("li");
+      return (
+        li &&
+        !li.classList.contains("startup-card") &&
+        !li.classList.contains("shutdown-card")
+      );
+    });
+  }
+
+  /**
+   * 將焦點移到實驗 ID 輸入框
+   */
+  focusExperimentIdInput() {
+    const input = document.getElementById("experimentIdInput");
+    if (input) input.focus();
+  }
+
+  /**
+   * 綁定受試者名稱輸入框事件，並回傳初始值。
+   * @param {{ onInput: (name: string) => void, onInitial?: (name: string) => void }} callbacks
+   */
+  bindParticipantNameInput({ onInput, onInitial } = {}) {
+    const input = document.getElementById("participantNameInput");
+    if (!input) return;
+
+    const initialValue = input.value.trim();
+    onInitial?.(initialValue);
+
+    input.addEventListener("input", (e) => {
+      onInput?.(e.target.value.trim());
+    });
+
+    input.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") e.preventDefault();
+    });
+  }
+
 };
 
 // ES6 模組匯出

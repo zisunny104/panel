@@ -1,7 +1,7 @@
 /**
-* PanelPageManager - 面板頁面管理器
+* PanelPageManager - 機台面板頁面管理器
 *
-* 負責面板頁面腳本的載入與初始化。
+* 頁面腳本的載入與初始化。
 */
 
 import { buildActionSequenceFromUnits, loadUnitsFromScenarios } from "../core/data-loader.js";
@@ -144,7 +144,7 @@ class PanelPageManager {
 
   async _initializeExperimentUIAndData() {
     const scriptData = await loadUnitsFromScenarios();
-    this.experimentFlowManager.updateDependencies({
+    this.experimentFlowManager.injectDependencies({
       unitsData: scriptData.units,
       actionsMap: scriptData.actions,
     });
@@ -189,7 +189,7 @@ class PanelPageManager {
    */
   _setupExperimentEventListeners() {
     if (this._listenersSetup) {
-      Logger.warn("Panel: 事件監聽器已設定，跳過重複設定");
+      Logger.debug("Panel: 事件監聽器已設定，略過重複綁定");
       return;
     }
 
@@ -279,20 +279,9 @@ class PanelPageManager {
   }
 
   _getPowerOptionsForCurrentCombination() {
-    const combo =
-      this.experimentCombinationManager?.getCurrentCombination?.() ||
-      this.experimentSystemManager?.state?.currentCombination ||
-      null;
-    const powerOptions = combo?.powerOptions || {};
-    return {
-      includeStartup:
-        typeof powerOptions.includeStartup === "boolean"
-          ? powerOptions.includeStartup
-          : true,
-      includeShutdown:
-        typeof powerOptions.includeShutdown === "boolean"
-          ? powerOptions.includeShutdown
-          : true,
+    return this.experimentSystemManager?.getCurrentPowerOptions?.() || {
+      includeStartup: true,
+      includeShutdown: true,
     };
   }
 
@@ -325,7 +314,7 @@ class PanelPageManager {
     }
 
     const systemManager = this.experimentSystemManager;
-    const allUnits = systemManager.state.scriptData.units || [];
+    const allUnits = systemManager.getScriptUnits();
 
     const unitIdToLoad = unitIds[0];
 
@@ -362,7 +351,7 @@ class PanelPageManager {
       isFirstUnit = false,
       isLastUnit = false,
     } = options;
-    const allUnits = this.experimentSystemManager?.state?.scriptData?.units || [];
+    const allUnits = this.experimentSystemManager?.getScriptUnits?.() || [];
     const actions = buildActionSequenceFromUnits(
       [unit.unit_id],
       this.actionsMap,
@@ -452,6 +441,9 @@ class PanelPageManager {
     this.panelUIManager.updateDependencies({
       buttonManager: this.buttonManager,
     });
+    this.panelUIManager?.updateStepCooldown?.(
+      localStorage.getItem("stepCooldownMs") ?? 3000,
+    );
 
     this.buttonManager.on("button:action-clicked", (data) => {
       this._handleButtonActionClick(data);
@@ -477,7 +469,7 @@ class PanelPageManager {
       action: action,
     }));
 
-    // 直接同步通知一次，避免初始化時事件監聽器尚未完成綁定而漏掉刷新
+    // 直接同步通知一次，避免初始化時事件監聽器尚未完成綁定而漏掉更新
     this.buttonManager.handleExperimentActionsLoaded?.({
       actions: actionData,
       unit,
@@ -570,7 +562,6 @@ class PanelPageManager {
    */
   async _handleSequenceCompletedForUnitProgression() {
     const systemManager = this.experimentSystemManager;
-    const powerOptions = this._getPowerOptionsForCurrentCombination();
     const beforeProgress = systemManager.getFlowProgressSnapshot();
 
     if (beforeProgress.isLastUnit) {
@@ -578,12 +569,13 @@ class PanelPageManager {
       return;
     }
 
-    Logger.debug("Panel: 推進到下一個單元");
-    systemManager.advanceToNextUnit();
+    await this.buttonManager?.triggerStepCompleteEffect?.({
+      advanceStep: false,
+    });
 
     const afterProgress = systemManager.getFlowProgressSnapshot();
     const nextUnitId = afterProgress.unitIds[afterProgress.currentUnitIndex];
-    const allUnits = systemManager.state.scriptData.units || [];
+    const allUnits = systemManager.getScriptUnits();
     const nextUnit = allUnits.find((unit) => unit.unit_id === nextUnitId);
 
     if (!nextUnit) {
@@ -591,6 +583,7 @@ class PanelPageManager {
       return;
     }
 
+    const powerOptions = this._getPowerOptionsForCurrentCombination();
     await this._loadUnitActionsToActionHandler(nextUnit, {
       includeStartup: false,
       includeShutdown: powerOptions.includeShutdown,
@@ -599,12 +592,16 @@ class PanelPageManager {
     });
     this._notifyButtonManagerForActions(nextUnit);
 
-    Logger.debug("Panel: 已推進到下一個單元並載入動作序列", {
+    Logger.debug("Panel: 已完成跨單元冷卻並載入下一單元動作序列", {
       nextUnitId,
       actionCount: (nextUnit.steps || []).flatMap(
         (step) => step.actions || [],
       ).length,
     });
+  }
+
+  setExperimentControlsLocked(_locked) {
+    // Panel 的通用控制鎖定已由 ExperimentSystemManager DOM 控制主導。
   }
 
 };

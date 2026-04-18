@@ -1,94 +1,77 @@
 /**
  * ExperimentFlowManager - 實驗流程管理器
  *
- * 負責實驗生命週期控制（開始、暫停、恢復、停止、完成）、
+ * 負責實驗生命週期控制（開始、暫停、繼續、停止、完成）、
  * 步驟與單元進度管理，並發布流程事件供其他模組訂閱。
  * 與 ExperimentTimerManager 和 UI 層互動以驅動實驗進行。
  */
 
 import { buildActionSequenceFromUnits } from "../core/data-loader.js";
-import { SYNC_EVENTS } from "../constants/index.js";
+import {
+  SYNC_EVENTS,
+  EXPERIMENT_FLOW_STATE,
+  EXPERIMENT_FLOW_EVENTS,
+  EXPERIMENT_FLOW_DOM_EVENTS,
+} from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
+import { EventEmitter } from "../core/event-emitter.js";
 
-class ExperimentFlowManager {
-  /**
-   * 實驗狀態常數
-   */
-  static STATE = {
-    IDLE: "idle", // 閒置（未開始）
-    RUNNING: "running", // 進行中
-    PAUSED: "paused", // 暫停
-    STOPPED: "stopped", // 已停止
-    COMPLETED: "completed", // 已完成
-  };
+class ExperimentFlowManager extends EventEmitter {
+  static STATE = EXPERIMENT_FLOW_STATE;
+  static EVENT = EXPERIMENT_FLOW_EVENTS;
 
-  /**
-   * 事件類型常數
-   */
-  static EVENT = {
-    STARTED: "flow:started",
-    PAUSED: "flow:paused",
-    RESUMED: "flow:resumed",
-    STOPPED: "flow:stopped",
-    COMPLETED: "flow:completed",
-    LOCKED: "flow:locked",
-    UNLOCKED: "flow:unlocked",
-    STEP_CHANGED: "flow:step_changed",
-    UNIT_CHANGED: "flow:unit_changed",
-    UNIT_COMPLETED: "flow:unit_completed",
-    STATE_CHANGED: "flow:state_changed",
-    ERROR: "flow:error",
-  };
+  constructor({
+    hubManager = null,
+    combinationManager = null,
+    actionHandler = null,
+    uiManager = null,
+    stateManager = null,
+    actionsMap = null,
+    unitsData = null,
+  } = {}) {
+    super();
+    this.hubManager = hubManager;
+    this.combinationManager = combinationManager;
+    this.actionHandler = actionHandler;
+    this.uiManager = uiManager;
+    this.stateManager = stateManager;
+    this.actionsMap = actionsMap;
+    this.unitsData = unitsData;
 
-  constructor(config = {}) {
-    // 配置
-    this.config = {
-      enableAutoProgress: config.enableAutoProgress !== false,
-      stepTimeout: config.stepTimeout || null,
-      ...config,
+    this._localFlowState = {
+      state: ExperimentFlowManager.STATE.IDLE,
+      isRunning: false,
+      isPaused: false,
+      locked: false,
+      currentUnitIndex: 0,
+      currentStepIndex: 0,
+      loadedUnits: [],
+      completedUnits: new Set(),
+      deferCompletion: false,
     };
 
-    // 狀態
     this.state = ExperimentFlowManager.STATE.IDLE;
     this.isRunning = false;
     this.isPaused = false;
-    // locked 表示是否禁止變更實驗ID或組合（RUNNING 或 PAUSED 時為 true）
     this.locked = false;
 
-    // 進度追蹤
     this.currentUnitIndex = 0;
     this.currentStepIndex = 0;
     this.loadedUnits = [];
     this.completedUnits = new Set();
-    // 若為遠端啟動且需要手動結束，延後完成狀態切換
     this.deferCompletion = false;
 
-    // 依賴注入
-    this.dependencies = {
-      hubManager: null,
-      combinationManager: null,
-      actionHandler: null,
-      uiManager: null,
-      actionsMap: null,
-      unitsData: null,
-    };
-
-    // 事件監聽器
-    this.eventListeners = new Map();
-
-    // 自動推進計時器
     this.autoProgressTimer = null;
-
-    // 可見度自動暫停/恢復狀態
     this.pausedByVisibility = false;
-    this._setupVisibilityHandler();
 
+    this._setupVisibilityHandler();
     Logger.debug("ExperimentFlowManager 初始化完成");
   }
 
   _setupVisibilityHandler() {
     if (typeof document === "undefined") return;
 
-    document.addEventListener("visibilitychange", () => {
+    document.addEventListener(EXPERIMENT_FLOW_DOM_EVENTS.VISIBILITY_CHANGE, () => {
       if (document.hidden) {
         if (this.isRunning && !this.isPaused) {
           this.pausedByVisibility = true;
@@ -103,69 +86,138 @@ class ExperimentFlowManager {
     });
   }
 
-  // ==================== 依賴注入 ====================
-
   /**
-   * 注入 HubManager
+   * 建構後 inject dependencies（用於延後綁定情境）
    */
-  injectHubManager(hubManager) {
-    this.dependencies.hubManager = hubManager;
-    Logger.debug("HubManager 已注入");
-    return this;
-  }
-
-  /**
-   * 注入 CombinationManager
-   */
-  injectCombinationManager(combinationManager) {
-    this.dependencies.combinationManager = combinationManager;
-    Logger.debug("CombinationManager 已注入");
-    return this;
-  }
-
-  /**
-   * 注入 ActionHandler
-   */
-  injectActionHandler(actionHandler) {
-    this.dependencies.actionHandler = actionHandler;
-    Logger.debug("ActionHandler 已注入");
-    return this;
-  }
-
-  /**
-   * 注入 UIManager
-   */
-  injectUIManager(uiManager) {
-    this.dependencies.uiManager = uiManager;
-    Logger.debug("UIManager 已注入");
-    return this;
-  }
-
-  /**
-   * 更新依賴 (支援批次注入)
-   */
-  updateDependencies(deps = {}) {
-    Object.keys(deps).forEach((key) => {
-      if (Object.prototype.hasOwnProperty.call(this.dependencies, key)) {
-        this.dependencies[key] = deps[key];
+  injectDependencies({
+    hubManager,
+    combinationManager,
+    actionHandler,
+    uiManager,
+    stateManager,
+    actionsMap,
+    unitsData,
+  } = {}) {
+    if (hubManager) this.hubManager = hubManager;
+    if (combinationManager) this.combinationManager = combinationManager;
+    if (actionHandler) this.actionHandler = actionHandler;
+    if (uiManager) this.uiManager = uiManager;
+    if (stateManager) {
+      if (this.stateManager !== stateManager) {
+        const snapshot = this._snapshotFlowState();
+        this.stateManager = stateManager;
+        Object.assign(this.stateManager, snapshot);
       }
-    });
+    }
+    if (actionsMap) this.actionsMap = actionsMap;
+    if (unitsData) this.unitsData = unitsData;
     return this;
   }
 
-  /**
-   * 取得依賴
-   */
-  getDependency(name) {
-    return this.dependencies[name];
+  _getFlowStateStore() {
+    return this.stateManager || this._localFlowState;
   }
 
-  // ==================== 生命週期管理 ====================
+  _snapshotFlowState() {
+    const store = this._getFlowStateStore();
+    return {
+      state: store.state,
+      isRunning: store.isRunning,
+      isPaused: store.isPaused,
+      locked: store.locked,
+      currentUnitIndex: store.currentUnitIndex,
+      currentStepIndex: store.currentStepIndex,
+      loadedUnits: Array.isArray(store.loadedUnits) ? [...store.loadedUnits] : [],
+      completedUnits: store.completedUnits instanceof Set ? new Set(store.completedUnits) : new Set(),
+      deferCompletion: store.deferCompletion,
+    };
+  }
+
+  get state() {
+    return this._getFlowStateStore().state;
+  }
+
+  set state(value) {
+    this._getFlowStateStore().state = value;
+  }
+
+  get isRunning() {
+    return this._getFlowStateStore().isRunning;
+  }
+
+  set isRunning(value) {
+    this._getFlowStateStore().isRunning = Boolean(value);
+  }
+
+  get isPaused() {
+    return this._getFlowStateStore().isPaused;
+  }
+
+  set isPaused(value) {
+    this._getFlowStateStore().isPaused = Boolean(value);
+  }
+
+  get locked() {
+    return this._getFlowStateStore().locked;
+  }
+
+  set locked(value) {
+    this._getFlowStateStore().locked = Boolean(value);
+  }
+
+  get currentUnitIndex() {
+    return this._getFlowStateStore().currentUnitIndex;
+  }
+
+  set currentUnitIndex(value) {
+    this._getFlowStateStore().currentUnitIndex = Number(value) || 0;
+  }
+
+  get currentStepIndex() {
+    return this._getFlowStateStore().currentStepIndex;
+  }
+
+  set currentStepIndex(value) {
+    this._getFlowStateStore().currentStepIndex = Number(value) || 0;
+  }
+
+  get loadedUnits() {
+    const store = this._getFlowStateStore();
+    if (!Array.isArray(store.loadedUnits)) {
+      store.loadedUnits = [];
+    }
+    return store.loadedUnits;
+  }
+
+  set loadedUnits(value) {
+    this._getFlowStateStore().loadedUnits = Array.isArray(value) ? value : [];
+  }
+
+  get completedUnits() {
+    const store = this._getFlowStateStore();
+    if (!(store.completedUnits instanceof Set)) {
+      store.completedUnits = new Set();
+    }
+    return store.completedUnits;
+  }
+
+  set completedUnits(value) {
+    this._getFlowStateStore().completedUnits = value instanceof Set ? value : new Set();
+  }
+
+  get deferCompletion() {
+    return this._getFlowStateStore().deferCompletion;
+  }
+
+  set deferCompletion(value) {
+    this._getFlowStateStore().deferCompletion = Boolean(value);
+  }
 
   /**
    * 開始實驗
    */
   async startExperiment(options = {}) {
+    const broadcast = options.broadcast !== false;
     if (this.isRunning) {
       Logger.warn("實驗已在進行中");
       return false;
@@ -174,33 +226,29 @@ class ExperimentFlowManager {
     try {
       Logger.info("開始實驗");
 
-      // 載入單元列表
       if (options.units) {
         this.loadedUnits = options.units;
-      } else if (this.dependencies.combinationManager) {
-        this.loadedUnits =
-          this.dependencies.combinationManager.getLoadedUnits();
+      } else if (this.combinationManager?.getLoadedUnits) {
+        this.loadedUnits = this.combinationManager.getLoadedUnits();
       }
 
       if (this.loadedUnits.length === 0) {
         throw new Error("沒有可用的單元");
       }
 
-      // 重置進度
       this.currentUnitIndex = 0;
       this.currentStepIndex = 0;
       this.completedUnits.clear();
 
-      // Initialize action sequence (if actionHandler is available)
-      if (this.dependencies.actionHandler && typeof window !== "undefined") {
+      if (this.actionHandler && typeof window !== "undefined") {
         const unitIds =
           this.loadedUnits.length > 0
             ? this.loadedUnits
-            : this.dependencies.combinationManager?.getLoadedUnits?.() || [];
-        const actionsMap = this.dependencies.actionsMap || new Map();
-        const unitsData = this.dependencies.unitsData || [];
+            : this.combinationManager?.getLoadedUnits?.() || [];
+        const actionsMap = this.actionsMap || new Map();
+        const unitsData = this.unitsData || [];
         const combo =
-          this.dependencies.combinationManager?.getCurrentCombination?.() || null;
+          this.combinationManager?.getCurrentCombination?.() || null;
         const powerOptions = combo?.powerOptions || {};
         const includeStartup =
           typeof powerOptions.includeStartup === "boolean"
@@ -221,25 +269,24 @@ class ExperimentFlowManager {
         );
 
         if (actionSequence && actionSequence.length > 0) {
-          this.dependencies.actionHandler.initializeSequence(actionSequence);
+          this.actionHandler.initializeSequence(actionSequence);
           Logger.debug("已初始化 action 序列", {
             actionCount: actionSequence.length,
           });
         }
       }
 
-      // 更新狀態
       this.isRunning = true;
       this.isPaused = false;
       this.state = ExperimentFlowManager.STATE.RUNNING;
-      // 鎖定變更（禁止變更 experimentId/組合）
       this.locked = true;
       this.emit(ExperimentFlowManager.EVENT.LOCKED, { locked: true });
 
-      // 觸發內部事件
       const startData = {
         units: [...this.loadedUnits],
         timestamp: new Date().toISOString(),
+        source: options.source || "local",
+        broadcast,
       };
       this.emit(ExperimentFlowManager.EVENT.STARTED, startData);
 
@@ -248,8 +295,7 @@ class ExperimentFlowManager {
         newState: this.state,
       });
 
-      // 廣播 DOM 事件供同步橋接器使用
-      if (typeof window !== "undefined") {
+      if (broadcast && typeof window !== "undefined") {
         document.dispatchEvent(
           new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
             detail: startData,
@@ -275,7 +321,8 @@ class ExperimentFlowManager {
   /**
    * 暫停實驗
    */
-  pauseExperiment() {
+  pauseExperiment(options = {}) {
+    const broadcast = options.broadcast !== false;
     if (!this.isRunning) {
       Logger.warn("實驗未進行，無法暫停");
       return false;
@@ -290,17 +337,15 @@ class ExperimentFlowManager {
 
     this.isPaused = true;
     this.state = ExperimentFlowManager.STATE.PAUSED;
-    // 保持鎖定（仍禁止變更 experimentId/組合），但允許編輯受試者名稱
     this.locked = true;
     this.emit(ExperimentFlowManager.EVENT.LOCKED, { locked: true });
-
-    // 清除自動推進計時器
-    this.clearAutoProgress();
 
     const pauseData = {
       currentUnit: this.currentUnitIndex,
       currentStep: this.currentStepIndex,
       timestamp: new Date().toISOString(),
+      source: options.source || "local",
+      broadcast,
     };
     this.emit(ExperimentFlowManager.EVENT.PAUSED, pauseData);
 
@@ -309,8 +354,7 @@ class ExperimentFlowManager {
       newState: this.state,
     });
 
-    // 廣播 DOM 事件供同步橋接器使用
-    if (typeof window !== "undefined") {
+    if (broadcast && typeof window !== "undefined") {
       document.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.EXPERIMENT_PAUSED, {
           detail: pauseData,
@@ -322,11 +366,12 @@ class ExperimentFlowManager {
   }
 
   /**
-   * 恢復實驗
+   * 繼續實驗
    */
-  resumeExperiment() {
+  resumeExperiment(options = {}) {
+    const broadcast = options.broadcast !== false;
     if (!this.isRunning) {
-      Logger.warn("實驗未進行，無法恢復");
+      Logger.warn("實驗未進行，無法繼續");
       return false;
     }
 
@@ -335,11 +380,10 @@ class ExperimentFlowManager {
       return false;
     }
 
-    Logger.info("恢復實驗");
+    Logger.info("繼續實驗");
 
     this.isPaused = false;
     this.state = ExperimentFlowManager.STATE.RUNNING;
-    // 重新鎖定並禁止修改受試者名稱
     this.locked = true;
     this.emit(ExperimentFlowManager.EVENT.LOCKED, { locked: true });
 
@@ -347,6 +391,8 @@ class ExperimentFlowManager {
       currentUnit: this.currentUnitIndex,
       currentStep: this.currentStepIndex,
       timestamp: new Date().toISOString(),
+      source: options.source || "local",
+      broadcast,
     };
     this.emit(ExperimentFlowManager.EVENT.RESUMED, resumeData);
 
@@ -355,8 +401,7 @@ class ExperimentFlowManager {
       newState: this.state,
     });
 
-    // 廣播 DOM 事件供同步橋接器使用
-    if (typeof window !== "undefined") {
+    if (broadcast && typeof window !== "undefined") {
       document.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.EXPERIMENT_RESUMED, {
           detail: resumeData,
@@ -371,12 +416,11 @@ class ExperimentFlowManager {
    * 停止實驗
    */
   stopExperiment(reason = "manual", options = {}) {
+    const broadcast = options.broadcast !== false;
     if (!this.isRunning) {
       Logger.warn("實驗未進行，無法停止");
       return false;
     }
-
-    const broadcast = options.broadcast !== false;
 
     Logger.info("停止實驗", { reason });
 
@@ -384,12 +428,8 @@ class ExperimentFlowManager {
     this.isRunning = false;
     this.isPaused = false;
     this.state = ExperimentFlowManager.STATE.STOPPED;
-    // 解鎖並禁止受試者名稱編輯
     this.locked = false;
     this.emit(ExperimentFlowManager.EVENT.UNLOCKED, { locked: false });
-
-    // 清除自動推進計時器
-    this.clearAutoProgress();
 
     const stopData = {
       reason,
@@ -398,6 +438,7 @@ class ExperimentFlowManager {
       currentStep: this.currentStepIndex,
       completedUnits: this.completedUnits.size,
       timestamp: new Date().toISOString(),
+      source: options.source || "local",
     };
     this.emit(ExperimentFlowManager.EVENT.STOPPED, stopData);
 
@@ -406,8 +447,7 @@ class ExperimentFlowManager {
       newState: this.state,
     });
 
-    // 廣播 DOM 事件供同步橋接器使用
-    if (typeof window !== "undefined") {
+    if (broadcast && typeof window !== "undefined") {
       document.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, {
           detail: stopData,
@@ -421,7 +461,8 @@ class ExperimentFlowManager {
   /**
    * 完成實驗
    */
-  completeExperiment() {
+  completeExperiment(options = {}) {
+    const broadcast = options.broadcast !== false;
     if (!this.isRunning) {
       Logger.warn("實驗未進行，無法標記為完成");
       return false;
@@ -433,23 +474,32 @@ class ExperimentFlowManager {
     this.isRunning = false;
     this.isPaused = false;
     this.state = ExperimentFlowManager.STATE.COMPLETED;
-    // 解鎖並禁止受試者名稱編輯
     this.locked = false;
     this.emit(ExperimentFlowManager.EVENT.UNLOCKED, { locked: false });
 
-    // 清除自動推進計時器
-    this.clearAutoProgress();
-
-    this.emit(ExperimentFlowManager.EVENT.COMPLETED, {
+    const completedData = {
       totalUnits: this.loadedUnits.length,
       completedUnits: this.completedUnits.size,
+      reason: "completed",
+      broadcast,
       timestamp: new Date().toISOString(),
-    });
+      source: options.source || "local",
+    };
+
+    this.emit(ExperimentFlowManager.EVENT.COMPLETED, completedData);
 
     this.emit(ExperimentFlowManager.EVENT.STATE_CHANGED, {
       oldState,
       newState: this.state,
     });
+
+    if (broadcast && typeof window !== "undefined") {
+      document.dispatchEvent(
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, {
+          detail: completedData,
+        }),
+      );
+    }
 
     return true;
   }
@@ -468,11 +518,8 @@ class ExperimentFlowManager {
     this.currentUnitIndex = 0;
     this.currentStepIndex = 0;
     this.completedUnits.clear();
-    // 解鎖並禁止受試者名稱編輯
     this.locked = false;
     this.emit(ExperimentFlowManager.EVENT.UNLOCKED, { locked: false });
-
-    this.clearAutoProgress();
 
     if (oldState !== this.state) {
       this.emit(ExperimentFlowManager.EVENT.STATE_CHANGED, {
@@ -483,8 +530,6 @@ class ExperimentFlowManager {
 
     Logger.debug("實驗已重置");
   }
-
-  // ==================== 步驟流程控制 ====================
 
   /**
    * 前進到下一步
@@ -503,7 +548,6 @@ class ExperimentFlowManager {
 
     const oldStepIndex = this.currentStepIndex;
 
-    // 檢查是否還有下一步
     if (this.currentStepIndex < currentUnit.steps.length - 1) {
       this.currentStepIndex++;
 
@@ -521,90 +565,8 @@ class ExperimentFlowManager {
 
       return true;
     } else {
-      // 目前單元已完成
       return this.nextUnit();
     }
-  }
-
-  /**
-   * 後退到上一步
-   */
-  prevStep() {
-    if (!this.isRunning) {
-      Logger.warn("實驗未進行，無法後退");
-      return false;
-    }
-
-    const oldStepIndex = this.currentStepIndex;
-
-    if (this.currentStepIndex > 0) {
-      this.currentStepIndex--;
-
-      this.emit(ExperimentFlowManager.EVENT.STEP_CHANGED, {
-        unitIndex: this.currentUnitIndex,
-        oldStepIndex,
-        newStepIndex: this.currentStepIndex,
-        step: this.getCurrentStep(),
-      });
-
-      Logger.debug("後退到上一步", {
-        unit: this.currentUnitIndex,
-        step: this.currentStepIndex,
-      });
-
-      return true;
-    } else if (this.currentUnitIndex > 0) {
-      // 回到上一個單元的最後一步
-      return this.prevUnit();
-    }
-
-    Logger.warn("已經是第一步");
-    return false;
-  }
-
-  /**
-   * 跳到指定步驟
-   */
-  jumpToStep(unitIndex, stepIndex) {
-    if (!this.isRunning) {
-      Logger.warn("實驗未進行，無法跳轉");
-      return false;
-    }
-
-    if (unitIndex < 0 || unitIndex >= this.loadedUnits.length) {
-      Logger.warn("單元索引超出範圍", unitIndex);
-      return false;
-    }
-
-    const unit = this.getUnitAt(unitIndex);
-    if (!unit || stepIndex < 0 || stepIndex >= unit.steps.length) {
-      Logger.warn("步驟索引超出範圍", stepIndex);
-      return false;
-    }
-
-    const oldUnitIndex = this.currentUnitIndex;
-    const oldStepIndex = this.currentStepIndex;
-
-    this.currentUnitIndex = unitIndex;
-    this.currentStepIndex = stepIndex;
-
-    if (oldUnitIndex !== unitIndex) {
-      this.emit(ExperimentFlowManager.EVENT.UNIT_CHANGED, {
-        oldUnitIndex,
-        newUnitIndex: unitIndex,
-        unit: this.getCurrentUnit(),
-      });
-    }
-
-    this.emit(ExperimentFlowManager.EVENT.STEP_CHANGED, {
-      unitIndex,
-      oldStepIndex,
-      newStepIndex: stepIndex,
-      step: this.getCurrentStep(),
-    });
-
-    Logger.debug("已跳轉到指定步驟", { unitIndex, stepIndex });
-    return true;
   }
 
   /**
@@ -616,8 +578,6 @@ class ExperimentFlowManager {
     return unit.steps[this.currentStepIndex] || null;
   }
 
-  // ==================== 單元進度控制 ====================
-
   /**
    * 前進到下一個單元
    */
@@ -627,7 +587,6 @@ class ExperimentFlowManager {
       return false;
     }
 
-    // 標記目前單元為完成
     this.markUnitAsCompleted(this.currentUnitIndex);
 
     const oldUnitIndex = this.currentUnitIndex;
@@ -648,7 +607,6 @@ class ExperimentFlowManager {
 
       return true;
     } else {
-      // 所有單元已完成
       Logger.info("所有單元已完成");
       if (this.deferCompletion) {
         Logger.debug("完成已延後，等待手動結束");
@@ -662,41 +620,6 @@ class ExperimentFlowManager {
 
   setDeferCompletion(shouldDefer) {
     this.deferCompletion = Boolean(shouldDefer);
-  }
-
-  /**
-   * 後退到上一個單元
-   */
-  prevUnit() {
-    if (!this.isRunning) {
-      Logger.warn("實驗未進行，無法後退到上一單元");
-      return false;
-    }
-
-    const oldUnitIndex = this.currentUnitIndex;
-
-    if (this.currentUnitIndex > 0) {
-      this.currentUnitIndex--;
-
-      // 跳到該單元的最後一步
-      const unit = this.getCurrentUnit();
-      this.currentStepIndex = unit.steps.length - 1;
-
-      this.emit(ExperimentFlowManager.EVENT.UNIT_CHANGED, {
-        oldUnitIndex,
-        newUnitIndex: this.currentUnitIndex,
-        unit: this.getCurrentUnit(),
-      });
-
-      Logger.debug("後退到上一單元", {
-        unit: this.currentUnitIndex,
-      });
-
-      return true;
-    }
-
-    Logger.warn("已經是第一個單元");
-    return false;
   }
 
   /**
@@ -740,7 +663,7 @@ class ExperimentFlowManager {
     }
 
     const unitId = this.loadedUnits[index];
-    const unitsData = this.dependencies.unitsData;
+    const unitsData = this.unitsData;
 
     if (Array.isArray(unitsData) && unitsData.length > 0) {
       return unitsData.find((u) => u.unit_id === unitId) || null;
@@ -785,8 +708,6 @@ class ExperimentFlowManager {
   isUnitCompleted(unitIndex) {
     return this.completedUnits.has(unitIndex);
   }
-
-  // ==================== 狀態查詢 ====================
 
   /**
    * 檢查實驗是否進行中
@@ -843,101 +764,6 @@ class ExperimentFlowManager {
     };
   }
 
-  // ==================== 自動推進 ====================
-
-  /**
-   * 啟用自動推進
-   */
-  enableAutoProgress(delay = 3000) {
-    if (!this.config.enableAutoProgress) {
-      Logger.warn("自動推進功能已停用");
-      return false;
-    }
-
-    this.clearAutoProgress();
-
-    this.autoProgressTimer = setTimeout(() => {
-      if (this.isRunning && !this.isPaused) {
-        Logger.debug("自動推進到下一步");
-        this.nextStep();
-      }
-    }, delay);
-
-    return true;
-  }
-
-  /**
-   * 停用自動推進
-   */
-  disableAutoProgress() {
-    this.clearAutoProgress();
-  }
-
-  /**
-   * 清除自動推進計時器
-   */
-  clearAutoProgress() {
-    if (this.autoProgressTimer) {
-      clearTimeout(this.autoProgressTimer);
-      this.autoProgressTimer = null;
-    }
-  }
-
-  // ==================== 事件通知 ====================
-
-  /**
-   * 註冊事件監聽器
-   */
-  on(eventType, callback) {
-    if (!this.eventListeners.has(eventType)) {
-      this.eventListeners.set(eventType, []);
-    }
-    this.eventListeners.get(eventType).push(callback);
-    return () => this.off(eventType, callback);
-  }
-
-  /**
-   * 移除事件監聽器
-   */
-  off(eventType, callback) {
-    if (!this.eventListeners.has(eventType)) return;
-
-    const listeners = this.eventListeners.get(eventType);
-    const index = listeners.indexOf(callback);
-    if (index > -1) {
-      listeners.splice(index, 1);
-    }
-  }
-
-  /**
-   * 觸發事件
-   */
-  emit(eventType, data) {
-    if (!this.eventListeners.has(eventType)) return;
-
-    const listeners = this.eventListeners.get(eventType);
-    listeners.forEach((callback) => {
-      try {
-        callback(data);
-      } catch (error) {
-        Logger.error(`事件處理器錯誤 (${eventType})`, error);
-      }
-    });
-  }
-
-  /**
-   * 清除所有事件監聽器
-   */
-  clearListeners(eventType = null) {
-    if (eventType) {
-      this.eventListeners.delete(eventType);
-    } else {
-      this.eventListeners.clear();
-    }
-  }
-
-  // ==================== 工具方法 ====================
-
   /**
    * 銷毀管理器
    */
@@ -950,8 +776,5 @@ class ExperimentFlowManager {
   }
 }
 
-// Removed global exposure of ExperimentFlowManager
-
-// ES6 模組匯出
 export default ExperimentFlowManager;
 export { ExperimentFlowManager };

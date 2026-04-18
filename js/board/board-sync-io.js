@@ -1,17 +1,45 @@
 /**
- * BoardSyncIO - board 端同步收發控制
+ * BoardSyncIO - board 端（實驗者）同步收發控制
  *
  * 集中處理同步訊息接收（receive*）與送出（send*），
  * 讓 page manager 專注在頁面協調。
+ *
+ * 角色說明：
+ * - Board（board.html）：實驗者（experimenter）控制實驗流程、手動標記 action 完成
+ * - Panel（panel.html）：受試者（participant）配戴 MR 裝置進行實際操作
+ *
+ * 同步方向重點：
+ * - 實驗生命週期（開始/暫停/繼續/停止）：雙向同步
+ * - ACTION_COMPLETED：panel → board（受試者完成動作，通知實驗者標記）
+ * - board 端的 gesture step 推進由實驗者本人點擊手勢按鈕觸發，不由遠端驅動
  */
 
 import { RECORD_SOURCES, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
 import { dispatchSessionRestoreEvents } from "../core/session-restore-events.js";
 
 class BoardSyncIO {
   constructor(pageManager) {
     this.pageManager = pageManager;
     this._started = false;
+  }
+
+  _getExperimentId() {
+    const page = this.pageManager;
+    return (
+      page.experimentSystemManager?.getExperimentId?.() ||
+      page.experimentId ||
+      ""
+    );
+  }
+
+  _getParticipantName() {
+    const page = this.pageManager;
+    return (
+      page.experimentSystemManager?.getParticipantName?.() ||
+      page.participantName ||
+      ""
+    );
   }
 
   startReceive() {
@@ -81,7 +109,7 @@ class BoardSyncIO {
       }
     });
 
-    window.addEventListener("experiment_id_broadcasted", (event) => {
+    window.addEventListener("experiment_id_broadcasted", async (event) => {
       const { experimentId, client_id } = event.detail;
       const page = this.pageManager;
       const hubManager = page.experimentHubManager;
@@ -92,18 +120,40 @@ class BoardSyncIO {
 
       Logger.debug(`收到遠程實驗ID廣播: ${experimentId}`);
 
-      const experimentIdInput = document.getElementById("experimentIdInput");
-      if (experimentIdInput && experimentIdInput.value !== experimentId) {
-        experimentIdInput.value = experimentId;
-        Logger.info(`已同步實驗ID到UI: ${experimentId}`);
+      const currentId = this._getExperimentId();
+      if (experimentId && currentId !== experimentId) {
+        await page.experimentSystemManager?.setExperimentId?.(
+          experimentId,
+          RECORD_SOURCES.SYNC_BROADCAST,
+          {
+            registerToHub: false,
+            broadcast: false,
+            reapplyCombination: true,
+          },
+        );
+        page.experimentId = experimentId;
+        Logger.info(`已同步實驗ID到系統: ${experimentId}`);
       }
     });
   }
 
+  /**
+   * 接收來自受試者（panel）端的 ACTION_COMPLETED 通知。
+   *
+   * 職責：
+   * 1. 在 board 的手勢按鈕上標記綠色（讓實驗者看到受試者已完成此 action）
+   * 2. 記錄同步事件日誌
+   *
+   * 不做的事：
+   * - 不推進 gesture step（activateGestureStep）。
+   *   gesture step 只由實驗者本人點擊 board 手勢按鈕觸發，
+   *   不應由受試者的遠端訊號自動驅動。
+   */
   receiveActionCompleted(syncData) {
     const page = this.pageManager;
     const {
       actionId,
+      enteredActionId,
       source,
       clientId,
       timestamp,
@@ -111,10 +161,7 @@ class BoardSyncIO {
       experimentId,
     } = syncData;
 
-    const currentExperimentId =
-      document.getElementById("experimentIdInput")?.value?.trim() ||
-      page.experimentId ||
-      "";
+    const currentExperimentId = this._getExperimentId();
 
     if (!page.experimentRunning) {
       Logger.debug("忽略遠端 ACTION_COMPLETED：實驗尚未開始", {
@@ -160,26 +207,24 @@ class BoardSyncIO {
       timestamp: timestamp,
     });
 
-    const actionButton = document.querySelector(
-      `.gesture-action-button[data-action-id="${actionId}"]`,
-    );
-    if (actionButton) {
-      page._markActionCompleted(actionButton, actionId, gestureIndex, true);
+    // 在對應的手勢按鈕上標記綠色，讓實驗者知道受試者已完成此 action。
+    // gesture step 的推進由實驗者點擊手勢按鈕時觸發，不在此處驅動。
+    const markSyncedAction = (targetActionId) => {
+      if (!targetActionId) return;
+      const targetButton = document.querySelector(
+        `.gesture-action-button[data-action-id="${targetActionId}"]`,
+      );
+      if (!targetButton) return;
 
-      const resolvedGestureIndex =
-        gestureIndex ?? actionButton.getAttribute("data-gesture-index");
-      if (resolvedGestureIndex !== null && resolvedGestureIndex !== undefined) {
-        const idx = parseInt(resolvedGestureIndex, 10);
-        if (!Number.isNaN(idx)) {
-          page.gestureUtils?.activateGestureStep(idx);
-        }
-      }
-
-      actionButton.classList.add("sync-action-completed");
+      page._markActionCompleted(targetButton, targetActionId, gestureIndex, true);
+      targetButton.classList.add("sync-action-completed");
       setTimeout(() => {
-        actionButton.classList.remove("sync-action-completed");
+        targetButton.classList.remove("sync-action-completed");
       }, 2000);
-    }
+    };
+
+    markSyncedAction(actionId);
+    markSyncedAction(enteredActionId);
   }
 
   receiveActionCancelled(syncData) {
@@ -210,8 +255,7 @@ class BoardSyncIO {
       clientId,
     } = data;
 
-    const currentExperimentId =
-      document.getElementById("experimentIdInput")?.value || "";
+    const currentExperimentId = this._getExperimentId();
 
     if (actionId) {
       const now = Date.now();
@@ -241,30 +285,22 @@ class BoardSyncIO {
     }
   }
 
-  receiveExperimentInit(data) {
+  async receiveExperimentInit(data) {
     const page = this.pageManager;
     const { experimentId, currentCombination, participantName, loadedUnits } = data;
 
     if (experimentId) {
+      await page.experimentSystemManager?.handleSyncExperimentIdUpdate?.({
+        experimentId,
+      });
       page.experimentId = experimentId;
       Logger.info(`從機台面板同步的實驗ID: ${experimentId}`);
-
-      const experimentIdInput = document.getElementById("experimentIdInput");
-      if (
-        experimentIdInput &&
-        experimentIdInput.value.trim() !== experimentId
-      ) {
-        experimentIdInput.value = experimentId;
-      }
     }
 
     if (participantName) {
-      const participantNameInput = document.getElementById("participantNameInput");
-      if (participantNameInput && participantNameInput.value.trim() !== participantName) {
-        participantNameInput.value = participantName;
-        page.participantName = participantName;
-        page.lastSavedParticipantName = participantName;
-      }
+      page.experimentSystemManager?.setParticipantName?.(participantName);
+      page.participantName = participantName;
+      page.lastSavedParticipantName = participantName;
     }
 
     if (currentCombination) {
@@ -274,7 +310,13 @@ class BoardSyncIO {
         return;
       }
 
-      page.currentCombination = currentCombination;
+      await page.experimentSystemManager?.applyCombinationFromSync?.({
+        combination: currentCombination,
+        experimentId,
+      });
+      page.currentCombination =
+        page.experimentCombinationManager?.getCurrentCombination?.() ||
+        currentCombination;
       if (loadedUnits) {
         page.loadedUnits = loadedUnits;
       }
@@ -282,7 +324,9 @@ class BoardSyncIO {
 
     if (!page.experimentRunning) {
       if (currentCombination && !page.pendingCombinationUpdate) {
-        page.currentCombination = currentCombination;
+        page.currentCombination =
+          page.experimentCombinationManager?.getCurrentCombination?.() ||
+          currentCombination;
       }
       if (loadedUnits && !page.pendingCombinationUpdate) {
         page.loadedUnits = loadedUnits;
@@ -300,13 +344,9 @@ class BoardSyncIO {
     }
 
     const { participantName } = data;
-
-    const participantNameInput = document.getElementById("participantNameInput");
-    if (participantNameInput && participantNameInput.value.trim() !== participantName) {
-      participantNameInput.value = participantName;
-      page.participantName = participantName;
-      page.lastSavedParticipantName = participantName;
-    }
+    page.experimentSystemManager?.setParticipantName?.(participantName);
+    page.participantName = participantName;
+    page.lastSavedParticipantName = participantName;
   }
 
   receiveExperimentIdUpdate(data) {
@@ -322,28 +362,17 @@ class BoardSyncIO {
     const { experimentId } = data;
     Logger.debug(`套用遠端實驗ID更新: ${experimentId}`);
 
-    const experimentIdInput = document.getElementById("experimentIdInput");
-    if (experimentIdInput && experimentIdInput.value.trim() !== experimentId) {
-      experimentIdInput.value = experimentId;
-      page.experimentId = experimentId;
-
-      if (page.experimentStateManager) {
-        page.experimentStateManager.setExperimentId(
-          experimentId,
-          RECORD_SOURCES.SYNC_BROADCAST,
-        );
-      }
-
-      if (page.experimentSystemManager?.setExperimentId) {
-        page.experimentSystemManager.setExperimentId(experimentId, RECORD_SOURCES.SYNC_BROADCAST, {
-          registerToHub: false,
-          broadcast: false,
-          reapplyCombination: true,
-        });
-      }
-
-      Logger.info(`實驗ID已同步並儲存: ${experimentId}`);
-    }
+    page.experimentSystemManager?.setExperimentId?.(
+      experimentId,
+      RECORD_SOURCES.SYNC_BROADCAST,
+      {
+        registerToHub: false,
+        broadcast: false,
+        reapplyCombination: true,
+      },
+    );
+    page.experimentId = experimentId;
+    Logger.info(`實驗ID已同步並儲存: ${experimentId}`);
   }
 
   sendParticipantNameUpdate(participantName) {
@@ -362,7 +391,7 @@ class BoardSyncIO {
       type: SYNC_DATA_TYPES.PARTICIPANT_NAME_UPDATE,
       clientId: page.syncManager?.core?.syncClient?.clientId || "experiment_panel",
       timestamp: Date.now(),
-      experimentId: document.getElementById("experimentIdInput")?.value || "",
+      experimentId: this._getExperimentId(),
       participantName: participantName.trim(),
     };
 
@@ -391,10 +420,7 @@ class BoardSyncIO {
     }
 
     if (page.experimentRunning) {
-      const currentId =
-        document.getElementById("experimentIdInput")?.value?.trim() ||
-        page.experimentId ||
-        "";
+      const currentId = this._getExperimentId();
       if (currentId === detail.experimentId) {
         Logger.debug("Board: 收到遠端實驗開始，但本機已在進行相同實驗，忽略");
         return;
@@ -406,30 +432,31 @@ class BoardSyncIO {
       experimentId: detail.experimentId,
     });
 
-    const currentExperimentId =
-      document.getElementById("experimentIdInput")?.value.trim() || "";
+    const currentExperimentId = this._getExperimentId();
     if (currentExperimentId !== detail.experimentId) {
-      const experimentIdInput = document.getElementById("experimentIdInput");
-      if (experimentIdInput) {
-        experimentIdInput.value = detail.experimentId;
-      }
+      page.experimentSystemManager?.setExperimentId?.(
+        detail.experimentId,
+        RECORD_SOURCES.SYNC_BROADCAST,
+        {
+          registerToHub: false,
+          broadcast: false,
+          reapplyCombination: true,
+        },
+      );
+      page.experimentId = detail.experimentId;
     }
 
     if (detail.participantName) {
-      const participantNameInput = document.getElementById("participantNameInput");
-      if (participantNameInput && !participantNameInput.value.trim()) {
-        participantNameInput.value = detail.participantName;
+      const currentParticipantName = this._getParticipantName();
+      if (!currentParticipantName) {
+        page.experimentSystemManager?.setParticipantName?.(detail.participantName);
+        page.participantName = detail.participantName;
+        page.lastSavedParticipantName = detail.participantName;
       }
     }
 
     if (detail.combinationId) {
-      const combinationSelect = document.getElementById(
-        "unitCombinationSelect",
-      );
-      if (combinationSelect) {
-        combinationSelect.value = detail.combinationId;
-        combinationSelect.dispatchEvent(new Event("change"));
-      }
+      await page.experimentSystemManager?.selectCombination?.(detail.combinationId);
     }
 
     page.logAction("sync_experiment_started", {
@@ -453,22 +480,15 @@ class BoardSyncIO {
       return;
     }
 
-    const isPaused = page.timerManager?.experimentPaused ?? false;
-    if (isPaused) {
+    // 透過 ExperimentSystemManager 路由，確保 FlowManager 狀態、
+    // 計時器、UI 鎖定、recordManager.logExperimentPause() 一致更新
+    const handled = page.experimentSystemManager?.handleSyncExperimentPaused?.(detail);
+    if (handled === false) {
+      // FlowManager 已暫停（冪等保護），直接略過
       return;
     }
 
-    if (page.timerManager) {
-      page.timerManager.pauseExperimentTimer();
-    }
-
-    const pauseBtn = document.getElementById("pauseExperimentBtn");
-    if (pauseBtn) {
-      pauseBtn.textContent = "▶ 繼續";
-    }
-
     Logger.info("遠端暫停實驗");
-
     page.logAction("sync_experiment_paused", {
       clientId: detail.clientId,
     });
@@ -480,22 +500,15 @@ class BoardSyncIO {
       return;
     }
 
-    const isPaused = page.timerManager?.experimentPaused ?? false;
-    if (!isPaused) {
+    // 透過 ExperimentSystemManager 路由，確保 FlowManager 狀態、
+    // 計時器、UI 鎖定、recordManager.logExperimentResume() 一致更新
+    const handled = page.experimentSystemManager?.handleSyncExperimentResumed?.(detail);
+    if (handled === false) {
+      // FlowManager 未暫停（冪等保護），直接略過
       return;
     }
 
-    if (page.timerManager) {
-      page.timerManager.resumeExperimentTimer();
-    }
-
-    const pauseBtn = document.getElementById("pauseExperimentBtn");
-    if (pauseBtn) {
-      pauseBtn.textContent = "⏸ 暫停";
-    }
-
     Logger.info("遠端繼續實驗");
-
     page.logAction("sync_experiment_resumed", {
       clientId: detail.clientId,
     });
@@ -507,13 +520,11 @@ class BoardSyncIO {
       return;
     }
 
-    page.logAction("sync_experiment_stopped_started", {
+    page.logAction("sync_experiment_stopped_received", {
       clientId: detail.clientId,
     });
 
-    page.stopExperiment();
-
-    page.logAction("sync_experiment_stopped_completed", {
+    Logger.warn("收到遠端停止訊號，依策略保留手動結束（Board 不自動 stopExperiment）", {
       clientId: detail.clientId,
     });
   }

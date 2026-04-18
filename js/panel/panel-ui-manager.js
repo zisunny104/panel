@@ -15,6 +15,7 @@ class PanelUIManager {
     topSpacerHeight: 5,
     bottomSpacerHeight: 3,
     powerSwitchScale: 0.9,
+    stepCooldownMs: 3000,
     beepVolume: 50,
     mediaVolume: 70,
   };
@@ -550,6 +551,25 @@ class PanelUIManager {
   }
 
   /**
+   * 更新步驟冷卻時間（毫秒）
+   * @param {string|number} value - 冷卻時間 (0-5000)
+   */
+  updateStepCooldown(value) {
+    const parsed = Number.parseInt(value, 10);
+    const normalized = Number.isFinite(parsed) ? Math.max(0, Math.min(5000, parsed)) : 0;
+
+    const range = document.getElementById("stepCooldownRange");
+    const input = document.getElementById("stepCooldownNumber");
+    if (range) range.value = normalized;
+    if (input) input.value = normalized;
+
+    localStorage.setItem("stepCooldownMs", String(normalized));
+    const configManager = this.configManager;
+    configManager?.updateUserSetting("stepCooldownMs", normalized);
+    this.buttonManager?.setStepCooldownMs?.(normalized);
+  }
+
+  /**
    * 更新全螢幕按鈕圖標
    */
   updateFullscreenButtonIcon() {
@@ -726,6 +746,12 @@ class PanelUIManager {
     // 音量控制
     const volumeConfigs = [
       {
+        rangeId: "stepCooldownRange",
+        inputId: "stepCooldownNumber",
+        key: "stepCooldownMs",
+        handler: (v) => this.updateStepCooldown(v),
+      },
+      {
         rangeId: "beepVolume",
         inputId: "beepVolumeNumber",
         key: "beepVolume",
@@ -744,7 +770,8 @@ class PanelUIManager {
       const input = document.getElementById(inputId);
 
       const syncValues = (value) => {
-        const clamped = Math.max(0, Math.min(100, value));
+        const max = key === "stepCooldownMs" ? 5000 : 100;
+        const clamped = Math.max(0, Math.min(max, value));
         localStorage.setItem(key, clamped);
         const configManager = this.configManager;
         configManager?.updateUserSetting(key, clamped);
@@ -853,6 +880,13 @@ class PanelUIManager {
 
     this.updateBeepVolume(beepVolume);
     this.updateMediaVolume(mediaVolume);
+
+    const stepCooldownMs =
+      configSettings.stepCooldownMs ??
+      localStorage.getItem("stepCooldownMs") ??
+      PanelUIManager.DEFAULTS.stepCooldownMs;
+    this.updateStepCooldown(stepCooldownMs);
+
     this.syncUIElements(configSettings);
     this.setupResetButton();
 
@@ -909,6 +943,15 @@ class PanelUIManager {
     if (powerScaleRange) powerScaleRange.value = powerValue;
     if (powerScaleNumberInput)
       powerScaleNumberInput.value = parseFloat(powerValue).toFixed(2);
+
+    const stepCooldownRange = document.getElementById("stepCooldownRange");
+    const stepCooldownNumber = document.getElementById("stepCooldownNumber");
+    const stepCooldownValue =
+      configSettings.stepCooldownMs ??
+      localStorage.getItem("stepCooldownMs") ??
+      PanelUIManager.DEFAULTS.stepCooldownMs;
+    if (stepCooldownRange) stepCooldownRange.value = stepCooldownValue;
+    if (stepCooldownNumber) stepCooldownNumber.value = stepCooldownValue;
 
     const toggleButtonLabels = document.getElementById("toggleButtonLabels");
     const toggleButtonColors = document.getElementById("toggleButtonColors");

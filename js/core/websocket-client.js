@@ -9,30 +9,39 @@
  * - 訊息路由與事件分發
  */
 
-import { SYNC_EVENTS } from "../constants/index.js";
+import { SYNC_EVENTS, SYNC_ROLE_CONFIG } from "../constants/index.js";
 import { Logger } from "./console-manager.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 
 class WebSocketClient {
+  /**
+   * 建立 WebSocketClient。
+   * @param {Object} options - 連線與行為設定。
+   * @param {string} [options.url] - WebSocket 連線網址。
+   * @param {Object} [options.roleConfig] - 角色識別值。
+   * @param {number} [options.heartbeatInterval] - 心跳間隔（毫秒）。
+   * @param {number} [options.reconnectInterval] - 重連間隔基準（毫秒）。
+   * @param {number} [options.maxReconnectAttempts] - 最大重連次數。
+   * @param {string} [options.storagePrefix] - sessionStorage 前綴。
+   * @param {boolean} [options.autoReconnect=true] - 是否自動重連。
+   * @param {number} [options.maxMessageQueueSize=500] - 佇列最大長度。
+   */
   constructor(options = {}) {
-    // 配置
     this.config = {
       url: options.url || this.getDefaultWebSocketUrl(),
-      heartbeatInterval: options.heartbeatInterval || 30000, // 30秒
-      reconnectInterval: options.reconnectInterval || 3000, // 3秒
+      heartbeatInterval: options.heartbeatInterval || 30000,
+      reconnectInterval: options.reconnectInterval || 3000,
       maxReconnectAttempts: options.maxReconnectAttempts || 5,
-      storagePrefix: options.storagePrefix || "panel_", // sessionStorage 前綴
+      storagePrefix: options.storagePrefix || "panel_",
       autoReconnect: options.autoReconnect !== false,
     };
+
     this.roleConfig = {
-      VIEWER: "viewer",
-      OPERATOR: "operator",
-      LOCAL: "local",
+      ...SYNC_ROLE_CONFIG,
       ...options.roleConfig,
     };
     this.timeSyncManager = options.timeSyncManager || null;
 
-    // 連接狀態
     this.ws = null;
     this.wsConnectionId = null;
     this.clientId = null;
@@ -42,19 +51,14 @@ class WebSocketClient {
     this.isAuthenticated = false;
     this.reconnectAttempts = 0;
 
-    // 定時器
     this.heartbeatTimer = null;
     this.reconnectTimer = null;
 
-    // 事件處理器
     this.eventHandlers = new Map();
 
-    // 訊息佇列（未連接時暫存）
-    // 最大限制：500 條消息（防止長期離線導致內存溢出）
     this.messageQueue = [];
     this.maxMessageQueueSize = options.maxMessageQueueSize || 500;
 
-    // 綁定方法
     this.handleOpen = this.handleOpen.bind(this);
     this.handleMessage = this.handleMessage.bind(this);
     this.handleClose = this.handleClose.bind(this);
@@ -62,51 +66,49 @@ class WebSocketClient {
   }
 
   /**
-   * 取得預設 WebSocket URL（自動偵測目前網域）
-   * 支援 Nginx 反向代理路徑
+   * 取得預設 WebSocket URL。
+   * 會依目前網域與頁面路徑自動組合 ws / wss 端點。
+   * @returns {string}
    */
   getDefaultWebSocketUrl() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host; // 包含 hostname 和 port
-
-    // 根據環境決定 WebSocket 路徑前綴
+    const host = window.location.host;
     const basePath = this.getWebSocketBasePath();
 
     return `${protocol}//${host}${basePath}`;
   }
 
   /**
-   * 取得 WebSocket 路徑前綴（根據目前頁面路徑動態計算，避免硬編碼）
+   * 取得 WebSocket 路徑前綴。
+   * @returns {string}
    */
   getWebSocketBasePath() {
-    // 根據頁面路徑動態決定 WebSocket 前綴（完全動態，無硬編碼）
     const pathname = window.location.pathname;
 
-    // 取得頁面所在的目錄路徑
     let basePath = pathname;
     if (!basePath.endsWith("/")) {
-      // 如果包含檔名，移除檔名部分
       basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
     }
 
-    // 確保以 / 結尾
     if (!basePath.endsWith("/")) {
       basePath += "/";
     }
 
-    // WebSocket 永遠在頁面所在目錄的 ws 子目錄
-    // 讓 Nginx 處理實際的路徑映射
     return basePath + "ws";
   }
 
-  /**   * 初始化連接
-   * @param {Object} authData - 認證資料 { sessionId, clientId?, role? }
+  /**
+   * 初始化並建立連接。
+   * @param {Object} authData - 認證資料。
+   * @param {string} authData.sessionId - 工作階段 ID。
+   * @param {string} [authData.clientId] - 客戶端 ID。
+   * @param {string} [authData.role] - 角色。
+   * @param {string} [authData.clientType] - 客戶端類型。
+   * @returns {Promise<void>}
    */
   async connect(authData = {}) {
-    // 1. 檢查是否有儲存的連接資訊
     const savedData = this.loadFromStorage();
 
-    // 2. 合併認證資料（優先使用傳入的，再使用儲存的）
     this.sessionId = authData.sessionId || savedData.sessionId;
     this.clientId = authData.clientId || savedData.clientId;
     this.role = authData.role || savedData.role || this.roleConfig.VIEWER;
@@ -115,12 +117,10 @@ class WebSocketClient {
       savedData.clientType ||
       this.detectClientType();
 
-    // 3. 檢查必要欄位
     if (!this.sessionId) {
       throw new Error("缺少 sessionId，無法連接");
     }
 
-    // 4. 清除舊連接（防止舊 onclose 觸發幽靈重連）
     if (this.ws) {
       const oldWs = this.ws;
       oldWs.onopen = null;
@@ -137,13 +137,11 @@ class WebSocketClient {
       Logger.debug("[WebSocketClient] 已清除舊連接");
     }
 
-    // 5. 清除待處理的重連計時器
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
 
-    // 6. 建立 WebSocket 連接
     Logger.info(
       "[WebSocketClient] 正在連接到 WebSocket 伺服器...",
       this.config.url,
@@ -152,7 +150,6 @@ class WebSocketClient {
     try {
       this.ws = new WebSocket(this.config.url);
 
-      // 設定事件處理器
       this.ws.onopen = this.handleOpen;
       this.ws.onmessage = this.handleMessage;
       this.ws.onclose = this.handleClose;
@@ -164,27 +161,34 @@ class WebSocketClient {
   }
 
   /**
-   * 連接開啟處理
+   * 處理連線開啟事件。
+   * @param {Event} event - WebSocket open event。
    */
   handleOpen(event) {
     Logger.info("[WebSocketClient] WebSocket 連接已建立");
     this.reconnectAttempts = 0;
-
-    // 等待 'connected' 訊息後再進行認證
-    // (伺服器會先發送 connected 訊息)
   }
 
   /**
-   * 訊息接收處理
+   * 處理收到的訊息。
+   * @param {MessageEvent} event - WebSocket message event。
    */
   handleMessage(event) {
     try {
       const message = JSON.parse(event.data);
-      const { type, data, timestamp: _timestamp } = message;
+      const { type, data } = message;
 
-      Logger.debug(`[WebSocketClient] 收到訊息 [${type}]:`, data);
+      const highFrequencyTypes = new Set([
+        WS_PROTOCOL.S2C.HEARTBEAT_ACK,
+        WS_PROTOCOL.S2C.SESSION_STATE_UPDATE,
+        WS_PROTOCOL.S2C.STATE_UPDATE_ACK,
+      ]);
+      if (highFrequencyTypes.has(type)) {
+        Logger.debug(`[WebSocketClient] 收到訊息 [${type}]`);
+      } else {
+        Logger.debug(`[WebSocketClient] 收到訊息 [${type}]:`, data);
+      }
 
-      // 路由訊息到對應處理器
       switch (type) {
         case WS_PROTOCOL.S2C.CONNECTED:
           this.handleConnected(data);
@@ -224,7 +228,6 @@ class WebSocketClient {
           break;
 
         case WS_PROTOCOL.S2C.STATE_UPDATE_ACK:
-          // 狀態更新確認回應，記錄但不需要特殊處理
           Logger.debug("[WebSocketClient] 伺服器確認狀態更新", data);
           break;
 
@@ -233,7 +236,6 @@ class WebSocketClient {
         case WS_PROTOCOL.S2C.EXPERIMENT_RESUMED:
         case WS_PROTOCOL.S2C.EXPERIMENT_STOPPED:
         case WS_PROTOCOL.S2C.EXPERIMENT_ID_CHANGED:
-          // 直接以 type 作為事件名發出，WS_PROTOCOL.S2C 與 SYNC_EVENTS 的字串對時就能符合
           this.emit(type, data);
           break;
 
@@ -250,18 +252,17 @@ class WebSocketClient {
   }
 
   /**
-   * 處理 connected 訊息
+   * 處理連線成功通知。
+   * @param {Object} data - 伺服器傳回的 connected 資料。
    */
   handleConnected(data) {
     this.wsConnectionId = data.wsConnectionId;
     Logger.debug(`[WebSocketClient] WebSocket 連接 ID: ${this.wsConnectionId}`);
-
-    // 連接成功後立即認證
     this.authenticate();
   }
 
   /**
-   * 發送認證訊息
+   * 送出認證訊息。
    */
   authenticate() {
     if (!this.sessionId) {
@@ -288,30 +289,26 @@ class WebSocketClient {
   }
 
   /**
-   * 處理認證成功
+   * 處理認證成功。
+   * @param {Object} data - 驗證成功資料。
    */
   handleAuthSuccess(data) {
     const { sessionId, clientId, role, roomInfo, isReconnect, serverTime } =
       data;
 
-    // 更新狀態
     this.sessionId = sessionId;
     this.clientId = clientId;
     this.role = role;
     this.isAuthenticated = true;
 
-    // 儲存到 sessionStorage
     this.saveToStorage();
 
-    // 進行一次性校時（如果伺服器有提供時間戳）
     if (serverTime) {
       this.timeSyncManager?.syncWithWebSocket?.(serverTime);
     }
 
-    // 啟動心跳
     this.startHeartbeat();
 
-    // 發送已連接的佇列訊息
     this.flushMessageQueue();
 
     if (isReconnect) {
@@ -324,8 +321,8 @@ class WebSocketClient {
   }
 
   /**
-   * 處理清除同步數據命令
-   * 當伺服器發現工作階段不存在時，通知客戶端清除本機的同步資訊
+   * 處理清除同步資料命令。
+   * @param {Object} data - 清除命令資料。
    */
   handleClearSyncData(data) {
     const { reason, message } = data;
@@ -334,14 +331,11 @@ class WebSocketClient {
       `[WebSocketClient] 接收到清除同步數據命令 [${reason}]: ${message}`,
     );
 
-    // 停用自動重連，避免無限重連循環
     this.config.autoReconnect = false;
     Logger.debug("[WebSocketClient] 已停用自動重連");
 
-    // 清除本機同步資訊
     this.clearLocalSyncData();
 
-    // 派發 window 事件，讓 SyncManager 進行後續處理
     const clearEvent = new CustomEvent(SYNC_EVENTS.DATA_CLEARED, {
       detail: {
         reason,
@@ -358,7 +352,6 @@ class WebSocketClient {
     window.dispatchEvent(clearEvent);
     Logger.info("[WebSocketClient] 已派發 window.sync_data_cleared 事件");
 
-    // 同時派發內部事件
     this.emit("sync_data_cleared", {
       reason,
       message,
@@ -369,7 +362,6 @@ class WebSocketClient {
       `[WebSocketClient] 已派發內部 sync_data_cleared 事件 [${reason}]`,
     );
 
-    // 延遲斷開連線，給 SyncManager 時間處理事件
     Logger.debug("[WebSocketClient] 500ms 後斷開連線...");
     setTimeout(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -380,15 +372,14 @@ class WebSocketClient {
   }
 
   /**
-   * 清除本機同步資訊
+   * 清除舊版固定前綴的本機同步資訊。
+   * 這個方法保留是為了清理早期版本寫入的 sessionStorage 鍵。
    */
   clearLocalSyncData() {
     try {
-      // 清除 sessionStorage 中的同步資訊
-      sessionStorage.removeItem("syncClientState_sessionId");
-      sessionStorage.removeItem("syncClientState_clientId");
-      sessionStorage.removeItem("syncClientState_role");
-      sessionStorage.removeItem("syncClientState_timestamp");
+      ["sessionId", "clientId", "role", "timestamp"].forEach((key) => {
+        sessionStorage.removeItem(`syncClientState_${key}`);
+      });
 
       Logger.info("[WebSocketClient] 本機同步數據已清除");
     } catch (error) {
@@ -397,7 +388,8 @@ class WebSocketClient {
   }
 
   /**
-   * 連接關閉處理
+   * 處理連線關閉事件。
+   * @param {CloseEvent} event - WebSocket close event。
    */
   handleClose(event) {
     Logger.info(
@@ -409,7 +401,6 @@ class WebSocketClient {
 
     this.emit("disconnected", { code: event.code, reason: event.reason });
 
-    // 自動重連
     if (
       this.config.autoReconnect &&
       this.reconnectAttempts < this.config.maxReconnectAttempts
@@ -419,7 +410,8 @@ class WebSocketClient {
   }
 
   /**
-   * 錯誤處理
+   * 處理 WebSocket 錯誤。
+   * @param {Event} event - WebSocket error event。
    */
   handleError(event) {
     Logger.error("[WebSocketClient] WebSocket 錯誤:", event);
@@ -427,12 +419,12 @@ class WebSocketClient {
   }
 
   /**
-   * 處理伺服器錯誤訊息
+   * 處理伺服器錯誤訊息。
+   * @param {Object} data - 錯誤資料。
    */
   handleServerError(data) {
     Logger.error("[WebSocketClient] 伺服器錯誤:", data);
 
-    // 檢查是否為工作階段不存在錯誤，如果是則發送全域事件
     if (data && data.message && data.message.includes("工作階段不存在")) {
       Logger.warn("[WebSocketClient] 偵測到工作階段不存在錯誤，發送清理事件");
       window.dispatchEvent(
@@ -449,7 +441,7 @@ class WebSocketClient {
   }
 
   /**
-   * 排程重新連接
+   * 排程重新連接。
    */
   scheduleReconnect() {
     this.reconnectAttempts++;
@@ -470,10 +462,10 @@ class WebSocketClient {
   }
 
   /**
-   * 啟動心跳
+   * 啟動心跳。
    */
   startHeartbeat() {
-    this.stopHeartbeat(); // 清除舊的定時器
+    this.stopHeartbeat();
 
     this.heartbeatTimer = setInterval(() => {
       if (this.isAuthenticated) {
@@ -493,7 +485,7 @@ class WebSocketClient {
   }
 
   /**
-   * 停止心跳
+   * 停止心跳。
    */
   stopHeartbeat() {
     if (this.heartbeatTimer) {
@@ -503,26 +495,23 @@ class WebSocketClient {
   }
 
   /**
-   * 處理心跳確認
+   * 處理心跳確認。
    */
   handleHeartbeatAck(data) {
-    // console.log('心跳確認', data);
   }
 
   /**
-   * 發送訊息
+   * 送出訊息；若尚未連線則先加入佇列。
+   * @param {Object} message - 要送出的訊息。
+   * @returns {boolean}
    */
   send(message) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      // WebSocket 未連接，將消息加入佇列
-
-      // 檢查佇列大小限制
       if (this.messageQueue.length >= this.maxMessageQueueSize) {
         Logger.warn(
           `[WebSocketClient] 消息佇列已達最大限制 (${this.maxMessageQueueSize}/${this.maxMessageQueueSize})，舊消息可能被丟棄`,
           { queueSize: this.messageQueue.length },
         );
-        // 移除最舊的消息，騰出空間（FIFO 超限丟棄）
         this.messageQueue.shift();
       }
 
@@ -538,14 +527,13 @@ class WebSocketClient {
       return true;
     } catch (error) {
       Logger.error("[WebSocketClient] 發送訊息失敗:", error);
-      // 發送失敗時也加入佇列以便稍後重試
       this.messageQueue.push(message);
       return false;
     }
   }
 
   /**
-   * 發送已連接的佇列訊息
+   * 發送已累積的佇列訊息。
    */
   flushMessageQueue() {
     if (this.messageQueue.length === 0) return;
@@ -561,7 +549,8 @@ class WebSocketClient {
   }
 
   /**
-   * 更新工作階段狀態
+   * 更新工作階段狀態。
+   * @param {Object} state - 要同步的狀態。
    */
   updateState(state) {
     this.send({
@@ -575,7 +564,9 @@ class WebSocketClient {
   }
 
   /**
-   * 註冊事件處理器
+   * 註冊事件處理器。
+   * @param {string} event - 事件名稱。
+   * @param {Function} handler - 處理函數。
    */
   on(event, handler) {
     if (!this.eventHandlers.has(event)) {
@@ -585,7 +576,9 @@ class WebSocketClient {
   }
 
   /**
-   * 移除事件處理器
+   * 移除事件處理器。
+   * @param {string} event - 事件名稱。
+   * @param {Function} handler - 處理函數。
    */
   off(event, handler) {
     if (!this.eventHandlers.has(event)) return;
@@ -598,7 +591,9 @@ class WebSocketClient {
   }
 
   /**
-   * 觸發事件
+   * 觸發事件。
+   * @param {string} event - 事件名稱。
+   * @param {*} data - 事件資料。
    */
   emit(event, data) {
     if (!this.eventHandlers.has(event)) return;
@@ -614,7 +609,7 @@ class WebSocketClient {
   }
 
   /**
-   * 儲存連接資訊到 sessionStorage
+   * 儲存連接資訊到 sessionStorage。
    */
   saveToStorage() {
     const prefix = this.config.storagePrefix;
@@ -631,7 +626,8 @@ class WebSocketClient {
   }
 
   /**
-   * 從 sessionStorage 載入連接資訊
+   * 從 sessionStorage 載入連接資訊。
+   * @returns {{clientId?: string, sessionId?: string, role?: string}}
    */
   loadFromStorage() {
     const prefix = this.config.storagePrefix;
@@ -657,7 +653,7 @@ class WebSocketClient {
   }
 
   /**
-   * 清除 sessionStorage
+   * 清除 sessionStorage 中的連接資訊。
    */
   clearStorage() {
     const prefix = this.config.storagePrefix;
@@ -674,7 +670,7 @@ class WebSocketClient {
   }
 
   /**
-   * 手動重新連接
+   * 手動重新連接。
    */
   reconnect() {
     Logger.info("[WebSocketClient] 手動重新連接...");
@@ -694,7 +690,7 @@ class WebSocketClient {
   }
 
   /**
-   * 關閉連接
+   * 關閉連接但保留儲存資訊。
    */
   close() {
     Logger.info("[WebSocketClient] 正在關閉 WebSocket 連接...");
@@ -712,14 +708,11 @@ class WebSocketClient {
       this.ws = null;
     }
 
-    // 清除所有事件監聽器
-    this.eventHandlers.clear();
-
     this.isAuthenticated = false;
   }
 
   /**
-   * 完全斷開連接並清除資料
+   * 完全斷開連接並清除儲存資料。
    */
   disconnect() {
     this.close();
@@ -728,7 +721,8 @@ class WebSocketClient {
   }
 
   /**
-   * 取得連接狀態
+   * 取得目前連接狀態快照。
+   * @returns {Object}
    */
   getState() {
     return {

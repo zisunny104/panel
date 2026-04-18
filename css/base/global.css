@@ -26,7 +26,7 @@ body {
     overflow-x: hidden;
     /* 確保多點觸控可以正常工作 */
     touch-action: manipulation;
-    /* 設置為非襯線字體 */
+    /* 設定為非襯線字體 */
     font-family: sans-serif;
 }
 

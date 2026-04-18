@@ -1,3 +1,7 @@
+import {
+  SYNC_SESSION_STORAGE_LEGACY_KEYS,
+} from "../constants/index.js";
+
 const resolveFromPage = (path) => new URL(path, window.location.href).href;
 
 const fetchAppVersion = async () => {
@@ -48,10 +52,10 @@ const cleanupLegacyBrowserState = async () => {
 
   [
     "loggerMinimized",
-    "sync_session_backup",
-    "sync_session_id",
-    "sync_client_id",
-    "sync_preferred_role",
+    SYNC_SESSION_STORAGE_LEGACY_KEYS.BACKUP,
+    SYNC_SESSION_STORAGE_LEGACY_KEYS.SESSION_ID,
+    SYNC_SESSION_STORAGE_LEGACY_KEYS.CLIENT_ID,
+    SYNC_SESSION_STORAGE_LEGACY_KEYS.ROLE,
     "preferredCameraId",
     "preferredCameraLabel",
   ].forEach((key) => window.localStorage?.removeItem(key));
@@ -71,7 +75,7 @@ export const bootstrapPage = async ({ entryModules = [] } = {}) => {
     return;
   }
 
-  // 保留第一個模組的順序（通常是 Logger），其餘模組改為平行載入以縮短啟動時間。
+  // 先載入 Logger，避免後續模組輸出早於除錯管線就緒；其餘模組再平行載入以縮短啟動時間。
   const [firstModule, ...remainingModules] = entryModules;
   await import(resolveFromPage(firstModule));
 

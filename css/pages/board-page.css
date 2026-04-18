@@ -70,3 +70,48 @@ body.board-page {
 .board-section:last-child {
     margin-bottom: 0;
 }
+
+/* ===== Board 初始化階段式顯示 =====
+   目標：先呈現左右面板框架，再呈現區塊，再呈現區塊內容。 */
+body.board-page.board-booting .left-panel,
+body.board-page.board-booting .right-panel {
+    position: relative;
+}
+
+/* 第一階段：只顯示框架（左右面板），隱藏區塊內容 */
+body.board-page.board-booting[data-board-stage="dependency_ready"] #experimentSettings,
+body.board-page.board-booting[data-board-stage="dependency_ready"] #experimentStats,
+body.board-page.board-booting[data-board-stage="dependency_ready"] #recordsList,
+body.board-page.board-booting[data-board-stage="dependency_ready"] #contentArea {
+    visibility: hidden;
+}
+
+/* 第二階段：顯示區塊框，不顯示區塊內部細節 */
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings,
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats,
+body.board-page.board-booting[data-board-stage="modules_init"] #recordsList,
+body.board-page.board-booting[data-board-stage="modules_init"] #contentArea {
+    visibility: visible;
+}
+
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings>*:not(h2),
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats>*:not(.stats-header),
+body.board-page.board-booting[data-board-stage="modules_init"] #recordsList>*,
+body.board-page.board-booting[data-board-stage="modules_init"] #contentArea>* {
+    visibility: hidden;
+}
+
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings,
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats,
+body.board-page.board-booting[data-board-stage="modules_init"] #recordsList,
+body.board-page.board-booting[data-board-stage="modules_init"] #contentArea {
+    min-height: 110px;
+}
+
+/* 第三階段開始（components_init）之後交由實際內容接管 */
+body.board-page.board-booting[data-board-stage="components_init"] #experimentSettings>*,
+body.board-page.board-booting[data-board-stage="components_init"] #experimentStats>*,
+body.board-page.board-booting[data-board-stage="components_init"] #recordsList>*,
+body.board-page.board-booting[data-board-stage="components_init"] #contentArea>* {
+    visibility: visible;
+}

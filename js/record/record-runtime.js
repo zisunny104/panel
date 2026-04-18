@@ -18,7 +18,11 @@ export const recordRuntime = {
 
     try {
       const jsonlContent = this.records.map((record) => JSON.stringify(record)).join("\n");
-      const filename = `${this.experimentId}_${Date.now()}.jsonl`;
+      const resolvedExperimentId =
+        this._resolveCurrentExperimentId?.() ||
+        this.records.find((record) => record?.exp_id)?.exp_id ||
+        "unknown_experiment";
+      const filename = `${resolvedExperimentId}_${Date.now()}.jsonl`;
       const apiUrl = this._getApiUrl();
 
       const response = await fetch(`${apiUrl}/record/save`, {

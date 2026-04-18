@@ -166,7 +166,7 @@ class PowerControl {
   }
 
   /**
-   * 設置電源開關高亮效果
+   * 設定電源開關高亮效果
    * @param {boolean} enable - 是否開啟高亮
    */
   setPowerSwitchHighlight(enable) {
@@ -359,7 +359,7 @@ class PowerControl {
   }
 
   /**
-   * 設置電源狀態（開機/關機）
+   * 設定電源狀態（開機/關機）
    * @param {boolean} nextState - 下一個狀態（true=開機，false=關機）
    * @param {string} trigger - 觸發來源（'sync'、'knob'、'panel'）
    */
@@ -515,7 +515,7 @@ class PowerControl {
   }
 
   /**
-   * 設置事件監聽器
+   * 設定事件監聽器
    * @private
    */
   setupEventListeners() {
@@ -622,7 +622,7 @@ class PowerControl {
   }
 
   /**
-   * 設置遠端同步事件監聽器
+   * 設定遠端同步事件監聽器
    * @private
    */
   setupSyncEventListeners() {

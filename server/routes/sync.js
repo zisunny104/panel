@@ -14,6 +14,12 @@ import {
   findOperatorConflict,
   normalizeClientType,
 } from "../utils/sync-role-guard.js";
+import {
+  getValidCreateCode,
+  getValidCreateCodeDescription,
+  getSyncEnableFlag,
+  getSyncMaxClients,
+} from "../config/server.js";
 
 // 本檔使用的角色常數，避免在多處硬編碼
 const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
@@ -59,6 +65,23 @@ function closeSessionEverywhere(
 router.post("/session", (req, res) => {
   const { createCode } = req.body;
 
+  if (!getSyncEnableFlag()) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      error: "SYNC_DISABLED",
+      message: "同步功能目前已停用",
+    });
+  }
+
+  const validCreateCode = getValidCreateCode();
+  if (createCode !== validCreateCode) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      error: ERROR_CODES.INVALID_CREATE_CODE,
+      message: getValidCreateCodeDescription() || "建立代碼無效",
+    });
+  }
+
   try {
     // 產生新的clientId（建立者的分頁ID）
     const clientId = generateClientId();
@@ -74,6 +97,7 @@ router.post("/session", (req, res) => {
         clientId: session.clientId,
         role: ROLE.OPERATOR, // 建立者預設為操作者
         created_at: session.created_at,
+        maxClients: getSyncMaxClients(),
       },
     });
   } catch (error) {
@@ -148,6 +172,14 @@ router.post("/generate_share_code", (req, res) => {
 router.post("/join", (req, res) => {
   const { shareCode, role, clientId, clientType } = req.body;
 
+  if (!getSyncEnableFlag()) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      error: "SYNC_DISABLED",
+      message: "同步功能目前已停用",
+    });
+  }
+
   Logger.debug(`[Join] 加入請求 - 代碼: ${shareCode}, 角色: ${role}, 客戶端ID: ${clientId}`);
 
   if (!shareCode) {
@@ -194,8 +226,21 @@ router.post("/join", (req, res) => {
     // 使用提供的clientId或產生新的
     const finalClientId = clientId || generateClientId();
 
+    const sessionManager = req.app?.locals?.sessionManager;
+    const currentClientCount = sessionManager?.getClientCount?.(
+      validation.session_id,
+    ) || 0;
+    const maxClients = getSyncMaxClients();
+
+    if (currentClientCount >= maxClients) {
+      return res.status(HTTP_STATUS.CONFLICT).json({
+        success: false,
+        error: "SESSION_CLIENT_LIMIT_REACHED",
+        message: `工作階段已達人數上限 (${maxClients})`,
+      });
+    }
+
     if (resolvedRole === ROLE.OPERATOR) {
-      const sessionManager = req.app?.locals?.sessionManager;
       const conflict = findOperatorConflict(
         sessionManager,
         validation.session_id,

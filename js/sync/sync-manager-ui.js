@@ -3,40 +3,95 @@
  * 負責膠囊指示器、控制面板、按鈕與輸入框
  */
 
-import { SYNC_EVENTS } from "../constants/index.js";
+import { SYNC_EVENTS, SYNC_MANAGER_CONSTANTS } from "../constants/index.js";
 import { UIModal } from "../ui/modal.js";
 import { Logger } from "../core/console-manager.js";
+import { getSharedConfig } from "../core/config.js";
 
 export class SyncManagerUI {
   constructor(core, config = {}) {
     this.core = core;
     this.syncManager = config.syncManager || null;
-    this.roleConfig = config.roleConfig || this.syncManager?.ROLE || {
-      VIEWER: "viewer",
-      OPERATOR: "operator",
-      LOCAL: "local",
-    };
-    this.pageConfig = config.pageConfig || this.syncManager?.PAGE || {
-      PANEL: "panel",
-      BOARD: "board",
-    };
-    this.statusConfig = config.statusConfig || this.syncManager?.STATUS || {
-      IDLE: "idle",
-      OFFLINE: "offline",
-      VIEWER: "viewer",
-      OPERATOR: "operator",
-    };
+    this.roleConfig =
+      config.roleConfig ||
+      this.syncManager?.ROLE ||
+      SYNC_MANAGER_CONSTANTS.DEFAULT_ROLE_CONFIG;
+    this.pageConfig =
+      config.pageConfig ||
+      this.syncManager?.PAGE ||
+      SYNC_MANAGER_CONSTANTS.DEFAULT_PAGE_CONFIG;
+    this.statusConfig =
+      config.statusConfig ||
+      this.syncManager?.STATUS ||
+      SYNC_MANAGER_CONSTANTS.DEFAULT_STATUS_CONFIG;
     this.indicatorManager = config.indicatorManager || null;
     this.capsuleIndicator = null;
     this.controlPanel = null;
     this.controlPanelModal = null;
-    this.statusElement = null;
     this.currentShareCode = null;
     this.initialized = false;
-    this.sharePanelOpened = false;
-    this.eventListeners = []; // 記錄全域事件監聽器
-    this.domListeners = []; // 記錄 DOM 元素事件監聽器
+    this.eventListeners = [];
+    this.domListeners = [];
     this._windowListenersBound = false;
+    this.syncBusinessConfig = getSharedConfig()?.multiScreenSync || {};
+  }
+
+  isSyncEnabled() {
+    return this.syncBusinessConfig.enableSync !== false;
+  }
+
+  getValidCreateCode() {
+    const configuredCode = this.syncBusinessConfig.validCreateCode;
+    if (typeof configuredCode !== "string") return null;
+    const normalized = configuredCode.trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  getCreateCodeLength() {
+    const configuredCode = this.getValidCreateCode();
+    return configuredCode ? configuredCode.length : 9;
+  }
+
+  getCreateCodeHint() {
+    const fallback = "輸入建立代碼";
+    const text = this.syncBusinessConfig.validCreateCodeDescription;
+    return typeof text === "string" && text.trim().length > 0
+      ? text.trim()
+      : fallback;
+  }
+
+  applyCreateCodeInputConfig(createCodeInput) {
+    if (!createCodeInput) return;
+    const expectedLength = this.getCreateCodeLength();
+
+    createCodeInput.maxLength = expectedLength;
+    createCodeInput.placeholder = this.getCreateCodeHint();
+    createCodeInput.title = this.getCreateCodeHint();
+  }
+
+  applySyncAvailabilityState() {
+    if (this.isSyncEnabled()) return;
+
+    const createCodeInput = document.getElementById("createCodeInput");
+    const createBtn = document.getElementById("createSessionBtn");
+    const joinInput = document.getElementById("sessionCodeInput");
+    const joinBtn = document.getElementById("joinSessionBtn");
+    const channelButtons = this.controlPanel?.querySelectorAll?.(
+      ".sync-channel-btn",
+    );
+
+    if (createCodeInput) createCodeInput.disabled = true;
+    if (createBtn) createBtn.disabled = true;
+    if (joinInput) joinInput.disabled = true;
+    if (joinBtn) joinBtn.disabled = true;
+
+    if (channelButtons?.length) {
+      channelButtons.forEach((button) => {
+        button.disabled = true;
+      });
+    }
+
+    this.showStatus("error", "同步功能已停用（config）");
   }
 
   getRoleText(role) {
@@ -55,9 +110,6 @@ export class SyncManagerUI {
     return this.syncManager?.getPagePath?.(pageKey) || pageKey;
   }
 
-  /**
-   * 初始化 UI
-   */
   initialize() {
     if (this.initialized) {
       Logger.debug("[SyncManagerUI.initialize] 已初始化，跳過");
@@ -71,19 +123,13 @@ export class SyncManagerUI {
       this.createCapsuleIndicator();
       this.setupEventListeners();
       this.updateIndicator();
-
-      setTimeout(() => {
-        this.updateUIState();
-      }, 0);
+      this.updateUIState();
 
       this.initialized = true;
 
       const duration = performance.now() - initStart;
       Logger.debug(
         `[SyncManagerUI.initialize] 完成 (<orange>${duration.toFixed(0)} ms</orange>)`,
-      );
-      Logger.debug(
-        `UI 初始化完成 (<orange>${duration.toFixed(0)} ms</orange>)`,
       );
     } catch (error) {
       Logger.error("UI 初始化失敗", error);
@@ -133,7 +179,6 @@ export class SyncManagerUI {
 
     this.setupEventListeners();
 
-    // 將 indicator 狀態訊息容器掛載到 modal 面板內
     if (this.indicatorManager && this.controlPanel) {
       const panelContent = this.controlPanel.querySelector(
         ".sync-panel-content",
@@ -316,22 +361,11 @@ export class SyncManagerUI {
     `;
   }
 
-  /**
-   * 新增並記錄全域視窗事件監聽器
-   * @param {string} eventType - 事件類型
-   * @param {Function} handler - 事件處理函數
-   */
   addWindowListener(eventType, handler) {
     window.addEventListener(eventType, handler);
     this.eventListeners.push({ target: window, event: eventType, handler });
   }
 
-  /**
-   * 新增並記錄 DOM 元素事件監聽器
-   * @param {HTMLElement} element - DOM 元素
-   * @param {string} eventType - 事件類型
-   * @param {Function} handler - 事件處理函數
-   */
   addDOMListener(element, eventType, handler) {
     if (element) {
       element.addEventListener(eventType, handler);
@@ -343,7 +377,6 @@ export class SyncManagerUI {
     try {
       this._resetDomListeners();
 
-      // 記錄全域視窗事件監聽器
       if (!this._windowListenersBound) {
         this.addWindowListener(SYNC_EVENTS.SESSION_JOINED, (event) => {
           const detail = event.detail || {};
@@ -353,13 +386,13 @@ export class SyncManagerUI {
           }
         });
 
-        this.addWindowListener(SYNC_EVENTS.CONNECTED, (event) => {
+        this.addWindowListener(SYNC_EVENTS.CONNECTED, () => {
           this.updateUIState();
           this.updateIndicator();
           this.updateConnectedSessionInfo();
         });
 
-        this.addWindowListener(SYNC_EVENTS.DISCONNECTED, (event) => {
+        this.addWindowListener(SYNC_EVENTS.DISCONNECTED, () => {
           this.updateUIState();
           this.updateIndicator();
         });
@@ -460,6 +493,7 @@ export class SyncManagerUI {
 
       const createCodeInput = document.getElementById("createCodeInput");
       const createBtn = document.getElementById("createSessionBtn");
+      this.applyCreateCodeInputConfig(createCodeInput);
 
       this.addDOMListener(createCodeInput, "input", (e) => {
         e.target.value = e.target.value.replace(/[^0-9]/g, "");
@@ -467,16 +501,20 @@ export class SyncManagerUI {
       });
 
       this.addDOMListener(createCodeInput, "keypress", (e) => {
-        if (e.key === "Enter" && createCodeInput.value.length === 9) {
+        const expectedLength = this.getCreateCodeLength();
+        if (e.key === "Enter" && createCodeInput.value.length === expectedLength) {
           this.handleCreateSession();
         }
       });
 
       this.addDOMListener(createBtn, "click", () => {
-        if (createCodeInput.value.length === 9) {
+        const expectedLength = this.getCreateCodeLength();
+        if (createCodeInput.value.length === expectedLength) {
           this.handleCreateSession();
         }
       });
+
+      this.applySyncAvailabilityState();
 
       const roleCard = document.getElementById("roleCard");
       if (roleCard) {
@@ -502,7 +540,7 @@ export class SyncManagerUI {
             );
           } catch (error) {
             Logger.error("角色切換失敗:", error);
-            this.showStatus("error", "角色切換失敗", error && error.message);
+            this.showStatus("error", "角色切換失敗");
           }
         });
       }
@@ -510,7 +548,6 @@ export class SyncManagerUI {
       const joinBtn = document.getElementById("joinSessionBtn");
       this.addDOMListener(joinBtn, "click", () => this.handleJoinSession());
 
-      // 公開頻道按鈕 - 點一下直接進入頻道
       const channelBtns =
         this.controlPanel.querySelectorAll(".sync-channel-btn");
       channelBtns.forEach((btn) => {
@@ -520,7 +557,6 @@ export class SyncManagerUI {
         });
       });
 
-      // 公開頻道角色切換
       const chRoleBtns =
         this.controlPanel.querySelectorAll(".sync-ch-role-btn");
       chRoleBtns.forEach((btn) => {
@@ -584,7 +620,7 @@ export class SyncManagerUI {
                   copyShareCodeBtn.classList.remove("copied");
                 }, 2000);
               })
-              .catch((err) => {
+              .catch(() => {
                 alert("複製失敗，請手動複製");
               });
           }
@@ -640,7 +676,6 @@ export class SyncManagerUI {
             this.showStatus(
               "error",
               "重新產生分享代碼失敗",
-              error && error.message,
             );
           } finally {
             regenerateShareCodeBtn.disabled = false;
@@ -682,7 +717,6 @@ export class SyncManagerUI {
             this.showStatus(
               "error",
               "分享連結複製失敗",
-              error && error.message,
             );
           }
         });
@@ -695,6 +729,8 @@ export class SyncManagerUI {
   validateCreateCode(code) {
     const statusDiv = document.getElementById("codeValidationStatus");
     const createBtn = document.getElementById("createSessionBtn");
+    const expectedLength = this.getCreateCodeLength();
+    const configuredCode = this.getValidCreateCode();
 
     if (code.length === 0) {
       statusDiv.className = "sync-code-validation-indicator";
@@ -703,12 +739,21 @@ export class SyncManagerUI {
       return;
     }
 
-    if (code.length < 9) {
+    if (code.length < expectedLength) {
       statusDiv.className = "sync-code-validation-indicator invalid";
       statusDiv.innerHTML =
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>";
       createBtn.disabled = true;
-    } else if (code.length === 9) {
+    } else if (code.length === expectedLength) {
+      const isExpectedCode = !configuredCode || code === configuredCode;
+      if (!isExpectedCode) {
+        statusDiv.className = "sync-code-validation-indicator invalid";
+        statusDiv.innerHTML =
+          "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>";
+        createBtn.disabled = true;
+        return;
+      }
+
       statusDiv.className = "sync-code-validation-indicator valid";
       statusDiv.innerHTML =
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"20,6 9,17 4,12\"></polyline></svg>";
@@ -717,11 +762,23 @@ export class SyncManagerUI {
   }
 
   async handleCreateSession() {
+    if (!this.isSyncEnabled()) {
+      this.showStatus("error", "同步功能已停用（config）");
+      return;
+    }
+
     const input = document.getElementById("createCodeInput");
     const code = input.value.trim();
+    const expectedLength = this.getCreateCodeLength();
+    const configuredCode = this.getValidCreateCode();
 
-    if (code.length !== 9) {
+    if (code.length !== expectedLength) {
       this.showStatus("error", "請輸入有效代碼");
+      return;
+    }
+
+    if (configuredCode && code !== configuredCode) {
+      this.showStatus("error", "建立代碼錯誤");
       return;
     }
 
@@ -746,12 +803,17 @@ export class SyncManagerUI {
 
       Logger.info("[SyncUI] 工作階段建立成功", { sessionId });
     } catch (error) {
-      this.showStatus("error", "建立工作階段失敗", error && error.message);
+      this.showStatus("error", "建立工作階段失敗");
       Logger.error("[SyncUI] 建立工作階段失敗:", error);
     }
   }
 
   async handleJoinSession() {
+    if (!this.isSyncEnabled()) {
+      this.showStatus("error", "同步功能已停用（config）");
+      return;
+    }
+
     const input = document.getElementById("sessionCodeInput");
     const code = input.value.trim().toUpperCase();
 
@@ -795,7 +857,6 @@ export class SyncManagerUI {
     const roleText = this.getRoleText(role) || role;
     this.showStatus("info", `加入頻道 ${channelName}…`);
 
-    // 按鈕載入狀態
     const allBtns = this.controlPanel.querySelectorAll(".sync-channel-btn");
     allBtns.forEach((b) => (b.disabled = true));
 
@@ -828,14 +889,7 @@ export class SyncManagerUI {
 
     try {
       this.showStatus("info", "正在退出工作階段...");
-
-      if (this.core.syncClient) {
-        await this.core.syncClient.disconnect();
-      }
-
-      this.core.currentSessionId = null;
-      this.core.currentShareCode = null;
-      this.core.currentRole = null;
+      this.core.disconnect();
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -861,7 +915,7 @@ export class SyncManagerUI {
         this.hidePanel();
       }, 1500);
     } catch (error) {
-      this.showStatus("error", "退出工作階段失敗", error && error.message);
+      this.showStatus("error", "退出工作階段失敗");
       Logger.error("Disconnect error:", error);
     }
   }
@@ -873,7 +927,9 @@ export class SyncManagerUI {
       return;
     }
 
-    const isPublicChannel = sessionId.startsWith("__CH_");
+    const isPublicChannel = sessionId.startsWith(
+      SYNC_MANAGER_CONSTANTS.PUBLIC_CHANNEL_PREFIX,
+    );
     const confirmMessage = isPublicChannel
       ? "確定要關閉目前公開頻道嗎？所有連線將被中斷。"
       : "確定要關閉目前工作階段嗎？所有連線將被中斷。";
@@ -891,14 +947,7 @@ export class SyncManagerUI {
       );
 
       const result = await this.core.closeCurrentSession(sessionId);
-
-      // 關閉公開頻道後，同步清除本機快取，避免斷線後自動還原回同一個工作階段
-      if (this.core.syncClient) {
-        await this.core.syncClient.disconnect();
-      }
-      this.core.currentSessionId = null;
-      this.core.currentShareCode = null;
-      this.core.currentRole = null;
+      this.core.disconnect();
 
       this.showStatus(
         "success",
@@ -914,15 +963,12 @@ export class SyncManagerUI {
       this.showStatus(
         "error",
         "關閉工作階段失敗",
-        error && error.message,
       );
     }
   }
 
   async initializeShareCode() {
     Logger.debug("開始初始化分享代碼");
-
-    this.sharePanelOpened = true;
 
     let shareCode = this.currentShareCode;
 
@@ -931,15 +977,11 @@ export class SyncManagerUI {
       if (shareDisplayCode) {
         shareDisplayCode.textContent = shareCode;
       }
-
     } else {
       await this.regenerateAndDisplayShareCode();
     }
   }
 
-  /**
-   * 重新產生分享代碼並顯示
-   */
   async regenerateAndDisplayShareCode() {
     try {
       if (!this.core.syncClient) {
@@ -955,16 +997,12 @@ export class SyncManagerUI {
       if (shareDisplayCode) {
         shareDisplayCode.textContent = shareCode;
       }
-
     } catch (error) {
       Logger.error("產生新分享代碼失敗:", error);
       throw error;
     }
   }
 
-  /**
-   * 更新膠囊指示器
-   */
   updateIndicator() {
     if (!this.capsuleIndicator) {
       Logger.warn("capsuleIndicator 不存在，UI 初始化可能失敗或未執行", {
@@ -994,37 +1032,29 @@ export class SyncManagerUI {
       this.capsuleIndicator.classList.add("offline", status);
     }
 
-    const textMap = {
-      offline: this.getStatusText(this.statusConfig.OFFLINE),
-      idle: this.getStatusText(this.statusConfig.IDLE),
-      viewer: this.getStatusText(this.roleConfig.VIEWER),
-      operator: this.getStatusText(this.roleConfig.OPERATOR),
-    };
+    const textMap = this._getStatusTextMap();
 
     const statusText = this.capsuleIndicator.querySelector(".sync-status-text");
     if (statusText) {
       statusText.textContent = textMap[status] || "已離線";
     }
 
-    // 發送帶顏色的 debug log
     this.logIndicatorStatusChange(status, textMap[status], oldStatusText);
 
     this.updateUIState();
   }
 
   logIndicatorStatusChange(status, displayText, oldDisplayText) {
-    // 定義狀態對應的顏色代碼
     const colorMap = {
-      offline: "red", // 未連線：紅色
-      idle: "orange", // 未同步：橙色
-      viewer: "blue", // 檢視者：藍色
-      operator: "green", // 同步中：綠色
+      offline: "red",
+      idle: "orange",
+      viewer: "blue",
+      operator: "green",
     };
 
     const color = colorMap[status] || "gray";
     const coloredText = `<${color}>${displayText}</${color}>`;
 
-    // 如果狀態有變更，記錄變更
     if (displayText !== oldDisplayText) {
       Logger.debug(`指示器狀態: ${oldDisplayText || "初始"} → ${coloredText}`, {
         status,
@@ -1034,7 +1064,6 @@ export class SyncManagerUI {
         timestamp: new Date().toISOString(),
       });
     } else {
-      // 即使狀態沒變，也記錄目前狀態（用於初始化確認）
       Logger.debug(`指示器狀態: ${coloredText}`, {
         status,
         isConnected: this.core.isConnected(),
@@ -1044,9 +1073,6 @@ export class SyncManagerUI {
     }
   }
 
-  /**
-   * 更新UI狀態
-   */
   updateUIState() {
     try {
       const connectionSection = document.getElementById(
@@ -1077,21 +1103,13 @@ export class SyncManagerUI {
     }
   }
 
-  /**
-   * 更新已連線狀態下的工作階段資訊
-   */
   updateConnectedSessionInfo() {
     try {
       const sessionId = this.core.getSessionId();
       const role = this.core.syncClient?.role || "-";
       const status = this.core.getStatusText();
 
-      const statusTextMap = {
-        offline: this.getStatusText(this.statusConfig.OFFLINE),
-        idle: this.getStatusText(this.statusConfig.IDLE),
-        viewer: this.getStatusText(this.roleConfig.VIEWER),
-        operator: this.getStatusText(this.roleConfig.OPERATOR),
-      };
+      const statusTextMap = this._getStatusTextMap();
 
       const sessionIdSpan = document.getElementById(
         "connectedDisplaySessionId",
@@ -1106,12 +1124,7 @@ export class SyncManagerUI {
         roleSpan.textContent = this.getRoleText(role);
       }
       if (statusSpan) {
-        const statusMap = {
-          viewer: this.getStatusText(this.roleConfig.VIEWER),
-          operator: this.getStatusText(this.roleConfig.OPERATOR),
-        };
-        statusSpan.textContent =
-          statusMap[role] || statusTextMap[status] || status;
+        statusSpan.textContent = statusTextMap[role] || statusTextMap[status] || status;
       }
 
       const clientIdEl = document.getElementById("connectedDisplayClientId");
@@ -1119,8 +1132,9 @@ export class SyncManagerUI {
         clientIdEl.textContent = this.core.syncClient?.clientId || "-";
       }
 
-      // 公開頻道不支援分享代碼，隱藏整列分享按鈕
-      const isPublicChannel = sessionId && sessionId.startsWith("__CH_");
+      const isPublicChannel =
+        sessionId &&
+        sessionId.startsWith(SYNC_MANAGER_CONSTANTS.PUBLIC_CHANNEL_PREFIX);
       const shareRow = this.controlPanel?.querySelector(
         ".sync-session-share-row",
       );
@@ -1133,16 +1147,12 @@ export class SyncManagerUI {
       );
       if (closePublicChannelBtn) {
         closePublicChannelBtn.style.display = sessionId ? "" : "none";
-        closePublicChannelBtn.textContent = "關閉目前工作階段";
       }
     } catch (error) {
       Logger.warn("updateConnectedSessionInfo 錯誤:", error);
     }
   }
 
-  /**
-   * 更新頁面切換按鈕的 active 狀態
-   */
   updatePageToggleButtonState() {
     const currentPath = window.location.pathname;
     let currentPage = "panel";
@@ -1164,11 +1174,25 @@ export class SyncManagerUI {
     });
   }
 
-  showStatus(type, message, errorDetail) {
+  _getStatusTextMap() {
+    return {
+      offline: this.getStatusText(this.statusConfig.OFFLINE),
+      idle: this.getStatusText(this.statusConfig.IDLE),
+      viewer: this.getStatusText(this.roleConfig.VIEWER),
+      operator: this.getStatusText(this.roleConfig.OPERATOR),
+    };
+  }
+
+  showStatus(type, message) {
     if (this.indicatorManager) {
       this.indicatorManager.showStatus(type, message || "", 5000);
-      return;
     }
+  }
+
+  refreshFromCoreState() {
+    this.updateIndicator();
+    this.updateUIState();
+    this.updateConnectedSessionInfo();
   }
 
   showPanel() {
@@ -1176,7 +1200,6 @@ export class SyncManagerUI {
     if (!this.controlPanel || !document.body.contains(this.controlPanel)) {
       Logger.debug("[SyncManagerUI.showPanel] controlPanel不存在或不在DOM中，呼叫 createControlPanel()");
       this.createControlPanel();
-      this.setupEventListeners();
     }
 
     if (this.capsuleIndicator) {
@@ -1188,7 +1211,7 @@ export class SyncManagerUI {
 
     this.updatePageToggleButtonState();
 
-    this.updateUIState();
+    this.refreshFromCoreState();
     Logger.debug("[SyncManagerUI.showPanel] 完成");
   }
 
@@ -1210,25 +1233,21 @@ export class SyncManagerUI {
     this.domListeners = [];
   }
 
-  /**
-   * 清理資源
-   */
   cleanup() {
-    // 移除記錄的全域事件監聽器
     this.eventListeners.forEach(({ target, event, handler }) => {
       target.removeEventListener(event, handler);
     });
+    this.eventListeners = [];
+    this._windowListenersBound = false;
 
-    // 移除記錄的 DOM 事件監聽器
-    this.domListeners.forEach(({ element, event, handler }) => {
-      element?.removeEventListener(event, handler);
-    });
+    this._resetDomListeners();
 
-    // 移除 DOM 元素
     this.capsuleIndicator?.remove();
     this.controlPanel?.remove();
     this.controlPanelModal?.close();
     this.controlPanel = null;
+    this.currentShareCode = null;
+    this.initialized = false;
 
     Logger.debug("SyncManagerUI 清理完成");
   }

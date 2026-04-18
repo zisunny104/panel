@@ -1,116 +1,181 @@
 /**
- * SyncManager - 多裝置同步管理器主入口
+ * SyncManager - 同步狀態協調入口。
  *
- * 整合核心、UI、Sessions 三個模組
+ * 負責還原與維持同步工作階段、管理連線檢查、轉發同步事件，
+ * 並同步更新同步面板與狀態指示器。
  */
 import { SyncManagerCore } from "./sync-manager-core.js";
 import { SyncManagerUI } from "./sync-manager-ui.js";
 import { SyncSessionsModal } from "./sync-sessions-modal.js";
 import SyncConfirmDialogManager from "./sync-confirm-dialog.js";
-import { SYNC_EVENTS } from "../constants/index.js";
+import {
+  SYNC_EVENTS,
+  SYNC_MANAGER_CONSTANTS,
+  SYNC_ROLE_CONFIG,
+  SYNC_STATUS_CONFIG,
+  SYNC_PAGE_CONFIG,
+  SYNC_SESSION_STORAGE_KEYS,
+  SYNC_SESSION_STORAGE_LEGACY_KEYS,
+  SYNC_ROLE_TEXTS,
+  SYNC_MODE_TEXTS,
+  SYNC_STATUS_TEXTS,
+  SYNC_PAGE_LIST,
+  getSyncRoleText,
+  addSyncRoleText,
+  getSyncStatusText,
+  addSyncStatusText,
+  getSyncPageName,
+  getSyncPagePath,
+  addSyncPage,
+} from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { IndicatorManager } from "./indicator-manager.js";
-import { createSyncSessionStore } from "../core/sync-session-store.js";
+
+function safeGet(storage, key) {
+  try {
+    return storage?.getItem?.(key) || null;
+  } catch {
+    return null;
+  }
+}
+
+function safeSet(storage, key, value) {
+  try {
+    storage?.setItem?.(key, value);
+  } catch {}
+}
+
+function safeRemove(storage, key) {
+  try {
+    storage?.removeItem?.(key);
+  } catch {}
+}
+
+/**
+ * 建立同步工作階段儲存介面。
+ * 支援目前鍵名與舊版鍵名，供同步管理器還原、保存與清除狀態使用。
+ * @param {Object} [param0={}]
+ * @param {Storage} [param0.session=window.sessionStorage]
+ * @param {Storage} [param0.local=window.localStorage]
+ * @returns {{load: Function, save: Function, clear: Function}}
+ */
+function createSyncSessionStore({
+  session = window.sessionStorage,
+  local = window.localStorage,
+} = {}) {
+  const {
+    SESSION_ID,
+    CLIENT_ID,
+    ROLE,
+  } = SYNC_SESSION_STORAGE_KEYS;
+  const {
+    SESSION_ID: LEGACY_SESSION_ID,
+    CLIENT_ID: LEGACY_CLIENT_ID,
+    ROLE: LEGACY_ROLE,
+    BACKUP: LEGACY_BACKUP,
+  } = SYNC_SESSION_STORAGE_LEGACY_KEYS;
+
+  return {
+    load() {
+      const sessionId =
+        safeGet(session, SESSION_ID) ||
+        safeGet(session, LEGACY_SESSION_ID) ||
+        safeGet(local, LEGACY_SESSION_ID);
+
+      const clientId =
+        safeGet(session, CLIENT_ID) ||
+        safeGet(session, LEGACY_CLIENT_ID) ||
+        safeGet(local, LEGACY_CLIENT_ID);
+
+      const role = safeGet(session, ROLE) || safeGet(local, LEGACY_ROLE);
+
+      return {
+        sessionId: sessionId || null,
+        clientId: clientId || null,
+        role: role || null,
+      };
+    },
+
+    save({ sessionId, clientId, role } = {}) {
+      safeSet(session, SESSION_ID, sessionId || "");
+      safeSet(session, CLIENT_ID, clientId || "");
+      safeSet(session, ROLE, role || SYNC_ROLE_CONFIG.LOCAL);
+    },
+
+    clear() {
+      [SESSION_ID, CLIENT_ID, ROLE].forEach((key) => safeRemove(session, key));
+      [LEGACY_SESSION_ID, LEGACY_CLIENT_ID, LEGACY_ROLE, LEGACY_BACKUP].forEach(
+        (key) => {
+          safeRemove(session, key);
+          safeRemove(local, key);
+        },
+      );
+    },
+  };
+}
 
 class SyncManager {
-  static ROLE = {
-    VIEWER: "viewer",
-    OPERATOR: "operator",
-    LOCAL: "local",
-  };
+  static ROLE = SYNC_ROLE_CONFIG;
 
-  static STATUS = {
-    IDLE: "idle",
-    OFFLINE: "offline",
-    VIEWER: "viewer",
-    OPERATOR: "operator",
-  };
+  static STATUS = SYNC_STATUS_CONFIG;
 
-  static ROLE_TEXTS = {
-    viewer: "檢視者",
-    operator: "操作者",
-    local: "本機",
-  };
+  static ROLE_TEXTS = SYNC_ROLE_TEXTS;
 
-  static MODE_TEXTS = {
-    viewer: "檢視模式",
-    operator: "同步操作",
-  };
+  static MODE_TEXTS = SYNC_MODE_TEXTS;
 
-  static STATUS_TEXTS = {
-    idle: "未同步",
-    viewer: "檢視中",
-    operator: "同步中",
-    offline: "已離線",
-  };
+  static STATUS_TEXTS = SYNC_STATUS_TEXTS;
 
-  static PAGE = {
-    PANEL: "panel",
-    BOARD: "board",
-  };
+  static PAGE = SYNC_PAGE_CONFIG;
 
-  static PAGE_LIST = {
-    panel: {
-      name: "機台面板",
-      path: "index.html",
-    },
-    board: {
-      name: "實驗管理",
-      path: "board.html",
-    },
-  };
+  static PAGE_LIST = SYNC_PAGE_LIST;
 
   static getRoleText(role) {
-    return this.ROLE_TEXTS[role] || role;
+    return getSyncRoleText(role);
   }
 
   static addRoleText(key, text) {
-    if (this.ROLE_TEXTS.hasOwnProperty(key)) {
+    if (!addSyncRoleText(key, text)) {
       Logger.warn("角色鍵名已存在，跳過新增:", key);
       return false;
     }
-    this.ROLE_TEXTS[key] = text;
     return true;
   }
 
   static getStatusText(status) {
-    return this.STATUS_TEXTS[status] || status;
+    return getSyncStatusText(status);
   }
 
   static addStatusText(key, text) {
-    if (this.STATUS_TEXTS.hasOwnProperty(key)) {
+    if (!addSyncStatusText(key, text)) {
       Logger.warn("狀態鍵名已存在，跳過新增:", key);
       return false;
     }
-    this.STATUS_TEXTS[key] = text;
     return true;
   }
 
-  // ========== 靜態方法 - 頁面清單 ==========
   /**
-   * 取得頁面名稱
-   * @param {string} pageKey - 頁面鍵名
-   * @returns {string} 頁面顯示名稱
+   * 取得頁面顯示名稱。
+   * @param {string} pageKey - 頁面鍵名。
+   * @returns {string}
    */
   static getPageName(pageKey) {
-    return this.PAGE_LIST[pageKey]?.name || pageKey;
+    return getSyncPageName(pageKey);
   }
 
   /**
-   * 取得頁面路徑
-   * @param {string} pageKey - 頁面鍵名
-   * @returns {string} 頁面路徑
+   * 取得頁面路徑。
+   * @param {string} pageKey - 頁面鍵名。
+   * @returns {string}
    */
   static getPagePath(pageKey) {
-    return this.PAGE_LIST[pageKey]?.path || pageKey;
+    return getSyncPagePath(pageKey);
   }
 
   static addPage(key, name, path) {
-    if (this.PAGE_LIST.hasOwnProperty(key)) {
+    if (!addSyncPage(key, name, path)) {
       Logger.warn("頁面鍵名已存在，跳過新增:", key);
       return false;
     }
-    this.PAGE_LIST[key] = { name, path };
     return true;
   }
 
@@ -154,7 +219,7 @@ class SyncManager {
     this.eventListeners = [];
     this.isSyncMode = null;
     this.initialized = false;
-    this._isRestoring = false; // 初始化還原標誌
+    this._isRestoring = false;
     this.initialize();
   }
 
@@ -168,47 +233,38 @@ class SyncManager {
     const initStart = performance.now();
     Logger.debug("開始初始化");
 
-    // 初始化 UI（包含膠囊指示器與事件監聽）
     Logger.debug("初始化同步 UI");
     this.ui.initialize();
 
-    // 先嘗試還原工作階段，判斷是本機模式還是同步模式
     this.attemptSessionRestore()
       .then((isSync) => {
-        this.isSyncMode = isSync; // 記錄模式狀態
+        this.isSyncMode = isSync;
         Logger.debug("工作階段還原檢查完成", {
           isSync,
           hasSessionId: !!this.core.syncClient.getSessionId?.(),
         });
 
-        // 只在同步模式下初始化完整功能
         if (isSync) {
           this.sessions.initialize();
           this.ui.initialized = true;
-          // 同步模式下立即更新膠囊狀態（根據實際 role）
           this.ui.updateIndicator();
         } else {
-          // 本機模式下設定角色為 LOCAL
           this.core.syncClient.role = SyncManager.ROLE.LOCAL;
           Logger.debug("本機模式設定角色為 LOCAL");
           this.ui.initialized = true;
-          // 膠囊根據 SyncClient.getStatusText() 自動顯示 "idle"（未同步）
         }
 
-        // 模式確認後才啟動連線檢查
         this.startConnectionCheck();
       })
       .catch((error) => {
         Logger.warn("工作階段還原過程中發生錯誤", error);
 
-        // 發生錯誤時預設為本機模式
         this.isSyncMode = false;
         this.startConnectionCheck();
       });
 
     this.setupEventListeners();
 
-    // 初始化時執行一次心跳檢測並設定初始狀態
     this.core
       .checkServerHealth()
       .then((online) => {
@@ -216,12 +272,10 @@ class SyncManager {
         this.serverOnline = online;
         Logger.debug("伺服器心跳檢測完成", { online });
 
-        // 只在 UI 已初始化時更新指示器
         if (this.ui?.initialized) {
           this.ui.updateIndicator();
         }
 
-        // 初始化完成後，觸發事件讓日誌管理器知道 syncClient 已就緒
         window.dispatchEvent(
           new CustomEvent(SYNC_EVENTS.CLIENT_INITIALIZED, {
             detail: { serverOnline: online },
@@ -236,7 +290,6 @@ class SyncManager {
       .catch((error) => {
         this.initialized = true;
         Logger.warn("伺服器心跳檢測失敗", error);
-        // 即使心跳檢測失敗，也觸發初始化完成事件
         window.dispatchEvent(
           new CustomEvent(SYNC_EVENTS.CLIENT_INITIALIZED, {
             detail: { serverOnline: false },
@@ -249,18 +302,15 @@ class SyncManager {
         );
       });
 
-    // 當工作階段加入時，動態初始化 Sessions 模組
     const sessionJoinedDynamicHandler = () => {
       Logger.debug("工作階段已加入，初始化 Sessions 模組");
 
-      // 如果之前在本機模式，現在需要動態初始化 Sessions
       if (!this.isSyncMode) {
         Logger.debug("動態初始化 Sessions（已加入工作階段）");
         this.isSyncMode = true;
         this.sessions.initialize();
       }
 
-      // 通知 ExperimentHubClient 可以連線
       if (this.experimentHubManager?.hubClient?.tryConnect) {
         this.experimentHubManager.hubClient.tryConnect();
       }
@@ -272,12 +322,10 @@ class SyncManager {
       handler: sessionJoinedDynamicHandler,
     });
 
-    // 監聽伺服器狀態變化
     const serverStatusHandler = (event) => {
       const wasOnline = this.serverOnline;
       this.serverOnline = event.detail.online;
 
-      // 如果狀態改變，調整檢查頻率
       if (wasOnline !== this.serverOnline) {
         this.adjustConnectionCheckInterval();
       }
@@ -315,14 +363,12 @@ class SyncManager {
         role,
       });
 
-      // 等待伺服器心跳檢測
       const isOnline = await this.core.checkServerHealth();
       if (!isOnline) {
         Logger.warn("伺服器離線，略過工作階段還原");
-        return false; // 本機模式
+        return false;
       }
 
-      // 嘗試恢復連線
       try {
         const result = await this.core.syncClient.restoreSession(
           sessionId,
@@ -335,8 +381,9 @@ class SyncManager {
             clientId,
           });
 
-          // 從伺服器取得工作階段的完整客戶端資訊（公開頻道無 DB session，跳過）
-          const isPublicChannel = sessionId.startsWith("__CH_");
+          const isPublicChannel = sessionId.startsWith(
+            SYNC_MANAGER_CONSTANTS.PUBLIC_CHANNEL_PREFIX,
+          );
           if (!isPublicChannel) {
             try {
               const sessionInfo =
@@ -356,7 +403,6 @@ class SyncManager {
             }
           }
 
-          // 觸發工作階段還原事件
           window.dispatchEvent(
             new CustomEvent(SYNC_EVENTS.SESSION_JOINED, {
               detail: {
@@ -367,21 +413,19 @@ class SyncManager {
             }),
           );
 
-          // 更新 UI（延遲初始化，但由於 initialize() 已做，這裡只是更新狀態）
           this.ui?.updateIndicator?.();
           this.ui?.updateConnectedSessionInfo?.();
 
-          return true; // 同步模式
+          return true;
         }
       } catch (error) {
         Logger.warn("工作階段還原失敗", error);
-        // 統一交由 SyncClient 管理所有工作階段儲存鍵清理
         this.core.syncClient.clearState();
-        return false; // 本機模式
+        return false;
       }
     } catch (error) {
       Logger.error("還原工作階段出錯", error);
-      return false; // 本機模式
+      return false;
     }
   }
 
@@ -407,7 +451,6 @@ class SyncManager {
       handler: showPanelHandler,
     });
 
-    // 監聽實驗狀態變化事件，並將其同步到其他裝置
     const stateChangeHandler = (event) => {
       this.syncState(event.detail);
     };
@@ -421,22 +464,18 @@ class SyncManager {
       handler: stateChangeHandler,
     });
 
-    // 監聽同步數據清除事件（工作階段不存在時）
     const syncDataClearedHandler = (event) => {
       Logger.warn("監聽到 sync_data_cleared 事件", event.detail);
 
       const { reason, message } = event.detail || {};
       Logger.warn(`同步數據已清除 [${reason}]: ${message}`);
 
-      // 重置為本機模式
       this.isSyncMode = false;
       Logger.info("已切換為本機模式");
 
-      // 隱藏同步面板並更新指示器
       this.ui?.hidePanel();
       this.ui?.updateIndicator();
 
-      // 觸發事件通知其他模組同步已清除
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.DATA_CLEARED, {
           detail: { reason, message, timestamp: Date.now() },
@@ -454,26 +493,21 @@ class SyncManager {
       handler: syncDataClearedHandler,
     });
 
-    // 監聽 WebSocket 斷線事件，切換為本機模式（保留 session 資訊以便還原）
     const disconnectedHandler = (event) => {
       Logger.warn(
         "收到 sync_disconnected，連線中斷，切換為本機模式",
         event.detail,
       );
 
-      // 標記為本機模式（不清除 sessionStorage）
       this.isSyncMode = false;
 
-      // 將 SyncClient 角色設為 LOCAL，讓 UI 與按鈕回復本機行為
       if (this.core?.syncClient) {
         this.core.syncClient.role = SyncManager.ROLE.LOCAL;
       }
 
-      // 隱藏同步面板並更新指示器
       this.ui?.hidePanel();
       this.ui?.updateIndicator();
 
-      // 通知其他模組：連線中斷（保留 session 以便還原）
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.CONNECTION_LOST, {
           detail: event.detail || { reason: "disconnected" },
@@ -489,11 +523,7 @@ class SyncManager {
       handler: disconnectedHandler,
     });
 
-    // 監聯 WebSocket 重新連線，嘗試還原工作階段
-    // 注意：sync_connected 在首次認證成功時也會觸發，
-    // 此時已經處於連線狀態，不需要再次還原。
     const connectedHandler = (event) => {
-      // 如果已在同步模式或正在還原中，跳過避免重複 connect 造成迴圈
       if (this.isSyncMode || this._isRestoring) {
         Logger.debug("收到 sync_connected，但已在同步模式或正在還原中，跳過");
         return;
@@ -567,19 +597,17 @@ class SyncManager {
   }
 
   async checkConnection() {
-    // 在本機模式或 UI 未初始化時，跳過連線檢查
     if (!this.isSyncMode || !this.ui?.initialized) {
       return;
     }
 
     if (this.isCheckingConnection) {
-      return; // 如果正在檢查中，跳過
+      return;
     }
 
     this.isCheckingConnection = true;
     try {
       await this.core.checkServerHealth();
-      // 只有在同步模式且 UI 已初始化時才更新指示器
       if (this.isSyncMode && this.ui?.initialized) {
         this.ui.updateIndicator();
       }
@@ -605,17 +633,14 @@ class SyncManager {
   }
 
   cleanup() {
-    // 清除所有事件監聽器
     this.eventListeners.forEach(({ target, event, handler }) => {
       target.removeEventListener(event, handler);
     });
 
-    // 清除連線檢查定時器
     if (this.connectionCheckTimer) {
       clearInterval(this.connectionCheckTimer);
     }
 
-    // 清除各個模組
     this.ui?.cleanup();
     this.sessions?.cleanup();
     this.core?.cleanup();
@@ -624,6 +649,5 @@ class SyncManager {
   }
 }
 
-// ES6 模組匯出
 export default SyncManager;
 export { SyncManager };

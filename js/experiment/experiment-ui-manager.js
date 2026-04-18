@@ -1,22 +1,29 @@
 /**
  * ExperimentUIManager - 管理實驗面板的 UI 控件與狀態同步
  *
- * 負責快取常用 DOM 元素、綁定與觸發 UI 事件，並回應
- * ExperimentFlowManager 的狀態變更以更新畫面與互動。
+ * 負責初始化、inject dependencies、計時器委派、ID 廣播，
+ * 以及回應 ExperimentFlowManager 的狀態變更以更新畫面與互動。
  *
- * 此檔案聚焦於現行行為與公開 API，說明反映目前實作與責任範圍。
+ * 繼承鏈：
+ *   ExperimentControlsDom → ExperimentUIRenderer → ExperimentUIManager
+ *
+ * DOM 操作    → ExperimentControlsDom
+ * 通用 UI 工具與渲染 → ExperimentUIRenderer
+ * 初始化與流程協調   → ExperimentUIManager（本檔）
  */
 
 import { SYNC_DATA_TYPES, SYNC_EVENTS, RECORD_SOURCES } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
 import { generateExperimentId } from "../core/random-utils.js";
+import ExperimentUIRenderer from "./experiment-ui-renderer.js";
 
-class ExperimentUIManager {
+class ExperimentUIManager extends ExperimentUIRenderer {
   /**
    * 建構函式
    * @param {Object} config - 配置選項
    */
   constructor(config = {}) {
-    // 配置選項
+    super();
     this.config = {
       enableVisualHints: config.enableVisualHints ?? true,
       highlightDuration: config.highlightDuration ?? 300,
@@ -25,18 +32,19 @@ class ExperimentUIManager {
 
     this.timerManager = config.timerManager || null;
 
-    // 依賴注入容器
+    // dependencies container
     this.dependencies = {
       flowManager: null,
       combinationManager: null,
       hubManager: null,
       panelUIManager: null,
+      experimentSystemManager: null,
       syncManager: null,
       syncClient: null,
       experimentSyncCore: null,
     };
 
-    // UI 狀態
+    // UI 狀態（供 ExperimentUIRenderer 方法讀寫）
     this.state = {
       visualHintsEnabled: this.config.enableVisualHints,
       highlightedButtons: new Set(),
@@ -45,76 +53,84 @@ class ExperimentUIManager {
       panelUIInitialized: false,
     };
 
-    // DOM 元素快取
+    // DOM 元素快取（供 ExperimentUIRenderer 方法讀寫）
     this.elements = new Map();
 
-    // 事件監聽器集合
+    // 事件監聽器集合（供 ExperimentUIRenderer 的 on/off 使用）
     this.listeners = new Map();
 
-    // 初始化標記
     this.initialized = false;
 
     Logger.debug("ExperimentUIManager 已建立");
   }
 
   // ==========================================
-  // 初始化方法
+  // 初始化
   // ==========================================
 
-  /**
-   * 初始化 UI 管理器
-   */
   initialize() {
     if (this.initialized) {
       Logger.warn("UI 管理器已經初始化");
       return;
     }
-
-    // 快取常用的 DOM 元素
     this._cacheCommonElements();
-
+    this._setupStateInputSync();
     this.initialized = true;
     Logger.debug("UI 管理器初始化完成");
-
     this._emit("ui-manager-initialized");
   }
 
-  /**
-   * 快取常用 DOM 元素
-   * @private
-   */
+  /** @private */
   _cacheCommonElements() {
-    const commonSelectors = {
+    const selectors = {
       powerSwitchArea: "#powerSwitchArea",
       pauseIndicator: "#pauseIndicator",
       experimentTimer: "#experimentTimer",
       experimentPanel: ".experiment-panel",
       visualHintsToggle: "#toggleTouchVisuals",
     };
-
-    Object.entries(commonSelectors).forEach(([key, selector]) => {
-      const element = document.querySelector(selector);
-      if (element) {
-        this.elements.set(key, element);
-      }
+    Object.entries(selectors).forEach(([key, sel]) => {
+      const el = document.querySelector(sel);
+      if (el) this.elements.set(key, el);
     });
   }
 
   /**
-   * 依賴注入：FlowManager
+   * 監聽 ExperimentStateManager 的狀態事件，將值同步到 DOM 輸入框。
+   * @private
    */
-  injectFlowManager(flowManager) {
-    if (!flowManager) {
-      Logger.warn("注入的 FlowManager 無效");
-      return;
-    }
+  _setupStateInputSync() {
+    document.addEventListener("experimentState:experimentIdChanged", (e) => {
+      const { experimentId } = e.detail || {};
+      if (experimentId == null) return;
+      const input = document.getElementById("experimentIdInput");
+      if (input && input.value.trim() !== experimentId) input.value = experimentId;
+    });
 
+    document.addEventListener("experimentState:participantNameChanged", (e) => {
+      const { participantName } = e.detail || {};
+      if (participantName == null) return;
+      const input = document.getElementById("participantNameInput");
+      if (input && input.value.trim() !== participantName) input.value = participantName;
+    });
+  }
+
+  // ==========================================
+  // inject dependencies
+  // ==========================================
+
+  injectFlowManager(flowManager) {
+    if (!flowManager) { Logger.warn("Injected FlowManager 無效"); return; }
     this.dependencies.flowManager = flowManager;
   }
 
   updateDependencies(deps = {}) {
     Object.assign(this.dependencies, deps);
   }
+
+  // ==========================================
+  // 輸入框與狀態管理器綁定
+  // ==========================================
 
   /**
    * 綁定實驗 ID 與受試者名稱輸入欄位到 stateManager。
@@ -123,1777 +139,124 @@ class ExperimentUIManager {
   bindStateManagerInputs(stateManager) {
     if (!stateManager) return;
 
-    const experimentIdInput = document.getElementById("experimentIdInput");
-    if (experimentIdInput && !experimentIdInput._stateSyncBound) {
-      experimentIdInput._stateSyncBound = true;
+    const idInput = document.getElementById("experimentIdInput");
+    if (idInput && !idInput._stateSyncBound) {
+      idInput._stateSyncBound = true;
       let _debounceTimer = null;
       const DEBOUNCE_MS = 300;
-
-      experimentIdInput.addEventListener("input", (e) => {
-        const newId = e.target.value.trim();
-        if (_debounceTimer) clearTimeout(_debounceTimer);
-        _debounceTimer = setTimeout(() => {
-          if (newId !== stateManager.experimentId) {
-            stateManager.setExperimentId(newId, RECORD_SOURCES.LOCAL_INPUT);
-          }
-          _debounceTimer = null;
-        }, DEBOUNCE_MS);
-      });
-
-      // change 事件立即同步（例如離開欄位時）
-      experimentIdInput.addEventListener("change", (e) => {
-        const newId = e.target.value.trim();
-        if (_debounceTimer) {
-          clearTimeout(_debounceTimer);
-          _debounceTimer = null;
-        }
-        if (newId !== stateManager.experimentId) {
+      const applyId = (newId) => {
+        if (newId === stateManager.experimentId) return;
+        const sys = this.dependencies.experimentSystemManager;
+        if (sys?.setExperimentId) {
+          sys.setExperimentId(newId, RECORD_SOURCES.LOCAL_INPUT, {
+            broadcast: true, reapplyCombination: true,
+          });
+        } else {
           stateManager.setExperimentId(newId, RECORD_SOURCES.LOCAL_INPUT);
         }
+      };
+      idInput.addEventListener("input", (e) => {
+        const newId = e.target.value.trim();
+        if (_debounceTimer) clearTimeout(_debounceTimer);
+        _debounceTimer = setTimeout(() => { applyId(newId); _debounceTimer = null; }, DEBOUNCE_MS);
       });
-
-      if (experimentIdInput.value.trim() && !stateManager.experimentId) {
-        stateManager.experimentId = experimentIdInput.value.trim();
+      idInput.addEventListener("change", (e) => {
+        if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
+        applyId(e.target.value.trim());
+      });
+      if (idInput.value.trim() && !stateManager.experimentId) {
+        stateManager.experimentId = idInput.value.trim();
       }
     }
 
-    const participantNameInput = document.getElementById("participantNameInput");
-    if (participantNameInput && !participantNameInput._stateSyncBound) {
-      participantNameInput._stateSyncBound = true;
-
-      participantNameInput.addEventListener("input", (e) => {
-        const newName = e.target.value.trim();
+    const nameInput = document.getElementById("participantNameInput");
+    if (nameInput && !nameInput._stateSyncBound) {
+      nameInput._stateSyncBound = true;
+      const applyName = (newName) => {
         if (newName !== stateManager.participantName) {
           stateManager.setParticipantName(newName, "input");
         }
-      });
-
-      participantNameInput.addEventListener("change", (e) => {
-        const newName = e.target.value.trim();
-        if (newName !== stateManager.participantName) {
-          stateManager.setParticipantName(newName, "input");
-        }
-      });
-
-      if (participantNameInput.value.trim() && !stateManager.participantName) {
-        stateManager.participantName = participantNameInput.value.trim();
+      };
+      nameInput.addEventListener("input", (e) => applyName(e.target.value.trim()));
+      nameInput.addEventListener("change", (e) => applyName(e.target.value.trim()));
+      if (nameInput.value.trim() && !stateManager.participantName) {
+        stateManager.participantName = nameInput.value.trim();
       }
     }
   }
 
   updateSelectAllState() {
     const selectAllCheckbox = document.querySelector("#selectAllUnits");
-    const unitList = document.querySelector(
-      "#unitsPanelContainer .experiment-units-list",
-    );
-    if (!selectAllCheckbox || !unitList) {
-      return;
-    }
-    const checkboxes = Array.from(
-      unitList.querySelectorAll("input[name=\"unitCheckbox\"]"),
-    );
+    const unitList = document.querySelector("#unitsPanelContainer .experiment-units-list");
+    if (!selectAllCheckbox || !unitList) return;
+    const checkboxes = Array.from(unitList.querySelectorAll("input[name=\"unitCheckbox\"]"));
     const checkedCount = checkboxes.filter((cb) => cb.checked).length;
-
-    selectAllCheckbox.checked =
-      checkedCount === checkboxes.length && checkboxes.length > 0;
-    selectAllCheckbox.indeterminate =
-      checkedCount > 0 && checkedCount < checkboxes.length;
+    selectAllCheckbox.checked = checkedCount === checkboxes.length && checkboxes.length > 0;
+    selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
   }
 
   // ==========================================
-  // 按鈕狀態管理
+  // 計時器委派（給 experimentTimerManager）
   // ==========================================
 
-  /**
-   * 啟用按鈕
-   * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   */
-  enableButton(buttonOrSelector) {
-    const button = this._getElement(buttonOrSelector);
-    if (!button) return;
-
-    button.disabled = false;
-    button.classList.remove("disabled", "experiment-disabled");
-    this.state.lockedElements.delete(button);
-
-    this._emit("button-enabled", { button, selector: buttonOrSelector });
-  }
-
-  /**
-   * 停用按鈕
-   * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   * @param {string} reason - 停用原因（顯示在 title）
-   */
-  disableButton(buttonOrSelector, reason = "") {
-    const button = this._getElement(buttonOrSelector);
-    if (!button) return;
-
-    button.disabled = true;
-    button.classList.add("disabled");
-    if (reason) {
-      button.title = reason;
-    }
-
-    this._emit("button-disabled", {
-      button,
-      selector: buttonOrSelector,
-      reason,
-    });
-  }
-
-  /**
-   * 鎖定按鈕（實驗進行中無法操作）
-   * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   */
-  lockButton(buttonOrSelector) {
-    const button = this._getElement(buttonOrSelector);
-    if (!button) return;
-
-    button.disabled = true;
-    button.classList.add("experiment-disabled");
-    this.state.lockedElements.add(button);
-
-    this._emit("button-locked", { button, selector: buttonOrSelector });
-  }
-
-  /**
-   * 處理 FlowManager 的鎖定/解鎖事件
-   * @private
-   */
-  _handleFlowLocked(locked) {
-    // 實驗 ID 輸入框
-    const idInput = document.querySelector("#experimentIdInput");
-    if (idInput) {
-      idInput.disabled = !!locked;
-      if (locked) {
-        idInput.classList.add("experiment-disabled");
-      } else {
-        idInput.classList.remove("experiment-disabled");
-      }
-    }
-
-    // 組合選擇器
-    const comboContainer = document.querySelector(
-      "#combinationSelectorContainer",
-    );
-    if (comboContainer) {
-      // 將所有互動元素設為 disabled
-        comboContainer
-          .querySelectorAll("button,input,li,select")
-          .forEach((el) => {
-            try {
-              const isPermaDisabled =
-                el?.dataset?.permaDisabled === "true" ||
-                el?.id === "includeStartup" ||
-                el?.id === "includeShutdown";
-              if (locked) {
-                el.disabled = true;
-                el.classList.add("experiment-disabled");
-                return;
-              }
-              if (isPermaDisabled) {
-                el.disabled = true;
-                el.classList.add("experiment-disabled");
-                return;
-              }
-              el.disabled = false;
-              el.classList.remove("experiment-disabled");
-            } catch (e) {}
-          });
-    }
-
-    // 若有需要，也可以發出事件
-    this._emit("flow:locked:ui", { locked });
-  }
-
-  /**
-   * 處理受試者名稱編輯允許資訊
-   * @private
-   */
-  _handleParticipantEditAllowed(allowed) {
-    const pInput = document.querySelector("#participantNameInput");
-    if (pInput) {
-      // 當 allowed 為 true 表示可編輯，否則唯讀
-      pInput.readOnly = !allowed;
-      if (allowed) {
-        pInput.classList.remove("experiment-disabled");
-        pInput.removeAttribute("disabled");
-      } else {
-        pInput.classList.add("experiment-disabled");
-        pInput.setAttribute("disabled", "true");
-      }
-    }
-  }
-
-  /**
-   * 解鎖按鈕
-   * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   */
-  unlockButton(buttonOrSelector) {
-    const button = this._getElement(buttonOrSelector);
-    if (!button) return;
-
-    button.disabled = false;
-    button.classList.remove("experiment-disabled");
-    this.state.lockedElements.delete(button);
-
-    this._emit("button-unlocked", { button, selector: buttonOrSelector });
-  }
-
-  /**
-   * 批次啟用按鈕
-   * @param {Array<string|HTMLElement>} buttons - 按鈕列表
-   */
-  enableButtons(buttons) {
-    buttons.forEach((btn) => this.enableButton(btn));
-  }
-
-  /**
-   * 批次停用按鈕
-   * @param {Array<string|HTMLElement>} buttons - 按鈕列表
-   * @param {string} reason - 停用原因
-   */
-  disableButtons(buttons, reason = "") {
-    buttons.forEach((btn) => this.disableButton(btn, reason));
-  }
-
-  /**
-   * 批次鎖定按鈕
-   * @param {Array<string|HTMLElement>} buttons - 按鈕列表
-   */
-  lockButtons(buttons) {
-    buttons.forEach((btn) => this.lockButton(btn));
-  }
-
-  /**
-   * 批次解鎖按鈕
-   * @param {Array<string|HTMLElement>} buttons - 按鈕列表
-   */
-  unlockButtons(buttons) {
-    buttons.forEach((btn) => this.unlockButton(btn));
-  }
-
-  // ==========================================
-  // 按鈕高亮管理
-  // ==========================================
-
-  /**
-   * 高亮按鈕（新增視覺提示）
-   * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   * @param {string} highlightType - 高亮類型 ('primary' | 'secondary' | 'shift')
-   */
-  highlightButton(buttonOrSelector, highlightType = "primary") {
-    if (!this.state.visualHintsEnabled) return;
-
-    const button = this._getElement(buttonOrSelector);
-    if (!button) return;
-
-    const classList = {
-      primary: "next-step-highlight",
-      secondary: "next-step-highlight-secondary",
-      shift: "next-step-highlight-shift",
-    };
-
-    const className = classList[highlightType] || classList.primary;
-    button.classList.add(className);
-    this.state.highlightedButtons.add(button);
-
-    this._emit("button-highlighted", {
-      button,
-      selector: buttonOrSelector,
-      highlightType,
-    });
-  }
-
-  /**
-   * 移除按鈕高亮
-   * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   */
-  unhighlightButton(buttonOrSelector) {
-    const button = this._getElement(buttonOrSelector);
-    if (!button) return;
-
-    button.classList.remove(
-      "next-step-highlight",
-      "next-step-highlight-secondary",
-      "next-step-highlight-shift",
-    );
-    this.state.highlightedButtons.delete(button);
-
-    this._emit("button-unhighlighted", { button, selector: buttonOrSelector });
-  }
-
-  /**
-   * 高亮電源按鈕
-   * @param {boolean} enable - 是否啟用高亮
-   */
-  highlightPowerButton(enable) {
-    const powerSwitchArea = this.elements.get("powerSwitchArea");
-    if (!powerSwitchArea) {
-      Logger.warn("找不到電源開關區域");
-      return;
-    }
-
-    if (enable && this.state.visualHintsEnabled) {
-      powerSwitchArea.classList.add("next-step-highlight");
-      this._emit("power-button-highlighted", { enable: true });
-    } else {
-      powerSwitchArea.classList.remove("next-step-highlight");
-      this._emit("power-button-highlighted", { enable: false });
-    }
-  }
-
-  /**
-   * 高亮多個按鈕
-   * @param {Array<Object>} buttonConfigs - 按鈕配置列表
-   * @example highlightButtons([
-   *   { selector: '.button-overlay[data-label="B1"]', type: 'primary' },
-   *   { selector: '.button-overlay[data-label="B2"]', type: 'secondary' }
-   * ])
-   */
-  highlightButtons(buttonConfigs) {
-    buttonConfigs.forEach(({ selector, type }) => {
-      this.highlightButton(selector, type);
-    });
-  }
-
-  /**
-   * 清除所有按鈕高亮
-   */
-  clearAllHighlights() {
-    // 清除電源按鈕高亮
-    const powerSwitchArea = this.elements.get("powerSwitchArea");
-    if (powerSwitchArea) {
-      powerSwitchArea.classList.remove("next-step-highlight");
-    }
-
-    // 清除所有一般按鈕高亮
-    document.querySelectorAll(".button-overlay").forEach((btn) => {
-      btn.classList.remove(
-        "next-step-highlight",
-        "next-step-highlight-secondary",
-        "next-step-highlight-shift",
-      );
-    });
-
-    this.state.highlightedButtons.clear();
-    this._emit("all-highlights-cleared");
-  }
-
-  // ==========================================
-  // 視覺提示控制
-  // ==========================================
-
-  /**
-   * 啟用/停用視覺提示
-   * @param {boolean} enabled - 是否啟用
-   */
-  setVisualHintsEnabled(enabled) {
-    this.state.visualHintsEnabled = enabled;
-
-    if (enabled) {
-      document.body.classList.add("visual-hints-enabled");
-      this._emit("visual-hints-enabled");
-    } else {
-      document.body.classList.remove("visual-hints-enabled");
-      this.clearAllHighlights();
-      this._emit("visual-hints-disabled");
-    }
-
-    Logger.debug(`視覺提示已${enabled ? "啟用" : "停用"}`);
-  }
-
-  /**
-   * 取得視覺提示狀態
-   * @returns {boolean}
-   */
-  isVisualHintsEnabled() {
-    return this.state.visualHintsEnabled;
-  }
-
-  /**
-   * 根據 visualHintsToggle 狀態更新高亮可見性
-   */
-  updateHighlightVisibility() {
-    const toggle = this.elements.get("visualHintsToggle");
-    const showHighlight = toggle && toggle.checked;
-
-    if (!showHighlight) {
-      this.setVisualHintsEnabled(false);
-      return;
-    }
-
-    this.setVisualHintsEnabled(true);
-
-    // 發出事件讓外部模組處理具體的高亮邏輯
-    this._emit("highlight-visibility-updated", { enabled: showHighlight });
-  }
-
-  // ==========================================
-  // UI 元件更新
-  // ==========================================
-
-  /**
-   * 更新暫停指示器
-   * @param {boolean} isPaused - 是否暫停
-   */
-  updatePauseIndicator(isPaused) {
-    const indicator = this.elements.get("pauseIndicator");
-    if (!indicator) return;
-    // prefer class-based hiding; use show/hide helpers for consistency
-    try {
-      if (isPaused) this.showElement(indicator, "block");
-      else this.hideElement(indicator);
-    } catch (e) {}
-    indicator.textContent = isPaused ? "⏸ 暫停中" : "";
-
-    this._emit("pause-indicator-updated", { isPaused });
-  }
-
-  /**
-   * 更新計時器顯示
-   * @param {string} timeText - 時間文字（如 "00:05:32"）
-   */
-  updateTimerDisplay(timeText) {
-    const timer = this.elements.get("experimentTimer");
-    if (!timer) return;
-
-    timer.textContent = `花費時間：${timeText}`;
-    this._emit("timer-display-updated", { timeText });
-  }
-
-  /**
-   * 更新進度條
-   * @param {number} current - 目前進度
-   * @param {number} total - 總進度
-   */
-  updateProgressBar(current, total) {
-    const percentage = total > 0 ? (current / total) * 100 : 0;
-    const progressBar = document.querySelector(".experiment-progress-bar");
-
-    if (progressBar) {
-      progressBar.style.width = `${percentage}%`;
-      progressBar.textContent = `${current} / ${total}`;
-    }
-
-    this._emit("progress-bar-updated", { current, total, percentage });
-  }
-
-  /**
-   * 更新步驟指示器
-   * @param {number} currentStep - 目前步驟索引
-   * @param {number} totalSteps - 總步驟數
-   */
-  updateStepIndicator(currentStep, totalSteps) {
-    const indicator = document.querySelector(".step-indicator");
-    if (!indicator) return;
-
-    indicator.textContent = `步驟 ${currentStep + 1} / ${totalSteps}`;
-    this._emit("step-indicator-updated", { currentStep, totalSteps });
-  }
-
-  /**
-   * 更新單元指示器
-   * @param {number} currentUnit - 目前單元索引
-   * @param {number} totalUnits - 總單元數
-   * @param {string} unitName - 單元名稱
-   */
-  updateUnitIndicator(currentUnit, totalUnits, unitName = "") {
-    const indicator = document.querySelector(".unit-indicator");
-    if (!indicator) return;
-
-    const text = unitName
-      ? `單元 ${currentUnit + 1} / ${totalUnits}: ${unitName}`
-      : `單元 ${currentUnit + 1} / ${totalUnits}`;
-
-    indicator.textContent = text;
-    this._emit("unit-indicator-updated", { currentUnit, totalUnits, unitName });
-  }
-
-  // ==========================================
-  // 元件顯示/隱藏
-  // ==========================================
-
-  /**
-   * 顯示元素
-   * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
-   * @param {string} displayType - display 類型 (預設: 'block')
-   */
-  showElement(elementOrSelector, displayType = "block") {
-    const element = this._getElement(elementOrSelector);
-    if (!element) return;
-
-    // remove class-based hidden flag if present (preference for class-based control)
-    if (element.classList.contains("is-hidden")) {
-      element.classList.remove("is-hidden");
-    }
-
-    this.state.hiddenElements.delete(element);
-
-    this._emit("element-shown", { element, selector: elementOrSelector });
-  }
-
-  /**
-   * 隱藏元素
-   * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
-   */
-  hideElement(elementOrSelector) {
-    const element = this._getElement(elementOrSelector);
-    if (!element) return;
-
-    // prefer class-based hiding to allow stylesheet control
-    element.classList.add("is-hidden");
-
-    this.state.hiddenElements.add(element);
-
-    this._emit("element-hidden", { element, selector: elementOrSelector });
-  }
-
-  /**
-   * 切換元素顯示/隱藏
-   * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
-   * @param {string} displayType - display 類型 (預設: 'block')
-   */
-  toggleElement(elementOrSelector, displayType = "block") {
-    const element = this._getElement(elementOrSelector);
-    if (!element) return;
-
-    const isClassHidden = element.classList.contains("is-hidden");
-    if (isClassHidden) {
-      this.showElement(element, displayType);
-    } else {
-      this.hideElement(element);
-    }
-  }
-
-  /**
-   * 批次顯示元素
-   * @param {Array<string|HTMLElement>} elements - 元素列表
-   * @param {string} displayType - display 類型
-   */
-  showElements(elements, displayType = "block") {
-    elements.forEach((el) => this.showElement(el, displayType));
-  }
-
-  /**
-   * 批次隱藏元素
-   * @param {Array<string|HTMLElement>} elements - 元素列表
-   */
-  hideElements(elements) {
-    elements.forEach((el) => this.hideElement(el));
-  }
-
-  // ==========================================
-  // CSS 類別管理
-  // ==========================================
-
-  /**
-   * 新增 CSS class
-   * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
-   * @param {string|Array<string>} classNames - class 名稱（可以是陣列）
-   */
-  addClass(elementOrSelector, classNames) {
-    const element = this._getElement(elementOrSelector);
-    if (!element) return;
-
-    const classes = Array.isArray(classNames) ? classNames : [classNames];
-    element.classList.add(...classes);
-
-    this._emit("class-added", {
-      element,
-      selector: elementOrSelector,
-      classNames,
-    });
-  }
-
-  /**
-   * 移除 CSS class
-   * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
-   * @param {string|Array<string>} classNames - class 名稱（可以是陣列）
-   */
-  removeClass(elementOrSelector, classNames) {
-    const element = this._getElement(elementOrSelector);
-    if (!element) return;
-
-    const classes = Array.isArray(classNames) ? classNames : [classNames];
-    element.classList.remove(...classes);
-
-    this._emit("class-removed", {
-      element,
-      selector: elementOrSelector,
-      classNames,
-    });
-  }
-
-  /**
-   * 切換 CSS class
-   * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
-   * @param {string} className - class 名稱
-   * @param {boolean} force - 強制新增/移除
-   */
-  toggleClass(elementOrSelector, className, force = undefined) {
-    const element = this._getElement(elementOrSelector);
-    if (!element) return;
-
-    const result = element.classList.toggle(className, force);
-
-    this._emit("class-toggled", {
-      element,
-      selector: elementOrSelector,
-      className,
-      added: result,
-    });
-
-    return result;
-  }
-
-  /**
-   * 檢查是否有某個 class
-   * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
-   * @param {string} className - class 名稱
-   * @returns {boolean}
-   */
-  hasClass(elementOrSelector, className) {
-    const element = this._getElement(elementOrSelector);
-    return element ? element.classList.contains(className) : false;
-  }
-
-  // ==========================================
-  // 實驗面板控制
-  // ==========================================
-
-  /**
-   * 打開實驗面板
-   */
-  openExperimentPanel() {
-    const panel = this.elements.get("experimentPanel");
-    if (panel) {
-      this.showElement(panel, "block");
-      this._emit("experiment-panel-opened");
-    }
-  }
-
-  /**
-   * 關閉實驗面板
-   */
-  closeExperimentPanel() {
-    const panel = this.elements.get("experimentPanel");
-    if (panel) {
-      this.hideElement(panel);
-      this._emit("experiment-panel-closed");
-    }
-  }
-
-  // ==========================================
-  // 按鈕動畫和視覺回饋
-  // ==========================================
-
-  /**
-   * 顯示按鈕按下動畫
-   * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   */
-  showButtonPressAnimation(buttonOrSelector) {
-    const button = this._getElement(buttonOrSelector);
-    if (!button) return;
-
-    button.classList.add("button-pressed");
-
-    setTimeout(() => {
-      button.classList.remove("button-pressed");
-    }, this.config.highlightDuration);
-
-    this._emit("button-press-animation-shown", {
-      button,
-      selector: buttonOrSelector,
-    });
-  }
-
-  /**
-   * 閃爍按鈕（吸引注意）
-   * @param {string|HTMLElement} buttonOrSelector - 按鈕元素或選擇器
-   * @param {number} times - 閃爍次數
-   * @param {number} interval - 閃爍間隔 (ms)
-   */
-  blinkButton(buttonOrSelector, times = 3, interval = 500) {
-    const button = this._getElement(buttonOrSelector);
-    if (!button) return;
-
-    let count = 0;
-    const blinkInterval = setInterval(() => {
-      button.classList.toggle("button-blink");
-      count++;
-
-      if (count >= times * 2) {
-        clearInterval(blinkInterval);
-        button.classList.remove("button-blink");
-      }
-    }, interval);
-
-    this._emit("button-blink-started", {
-      button,
-      selector: buttonOrSelector,
-      times,
-    });
-  }
-
-  // ==========================================
-  // 輔助方法
-  // ==========================================
-
-  /**
-   * 取得 DOM 元素
-   * @param {string|HTMLElement} elementOrSelector - 元素或選擇器
-   * @returns {HTMLElement|null}
-   * @private
-   */
-  _getElement(elementOrSelector) {
-    if (elementOrSelector instanceof HTMLElement) {
-      return elementOrSelector;
-    }
-
-    if (typeof elementOrSelector === "string") {
-      return document.querySelector(elementOrSelector);
-    }
-
-    Logger.warn("無效的元素或選擇器:", elementOrSelector);
-    return null;
-  }
-
-  /**
-   * 發出事件
-   * @param {string} eventName - 事件名稱
-   * @param {Object} data - 事件數據
-   * @private
-   */
-  _emit(eventName, data = {}) {
-    const event = new CustomEvent(`ui-manager:${eventName}`, {
-      detail: data,
-      bubbles: true,
-    });
-    window.dispatchEvent(event);
-  }
-
-  // ==========================================
-  // 事件監聽器管理
-  // ==========================================
-
-  /**
-   * 監聽事件
-   * @param {string} eventName - 事件名稱
-   * @param {Function} handler - 事件處理器
-   */
-  on(eventName, handler) {
-    const fullEventName = `ui-manager:${eventName}`;
-    window.addEventListener(fullEventName, handler);
-
-    if (!this.listeners.has(eventName)) {
-      this.listeners.set(eventName, []);
-    }
-    this.listeners.get(eventName).push(handler);
-
-    return () => this.off(eventName, handler);
-  }
-
-  /**
-   * 取消監聽事件
-   * @param {string} eventName - 事件名稱
-   * @param {Function} handler - 事件處理器
-   */
-  off(eventName, handler) {
-    const fullEventName = `ui-manager:${eventName}`;
-    window.removeEventListener(fullEventName, handler);
-
-    if (this.listeners.has(eventName)) {
-      const handlers = this.listeners.get(eventName);
-      const index = handlers.indexOf(handler);
-      if (index > -1) {
-        handlers.splice(index, 1);
-      }
-    }
-  }
-
-  // ==========================================
-  // 清理方法
-  // ==========================================
-
-  /**
-   * 重置 UI 管理器
-   */
-  reset() {
-    // 清除所有高亮
-    this.clearAllHighlights();
-
-    // 重置狀態
-    this.state.highlightedButtons.clear();
-    this.state.lockedElements.clear();
-    this.state.hiddenElements.clear();
-
-    this._emit("ui-manager-reset");
-    Logger.debug("UI 管理器已重置");
-  }
-
-  /**
-   * 清理並銷毀 UI 管理器
-   */
-  destroy() {
-    // 移除所有事件監聽器
-    this.listeners.forEach((handlers, eventName) => {
-      handlers.forEach((handler) => {
-        this.off(eventName, handler);
-      });
-    });
-    this.listeners.clear();
-
-    // 清除快取
-    this.elements.clear();
-
-    // 重置狀態
-    this.reset();
-
-    // 清除依賴
-    this.dependencies.flowManager = null;
-
-    this.initialized = false;
-    this._emit("ui-manager-destroyed");
-    Logger.debug("UI 管理器已銷毀");
-  }
-
-  // ==========================================
-  // 通用 UI 元件渲染方法
-  // ==========================================
-
-  /**
-   * 渲染組合選擇器
-   * @param {HTMLElement|string} container - 容器元素或選擇器
-   * @param {Array} combinations - 組合資料陣列
-   * @param {Object} options - 可選配置
-   * @returns {HTMLElement} 渲染後的容器元素
-   */
-  renderCombinationSelector(container, combinations, options = {}) {
-    const containerEl =
-      typeof container === "string"
-        ? document.querySelector(container)
-        : container;
-    if (!containerEl) {
-      Logger.error("找不到容器元素:", container);
-      return null;
-    }
-    const renderNow = () => {
-      const config = {
-        showTitle: options.showTitle !== false,
-        title: options.title || "單元組合",
-        activeId: options.activeId || null,
-        onSelect: options.onSelect || null,
-        ...options,
-      };
-
-      // 如果容器是 ul 元素，直接在其中新增項目
-      if (containerEl.tagName === "UL") {
-        containerEl.innerHTML = combinations
-          .map(
-            (combo) => `
-        <li class="combination-item ${combo.id === config.activeId ? "active" : ""}"
-            data-combination-id="${combo.id}">
-          <div class="combo-name">${combo.name}</div>
-          <div class="combo-desc">${combo.description || ""}</div>
-        </li>
-      `,
-          )
-          .join("");
-      } else {
-        // 否則產生完整的 HTML
-        const html = `
-        <div class="combination-selector-section experiment-ui-card">
-          ${config.showTitle ? `<h3>${config.title}</h3>` : ""}
-          <ul class="experiment-default-list">
-            ${combinations
-              .map(
-                (combo) => `
-              <li class="combination-item ${combo.id === config.activeId ? "active" : ""}"
-                  data-combination-id="${combo.id}">
-                <div class="combo-name">${combo.name}</div>
-                <div class="combo-desc">${combo.description || ""}</div>
-              </li>
-            `,
-              )
-              .join("")}
-          </ul>
-        </div>
-      `;
-        containerEl.innerHTML = html;
-      }
-
-      // 記錄容器與標題使用情況，便於偵錯
-      Logger.debug("renderCombinationSelector: containerTag", {
-        tag: containerEl.tagName,
-        showTitle: config.showTitle,
-        title: config.title,
-      });
-
-      // 綁定點擊事件
-      if (config.onSelect) {
-        const items = containerEl.querySelectorAll(".combination-item");
-        items.forEach((item) => {
-          item.addEventListener("click", () => {
-            const comboId = item.dataset.combinationId;
-            // 移除所有 active class
-            items.forEach((i) => i.classList.remove("active"));
-            // 新增到點擊的項目
-            item.classList.add("active");
-            // 呼叫回調
-            config.onSelect(comboId);
-          });
-        });
-      }
-
-      Logger.debug("組合選擇器已渲染", { count: combinations.length });
-      return containerEl;
-    };
-
-    // 如果面板祖先被隱藏 (display:none)，延遲渲染直到可見
-    const panelAncestor = containerEl.closest(".experiment-panel");
-    if (
-      panelAncestor &&
-      window.getComputedStyle(panelAncestor).display === "none"
-    ) {
-      const mo = new MutationObserver((mutations, obs) => {
-        if (window.getComputedStyle(panelAncestor).display !== "none") {
-          obs.disconnect();
-          renderNow();
-        }
-      });
-      mo.observe(panelAncestor, {
-        attributes: true,
-        attributeFilter: ["style", "class"],
-      });
-      return containerEl;
-    }
-
-    return renderNow();
-  }
-
-  /**
-   * 更新組合選擇器的選中狀態
-   * @param {HTMLElement|string} container - 容器元素或選擇器
-   * @param {string} activeId - 要選中的組合ID
-   */
-  updateCombinationSelection(container, activeId) {
-    const containerEl =
-      typeof container === "string"
-        ? document.querySelector(container)
-        : container;
-    if (!containerEl) {
-      Logger.warn("找不到容器元素:", container);
-      return;
-    }
-
-    // 移除所有 active class
-    const items = containerEl.querySelectorAll(".combination-item");
-    items.forEach((item) => item.classList.remove("active"));
-
-    // 為指定的組合新增 active class
-    const activeItem = containerEl.querySelector(
-      `[data-combination-id="${activeId}"]`,
-    );
-    if (activeItem) {
-      activeItem.classList.add("active");
-    }
-
-    Logger.debug("組合選擇器選中狀態已更新", { activeId });
-  }
-
-  /**
-   * 渲染實驗單元面板
-   * @param {HTMLElement|string} container - 容器元素或選擇器
-   * @param {Array} units - 單元資料陣列
-   * @param {Array} unitIds - 要顯示的單元ID陣列（可選，用於過濾）
-   * @param {Object} options - 可選配置
-   * @returns {HTMLElement} 渲染後的容器元素
-   */
-  renderUnitsPanel(container, units, unitIds = null, options = {}) {
-    const containerEl =
-      typeof container === "string"
-        ? document.querySelector(container)
-        : container;
-    if (!containerEl) {
-      Logger.error("找不到容器元素:", container);
-      return null;
-    }
-
-    const renderNow = () => {
-      const config = {
-        showHeader: options.showHeader !== false,
-        headerTitle: options.headerTitle || "實驗單元",
-        showSelectAll: options.showSelectAll !== false,
-        showPowerOptions: options.showPowerOptions !== false,
-        includeStartup: options.includeStartup !== false,
-        includeShutdown: options.includeShutdown !== false,
-        enableSorting: options.enableSorting !== false,
-        onUnitToggle: options.onUnitToggle || null,
-        onReorder: options.onReorder || null,
-        ...options,
-      };
-
-      // 顯示所有單元，根據 unitIds 設定勾選狀態並套用組合排序
-      let displayUnits = units;
-      if (unitIds && Array.isArray(unitIds)) {
-        const allUnits = units.map((unit) => ({
-          ...unit,
-          checked: unitIds.includes(unit.unit_id || unit.id),
-        }));
-
-        // 依 unitIds 順序排列已選單元，未選的排在後面
-        const selectedInOrder = unitIds
-          .map((id) => allUnits.find((u) => (u.unit_id || u.id) === id))
-          .filter(Boolean);
-        const unselected = allUnits.filter(
-          (u) => !unitIds.includes(u.unit_id || u.id),
-        );
-        displayUnits = [...selectedInOrder, ...unselected];
-
-        Logger.debug("設定單元勾選狀態:", {
-          total: units.length,
-          preselected: unitIds.length,
-          unitIds,
-        });
-      } else {
-        displayUnits = units.map((unit) => ({
-          ...unit,
-          checked: false,
-        }));
-      }
-
-      const html = `
-      <div class="experiment-panel-units experiment-ui-card">
-        ${
-          config.showHeader
-            ? `
-          <div class="units-header">
-            <span>${config.headerTitle}</span>
-            ${
-              config.showSelectAll
-                ? `
-              <label class="select-all-checkbox">
-                <input type="checkbox" id="selectAllUnits" checked>
-                <span>全選</span>
-              </label>
-            `
-                : ""
-            }
-          </div>
-        `
-            : ""
-        }
-        <div class="units-list-container">
-          <ul class="experiment-units-list">
-            ${
-              config.showPowerOptions && config.includeStartup
-                ? `
-              <li class="power-option-card startup-card">
-                <label class="unit-checkbox">
-                  <input type="checkbox" id="includeStartup" checked disabled data-perma-disabled="true">
-                </label>
-                <div class="unit-sort">
-                  <div class="power-option-title">機器開機</div>
-                  <div class="power-option-subtitle">POWER_ON • 開始實驗前先開機</div>
-                </div>
-              </li>
-            `
-                : ""
-            }
-            ${displayUnits
-              .map(
-                (unit, index) => `
-              <li data-unit-id="${unit.unit_id || unit.id}">
-                <label class="unit-checkbox">
-                  <input type="checkbox" name="unitCheckbox" value="${unit.unit_id || unit.id}" ${unit.checked !== false ? "checked" : ""}>
-                </label>
-                <div class="unit-sort">
-                  <div class="unit-info-title">${unit.unit_name || unit.title || unit.name || "未命名單元"}</div>
-                  <div class="unit-info-subtitle">${unit.unit_id || unit.id} • ${unit.stepCount || unit.steps?.length || 0} 步驟</div>
-                </div>
-                ${
-                  config.enableSorting
-                    ? `
-                  <div class="unit-controls">
-                    <button class="unit-sort-btn unit-up-btn ${index === 0 ? "disabled" : ""}"
-                            title="上移" ${index === 0 ? "disabled" : ""}>▲</button>
-                    <button class="unit-sort-btn unit-down-btn ${index === displayUnits.length - 1 ? "disabled" : ""}"
-                            title="下移" ${index === displayUnits.length - 1 ? "disabled" : ""}>▼</button>
-                    <span class="unit-drag-handle" title="拖曳排序">⋮⋮</span>
-                  </div>
-                `
-                    : ""
-                }
-              </li>
-            `,
-              )
-              .join("")}
-            ${
-              config.showPowerOptions && config.includeShutdown
-                ? `
-              <li class="power-option-card shutdown-card">
-                <label class="unit-checkbox">
-                  <input type="checkbox" id="includeShutdown" checked disabled data-perma-disabled="true">
-                </label>
-                <div class="unit-sort">
-                  <div class="power-option-title">機器關機</div>
-                  <div class="power-option-subtitle">POWER_OFF • 完成關機才結束實驗</div>
-                </div>
-              </li>
-            `
-                : ""
-            }
-          </ul>
-        </div>
-      </div>
-    `;
-
-      containerEl.innerHTML = html;
-
-      // 綁定全選事件
-      if (config.showSelectAll) {
-        const selectAllCheckbox = containerEl.querySelector("#selectAllUnits");
-        if (selectAllCheckbox) {
-          selectAllCheckbox.addEventListener("change", (e) => {
-            const checkboxes = containerEl.querySelectorAll(
-              "input[name=\"unitCheckbox\"]",
-            );
-            checkboxes.forEach((cb) => (cb.checked = e.target.checked));
-            if (config.onUnitToggle) {
-              config.onUnitToggle({
-                type: "select-all",
-                checked: e.target.checked,
-              });
-            }
-          });
-        }
-      }
-
-      // 綁定單元切換事件
-      if (config.onUnitToggle) {
-        const checkboxes = containerEl.querySelectorAll(
-          "input[name=\"unitCheckbox\"]",
-        );
-        checkboxes.forEach((checkbox) => {
-          checkbox.addEventListener("change", (e) => {
-            config.onUnitToggle({
-              type: "unit",
-              unitId: e.target.value,
-              checked: e.target.checked,
-            });
-          });
-        });
-      }
-
-      // 綁定排序按鈕事件
-      if (config.enableSorting && config.onReorder) {
-        const upButtons = containerEl.querySelectorAll(".unit-up-btn");
-        const downButtons = containerEl.querySelectorAll(".unit-down-btn");
-
-        upButtons.forEach((btn) => {
-          btn.addEventListener("click", (e) => {
-            const li = e.target.closest("li");
-            const unitId = li.dataset.unitId;
-            // 交換順序
-            const unitList = containerEl.querySelector(
-              ".experiment-units-list",
-            );
-            const items = Array.from(
-              unitList.querySelectorAll("li[data-unit-id]"),
-            );
-            const currentIndex = items.findIndex(
-              (item) => item.dataset.unitId === unitId,
-            );
-            if (currentIndex > 0) {
-              // 交換 DOM
-              const temp = items[currentIndex];
-              items[currentIndex - 1].parentNode.insertBefore(
-                temp,
-                items[currentIndex - 1],
-              );
-              // 重新更新按鈕狀態
-              this._updateSortButtonStates(containerEl);
-              // 回調
-              config.onReorder({ unitId, direction: "up" });
-            }
-          });
-        });
-
-        downButtons.forEach((btn) => {
-          btn.addEventListener("click", (e) => {
-            const li = e.target.closest("li");
-            const unitId = li.dataset.unitId;
-            // 交換順序
-            const unitList = containerEl.querySelector(
-              ".experiment-units-list",
-            );
-            const items = Array.from(
-              unitList.querySelectorAll("li[data-unit-id]"),
-            );
-            const currentIndex = items.findIndex(
-              (item) => item.dataset.unitId === unitId,
-            );
-            if (currentIndex < items.length - 1) {
-              // 交換 DOM
-              const nextItem = items[currentIndex + 1];
-              li.parentNode.insertBefore(nextItem, li);
-              // 重新更新按鈕狀態
-              this._updateSortButtonStates(containerEl);
-              // 回調
-              config.onReorder({ unitId, direction: "down" });
-            }
-          });
-        });
-      }
-
-      // 綁定拖曳事件
-      if (config.enableSorting) {
-        this._setupUnitDragAndDrop(containerEl, config);
-      }
-
-      Logger.debug(
-        `【<cyan>排序追蹤</cyan>】<green>渲染完成</green> HTML順序[${displayUnits.map((u) => u.unit_id || u.id).join("→")}]`,
-        {
-          count: displayUnits.length,
-          displayOrder: displayUnits.map((u) => u.unit_id || u.id),
-        },
-      );
-      return containerEl;
-    };
-
-    const panelAncestor = containerEl.closest(".experiment-panel");
-    if (
-      panelAncestor &&
-      window.getComputedStyle(panelAncestor).display === "none"
-    ) {
-      const mo = new MutationObserver((mutations, obs) => {
-        if (window.getComputedStyle(panelAncestor).display !== "none") {
-          obs.disconnect();
-          renderNow();
-        }
-      });
-      mo.observe(panelAncestor, {
-        attributes: true,
-        attributeFilter: ["style", "class"],
-      });
-      return containerEl;
-    }
-
-    return renderNow();
-  }
-
-  /**
-   * 設定單元拖曳功能（使用原始的 mousemove + touchmove 方式）
-   * @private
-   */
-  _setupUnitDragAndDrop(containerEl, config) {
-    const unitList = containerEl.querySelector(".experiment-units-list");
-    if (!unitList) return;
-
-    let draggedLi = null;
-    let placeholder = null;
-
-    // 只對普通單元項目啟用拖曳，排除電源卡片
-    const handles = unitList.querySelectorAll(
-      "li:not(.power-option-card) .unit-drag-handle",
-    );
-
-    handles.forEach((handle) => {
-      handle.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        startDrag(handle, e.clientX, e.clientY);
-      });
-      handle.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        startDrag(handle, touch.clientX, touch.clientY);
-      });
-    });
-
-    const startDrag = (handle, startX, startY) => {
-      draggedLi = handle.closest("li");
-      if (!draggedLi) return;
-
-      placeholder = document.createElement("li");
-      placeholder.className = "drag-placeholder";
-      placeholder.style.height = `${draggedLi.offsetHeight}px`;
-
-      const originalStyle = draggedLi.style.cssText;
-      draggedLi.classList.add("dragging");
-      draggedLi.style.position = "fixed";
-      draggedLi.style.zIndex = "1000";
-      draggedLi.style.pointerEvents = "none";
-      draggedLi.style.width = `${draggedLi.offsetWidth}px`;
-      draggedLi.style.left = `${startX - draggedLi.offsetWidth / 2}px`;
-      draggedLi.style.top = `${startY - draggedLi.offsetHeight / 2}px`;
-      draggedLi.setAttribute("data-original-style", originalStyle);
-      draggedLi.parentNode.insertBefore(placeholder, draggedLi.nextSibling);
-      handle.classList.add("dragging-handle");
-
-      document.addEventListener("mousemove", onMouseDrag);
-      document.addEventListener("mouseup", onMouseDrop);
-      document.addEventListener("touchmove", onTouchDrag, { passive: false });
-      document.addEventListener("touchend", onTouchDrop);
-    };
-
-    const onMouseDrag = (e) => {
-      if (!draggedLi) return;
-      updateDragPosition(e.clientX, e.clientY);
-    };
-
-    const onTouchDrag = (e) => {
-      if (!draggedLi) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      updateDragPosition(touch.clientX, touch.clientY);
-    };
-
-    const updateDragPosition = (clientX, clientY) => {
-      draggedLi.style.left = `${clientX - draggedLi.offsetWidth / 2}px`;
-      draggedLi.style.top = `${clientY - draggedLi.offsetHeight / 2}px`;
-
-      // 只在普通單元項目之間進行排序，排除電源卡片
-      const items = Array.from(unitList.children).filter(
-        (item) => !item.classList.contains("power-option-card"),
-      );
-      let insertBefore = null;
-
-      for (let item of items) {
-        if (item === draggedLi || item === placeholder) continue;
-        const rect = item.getBoundingClientRect();
-        const itemCenterY = rect.top + rect.height / 2;
-        if (clientY < itemCenterY) {
-          insertBefore = item;
-          break;
-        }
-      }
-
-      // 確保插入位置在開機卡片之後，關機卡片之前
-      const startupCard = unitList.querySelector(".startup-card");
-      const shutdownCard = unitList.querySelector(".shutdown-card");
-
-      if (insertBefore) {
-        // 如果插入位置是開機卡片之前，則插入到開機卡片之後
-        if (insertBefore === startupCard) {
-          unitList.insertBefore(placeholder, startupCard.nextSibling);
-        } else {
-          unitList.insertBefore(placeholder, insertBefore);
-        }
-      } else {
-        // 如果沒有找到插入位置，插入到關機卡片之前
-        if (shutdownCard) {
-          unitList.insertBefore(placeholder, shutdownCard);
-        } else {
-          unitList.appendChild(placeholder);
-        }
-      }
-    };
-
-    const onMouseDrop = () => {
-      endDrag();
-    };
-
-    const onTouchDrop = () => {
-      endDrag();
-    };
-
-    const endDrag = () => {
-      if (!draggedLi || !placeholder) return;
-
-      document.removeEventListener("mousemove", onMouseDrag);
-      document.removeEventListener("mouseup", onMouseDrop);
-      document.removeEventListener("touchmove", onTouchDrag);
-      document.removeEventListener("touchend", onTouchDrop);
-
-      draggedLi.classList.remove("dragging");
-      const originalStyle = draggedLi.getAttribute("data-original-style") || "";
-      draggedLi.style.cssText = originalStyle;
-      draggedLi.removeAttribute("data-original-style");
-
-      placeholder.parentNode.insertBefore(draggedLi, placeholder);
-      placeholder.remove();
-
-      const handle = draggedLi.querySelector(".unit-drag-handle");
-      if (handle) handle.classList.remove("dragging-handle");
-
-      // 重新更新按鈕狀態
-      this._updateSortButtonStates(containerEl);
-
-      // 執行回調
-      if (config.onReorder) {
-        const allItems = Array.from(
-          unitList.querySelectorAll("li[data-unit-id]"),
-        );
-        const newIndex = allItems.indexOf(draggedLi);
-        config.onReorder({
-          unitId: draggedLi.dataset.unitId,
-          newIndex: newIndex,
-        });
-      }
-
-      draggedLi = null;
-      placeholder = null;
-    };
-
-    Logger.debug("單元拖曳功能已啟用");
-  }
-
-  /**
-   * 更新排序按鈕狀態
-   * @private
-   */
-  _updateSortButtonStates(containerEl) {
-    const unitList = containerEl.querySelector(".experiment-units-list");
-    if (!unitList) return;
-
-    const items = Array.from(unitList.querySelectorAll("li[data-unit-id]"));
-
-    items.forEach((item, index) => {
-      const upBtn = item.querySelector(".unit-up-btn");
-      const downBtn = item.querySelector(".unit-down-btn");
-
-      if (upBtn) {
-        if (index === 0) {
-          upBtn.classList.add("disabled");
-          upBtn.disabled = true;
-        } else {
-          upBtn.classList.remove("disabled");
-          upBtn.disabled = false;
-        }
-      }
-
-      if (downBtn) {
-        if (index === items.length - 1) {
-          downBtn.classList.add("disabled");
-          downBtn.disabled = true;
-        } else {
-          downBtn.classList.remove("disabled");
-          downBtn.disabled = false;
-        }
-      }
-    });
-  }
-
-  /**
-   * 渲染實驗控制面板
-   * @param {HTMLElement|string} container - 容器元素或選擇器
-   * @param {Object} options - 可選配置
-   * @returns {HTMLElement} 渲染後的容器元素
-   */
-  renderExperimentControls(container, options = {}) {
-    const containerEl =
-      typeof container === "string"
-        ? document.querySelector(container)
-        : container;
-    if (!containerEl) {
-      Logger.error("找不到容器元素:", container);
-      return null;
-    }
-
-    const renderNow = () => {
-      const config = {
-        showExperimentId: options.showExperimentId !== false,
-        showParticipantName: options.showParticipantName !== false,
-        showTimer: options.showTimer !== false,
-        experimentId: options.experimentId || "",
-        participantName: options.participantName || "",
-        onStart: options.onStart || null,
-        onPause: options.onPause || null,
-        onStop: options.onStop || null,
-        onRegenerateId: options.onRegenerateId || null,
-        ...options,
-      };
-
-      const html = `
-      <div class="experiment-panel-actions" id="experimentPanelActions">
-        <div class="input-section">
-          ${
-            config.showExperimentId
-              ? `
-            <div class="form-group">
-              <label for="experimentIdInput">實驗ID:</label>
-              <div class="experiment-id-group">
-                <input type="text" id="experimentIdInput" class="form-input"
-                       maxlength="10" placeholder="載入中..." value="${config.experimentId}">
-                <button id="regenerateIdButton" class="btn-secondary" title="重新產生實驗ID">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                       stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
-                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-                    <path d="M21 3v5h-5"></path>
-                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-                    <path d="M3 21v-5h5"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          `
-              : ""
-          }
-
-          ${
-            config.showParticipantName
-              ? `
-            <div class="form-group">
-              <label for="participantNameInput">受試者名稱:</label>
-              <input type="text" id="participantNameInput" class="form-input"
-                     placeholder="受試者名稱" value="${config.participantName}">
-            </div>
-          `
-              : ""
-          }
-
-          <div class="form-group experiment-control-group">
-            <div class="experiment-control-header">
-              <span class="experiment-control-title">實驗控制</span>
-              ${config.showTimer ? "<div id=\"experimentTimer\" class=\"experiment-timer\">00:00.000</div>" : ""}
-            </div>
-
-            <div id="experimentIdRow" class="experiment-start-row">
-              <button id="startExperimentBtn" class="experiment-start-btn btn-success">
-                ▶ 開始實驗
-              </button>
-            </div>
-
-            <div id="experimentControlButtons" class="experiment-control-buttons is-hidden">
-              <button id="pauseExperimentBtn" class="experiment-pause-btn btn-primary">
-                ⏸ 暫停
-              </button>
-              <button id="stopExperimentBtn" class="experiment-stop-btn btn-danger">
-                ⏹ 停止
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-      containerEl.innerHTML = html;
-
-      // 綁定事件
-      if (config.onStart) {
-        const startBtn = containerEl.querySelector("#startExperimentBtn");
-        if (startBtn) {
-          startBtn.addEventListener("click", () => {
-            // 隱藏開始按鈕，顯示控制按鈕
-            const startRow = containerEl.querySelector("#experimentIdRow");
-            const controlBtns = containerEl.querySelector(
-              "#experimentControlButtons",
-            );
-            if (startRow) {
-              this.hideElement(startRow);
-            }
-            if (controlBtns) {
-              this.showElement(controlBtns, "flex");
-            }
-
-            // 啟動計時器
-            if (config.showTimer) {
-              this.startExperimentTimer(
-                containerEl.querySelector("#experimentTimer"),
-              );
-            }
-
-            // 執行回調
-            config.onStart();
-          });
-        }
-      }
-
-      if (config.onPause) {
-        const pauseBtn = containerEl.querySelector("#pauseExperimentBtn");
-        if (pauseBtn) {
-          // 初始狀態由 _updateExperimentControlsForStarted 設定
-          // UI 與計時器狀態由 FlowManager 事件驅動（_updateExperimentControlsForPaused/Resumed）
-          pauseBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            const isPaused = pauseBtn.dataset.isPaused === "true";
-            if (!isPaused) {
-              config.onPause();
-            } else {
-              config.onResume?.();
-            }
-          });
-        }
-      }
-
-      if (config.onStop) {
-        const stopBtn = containerEl.querySelector("#stopExperimentBtn");
-        if (stopBtn) {
-          stopBtn.addEventListener("click", () => {
-            // 計時器停止由 FlowManager STOPPED 事件驅動（_handleFlowStopped → stopExperimentTimer）
-
-            // 重置暫停按鈕狀態
-            const pauseBtn = containerEl.querySelector("#pauseExperimentBtn");
-            if (pauseBtn) {
-              pauseBtn.textContent = "⏸ 暫停";
-              pauseBtn.classList.remove("btn-secondary");
-              pauseBtn.classList.add("btn-primary");
-              pauseBtn.dataset.isPaused = "false";
-            }
-
-            // 重置按鈕狀態
-            const startRow = containerEl.querySelector("#experimentIdRow");
-            const controlBtns = containerEl.querySelector(
-              "#experimentControlButtons",
-            );
-            if (startRow) {
-              this.showElement(startRow, "flex");
-            }
-            if (controlBtns) {
-              this.hideElement(controlBtns);
-            }
-
-            // 重置計時器顯示
-            if (config.showTimer) {
-              const timerEl = containerEl.querySelector("#experimentTimer");
-              if (timerEl) timerEl.textContent = "00:00.000";
-            }
-
-            // 執行回調
-            config.onStop();
-          });
-        }
-      }
-
-      if (config.onRegenerateId) {
-        const regenBtn = containerEl.querySelector("#regenerateIdButton");
-        if (regenBtn) {
-          regenBtn.addEventListener("click", config.onRegenerateId);
-        }
-      }
-
-      Logger.debug("實驗控制面板已渲染");
-      return containerEl;
-    };
-
-    const panelAncestor = containerEl.closest(".experiment-panel");
-    if (
-      panelAncestor &&
-      window.getComputedStyle(panelAncestor).display === "none"
-    ) {
-      const mo = new MutationObserver((mutations, obs) => {
-        if (window.getComputedStyle(panelAncestor).display !== "none") {
-          obs.disconnect();
-          renderNow();
-        }
-      });
-      mo.observe(panelAncestor, {
-        attributes: true,
-        attributeFilter: ["style", "class"],
-      });
-      return containerEl;
-    }
-
-    return renderNow();
-  }
-
-  /**
-   * 啟動實驗計時器（委派給 experimentTimerManager）
-   */
   startExperimentTimer() {
     this.timerManager.startExperimentTimer();
     Logger.debug("實驗計時器已啟動");
   }
 
-  /**
-   * 暫停實驗計時器（委派給 experimentTimerManager）
-   * @returns {boolean} 是否成功暫停
-   */
   pauseExperimentTimer() {
     const etm = this.timerManager;
-    if (!etm.experimentStartTime) {
-      Logger.warn("計時器未在執行中");
-      return false;
-    }
-    if (etm.experimentPaused) {
-      Logger.warn("計時器已處於暫停狀態");
-      return false;
-    }
+    if (!etm.experimentStartTime) { Logger.warn("計時器未在執行中"); return false; }
+    if (etm.experimentPaused) { Logger.warn("計時器已處於暫停狀態"); return false; }
     etm.pauseExperimentTimer();
     Logger.debug("實驗計時器已暫停");
     return true;
   }
 
-  /**
-   * 恢復實驗計時器（委派給 experimentTimerManager）
-   * @returns {boolean} 是否成功恢復
-   */
   resumeExperimentTimer() {
     const etm = this.timerManager;
-    if (!etm.experimentStartTime) {
-      Logger.warn("計時器未在執行中");
-      return false;
-    }
-    if (!etm.experimentPaused) {
-      Logger.warn("計時器未在暫停狀態");
-      return false;
-    }
+    if (!etm.experimentStartTime) { Logger.warn("計時器未在執行中"); return false; }
+    if (!etm.experimentPaused) { Logger.warn("計時器未在暫停狀態"); return false; }
     etm.resumeExperimentTimer();
-    Logger.debug("實驗計時器已恢復");
+    Logger.debug("實驗計時器已繼續");
     return true;
   }
 
-  /**
-   * 停止實驗計時器（委派給 experimentTimerManager）
-   */
   stopExperimentTimer() {
     this.timerManager.stopExperimentTimer();
     Logger.debug("實驗計時器已停止");
   }
 
-  /**
-   * 取得計時器目前時間（毫秒，委派給 experimentTimerManager）
-   * @returns {number} 經過的毫秒數
-   */
   getElapsedTime() {
     return this.timerManager.getExperimentElapsedMs();
   }
 
+  // ==========================================
+  // Panel UI 初始化
+  // ==========================================
+
   /**
-  * 初始化 Panel 頁面的 UI 元件
-  * 只渲染系統管理器未處理的元件（如實驗日誌）
+   * 初始化 Panel 頁面的 UI 元件（組合選擇器等由 ExperimentSystemManager 處理）
    */
   async initializePanelUI() {
-    try {
-      // 防止重複初始化
-      if (this.state.panelUIInitialized) {
-        Logger.debug("Panel UI 已經初始化，跳過重複初始化");
-        return;
-      }
-
-      Logger.debug("開始初始化 Panel UI 元件");
-
-      // 注意：組合選擇器、單元面板和實驗控制由 ExperimentSystemManager.initializeUI() 處理
-      // 實驗日誌面板由 board-log-ui.js 的 ExperimentLogUI 負責初始化
-
-      Logger.debug("Panel UI 元件初始化完成");
-
-      // 標記為已初始化
-      this.state.panelUIInitialized = true;
-    } catch (error) {
-      Logger.error("初始化 Panel UI 失敗:", error);
-    }
+    if (this.state.panelUIInitialized) return;
+    this.state.panelUIInitialized = true;
   }
 
-  /**
-   * 處理實驗開始
-   * @private
-   */
+  // ==========================================
+  // 流程事件處理
+  // ==========================================
+
+  /** @private */
   _handleExperimentStart() {
     Logger.debug("開始實驗");
-
     const panelUIManager = this.dependencies.panelUIManager;
-
-    // 關閉所有面板（實驗、日誌、設定）
     if (panelUIManager) {
       panelUIManager.closePanel("experiment");
       panelUIManager.closePanel("logger");
       panelUIManager.closePanel("settings");
       Logger.debug("實驗開始：已關閉所有面板");
     }
-
-    // 按鈕高亮為 Panel 專屬功能：僅在有 visualHintsToggle 元素時才執行
     const toggle = this.elements.get("visualHintsToggle");
     if (toggle && this.isVisualHintsEnabled()) {
       this.updateHighlightVisibility();
@@ -1901,144 +264,98 @@ class ExperimentUIManager {
     }
   }
 
+  // ==========================================
+  // 實驗 ID 重新產生與廣播
+  // ==========================================
 
-  /**
-   * 處理重新產生ID
-   * @private
-   */
+  /** @private */
   async _handleRegenerateId() {
-    Logger.debug("重新產生實驗ID");
-
+    Logger.debug("重新產生實驗 ID");
     try {
-      // 檢查是否在同步模式，並選擇適當的產生方法
-      const hubManager = this.dependencies.hubManager;
-      let newId;
-      // 即使 hubManager 不存在，也允許在本機產生 ID（離線模式）
-      if (hubManager && hubManager.isInSyncMode && hubManager.isInSyncMode()) {
-        // 同步模式：使用中樞註冊邏輯
-        Logger.debug("同步模式：產生新ID並註冊到中樞");
-        newId = await this._generateExperimentIdWithHub();
-      } else {
-        // 獨立模式：直接產生新ID
-        Logger.debug("獨立/離線模式：直接產生新ID");
-        newId = this._generateExperimentId();
-      }
-
-      // 檢查產生的ID是否有效
-      if (!newId || typeof newId !== "string" || newId.trim().length === 0) {
-        Logger.error("重新產生實驗ID失敗：產生的ID無效或為空", {
-          generatedId: newId,
-        });
+      const sys = this.dependencies.experimentSystemManager;
+      if (sys?.regenerateExperimentId) {
+        await sys.regenerateExperimentId();
         return;
       }
 
-      Logger.debug("已成功重新產生實驗ID:", newId);
-
-      // 更新UI中的輸入框
+      const newId = this._generateExperimentId();
+      if (!newId || typeof newId !== "string" || newId.trim().length === 0) {
+        Logger.error("重新產生實驗 ID 失敗：產生的 ID 無效或為空", { generatedId: newId });
+        return;
+      }
+      Logger.debug("已成功重新產生實驗 ID:", newId);
       const idInput = document.querySelector("#experimentIdInput");
       if (idInput) {
         idInput.value = newId;
-        Logger.debug("已更新UI中的實驗ID輸入框為:", newId);
       } else {
-        Logger.warn("找不到實驗ID輸入框元素");
+        Logger.warn("找不到實驗 ID 輸入框元素");
       }
-
-      // 廣播ID更新到其他連線裝置
       this._broadcastExperimentIdUpdate(newId);
-
-      // 觸發組合管理器的同步（如果需要）
       const combinationManager = this.dependencies.combinationManager;
-      if (combinationManager?.handleExperimentIdChanged) {
-        // 通知組合管理器實驗ID已更改，可能需要重新同步
-        combinationManager.handleExperimentIdChanged(newId);
-      }
+      combinationManager?.handleExperimentIdChanged?.(newId);
     } catch (error) {
       Logger.error("重新產生實驗ID失敗:", error);
     }
   }
 
-  /**
-   * 產生新的實驗ID（獨立模式）
-   * @private
-   * @returns {string} 新產生的實驗ID
-   */
+  /** @private */
   _generateExperimentId() {
-    // 優先使用 ExperimentHubManager（若存在），否則使用 random-utils 產生器
-    const hubManager = this.dependencies.hubManager;
-    if (hubManager?.generateExperimentId) {
-      return hubManager.generateExperimentId();
-    }
-
-    return generateExperimentId();
+    const hub = this.dependencies.hubManager;
+    return hub?.generateExperimentId ? hub.generateExperimentId() : generateExperimentId();
   }
 
-  /**
-   * 產生新的實驗ID並在同步模式下註冊到中樞
-   * @private
-   * @returns {Promise<string>} 新產生的實驗ID
-   */
-  async _generateExperimentIdWithHub() {
-    try {
-      Logger.debug("產生新的實驗ID...");
-
-      // 產生新的實驗ID
-      const newId = this._generateExperimentId();
-
-      // 檢查是否在同步模式
-      const hubManager = this.dependencies.hubManager;
-      if (hubManager?.isInSyncMode?.()) {
-        Logger.debug(`同步模式: 註冊新ID到中樞: ${newId}`);
-        // 在同步模式下，experimentHubManager.generateExperimentId() 應該已經處理了註冊
-      } else {
-        Logger.debug(`獨立模式: 新ID僅存本機: ${newId}`);
-      }
-
-      return newId;
-    } catch (error) {
-      Logger.error("產生新實驗ID失敗:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 廣播實驗ID更新到其他連線裝置
-   * @private
-   * @param {string} experimentId - 新的實驗ID
-   */
+  /** @private */
   _broadcastExperimentIdUpdate(experimentId) {
     const syncManager = this.dependencies.syncManager;
-    const syncClient =
-      this.dependencies.syncClient || syncManager?.core?.syncClient;
-    const experimentSyncCore = this.dependencies.experimentSyncCore;
+    if (!syncManager?.core?.isConnected?.()) return;
 
-    // 檢查是否存在同步工作階段
-    if (!syncManager?.core?.isConnected?.()) {
-      return;
-    }
+    const syncClient = this.dependencies.syncClient || syncManager?.core?.syncClient;
+    const experimentSyncCore = this.dependencies.experimentSyncCore;
 
     const updateData = {
       type: SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
       clientId: syncClient?.clientId || "experiment_panel",
       timestamp: Date.now(),
-      experimentId: experimentId,
+      experimentId,
     };
 
-    // 使用統一的同步機制
-    experimentSyncCore?.safeBroadcast?.(updateData).catch((error) => {
-      Logger.warn("同步實驗ID更新失敗:", error);
+    experimentSyncCore?.safeBroadcast?.(updateData).catch((err) => {
+      Logger.warn("同步實驗 ID 更新失敗:", err);
     });
 
-    // 分派事件供本機同步管理器捕獲
     document.dispatchEvent(
-      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, {
-        detail: updateData,
-      }),
+      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, { detail: updateData }),
     );
 
-    Logger.debug("已廣播實驗ID更新:", experimentId);
+    Logger.debug("已廣播實驗 ID 更新:", experimentId);
+  }
+
+  // ==========================================
+  // 清理
+  // ==========================================
+
+  reset() {
+    this.clearAllHighlights();
+    this.state.highlightedButtons.clear();
+    this.state.lockedElements.clear();
+    this.state.hiddenElements.clear();
+    this._emit("ui-manager-reset");
+    Logger.debug("UI 管理器已重置");
+  }
+
+  destroy() {
+    this.listeners.forEach((handlers, eventName) => {
+      handlers.forEach((handler) => this.off(eventName, handler));
+    });
+    this.listeners.clear();
+    this.elements.clear();
+    this.reset();
+    this.dependencies.flowManager = null;
+    this.initialized = false;
+    this._emit("ui-manager-destroyed");
+    Logger.debug("UI 管理器已銷毀");
   }
 }
 
-// ES6 模組匯出
 export default ExperimentUIManager;
 export { ExperimentUIManager };

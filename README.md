@@ -55,6 +55,16 @@ panel/
 
 ## 更新日誌
 
+#### v2.5.2ec0f36 - 系統架構整理與實驗流程修正
+
+- 同步系統與實驗系統全面補齊 `Logger` import，消除執行期 ReferenceError
+- 建立 `EventEmitter` 基底類（`js/core/event-emitter.js`），四個實驗 Manager 共用事件系統，移除約 200 行重複程式碼
+- 修正 `ExperimentCombinationManager` 跨模組耦合：改由 `panel-init.js` 直接接線，移除 `document.dispatchEvent` 繞道設計
+- 實驗開始時第一個手勢步驟卡片現在正確套用高亮邊框（統一改由 `STARTED` 事件驅動，移除搶先執行的 `activateGestureStep(0)`）
+- 實驗結束後手勢序列自動重置並捲回頂端（新增 `resetGestureSequence()`，統一三處呼叫點）
+- `experiment-state-manager` 防禦性 Logger 語法統一為直接呼叫
+- 移除文件中已刪除模組 `sync-session-store.js` 的殘留記錄
+
 #### v2.5.56abddf - 紀錄與同步流程整理
 
 - `record` 命名已全面對齊前端、後端、樣式與文件，移除舊版相容層與過時模組名
@@ -67,7 +77,7 @@ panel/
 - 統一 bootstrap 載入與版本化資源處理，入口頁改由共同初始化流程管理
 - 動作完成 / 進入事件分離，board 與 panel 的同步責任更清楚，起始步驟可正確進入
 - 關閉目前工作階段與 panel 本機關機分流，避免自動結束實驗帶到 board 端
-- 日誌載入改為延後刷新與分批讀取，並補強複製即時日誌與完成樣式
+- 日誌載入改為延後更新與分批讀取，並補強複製即時日誌與完成樣式
 
 #### v2.3.f366c7b - 同步與模組化更新
 

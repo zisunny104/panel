@@ -11,6 +11,8 @@ class IndicatorManager {
     this.statusContainer = null;
     this.getStatus = () => "idle";
     this.getStatusText = (status) => status;
+    this.maxStatusMessages = 100;
+    this.pendingStatusQueue = [];
     this._initContainers();
   }
 
@@ -37,6 +39,7 @@ class IndicatorManager {
     if (!this.statusContainer || !panelContent) return;
     // 確保移到正確的父元素下
     panelContent.appendChild(this.statusContainer);
+    this._flushPendingStatuses();
     Logger.debug("IndicatorManager: statusContainer 已掛載至面板");
   }
 
@@ -85,13 +88,35 @@ class IndicatorManager {
    * 顯示短暫狀態訊息（toast）
    * type: 'success' | 'error' | 'info' | 'warning'
    */
-  showStatus(type, message, timeout = 4000) {
+  showStatus(type, message, _timeout = 4000) {
     if (!message || !this.statusContainer) return;
 
-    // 若尚未掛載到 DOM，暫時附加到 body 作為備援
+    // 若尚未掛載到面板，先暫存，避免訊息直接跳到畫面上。
     if (!this.statusContainer.parentNode) {
-      document.body.appendChild(this.statusContainer);
+      this.pendingStatusQueue.push({ type, message });
+      const overflow = this.pendingStatusQueue.length - this.maxStatusMessages;
+      if (overflow > 0) {
+        this.pendingStatusQueue.splice(0, overflow);
+      }
+      return;
     }
+
+    this._appendStatusMessage(type, message);
+  }
+
+  _flushPendingStatuses() {
+    if (!this.statusContainer?.parentNode || this.pendingStatusQueue.length === 0) {
+      return;
+    }
+
+    const queued = this.pendingStatusQueue.splice(0, this.pendingStatusQueue.length);
+    queued.forEach(({ type, message }) => {
+      this._appendStatusMessage(type, message);
+    });
+  }
+
+  _appendStatusMessage(type, message) {
+    if (!message || !this.statusContainer) return;
 
     const now = new Date();
     const ts =
@@ -106,13 +131,24 @@ class IndicatorManager {
     msg.innerHTML = `<span class="indicator-status-time">${ts}</span> ${this._escapeHtml(message)}`;
     this.statusContainer.appendChild(msg);
 
+    // 讓最新訊息維持在可視區底部
+    requestAnimationFrame(() => {
+      this.statusContainer.scrollTop = this.statusContainer.scrollHeight;
+    });
+
     // screen-reader friendly
     msg.setAttribute("role", "status");
 
-    setTimeout(() => {
-      msg.classList.add("fade-out");
-      setTimeout(() => msg.remove(), 300);
-    }, timeout);
+    // 保留訊息作為可捲動的歷史紀錄，不自動移除。
+    // 只在超過上限時，移除最舊的訊息以避免無限制成長。
+    const overflow = this.statusContainer.children.length - this.maxStatusMessages;
+    if (overflow > 0) {
+      for (let i = 0; i < overflow; i += 1) {
+        const firstChild = this.statusContainer.firstElementChild;
+        if (!firstChild) break;
+        firstChild.remove();
+      }
+    }
   }
 
   /** 防止 XSS */

@@ -11,6 +11,7 @@
  *   getGesturesData → () => Object  手勢資料字典
  *   getCombination  → () => Object  目前組合
  *   syncLogsNow     → () => void    立即儲存日誌的回呼（可選）
+ *   onRecordsSyncedRefresh → ({ reason, data }) => void 廣播刷新前的額外 UI 收尾（可選）
  */
 
 import { RECORD_TYPE_LABELS, RECORD_TYPES } from "../constants/index.js";
@@ -29,6 +30,8 @@ class RecordView {
     this.getGesturesData = null;
     this.getCombination = null;
     this.syncLogsNow = null;
+    this.onRecordsSyncedRefresh = null;
+    this._syncNowInProgress = false;
 
     this._isLoadingList = false;
     this._lastLoadAt = 0;
@@ -63,6 +66,7 @@ class RecordView {
    * @param {Function} [deps.getGesturesData] - `() => Object` 取得手勢資料字典
    * @param {Function} [deps.getCombination]  - `() => Object` 取得目前組合
    * @param {Function} [deps.syncLogsNow]     - `() => void` 立即儲存日誌的回呼
+   * @param {Function} [deps.onRecordsSyncedRefresh] - `({ reason, data }) => void` 刷新前 UI 收尾回呼
    */
   updateDependencies(deps = {}) {
     Object.assign(this, deps);
@@ -382,15 +386,13 @@ class RecordView {
     const container = document.getElementById("recordContainer");
     if (!container) return;
 
-    container.addEventListener("click", (event) => {
+    container.addEventListener("click", async (event) => {
       const target = event.target.closest("[data-action]");
       if (!target) return;
       const action = target.dataset.action;
 
       if (action === "sync-now") {
-        // 優先使用注入的回呼；否則直接呼叫 recordManager
-        if (this.syncLogsNow) this.syncLogsNow();
-        else this.recordManager?.flushAll?.();
+        await this._handleSyncNow();
         return;
       }
       if (action === "copy-current-records") {
@@ -399,6 +401,33 @@ class RecordView {
     });
 
     this._currentRecordActionsBound = true;
+  }
+
+  async _handleSyncNow() {
+    if (this._syncNowInProgress) return;
+
+    const btn = document.getElementById("syncRecordsNowBtn");
+    this._syncNowInProgress = true;
+
+    if (btn) {
+      btn.disabled = true;
+      btn.dataset.syncing = "true";
+      btn.title = "同步中...";
+    }
+
+    try {
+      if (this.syncLogsNow) {
+        await this.syncLogsNow();
+      } else {
+        await this.recordManager?.flushAll?.();
+      }
+    } finally {
+      this._syncNowInProgress = false;
+      if (btn) {
+        btn.dataset.syncing = "false";
+        this.updateSyncButtonState("enabled", this.recordManager?.records?.length || 0);
+      }
+    }
   }
 
   _bindRecordListActions() {
@@ -483,7 +512,7 @@ class RecordView {
   }
 
   /**
-   * 請求刷新日誌列表，支援立即執行或防抖延後執行
+   * 請求更新日誌列表，支援立即執行或防抖延後執行
    * @param {Object}  [options]
    * @param {boolean} [options.immediate=false] - 是否立即執行（跳過防抖）
    * @param {string}  [options.reason]          - 觸發原因（用於 debug log）
@@ -499,6 +528,10 @@ class RecordView {
         this._refreshQueued = true;
         this._refreshQueuedImmediate = true;
         return;
+      }
+
+      if (reason === "broadcast_records_synced") {
+        this.onRecordsSyncedRefresh?.({ reason, data: null });
       }
 
       this._hasRequestedInitialLoad = true;
@@ -519,7 +552,10 @@ class RecordView {
       this._hasRequestedInitialLoad = true;
       this._refreshQueued = false;
       this._refreshQueuedImmediate = false;
-      Logger.debug(`[RecordView] 觸發延後刷新 (${reason})`);
+      if (reason === "broadcast_records_synced") {
+        this.onRecordsSyncedRefresh?.({ reason, data: null });
+      }
+      Logger.debug(`[RecordView] 觸發延後更新 (${reason})`);
       this.loadRecordList();
     }, this._loadDebounceMs);
   }
@@ -893,7 +929,7 @@ class RecordView {
         }
       };
     } catch (error) {
-      Logger.warn("[RecordView] BroadcastChannel 不支援，日誌列表需要手動刷新:", error);
+      Logger.warn("[RecordView] BroadcastChannel 不支援，日誌列表需要手動更新:", error);
     }
   }
 

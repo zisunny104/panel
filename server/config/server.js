@@ -123,3 +123,23 @@ export function getValidCreateCode() {
   const config = businessConfig || loadBusinessConfigSync();
   return config.multiScreenSync?.validCreateCode || "113151006";
 }
+
+export function getSyncEnableFlag() {
+  const config = businessConfig || loadBusinessConfigSync();
+  return config.multiScreenSync?.enableSync !== false;
+}
+
+export function getSyncMaxClients() {
+  const config = businessConfig || loadBusinessConfigSync();
+  const configValue = Number(config.multiScreenSync?.maxClients);
+  if (Number.isInteger(configValue) && configValue > 0) {
+    return configValue;
+  }
+  return SERVER_CONFIG.session.maxClients;
+}
+
+export function getValidCreateCodeDescription() {
+  const config = businessConfig || loadBusinessConfigSync();
+  const description = config.multiScreenSync?.validCreateCodeDescription;
+  return typeof description === "string" ? description : "";
+}

@@ -55,12 +55,12 @@ export const createBoardGestureUtils = function (deps) {
       if (currentIdx !== null && currentIdx !== idx) {
         const currentState = timerManager.timerStates?.[currentIdx];
         if (currentState?.running) {
-          timerManager.toggleIndexedTimer(currentIdx);
+            timerManager.toggleIndexedTimer(currentIdx, { logPause: false });
         }
       }
       const nextState = timerManager.timerStates?.[idx];
       if (!nextState?.running) {
-        timerManager.toggleIndexedTimer(idx);
+          timerManager.toggleIndexedTimer(idx, { logPause: false });
       }
     }
   };
@@ -177,14 +177,14 @@ export const createBoardGestureUtils = function (deps) {
         }
       };
 
-      // 最後一步完成後，不論日誌是否 flush 成功，都要回到實驗控制區。
+      // 最後一步完成後，回到實驗控制區。
       setTimeout(scrollToExperimentControls, 300);
 
       if (recordManager) {
         recordManager
-          .flushAll()
+          .flushPendingLogs()
           .then(() => {
-            Logger.info("所有日誌已發送完成");
+            Logger.info("手勢步驟日誌已同步 flush");
           })
           .catch((error) => {
             Logger.error("日誌發送失敗", error);
@@ -193,5 +193,17 @@ export const createBoardGestureUtils = function (deps) {
     }
   };
 
-  return { activateGestureStep, markGesture, goToNextStep };
+  const resetGestureSequence = function () {
+    document.querySelectorAll("[id^='gesture-card-']").forEach((card) => {
+      card.classList.remove("gesture-card-active", "gesture-card-current");
+      card.classList.add("gesture-card-inactive");
+    });
+
+    const rightPanel = document.querySelector(".right-panel");
+    if (rightPanel) {
+      rightPanel.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  return { activateGestureStep, markGesture, goToNextStep, resetGestureSequence };
 };

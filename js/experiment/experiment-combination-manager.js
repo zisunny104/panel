@@ -4,19 +4,18 @@
 * 負責組合載入、隨機化、快取與同步處理。
 */
 
-import { SYNC_DATA_TYPES } from "../constants/index.js";
+import {
+  SYNC_DATA_TYPES,
+  EXPERIMENT_COMBINATION_EVENTS,
+} from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
+import { EventEmitter } from "../core/event-emitter.js";
 import { getSharedConfig } from "../core/config.js";
 import { createSeededRandom, shuffleArray } from "../core/random-utils.js";
 
-export const ExperimentCombinationManager = class ExperimentCombinationManager {
+export const ExperimentCombinationManager = class ExperimentCombinationManager extends EventEmitter {
   static activeInstance = null;
-  static EVENT = {
-    COMBINATION_LOADED: "combination:loaded",
-    COMBINATION_SELECTED: "combination:selected",
-    COMBINATION_CHANGED: "combination:changed",
-    UNITS_RANDOMIZED: "combination:units_randomized",
-    ERROR: "combination:error",
-  };
+  static EVENT = EXPERIMENT_COMBINATION_EVENTS;
 
   /**
    * 取得目前的組合（靜態便捷方法）
@@ -26,6 +25,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
   }
 
   constructor(config = {}) {
+    super();
     this.config = {
       dataPath: config.dataPath || "data/scenarios.json",
       defaultCombinationId:
@@ -41,8 +41,8 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
     this.loadedUnits = [];
     this.isInitialized = false;
     this.readyPromise = null; // Promise to wait for initialization
-    this.eventListeners = new Map();
     this._selectionSignature = null;
+    this._comboSignatureCache = null;
     this.dependencies = {
       hubManager: null,
       syncManager: null,
@@ -53,7 +53,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
     ExperimentCombinationManager.activeInstance = this;
 
     // 不在 constructor 中自動初始化，由外部明確呼叫 initialize() 或 ready()
-    // 這樣可以確保事件監聽器在初始化前就已設置好
+    // 這樣可以確保事件監聽器在初始化前就已設定好
   }
 
   updateDependencies(deps = {}) {
@@ -338,7 +338,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
   }
 
   /**
-  * 使用種子洗牌陣列（依賴 random-utils）
+  * 使用種子洗牌陣列（使用 random-utils）
    */
   shuffleWithSeed(array, seed) {
     const seededRandom = createSeededRandom(seed);
@@ -448,6 +448,118 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
     Logger.debug("組合快取已清除");
   }
 
+  // ==================== 組合比對與自訂選擇 ====================
+
+  /** 取得目前載入的單元 ID 陣列（複本） */
+  getCurrentUnitIds() {
+    return [...this.loadedUnits];
+  }
+
+  /** 標準化電源選項（缺省值 true） */
+  normalizePowerOptions(options = {}) {
+    return {
+      includeStartup: options.includeStartup ?? true,
+      includeShutdown: options.includeShutdown ?? true,
+    };
+  }
+
+  isSamePowerOptions(a = {}, b = {}) {
+    return a.includeStartup === b.includeStartup && a.includeShutdown === b.includeShutdown;
+  }
+
+  isSameUnitOrder(a = [], b = []) {
+    if (a.length !== b.length) return false;
+    return a.every((id, i) => id === b[i]);
+  }
+
+  getUnitSignature(unitIds = []) {
+    return Array.isArray(unitIds) ? unitIds.join("|") : "";
+  }
+
+  /** 建立 signature → combination 快取 Map（按 experimentId 失效） */
+  getComboSignatureMap(experimentId) {
+    const combos = this.getAvailableCombinations();
+    const comboKey = combos.map((c) => c.combinationId).join("|");
+    if (
+      this._comboSignatureCache?.experimentId === experimentId &&
+      this._comboSignatureCache?.comboKey === comboKey
+    ) {
+      return this._comboSignatureCache.map;
+    }
+
+    const map = new Map();
+    combos.forEach((combo) => {
+      const ids = this.getCombinationUnitIds(combo, experimentId) || [];
+      if (ids.length) map.set(this.getUnitSignature(ids), combo);
+    });
+    this._comboSignatureCache = { experimentId, comboKey, map };
+    return map;
+  }
+
+  /** 根據單元 ID 序列找出匹配的預設組合，找不到回傳 null */
+  findMatchingCombination(unitIds = [], experimentId = null) {
+    const sig = this.getUnitSignature(unitIds);
+    if (!sig) return null;
+    return this.getComboSignatureMap(experimentId).get(sig) || null;
+  }
+
+  /** 建立自訂組合物件（不修改任何狀態） */
+  buildCustomCombination(unitIds, baseCombination = null, powerOptions = null) {
+    return {
+      combinationId: "custom",
+      combinationName: "自訂組合",
+      description: "根據選擇和排序產生的自訂組合",
+      units: [...unitIds],
+      is_randomizable: false,
+      baseCombinationId: baseCombination?.combinationId || null,
+      baseCombinationName: baseCombination?.combinationName || null,
+      powerOptions: this.normalizePowerOptions(powerOptions || {}),
+      source: "custom_order",
+    };
+  }
+
+  /**
+   * 根據使用者選取的單元 ID 陣列設定組合（比對預設組合或建立自訂組合）。
+   * @param {string[]} unitIds - 已選取且排序後的單元 ID
+   * @param {Object} options
+   * @param {string}  options.experimentId    - 目前實驗 ID（供隨機化種子使用）
+   * @param {Object}  options.powerOptions    - 電源選項（可選，缺省從 currentCombination 讀取）
+   * @param {boolean} options.forceBroadcast  - 即使順序未變也強制廣播
+   * @param {boolean} options.skipBroadcast   - 跳過廣播
+   * @returns {boolean}
+   */
+  applyCustomSelection(unitIds = [], options = {}) {
+    if (!Array.isArray(unitIds) || unitIds.length === 0) {
+      Logger.warn("忽略空白單元選擇，保留目前單元列表");
+      return false;
+    }
+
+    const powerOptions = this.normalizePowerOptions(options.powerOptions || {});
+    const currentPowerOptions = this.normalizePowerOptions(this.currentCombination?.powerOptions);
+    const baseComboId = this.currentCombination?.baseCombinationId || this.currentCombination?.combinationId;
+    const baseCombo = baseComboId ? this.getCombinationById(baseComboId) : null;
+
+    const orderUnchanged = this.isSameUnitOrder(unitIds, this.loadedUnits);
+    const powerOptionsChanged = !this.isSamePowerOptions(powerOptions, currentPowerOptions);
+    if (orderUnchanged && !powerOptionsChanged && !options.forceBroadcast) return false;
+
+    const experimentId = options.experimentId || null;
+    const matched = this.findMatchingCombination(unitIds, experimentId);
+    if (matched) {
+      return this.setCombination(
+        { ...matched, powerOptions },
+        experimentId,
+        { skipCache: false, skipBroadcast: options.skipBroadcast === true },
+      );
+    }
+
+    return this.setCombination(
+      this.buildCustomCombination(unitIds, baseCombo || this.currentCombination, powerOptions),
+      experimentId,
+      { skipCache: true, skipBroadcast: options.skipBroadcast === true },
+    );
+  }
+
   // ==================== 驗證與工具 ====================
 
   /**
@@ -532,58 +644,5 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager {
     }
   }
 
-  // ==================== 事件系統 ====================
-
-  /**
-   * 註冊事件監聽器
-   */
-  on(eventType, callback) {
-    if (!this.eventListeners.has(eventType)) {
-      this.eventListeners.set(eventType, []);
-    }
-    this.eventListeners.get(eventType).push(callback);
-    return () => this.off(eventType, callback);
-  }
-
-  /**
-   * 移除事件監聽器
-   */
-  off(eventType, callback) {
-    if (!this.eventListeners.has(eventType)) return;
-
-    const listeners = this.eventListeners.get(eventType);
-    const index = listeners.indexOf(callback);
-    if (index > -1) {
-      listeners.splice(index, 1);
-    }
-  }
-
-  /**
-   * 觸發事件
-   */
-  emit(eventType, data) {
-    if (this.eventListeners.has(eventType)) {
-      this.eventListeners.get(eventType).forEach((callback) => {
-        callback(data);
-      });
-    }
-
-    const customEvent = new CustomEvent(eventType, {
-      detail: data,
-      bubbles: true,
-    });
-    document.dispatchEvent(customEvent);
-  }
-
-  /**
-   * 清除所有事件監聽器
-   */
-  clearListeners(eventType = null) {
-    if (eventType) {
-      this.eventListeners.delete(eventType);
-    } else {
-      this.eventListeners.clear();
-    }
-  }
 };
 

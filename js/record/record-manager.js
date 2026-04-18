@@ -18,6 +18,7 @@ import {
   GESTURE_ATTEMPT_TYPE_LABELS,
   RECORD_SOURCES,
   SYNC_EVENTS,
+  SYNC_SESSION_STORAGE_LEGACY_KEYS,
 } from "../constants/index.js";
 import { recordStore } from "./record-store.js";
 import { recordRuntime } from "./record-runtime.js";
@@ -39,6 +40,8 @@ class RecordManager {
     this.experimentStartTime = null;
     this._flushAllInProgress = false;
     this._lastFlushAllExperimentId = null;
+    this._logSequence = 0;
+    this._lastFlushAllLogSequence = -1;
 
     // 設定
     this.syncEnabled = false;
@@ -53,6 +56,7 @@ class RecordManager {
     this.getGestures = null;
     this.getGesturesData = null;
     this.getCombination = null;
+    this.getUnitOrder = null;
 
     // IndexedDB
     this.db = null;
@@ -79,14 +83,16 @@ class RecordManager {
    * @param {Object}   [deps.view]            - RecordView 實例
    * @param {Function} [deps.getGestures]     - `(index) => gesture` 取得指定索引的手勢物件
    * @param {Function} [deps.getGesturesData] - `() => Object` 取得手勢資料字典
-   * @param {Function} [deps.getCombination]  - `() => Object` 取得目前實驗組合
+  * @param {Function} [deps.getCombination]  - `() => Object` 取得目前實驗組合
+  * @param {Function} [deps.getUnitOrder]     - `() => Array|string` 取得目前單元排序
    */
-  updateDependencies({ syncClient, view, getGestures, getGesturesData, getCombination } = {}) {
+  updateDependencies({ syncClient, view, getGestures, getGesturesData, getCombination, getUnitOrder } = {}) {
     if (syncClient !== undefined) this.syncClient = syncClient;
     if (view !== undefined) this.view = view;
     if (getGestures !== undefined) this.getGestures = getGestures;
     if (getGesturesData !== undefined) this.getGesturesData = getGesturesData;
     if (getCombination !== undefined) this.getCombination = getCombination;
+    if (getUnitOrder !== undefined) this.getUnitOrder = getUnitOrder;
   }
 
   // ─── 實驗 ID 同步 ──────────────────────────────────────────────────────────
@@ -117,9 +123,14 @@ class RecordManager {
     });
   }
 
-  getExperimentId() { return this.experimentId; }
-  _getCurrentExperimentId() { return this.experimentId; }
+  getExperimentId() {
+    return this.experimentId || this.stateManager?.getExperimentId?.() || this.stateManager?.experimentId || null;
+  }
+  _getCurrentExperimentId() { return this.getExperimentId(); }
   _getClientId() { return this.syncClient?.clientId || null; }
+  _getClientRole() {
+    return this.syncClient?.getRole?.() || this.syncClient?.role || null;
+  }
 
   /**
    * 取得指定索引的手勢 ID
@@ -135,6 +146,29 @@ class RecordManager {
   _getGestureName(gestureIndex) {
     const gesture = this.getGestures?.(gestureIndex);
     return gesture?.gesture_name || gesture?.name || null;
+  }
+
+  _resolveUnitOrder() {
+    const unitOrder = this.getUnitOrder?.();
+    if (Array.isArray(unitOrder)) {
+      return unitOrder
+        .map((unit) => unit?.unit_id || unit?.unitId || unit?.id || unit)
+        .filter((unitId) => unitId !== null && unitId !== undefined && unitId !== "")
+        .join("->");
+    }
+    if (typeof unitOrder === "string") {
+      return unitOrder;
+    }
+
+    const currentUnits = this.stateManager?.loadedUnits;
+    if (Array.isArray(currentUnits) && currentUnits.length > 0) {
+      return currentUnits
+        .map((unit) => unit?.unit_id || unit?.unitId || unit?.id || unit)
+        .filter((unitId) => unitId !== null && unitId !== undefined && unitId !== "")
+        .join("->");
+    }
+
+    return "";
   }
 
   // ─── 公開 API：初始化 ──────────────────────────────────────────────────────
@@ -155,6 +189,7 @@ class RecordManager {
       this.experimentStartTime = null;
       this._lastFlushAllExperimentId = null;
       this._flushAllInProgress = false;
+      this._lastFlushAllLogSequence = -1;
       Logger.info(`RecordManager 初始化: ID=${experimentId}, 受試者=${this.participantName}`);
       return true;
     } catch (error) {
@@ -170,9 +205,11 @@ class RecordManager {
    */
   setExperimentId(experimentId, source = RECORD_SOURCES.LOCAL_INPUT) {
     if (this.stateManager) {
+      this.experimentId = experimentId;
       this.stateManager.setExperimentId(experimentId, source);
       return;
     }
+
     if (this.experimentId === experimentId) return;
 
     this.experimentId = experimentId;
@@ -193,8 +230,8 @@ class RecordManager {
     if (!experimentId) { Logger.warn("實驗ID未設定"); return; }
 
     this.experimentStartTime = this._getTimestamp();
-    const combinationInfo = this.getCombination?.() ?? {};
-    const unitOrder = this.stateManager?.currentUnitIds?.join?.("->") ?? "";
+    const combinationInfo = this.getCombination?.() ?? this.stateManager?.currentCombination ?? {};
+    const unitOrder = this._resolveUnitOrder();
 
     const logEntry = {
       ts: this.experimentStartTime,
@@ -347,9 +384,19 @@ class RecordManager {
    * 記錄一般操作事件
    * @param {string}      actionId         - 操作識別碼
    * @param {number|null} [gestureIndex]   - 相關手勢索引（可選）
-   * @param {string|null} [stepId]         - 相關步驟 ID（可選）
+  * @param {string|null} [stepId]         - 相關步驟 ID（可選）
+  * @param {Object|null} [extraData]      - 額外欄位（例如實驗狀態快照）
    */
-  logAction(actionId, gestureIndex = null, stepId = null) {
+  logAction(actionId, gestureIndex = null, stepId = null, extraData = null) {
+    if (gestureIndex && typeof gestureIndex === "object" && !Array.isArray(gestureIndex)) {
+      extraData = gestureIndex;
+      gestureIndex = null;
+      stepId = null;
+    } else if (stepId && typeof stepId === "object" && !Array.isArray(stepId)) {
+      extraData = stepId;
+      stepId = null;
+    }
+
     const experimentId = this._getCurrentExperimentId();
     const clientId = this._getClientId();
     const gestureId = gestureIndex !== null ? this._getGestureId(gestureIndex) : null;
@@ -364,6 +411,9 @@ class RecordManager {
     if (gestureId) logEntry.g_id = gestureId;
     if (stepId) logEntry.s_id = stepId;
     if (clientId) logEntry.c_id = clientId;
+    if (extraData && typeof extraData === "object") {
+      Object.assign(logEntry, extraData);
+    }
     this._addLog(logEntry);
   }
 
@@ -392,13 +442,15 @@ class RecordManager {
   // ─── 儲存 ──────────────────────────────────────────────────────────────────
 
   /**
-   * 立即將緩衝區日誌寫入 IndexedDB
-   * @returns {Promise<boolean>} 是否有日誌被寫入
+   * 清空記憶體中的 pendingRecords 緩衝區並廣播同步通知。
+   * 注意：實際寫入 IndexedDB 是在 _addLog() → _saveLogToIndexedDB() 時即時完成的，
+   * 此方法僅清除緩衝區引用，不需再重複寫入。
+   * @returns {Promise<boolean>} 緩衝區是否有資料被清除
    */
   async flushPendingLogs() {
     if (this.pendingRecords.length === 0) return false;
     const flushedCount = this.pendingRecords.length;
-    Logger.info(`立即 flush ${flushedCount} 筆暫存記錄`);
+    Logger.info(`立即 flush ${flushedCount} 筆快取記錄`);
     try {
       this.pendingRecords = [];
       this._broadcastMessage("recordsFlushed", { count: flushedCount, timestamp: Date.now() });
@@ -417,7 +469,13 @@ class RecordManager {
   async flushAll() {
     const currentExperimentId = this._getCurrentExperimentId();
     if (this._flushAllInProgress) return;
-    if (currentExperimentId && this._lastFlushAllExperimentId === currentExperimentId) return;
+    if (
+      currentExperimentId &&
+      this._lastFlushAllExperimentId === currentExperimentId &&
+      this._lastFlushAllLogSequence === this._logSequence
+    ) {
+      return;
+    }
 
     this._flushAllInProgress = true;
     try {
@@ -446,7 +504,10 @@ class RecordManager {
 
       this.view?.showCompletionDisplay(savedRecordCount);
 
-      if (currentExperimentId) this._lastFlushAllExperimentId = currentExperimentId;
+      if (currentExperimentId) {
+        this._lastFlushAllExperimentId = currentExperimentId;
+      }
+      this._lastFlushAllLogSequence = this._logSequence;
     } catch (error) {
       Logger.error("flushAll 發生錯誤:", error);
     } finally {
@@ -477,9 +538,13 @@ class RecordManager {
           this._persistedRecordRefs = new WeakSet();
           this.db = null;
           const keys = [
-            "loggerMinimized", "sync_session_backup", "sync_session_id",
-            "sync_client_id", "sync_preferred_role",
-            "preferredCameraId", "preferredCameraLabel",
+            "loggerMinimized",
+            SYNC_SESSION_STORAGE_LEGACY_KEYS.BACKUP,
+            SYNC_SESSION_STORAGE_LEGACY_KEYS.SESSION_ID,
+            SYNC_SESSION_STORAGE_LEGACY_KEYS.CLIENT_ID,
+            SYNC_SESSION_STORAGE_LEGACY_KEYS.ROLE,
+            "preferredCameraId",
+            "preferredCameraLabel",
           ];
           keys.forEach((k) => localStorage.removeItem(k));
           resolve(true);
@@ -505,13 +570,80 @@ class RecordManager {
     return Date.now();
   }
 
+  _resolveCurrentExperimentId() {
+    if (this.experimentId) return this.experimentId;
+
+    const stateManagerExperimentId =
+      this.stateManager?.getExperimentId?.() || this.stateManager?.experimentId;
+    if (stateManagerExperimentId) {
+      this.experimentId = stateManagerExperimentId;
+      return this.experimentId;
+    }
+
+    const experimentIdInput = document.getElementById("experimentIdInput");
+    const inputExperimentId = experimentIdInput?.value?.trim();
+    if (inputExperimentId) {
+      this.experimentId = inputExperimentId;
+      return this.experimentId;
+    }
+
+    // 實驗進行中（含暫停）不允許任何設定補值，避免執行中發生隱性變更。
+    if (this.stateManager?.isExperimentRunning) {
+      return null;
+    }
+
+    // 僅在非實驗狀態下，才允許沿用既有紀錄的實驗ID。
+    const lastRecordedId = [...this.records]
+      .reverse()
+      .find((record) => record?.exp_id)?.exp_id;
+    if (lastRecordedId) {
+      this.experimentId = lastRecordedId;
+      return lastRecordedId;
+    }
+
+    return null;
+  }
+
   _getTypeLabel(type) {
     return RECORD_TYPE_LABELS[type] || type;
   }
 
   _addLog(logEntry) {
+    if (!logEntry || typeof logEntry !== "object") return;
+
+    const resolvedExperimentId =
+      logEntry.exp_id ||
+      logEntry.experimentId ||
+      this._resolveCurrentExperimentId();
+
+    if (!resolvedExperimentId) {
+      Logger.warn("略過未帶實驗ID的日誌", {
+        type: logEntry.type,
+        actionId: logEntry.a_id,
+      });
+      return;
+    }
+
+    logEntry.exp_id = resolvedExperimentId;
+
+    // 同步模式下補齊來源資訊，避免跨裝置日誌對不上
+    const clientId = this._getClientId();
+    if (clientId && !logEntry.c_id) {
+      logEntry.c_id = clientId;
+    }
+
+    const role = this._getClientRole();
+    if (role && !logEntry.role) {
+      logEntry.role = role;
+    }
+
+    if (!logEntry.mode) {
+      logEntry.mode = this.syncClient?.isConnected?.() ? "sync" : "local";
+    }
+
     this.records.push(logEntry);
     this.pendingRecords.push(logEntry);
+    this._logSequence += 1;
     this._saveLogToIndexedDB(logEntry);
     this._broadcastMessage("recordAdded", { recordCount: this.pendingRecords.length });
 

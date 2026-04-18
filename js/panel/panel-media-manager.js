@@ -45,7 +45,6 @@ class MediaManager {
     this.isPreloading = false;
     this.hasPreloadedEssential = false; // 是否已預先載入基本資源
 
-    // 監聽組合選擇事件，進行組合特定的預先載入
     this.setupEventListeners();
 
     // 套用已儲存的媒體音量設定
@@ -96,33 +95,23 @@ class MediaManager {
     }
   }
 
-  /**
-   * 設置事件監聽器
-   */
   setupEventListeners() {
-    const syncClient = this.syncClient;
-    // 監聽本機組合選擇事件
-    document.addEventListener("combination:selected", (event) => {
-      const combination = event.detail?.combination;
-      if (combination) {
-        setTimeout(() => this.preloadCombinationMedia(combination), 500);
-      } else {
-        setTimeout(() => this.preloadCombinationMedia(), 500);
-      }
-    });
-
     // 監聽同步狀態廣播事件 (來自其他裝置的組合選擇)
     window.addEventListener(SYNC_EVENTS.STATE_BROADCAST, (event) => {
       const detail = event.detail;
-      // 檢查類型是否為組合選擇，並避免處理自己發送的事件
-      if (detail.type === SYNC_DATA_TYPES.COMBINATION_SELECTED &&
-          detail.clientId !== syncClient?.clientId) {
-        const combination = detail.combination;
-        if (combination) {
-          setTimeout(() => this.preloadCombinationMedia(combination), 500);
+      if (
+        detail.type === SYNC_DATA_TYPES.COMBINATION_SELECTED &&
+        detail.clientId !== this.syncClient?.clientId
+      ) {
+        if (detail.combination) {
+          setTimeout(() => this.preloadCombinationMedia(detail.combination), 500);
         }
       }
     });
+  }
+
+  onCombinationSelected({ combination } = {}) {
+    setTimeout(() => this.preloadCombinationMedia(combination || undefined), 500);
   }
 
   /**
@@ -213,6 +202,22 @@ class MediaManager {
       !src.startsWith("blob:") &&
       !src.startsWith("data:")
     ) {
+      const configuredBasePath =
+        String(getSharedConfig()?.media_base_path || "").trim();
+      const normalizedBasePath = configuredBasePath
+        ? configuredBasePath.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "")
+        : "";
+
+      const normalizedSrc = src.replace(/\\/g, "/");
+      const shouldPrefixBasePath =
+        normalizedBasePath &&
+        !normalizedSrc.startsWith(`${normalizedBasePath}/`) &&
+        !normalizedSrc.startsWith("/");
+
+      const resolvedSrc = shouldPrefixBasePath
+        ? `${normalizedBasePath}/${normalizedSrc}`
+        : normalizedSrc;
+
       const baseUrl =
         window.location.origin +
         window.location.pathname.substring(
@@ -221,21 +226,21 @@ class MediaManager {
         );
 
       try {
-        const finalSrc = new URL(src, baseUrl).href;
+        const finalSrc = new URL(resolvedSrc, baseUrl).href;
         // 檢查轉換後的 URL 是否包含檔名的數字部分（中文會被 URL 編碼，所以不能直接檢查）
-        const fileName = src.split("/").pop();
+        const fileName = resolvedSrc.split("/").pop();
         const fileExtension = fileName.split(".").pop();
         // 只檢查副檔名是否存在，副檔名通常不含中文，不會被編碼
         if (finalSrc === baseUrl || !finalSrc.includes("." + fileExtension)) {
           Logger.warn(
-            `URL 轉換失敗: 原始=${src}, baseUrl=${baseUrl}, 結果=${finalSrc}`,
+            `URL 轉換失敗: 原始=${src}, 解析=${resolvedSrc}, baseUrl=${baseUrl}, 結果=${finalSrc}`,
           );
-          return baseUrl + src;
+          return baseUrl + resolvedSrc;
         }
         return finalSrc;
       } catch (e) {
-        Logger.warn(`URL 編碼失敗，使用原始路徑: ${src}`, e);
-        return src;
+        Logger.warn(`URL 編碼失敗，使用原始路徑: ${resolvedSrc}`, e);
+        return resolvedSrc;
       }
     }
     return src;
@@ -1192,7 +1197,7 @@ class MediaManager {
         reject(new Error(`Preload timeout for ${src}`));
       }, 15000); // 15秒超時
 
-      // 設置來源
+      // 設定來源
       element.src = src;
     });
   }

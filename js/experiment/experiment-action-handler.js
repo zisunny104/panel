@@ -9,36 +9,41 @@
  * 5. 遠端同步處理
  * 6. 錯誤處理
  *
+ * 角色說明：
+ * - Panel（panel.html）：受試者（participant）配戴 MR 裝置操作，
+ *   本機按鈕僅供記錄互動，完成後通知 board 端（實驗者）顯示對應標記。
+ * - Board（board.html）：實驗者（experimenter）控制流程並手動標記動作完成，
+ *   gesture step 的推進由實驗者點擊手勢按鈕觸發，不由 panel 端遠端驅動。
+ *
  * 備註：
  * - 對外以事件與公開方法協調動作序列、驗證與同步。
  */
 
-import { SYNC_DATA_TYPES, SYNC_EVENTS } from "../constants/index.js";
+import {
+  SYNC_DATA_TYPES,
+  SYNC_EVENTS,
+  ACTION_HANDLER_EVENTS,
+  ACTION_HANDLER_DEFAULTS,
+} from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
+import { EventEmitter } from "../core/event-emitter.js";
 
-class ExperimentActionHandler {
+class ExperimentActionHandler extends EventEmitter {
   /**
    * 事件類型常數
    */
-  static EVENT = {
-    ACTION_VALIDATED: "action:validated",
-    ACTION_COMPLETED: "action:completed",
-    ACTION_ENTERED: "action:entered",
-    ACTION_FAILED: "action:failed",
-    GESTURE_DETECTED: "action:gesture_detected",
-    SEQUENCE_COMPLETED: "action:sequence_completed",
-    AUTO_PROGRESS: "action:auto_progress",
-    SYNC_ACTION: "action:sync_action",
-    ERROR: "action:error",
-  };
+  static EVENT = ACTION_HANDLER_EVENTS;
 
-  static COMPLETION_COOLDOWN_MS = 3000;
+  static COMPLETION_COOLDOWN_MS = ACTION_HANDLER_DEFAULTS.COMPLETION_COOLDOWN_MS;
 
   constructor(config = {}) {
-    // 配置
+    super();
+    // 設定
     this.config = {
       enableRemoteSync: config.enableRemoteSync !== false,
       enableAutoProgress: config.enableAutoProgress !== false,
-      autoProgressDelay: config.autoProgressDelay || 3000,
+      autoProgressDelay:
+        config.autoProgressDelay || ACTION_HANDLER_DEFAULTS.AUTO_PROGRESS_DELAY_MS,
       ...config,
     };
 
@@ -51,27 +56,23 @@ class ExperimentActionHandler {
     // 自動推進計時器
     this.autoProgressTimer = null;
 
-    // 事件監聽器
-    this.eventListeners = new Map();
-
-    // 依賴注入
+    // dependencies
     this.dependencies = {
       flowManager: null,
-      hubManager: null,
       syncClient: null,
       experimentSystemManager: null,
     };
     Logger.debug("ExperimentActionHandler 初始化完成");
   }
 
-  // ==================== 依賴注入 ====================
+  // ==================== inject dependencies ====================
 
   /**
-   * 注入 FlowManager
+   * inject FlowManager
    */
   injectFlowManager(flowManager) {
     this.dependencies.flowManager = flowManager;
-    Logger.debug("FlowManager 已注入到 ActionHandler");
+    Logger.debug("FlowManager 已 inject 到 ActionHandler");
     return this;
   }
 
@@ -80,13 +81,24 @@ class ExperimentActionHandler {
     return this;
   }
 
-  /**
-   * 注入 HubManager
-   */
-  injectHubManager(hubManager) {
-    this.dependencies.hubManager = hubManager;
-    Logger.debug("HubManager 已注入到 ActionHandler");
-    return this;
+  _getResolvedSyncClient() {
+    return (
+      this.dependencies.syncClient ||
+      this.dependencies.experimentSystemManager?.pageManager?.syncManager?.core
+        ?.syncClient ||
+      this.dependencies.experimentSystemManager?.pageManager?.syncManager
+        ?.syncClient ||
+      null
+    );
+  }
+
+  _isSyncModeActive() {
+    return this.dependencies.experimentSystemManager?.pageManager?.syncManager
+      ?.isSyncMode === true;
+  }
+
+  _shouldWarnMissingSyncClient() {
+    return this.config.enableRemoteSync && this._isSyncModeActive();
   }
 
   // ==================== 動作序列管理 ====================
@@ -117,7 +129,8 @@ class ExperimentActionHandler {
    * @private
    */
   _getActionId(action) {
-    return action.actionId;
+    if (!action || typeof action !== "object") return null;
+    return action.actionId || action.action_id || null;
   }
 
   /**
@@ -198,18 +211,19 @@ class ExperimentActionHandler {
   }
 
   /**
-   * 處理正確動作
+   * 處理正確動作（受試者按下正確按鈕時呼叫）
    *
-   * 改進的時序邏輯：
+   * 時序邏輯：
    * 1. 發出 ACTION_COMPLETED（目前步驟完成）
    * 2. 推進索引到下一步
    * 3. 發出 ACTION_ENTERED（進入新步驟）
    *
    * 各端的職責：
-   * - Board（透過 SYNC 接收 ACTION_COMPLETED）：標記完成的步驟為綠色
-   * - Panel（監聽 ACTION_ENTERED 事件）：立即更新顯示下一步的媒體
-   *
-   * 無需額外的自動推進機制
+   * - Panel（受試者）：本機偵測到正確按鈕 → 推進本機 action 序列 →
+   *   廣播 ACTION_COMPLETED 通知 board（實驗者）；
+   *   透過 ACTION_ENTERED 事件即時更新 MR 顯示（播放下一步媒體）。
+   * - Board（實驗者）：接收 ACTION_COMPLETED → 手勢按鈕顯示綠色（視覺回饋）；
+   *   gesture step 的推進仍由實驗者自行點擊手勢按鈕決定，不由此訊號驅動。
    */
   handleCorrectAction(actionId, actionData = {}) {
     const validation = this.validateAction(actionId, actionData);
@@ -265,11 +279,7 @@ class ExperimentActionHandler {
       });
     }
 
-    // 遠端同步
-    if (this.config.enableRemoteSync) {
-      this.syncActionToRemote(normalizedActionId, "completed");
-    }
-
+    this._advanceAfterActionCompletion(normalizedActionId);
     return true;
   }
 
@@ -341,34 +351,31 @@ class ExperimentActionHandler {
     });
 
     this._broadcastButtonAction(currentAction, actionData);
-    if (!actionData?.buttonId) {
-      this._broadcastActionCompleted(normalizedActionId);
-    }
-
-    // [2] 推進到下一步
-    this.currentActionIndex++;
-
-    // [3] 檢查序列是否完成
-    if (this.currentActionIndex >= this.currentActionSequence.length) {
-      this.handleSequenceCompleted();
-    } else {
-      // [4] 發出進入新步驟的事件
-      const nextAction = this.getCurrentAction();
-      const nextActionId = this._getActionId(nextAction);
-
-      this.emit(ExperimentActionHandler.EVENT.ACTION_ENTERED, {
-        actionId: nextActionId,
-        action: nextAction,
-        progress: this.getProgress(),
-      });
-    }
-
-    // 遠端同步
-    if (this.config.enableRemoteSync) {
-      this.syncActionToRemote(normalizedActionId, "completed");
-    }
+    const nextAction = this.getNextAction();
+    this._broadcastActionCompleted(normalizedActionId, {
+      enteredActionId: this._getActionId(nextAction),
+    });
+    this._advanceAfterActionCompletion(normalizedActionId);
 
     return true;
+  }
+
+  _advanceAfterActionCompletion(_actionId) {
+    this.currentActionIndex++;
+
+    if (this.currentActionIndex >= this.currentActionSequence.length) {
+      this.handleSequenceCompleted();
+      return;
+    }
+
+    const nextAction = this.getCurrentAction();
+    const nextActionId = this._getActionId(nextAction);
+
+    this.emit(ExperimentActionHandler.EVENT.ACTION_ENTERED, {
+      actionId: nextActionId,
+      action: nextAction,
+      progress: this.getProgress(),
+    });
   }
 
   /**
@@ -388,16 +395,18 @@ class ExperimentActionHandler {
       return;
     }
 
-    if (!this.dependencies.syncClient?.clientId) {
-      Logger.warn("ExperimentActionHandler: syncClient 不可用，跳過廣播");
+    const syncClient = this._getResolvedSyncClient();
+    if (!syncClient?.clientId) {
+      const log = this._shouldWarnMissingSyncClient() ? Logger.warn : Logger.debug;
+      log("ExperimentActionHandler: syncClient 不可用，跳過廣播");
       return;
     }
 
     const payload = {
       type: SYNC_DATA_TYPES.BUTTON_ACTION,
-      clientId: this.dependencies.syncClient?.clientId,
+      clientId: syncClient.clientId,
       timestamp: Date.now(),
-      actionId: action.actionId,
+      actionId: this._getActionId(action),
       button: actionData.buttonId,
       function: actionData.functionName || actionData.function,
       experimentId,
@@ -423,20 +432,35 @@ class ExperimentActionHandler {
     const nextActionId =
       nextActionIdFromInteraction || this._getActionId(nextAction);
 
-    const targetActionId = nextActionId || currentActionId;
+    // 始終以「剛完成的 action」作為廣播對象，讓 board 標記正確的 gesture button；
+    // nextActionId 僅用於計算延遲，不作為廣播 target。
+    const targetActionId = currentActionId;
     if (!targetActionId) return null;
 
     const isFirstAction = this.currentActionIndex === 0;
     const currentStepId = this.actionToStepMap?.get(currentActionId)?.step_id;
-    const nextStepId = this.actionToStepMap?.get(targetActionId)?.step_id;
+    const nextStepId = nextActionId
+      ? this.actionToStepMap?.get(nextActionId)?.step_id
+      : null;
     const isSameStep =
       currentStepId && nextStepId && currentStepId === nextStepId;
     const shouldDelay = !isFirstAction && currentStepId && nextStepId && !isSameStep;
+    const delayMs = shouldDelay ? this._resolveCompletionCooldownMs() : 0;
 
     return {
       actionId: targetActionId,
-      delayMs: shouldDelay ? ExperimentActionHandler.COMPLETION_COOLDOWN_MS : 0,
+      enteredActionId: nextActionId || null,
+      delayMs,
     };
+  }
+
+  _resolveCompletionCooldownMs() {
+    const raw = localStorage.getItem("stepCooldownMs");
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+    return ExperimentActionHandler.COMPLETION_COOLDOWN_MS;
   }
 
   _scheduleCompletionBroadcast(action, actionData) {
@@ -447,26 +471,36 @@ class ExperimentActionHandler {
 
     if (target.delayMs > 0) {
       setTimeout(() => {
-        this._broadcastActionCompleted(target.actionId);
+        this._broadcastActionCompleted(target.actionId, {
+          enteredActionId: target.enteredActionId,
+        });
       }, target.delayMs);
       return;
     }
 
-    this._broadcastActionCompleted(target.actionId);
+    this._broadcastActionCompleted(target.actionId, {
+      enteredActionId: target.enteredActionId,
+    });
   }
 
   /**
-   * 廣播 action 完成（用於無按鈕的自動跳過）
+   * 廣播 action 完成至 board 端（實驗者）
+   * 用途：受試者完成某個 action 後，通知 board 在對應手勢按鈕上顯示綠色標記。
+   * board 端收到後僅更新視覺標記，不自動推進 gesture step。
    * Schema: {type, clientId, timestamp, actionId, experimentId}
    */
-  _broadcastActionCompleted(actionId) {
+  _broadcastActionCompleted(actionId, options = {}) {
     if (!actionId) return;
+
+    const { enteredActionId = null } = options;
 
     const experimentId =
       this.dependencies.experimentSystemManager?.getExperimentId?.() || "";
-    const clientId = this.dependencies.syncClient?.clientId;
+    const syncClient = this._getResolvedSyncClient();
+    const clientId = syncClient?.clientId;
     if (!clientId) {
-      Logger.warn("ExperimentActionHandler: syncClient 不可用，跳過 action 完成廣播");
+      const log = this._shouldWarnMissingSyncClient() ? Logger.warn : Logger.debug;
+      log("ExperimentActionHandler: syncClient 不可用，跳過 action 完成廣播");
       return;
     }
 
@@ -476,6 +510,10 @@ class ExperimentActionHandler {
       timestamp: Date.now(),
       actionId,
     };
+
+    if (enteredActionId) {
+      payload.enteredActionId = enteredActionId;
+    }
 
     if (experimentId) {
       payload.experimentId = experimentId;
@@ -506,7 +544,7 @@ class ExperimentActionHandler {
     const flowManager = this.dependencies.flowManager;
 
     if (!flowManager) {
-      Logger.warn("FlowManager 未注入，無法執行步驟轉換");
+      Logger.warn("FlowManager 未 inject，無法執行步驟轉換");
       return false;
     }
 
@@ -608,84 +646,6 @@ class ExperimentActionHandler {
     }
   }
 
-  // ==================== 遠端同步 ====================
-
-  /**
-   * 同步動作到遠端
-   */
-  syncActionToRemote(actionId, status) {
-    const hubManager = this.dependencies.hubManager;
-
-    if (!hubManager || !hubManager.isHubMode()) {
-      return false;
-    }
-
-    const data = {
-      type: "action_update",
-      actionId,
-      status,
-      timestamp: Date.now(),
-      experimentId: hubManager.getExperimentId(),
-    };
-
-    const success = hubManager.sendMessage("action_sync", data);
-
-    if (success) {
-      Logger.debug("動作已同步到遠端", { actionId, status });
-    }
-
-    return success;
-  }
-
-  /**
-   * 處理來自遠端的動作
-   */
-  handleRemoteAction(data) {
-    const { actionId, status, source } = data;
-
-    Logger.debug("收到遠端動作", { actionId, status, source });
-
-    this.emit(ExperimentActionHandler.EVENT.SYNC_ACTION, {
-      actionId,
-      status,
-      source,
-    });
-
-    if (status === "completed") {
-      // 標記為完成但不觸發本機邏輯
-      this.completedActions.add(actionId);
-
-      // 更新索引
-      const actionIndex = this.currentActionSequence.findIndex(
-        (a) => a.actionId === actionId,
-      );
-
-      if (actionIndex !== -1) {
-        this.currentActionIndex = Math.max(
-          this.currentActionIndex,
-          actionIndex + 1,
-        );
-      }
-      return;
-    }
-
-    if (status === "cancelled") {
-      this.completedActions.delete(actionId);
-      this.clearAutoProgress();
-
-      const actionIndex = this.currentActionSequence.findIndex(
-        (a) => this._getActionId(a) === actionId,
-      );
-
-      if (actionIndex !== -1) {
-        this.currentActionIndex = Math.min(
-          this.currentActionIndex,
-          actionIndex,
-        );
-      }
-    }
-  }
-
   // ==================== 錯誤處理 ====================
 
   /**
@@ -716,57 +676,6 @@ class ExperimentActionHandler {
   }
 
   // ==================== 事件通知 ====================
-
-  /**
-   * 註冊事件監聽器
-   */
-  on(eventType, callback) {
-    if (!this.eventListeners.has(eventType)) {
-      this.eventListeners.set(eventType, []);
-    }
-    this.eventListeners.get(eventType).push(callback);
-    return () => this.off(eventType, callback);
-  }
-
-  /**
-   * 移除事件監聽器
-   */
-  off(eventType, callback) {
-    if (!this.eventListeners.has(eventType)) return;
-
-    const listeners = this.eventListeners.get(eventType);
-    const index = listeners.indexOf(callback);
-    if (index > -1) {
-      listeners.splice(index, 1);
-    }
-  }
-
-  /**
-   * 觸發事件
-   */
-  emit(eventType, data) {
-    if (!this.eventListeners.has(eventType)) return;
-
-    const listeners = this.eventListeners.get(eventType);
-    listeners.forEach((callback) => {
-      try {
-        callback(data);
-      } catch (error) {
-        Logger.error(`事件處理器錯誤 (${eventType})`, error);
-      }
-    });
-  }
-
-  /**
-   * 清除所有事件監聽器
-   */
-  clearListeners(eventType = null) {
-    if (eventType) {
-      this.eventListeners.delete(eventType);
-    } else {
-      this.eventListeners.clear();
-    }
-  }
 
   // ==================== 工具方法 ====================
 

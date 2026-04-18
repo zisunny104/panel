@@ -151,7 +151,6 @@ data/
 | **time-sync-manager.js** | `TimeSyncManager` | 時間同步與格式化。方法：initialize, syncWithServer, getServerTime, getTimeOffset, isSynchronized |
 | **random-utils.js** | 匯出函數/物件 | 可重現隨機化工具。物件：RandomUtils。函數：createSeededRandom, shuffleArray, getCombinationUnitIds, generateExperimentId |
 | **session-restore-events.js** | 匯出函數 | 工作階段快照轉譯器。函數：dispatchSessionRestoreEvents() |
-| **sync-session-store.js** | 匯出函數 | 同步工作階段儲存封裝。函數：createSyncSessionStore() |
 
 #### js/panel/ - 面板控制模組
 
@@ -171,7 +170,7 @@ data/
 | 檔案                                    | class                         | 主要功能                                                                                                                                                                                                                           |
 | --------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **sync-manager.js**            | `SyncManager`              | 同步管理主入口。方法：initialize, setupInitialization。常數：ROLE, STATUS, ROLE_TEXTS, STATUS_TEXTS, PAGE, PAGE_LIST                                                                                                               |
-| **sync-manager-core.js**       | `SyncManagerCore`          | 同步核心邏輯。方法：initDependencies, getBaseUrl, generateQRContent, createSession, joinSession, restoreSession, syncState, processOfflineQueue                                                             |
+| **sync-manager-core.js**       | `SyncManagerCore`          | 同步核心邏輯。方法：initDependencies, getBaseUrl, generateShareUrl, createSession, joinSession, restoreSession, syncState, processOfflineQueue                                                             |
 | **sync-manager-ui.js**         | `SyncManagerUI`            | UI 膠囊指示器與控制面板。方法：initialize, createCapsuleIndicator, createControlPanel, updateIndicator, updateUIState, showPanel, hidePanel, setupEventListeners, bindEvents                                                       |
 | **sync-sessions-modal.js**     | `SyncSessionsModal`        | 工作階段管理 Modal。方法：initialize, showModal, loadSessionsData, renderSessionsList, bindEvents, refreshSessionsList, updateBatchOperationButtons                                                                        |
 | **sync-confirm-dialog.js**     | `SyncConfirmDialogManager` | 加入工作階段確認對話。方法：showJoinConfirmation                                                                                                                                                                                   |
@@ -850,7 +849,7 @@ DB_PATH=../runtime/database/experiment.db
 
 | 參數                                | 預設值                              | 說明                                       |
 | ----------------------------------- | ----------------------------------- | ------------------------------------------ |
-| `NODE_ENV`                          | `production`                        | 運行環境（影響日誌詳細度和最佳化）         |
+| `NODE_ENV`                          | `production`                        | 執行環境（影響日誌詳細度和最佳化）         |
 | `PORT`                              | `7645`                              | WebSocket 和 HTTP 服務器的監聽連接埠       |
 | `HOST`                              | `0.0.0.0`                           | 綁定地址（`0.0.0.0` 表示接受所有網路介面） |
 | `CORS_ORIGIN`                       | `http://localhost:7645`             | CORS 允許來源（多個可用 `\|` 分隔）        |
@@ -875,7 +874,7 @@ DB_PATH=../runtime/database/experiment.db
 2. **server/config/\*.js** - 預設值定義
 3. **硬編碼常數** - 最低優先級
 
-若需要改變運行行為，優先修改 `.env` 檔案，避免修改源代碼。
+若需要改變執行行為，優先修改 `.env` 檔案，避免修改源代碼。
 
 ---
 

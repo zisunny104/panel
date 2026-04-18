@@ -97,10 +97,9 @@ export async function initializeBoardManagers(page) {
 
     if (!page.experimentFlowManager) {
       const flowStart = performance.now();
-      page.experimentFlowManager = new ExperimentFlowManager();
-      page.experimentFlowManager.injectCombinationManager(page.experimentCombinationManager);
-      page.experimentFlowManager.injectHubManager(page.experimentHubManager);
-      page.experimentFlowManager.updateDependencies({
+      page.experimentFlowManager = new ExperimentFlowManager({
+        combinationManager: page.experimentCombinationManager,
+        hubManager: page.experimentHubManager,
         actionsMap: page.actionsMap || null,
         unitsData: page.unitsData || null,
       });
@@ -110,9 +109,11 @@ export async function initializeBoardManagers(page) {
     const stateStart = performance.now();
     page.experimentStateManager = new ExperimentStateManager({
       timeSyncManager: page.syncManager?.core?.timeSyncManager,
-      experimentHubManager: page.experimentHubManager,
     });
     logInitDuration("ExperimentStateManager 已初始化", stateStart);
+    page.experimentFlowManager.injectDependencies({
+      stateManager: page.experimentStateManager,
+    });
 
     if (!page.recordManager) {
       const logStart = performance.now();
@@ -137,6 +138,7 @@ export async function initializeBoardManagers(page) {
         getCurrentCombination: () => page.currentCombination,
       });
     }
+    page.timerManager.injectStateManager(page.experimentStateManager);
 
     if (!page.uiManager) {
       const uiStart = performance.now();
@@ -174,6 +176,8 @@ export async function initializeBoardManagers(page) {
         getGesturesData: () => page.gesturesData,
         getCombination: () => page.currentCombination,
         syncLogsNow: () => page.recordManager?.flushAll?.(),
+        onRecordsSyncedRefresh: () =>
+          page.resetGestureSequenceForRecordSync?.(),
       });
       if (!recordView._initialized) {
         recordView.initialize();
@@ -207,6 +211,7 @@ export async function initializeBoardManagers(page) {
         page.experimentSystemManager?.state?.gestures?.[idx],
       getGesturesData: () => page.gesturesData,
       getCombination: () => page.currentCombination,
+      getUnitOrder: () => page.experimentSystemManager?.state?.currentUnitIds || [],
     });
 
     logInitDuration("所有管理器已初始化", initStart);
