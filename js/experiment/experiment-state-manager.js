@@ -45,19 +45,9 @@ class ExperimentStateManager {
   }
 
   setupHubSync() {
-    document.addEventListener("hub_state_updated", (event) => {
-      const { state } = event.detail;
-      this.applyHubState(state);
-    });
-
     document.addEventListener(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (event) => {
       const { experimentId } = event.detail;
       this.setExperimentId(experimentId, RECORD_SOURCES.HUB_SYNC);
-    });
-
-    document.addEventListener("participant_name_updated", (event) => {
-      const { participantName } = event.detail;
-      this.setParticipantName(participantName, "hub");
     });
   }
 

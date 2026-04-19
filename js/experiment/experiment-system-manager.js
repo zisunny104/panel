@@ -43,7 +43,6 @@ class ExperimentSystemManager {
         unitPanel: false,
         experimentControls: false,
       },
-      // 受試者名稱暫存（輸入框渲染前的緩衝）
       pendingParticipantName: null,
     };
 
@@ -120,8 +119,6 @@ class ExperimentSystemManager {
     if (!actionHandler) {
       actionHandler = new ExperimentActionHandler({
         enableRemoteSync: true,
-        enableAutoProgress: true,
-        autoProgressDelay: 3000,
         enableGestureValidation: true,
       });
     }
@@ -417,7 +414,7 @@ class ExperimentSystemManager {
    * 當其他客戶端改變實驗 ID 時觸發
    * @private
    */
-  _handleHubIdChanged(data) {
+  async _handleHubIdChanged(data) {
     const { type, newValue, source } = data;
 
     if (type !== "experiment") {
@@ -444,23 +441,7 @@ class ExperimentSystemManager {
       newValue,
     });
 
-    // 更新 UI 中的實驗 ID 顯示
-    this._updateExperimentIdUI(newValue);
-
-    // 如果實驗面板已經初始化（即組合選擇器已渲染），需要重新載入組合信息
-    if (this.state.containers.combinationSelector) {
-      const container = document.querySelector(
-        this.state.containers.combinationSelector,
-      );
-      if (container) {
-        Logger.debug("實驗面板已渲染，重新載入新實驗 ID 的組合信息");
-        // 重新初始化組合選擇器（使用新的實驗 ID）
-        this._reinitializeCombinationForNewExperimentId(newValue);
-      }
-    }
-
-    const stateManager = this.pageManager?.experimentStateManager;
-    stateManager?.setExperimentId?.(newValue, source);
+    await this.handleSyncExperimentIdUpdate({ experimentId: newValue });
   }
 
   /**
@@ -508,7 +489,7 @@ class ExperimentSystemManager {
 
   /**
    * 綁定實驗ID輸入框監聽器（可重入，避免重複綁定）
-   * 【重要】分離了「綁定事件監聽」和「同步 ID 值」
+   * 分離了「綁定事件監聽」和「同步 ID 值」
    * 以確保每次面板打開時都能同步最新 ID
    * @private
    */
@@ -516,18 +497,21 @@ class ExperimentSystemManager {
     const idInput = document.getElementById("experimentIdInput");
     if (!idInput) return;
 
-    // 【第一步】始終同步最新 ID 到 DOM（即使已綁定過）
-    const currentId = this.hubManager?.ids?.experiment;
-    if (currentId) {
+    // 先同步最新 ID 到 DOM（即使已綁定過）
+    const currentId = this.getExperimentId();
+    if (currentId && idInput.value.trim() !== currentId) {
       idInput.value = currentId;
       Logger.debug("面板展開時同步實驗ID到UI:", currentId);
     }
 
-    // 【第二步】若未綁定過事件監聽，則綁定（避免重複綁定）
+    // 若尚未綁定事件監聽，則進行綁定（避免重複綁定）
     if (!idInput._experimentSystemBound) {
       this._setupExperimentIdInputListener(idInput);
       Logger.debug("實驗ID輸入框事件監聽已綁定");
     }
+
+    // 確保無論何時開啟面板，輸入框都會從系統狀態拉取最新 ID。
+    this._syncExperimentIdInputFromSystem();
   }
 
   /**
@@ -535,7 +519,7 @@ class ExperimentSystemManager {
    * @private
    */
   _handleCombinationSelected(data) {
-    const { combination, unitIds } = data;
+    const { combination, unitIds, experimentId } = data;
     // CombinationManager 已持有 currentCombination / loadedUnits，此處只需協調 UI 與廣播
     const normalizedPowerOptions = this.combinationManager.normalizePowerOptions(
       combination?.powerOptions,
@@ -552,7 +536,7 @@ class ExperimentSystemManager {
 
     window.dispatchEvent(
       new CustomEvent("experimentSystem:combinationSelected", {
-        detail: { combination, experimentId: this.getExperimentId() },
+        detail: { combination, experimentId: experimentId || this.getExperimentId() },
       }),
     );
 
@@ -623,64 +607,27 @@ class ExperimentSystemManager {
     }
   }
 
-  /** @private */
+  /**
+   * 處理單元面板切換事件
+   * @private
+   */
   _handleUnitToggle(event) {
     const selectedUnitIds = this._getUnitIdsFromUi({ onlyChecked: true });
     this._applyCustomUnitSelection(selectedUnitIds);
     setTimeout(() => this._tryCallPageManager("updateSelectAllState"), 10);
   }
 
-  /** @private */
+  /**
+   * 處理單元面板重新排序事件
+   * @private
+   * UI reorder 已由 Renderer 處理 DOM 結構，此處只需同步實驗狀態與控件顯示。
+   */
   _handleUnitReorder(fromIndex, toIndex) {
     Logger.debug("單元重新排序:", { fromIndex, toIndex });
     const selectedUnitIds = this._getUnitIdsFromUi({ onlyChecked: true });
     this._applyCustomUnitSelection(selectedUnitIds);
-    this._tryCallPageManager("handleUnitReorder", fromIndex, toIndex);
-  }
-
-  requestUnitReorder(arg1, arg2) {
-    const unitPanelSelector = this.state.containers?.unitPanel;
-    const unitList = unitPanelSelector
-      ? document.querySelector(`${unitPanelSelector} .experiment-units-list`)
-      : document.querySelector(".experiment-units-list");
-    if (!unitList) return false;
-
-    const items = Array.from(unitList.querySelectorAll("li:not(.power-option-card)"));
-    if (!items.length) return false;
-
-    let fromIndex = -1;
-    let toIndex = -1;
-
-    if (typeof arg1 === "number" && typeof arg2 === "number") {
-      fromIndex = arg1;
-      toIndex = arg2;
-    } else if (arg1 && typeof arg1 === "object") {
-      const { unitId, direction, newIndex } = arg1;
-      fromIndex = items.findIndex((it) => it.dataset.unitId === unitId);
-      if (fromIndex === -1) return false;
-      if (typeof newIndex === "number") toIndex = newIndex;
-      else if (direction === "up") toIndex = fromIndex - 1;
-      else if (direction === "down") toIndex = fromIndex + 1;
-    }
-
-    if (fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length || fromIndex === toIndex) {
-      return false;
-    }
-
-    const itemToMove = items[fromIndex];
-    if (!itemToMove?.parentNode) return false;
-
-    if (fromIndex < toIndex) {
-      itemToMove.parentNode.insertBefore(itemToMove, items[toIndex].nextSibling);
-    } else {
-      itemToMove.parentNode.insertBefore(itemToMove, items[toIndex]);
-    }
-
-    const selectedUnitIds = this._getUnitIdsFromUi({ onlyChecked: true });
-    this._applyCustomUnitSelection(selectedUnitIds, { forceBroadcast: true });
     this._tryCallPageManager("updateUnitButtonStates");
     this._tryCallPageManager("updateSelectAllState");
-    return true;
   }
 
   syncUnitSelectionFromUi() {
@@ -692,12 +639,18 @@ class ExperimentSystemManager {
     return true;
   }
 
-  /** 公開入口，委派給 CombinationManager.applyCustomSelection */
+  /**
+   * 可供外部呼叫，委派給 CombinationManager.applyCustomSelection
+   * @public
+   */
   applyCustomUnitSelection(unitIds = [], options = {}) {
     return this._applyCustomUnitSelection(unitIds, options);
   }
 
-  /** @private */
+  /**
+   * 將自訂單元選擇套用到 CombinationManager
+   * @private
+   */
   _applyCustomUnitSelection(unitIds = [], options = {}) {
     return this.combinationManager.applyCustomSelection(unitIds, {
       ...options,
@@ -798,6 +751,10 @@ class ExperimentSystemManager {
     return this.actionHandler?.completeCurrentAction?.(actionData) || false;
   }
 
+  handleCorrectAction(actionId, actionData = {}) {
+    return this.actionHandler?.handleCorrectAction?.(actionId, actionData) || false;
+  }
+
   findActionIndexById(actionId) {
     if (!actionId || !this.actionHandler?.currentActionSequence) return -1;
     return this.actionHandler.currentActionSequence.findIndex(
@@ -880,6 +837,11 @@ class ExperimentSystemManager {
       return false;
     }
 
+    Logger.debug("【<green>實驗啟動</green>】開始執行實驗", {
+      experimentId,
+      options,
+    });
+
     return flow.startExperiment(options);
   }
 
@@ -902,10 +864,6 @@ class ExperimentSystemManager {
   }
 
   stopExperiment(...args) {
-    // board 端需要 pageManager.stopExperiment() 以確保 UI/計時器等清理完整
-    if (this.pageManager?.stopExperiment) {
-      return this.pageManager.stopExperiment(...args);
-    }
     return this.stopFlowExperiment(...args);
   }
 
@@ -964,11 +922,15 @@ class ExperimentSystemManager {
     const currentId = this.getExperimentId();
     if (currentId === experimentId) return false;
 
+    Logger.debug("【<blue>SYNC</blue>】同步實驗 ID 更新", { currentId, experimentId });
+
     await this.setExperimentId(experimentId, RECORD_SOURCES.SYNC_BROADCAST, {
       registerToHub: false,
       broadcast: false,
       reapplyCombination: true,
+      skipCombinationBroadcast: true,
     });
+    this._updateExperimentIdUI(experimentId);
     return true;
   }
 
@@ -1044,8 +1006,15 @@ class ExperimentSystemManager {
    * @private
    */
   _handleExperimentStop() {
-    this.stopExperiment();
-    Logger.debug("實驗停止 - 透過 ExperimentSystemManager");
+    const stopEvent = new CustomEvent("experimentSystem:stopRequested", {
+      detail: { reason: "manual", broadcast: true, source: "ui" },
+      cancelable: true,
+    });
+    window.dispatchEvent(stopEvent);
+    if (!stopEvent.defaultPrevented) {
+      this.stopFlowExperiment({ reason: "manual", broadcast: true, source: "ui" });
+    }
+    Logger.debug("實驗停止請求已發出，若無 pageManager 處理則直接停止流程");
   }
 
   /**
@@ -1060,7 +1029,7 @@ class ExperimentSystemManager {
    * 以目前實驗ID重新計算組合的單元排序並更新UI
    * @private
    */
-  async _reapplyCombinationWithCurrentId() {
+  async _reapplyCombinationWithCurrentId({ skipBroadcast = false } = {}) {
     const combo = this.combinationManager.getCurrentCombination();
     if (!combo) { Logger.warn("沒有目前組合，跳過重新套用"); return; }
 
@@ -1072,18 +1041,40 @@ class ExperimentSystemManager {
 
     Logger.debug("以新實驗ID重新計算單元排序:", { experimentId, unitIds: newUnitIds });
 
-    this.combinationManager.handleExperimentIdChanged(experimentId);
+    this.combinationManager.handleExperimentIdChanged(experimentId, { skipBroadcast });
   }
 
   // ==========================================
-  // 實驗ID 生命週期管理（統一入口）
+  // 實驗ID 生命週期管理
   // ==========================================
 
   /**
-   * 取得目前實驗ID
-   * @returns {string|null}
+   * 同步實驗 ID 到所有管理器
+   * @param {string} newId
+   * @param {string} source
    */
+  _applyExperimentIdToManagers(newId, source) {
+    const stateManager = this.pageManager?.experimentStateManager;
+    if (stateManager?.setExperimentId) {
+      stateManager.setExperimentId(newId, source);
+    }
+
+    if (this.hubManager?.setExperimentId) {
+      this.hubManager.setExperimentId(newId, source, { silent: true });
+    }
+  }
+
   getExperimentId() {
+    const isSync = this.hubManager?.isInSyncMode?.() || false;
+    if (isSync) {
+      return (
+        this.hubManager?.getExperimentId?.() ||
+        this.pageManager?.experimentStateManager?.getExperimentId?.() ||
+        document.getElementById("experimentIdInput")?.value?.trim() ||
+        null
+      );
+    }
+
     const stateManager = this.pageManager?.experimentStateManager;
     return (
       stateManager?.getExperimentId?.() ||
@@ -1137,6 +1128,7 @@ class ExperimentSystemManager {
       registerToHub = undefined,
       broadcast = true,
       reapplyCombination = true,
+      skipCombinationBroadcast = false,
     } = options;
 
     if (!newId || typeof newId !== "string" || !newId.trim()) {
@@ -1148,10 +1140,8 @@ class ExperimentSystemManager {
     Logger.debug("設定實驗ID:", newId);
 
     const stateManager = this.pageManager?.experimentStateManager;
-    if (stateManager?.setExperimentId) {
-      stateManager.setExperimentId(newId, source);
-    } else if (this.hubManager?.setExperimentId) {
-      this.hubManager.setExperimentId(newId, source);
+    if (stateManager?.setExperimentId || this.hubManager?.setExperimentId) {
+      this._applyExperimentIdToManagers(newId, source);
     } else {
       Logger.warn("setExperimentId: 找不到可用的狀態管理器");
     }
@@ -1168,21 +1158,29 @@ class ExperimentSystemManager {
       source !== RECORD_SOURCES.HUB_SYNC;
     if (shouldRegister) {
       try {
-        await experimentSyncManager.registerExperimentIdToHub(newId);
-        Logger.debug("實驗ID已註冊到中樞");
+        if (this.hubManager?.registerExperimentId) {
+          await this.hubManager.registerExperimentId(newId);
+          Logger.debug("實驗ID已註冊到中樞");
+        } else {
+          Logger.warn(
+            "ExperimentHubManager 不可用，無法註冊實驗ID到中樞",
+          );
+        }
       } catch (error) {
         Logger.warn("註冊實驗ID到中樞失敗:", error);
       }
     }
 
-    // 廣播
-    if (broadcast) {
+    const shouldBroadcast = broadcast && !(isSync && shouldRegister);
+    if (shouldBroadcast) {
       experimentSyncManager.broadcastExperimentIdUpdate(newId);
     }
 
+    this._updateExperimentIdUI(newId);
+
     // 重新計算組合排序
     if (reapplyCombination) {
-      await this._reapplyCombinationWithCurrentId();
+      await this._reapplyCombinationWithCurrentId({ skipBroadcast: skipCombinationBroadcast });
     }
 
     return true;
@@ -1203,12 +1201,8 @@ class ExperimentSystemManager {
     const normalized = participantName.trim();
     this.updateParticipantNameUi(normalized);
 
-    // 與既有 stateManager 監聽事件保持相容，避免只改 UI 沒改狀態。
-    window.dispatchEvent(
-      new CustomEvent("participant_name_updated", {
-        detail: { participantName: normalized },
-      }),
-    );
+    const stateManager = this.pageManager?.experimentStateManager;
+    stateManager?.setParticipantName?.(normalized, "system");
 
     window.dispatchEvent(
       new CustomEvent("experimentSystem:participantNameChanged", {
@@ -1254,10 +1248,10 @@ class ExperimentSystemManager {
   }
 
   _applyPendingUiUpdates() {
-    // 同步 ID（HubManager 是唯一來源，直接寫入輸入框）
+    // 將目前系統實驗 ID 同步回 UI 的輸入框
     this._syncExperimentIdInputFromSystem();
 
-    // 受試者名稱暫存
+    // 將先前暫存的受試者名稱套用到輸入欄位
     if (this.state.pendingParticipantName) {
       const input = document.getElementById("participantNameInput");
       if (input) {
@@ -1282,7 +1276,7 @@ class ExperimentSystemManager {
   async regenerateExperimentId() {
     Logger.debug("重新產生實驗ID");
 
-    // 如果在同步模式，先檢查中樞是否有不同的ID
+    // 同步模式下先檢查 Hub 是否已有 experimentId
     const hubManager = this.hubManager;
     const isSync = hubManager?.isInSyncMode?.() || false;
 
@@ -1290,14 +1284,16 @@ class ExperimentSystemManager {
       try {
         const hubId = await hubManager.getExperimentId();
         const currentId = this.getExperimentId();
-        if (hubId && currentId && hubId !== currentId) {
-          // 中樞有不同ID，同步到中樞的ID
-          Logger.debug(`同步到中樞ID: ${hubId}`);
-          await this.setExperimentId(hubId, RECORD_SOURCES.HUB_SYNC, {
-            broadcast: false,
-            reapplyCombination: true,
-          });
-          return hubId;
+        if (hubId) {
+          if (currentId !== hubId) {
+            Logger.debug(`同步到中樞ID: ${hubId}`);
+            await this.setExperimentId(hubId, RECORD_SOURCES.HUB_SYNC, {
+              broadcast: false,
+              reapplyCombination: true,
+            });
+            return hubId;
+          }
+          Logger.debug("同步模式下已存在相同 Hub ID，繼續產生新實驗ID");
         }
       } catch (error) {
         Logger.warn("取得中樞ID失敗，產生新ID:", error);
@@ -1320,7 +1316,7 @@ class ExperimentSystemManager {
     let experimentId = null;
     const isSync = this.hubManager?.isInSyncMode?.() || false;
 
-    // 第1步：同步模式下從中樞取得
+    // 先嘗試從 Hub 取得實驗 ID
     if (isSync) {
       try {
         experimentId = await this.hubManager.getExperimentId();
@@ -1332,7 +1328,7 @@ class ExperimentSystemManager {
       }
     }
 
-    // 第2步：localStorage 快取（從 HubManager 讀取）
+    // 再檢查 localStorage 快取（由 HubManager 讀取）
     if (!experimentId && this.hubManager) {
       const cachedId = this.hubManager.getExperimentId();
       if (cachedId) {
@@ -1341,7 +1337,7 @@ class ExperimentSystemManager {
       }
     }
 
-    // 第3步：檢查 UI input（如果存在）
+    // 如果 UI input 已存在，則檢查其值
     const idInput = document.getElementById("experimentIdInput");
     if (!experimentId && idInput) {
       const inputVal = idInput.value.trim();
@@ -1351,7 +1347,7 @@ class ExperimentSystemManager {
       }
     }
 
-    // 第4步：產生新ID
+    // 若仍無 ID，則產生新 ID
     if (!experimentId) {
       experimentId = generateExperimentId();
       Logger.debug(`實驗ID來源：新產生 (${experimentId})`);
@@ -1408,7 +1404,7 @@ class ExperimentSystemManager {
     this._applyExperimentLockState({ locked: true, allowParticipantEdit: false });
     this._updateExperimentControlsForStarted();
     this.timerManager.startExperimentTimer();
-    Logger.debug("回應實驗開始事件，UI已更新");
+    Logger.debug("【<green>FLOW STARTED</green>】回應實驗開始事件，UI已更新");
   }
 
   _handleFlowPaused(data) {
@@ -1417,7 +1413,7 @@ class ExperimentSystemManager {
     this._applyExperimentLockState({ locked: true, allowParticipantEdit: true });
     this._updateExperimentControlsForPaused();
     this.timerManager.pauseExperimentTimer();
-    Logger.debug("回應實驗暫停事件，UI和計時器已更新");
+    Logger.debug("【<yellow>FLOW PAUSED</yellow>】回應實驗暫停事件，UI和計時器已更新");
   }
 
   _handleFlowResumed(data) {
@@ -1426,12 +1422,12 @@ class ExperimentSystemManager {
     this._applyExperimentLockState({ locked: true, allowParticipantEdit: false });
     this._updateExperimentControlsForResumed();
     this.timerManager.resumeExperimentTimer();
-    Logger.debug("回應實驗繼續事件，UI和計時器已更新");
+    Logger.debug("【<blue>FLOW RESUMED</blue>】回應實驗繼續事件，UI和計時器已更新");
   }
 
   _handleFlowStopped(data) {
     // 日誌記錄：board 端持久化（panel 端 recordManager 為 null，自動跳過）
-    // 此處覆蓋 STOPPED 與 COMPLETED 兩種路徑，確保結束日誌必然被寫入
+    // 此處用於統一處理實驗結束狀態，包含 STOPPED 與 COMPLETED 兩種結束來源
     this.recordManager?.logExperimentEnd();
     this._applyExperimentLockState({ locked: false, allowParticipantEdit: true });
     this._updateExperimentControlsForStopped();
@@ -1445,11 +1441,13 @@ class ExperimentSystemManager {
         },
       }),
     );
-    Logger.debug("回應實驗停止事件，UI已更新並發出通知");
+    Logger.debug("【<red>FLOW STOPPED</red>】回應實驗停止事件，UI已更新並發出通知");
   }
 
   /**
-   * 公開：將實驗控制 UI 重置為已停止狀態（供外部呼叫，如 resetGestureSequenceForRecordSync）
+   * 將實驗控制 UI 重置為已停止狀態。
+   * 供外部呼叫，例如 resetGestureSequenceForRecordSync。
+   * @public
    */
   resetControlsToStopped() {
     this._applyExperimentLockState({ locked: false, allowParticipantEdit: true });

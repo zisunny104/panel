@@ -1,6 +1,10 @@
-import { SYNC_SESSION_STORAGE_KEYS } from "../constants/index.js";
-
 const resolveFromPage = (path) => new URL(path, window.location.href).href;
+
+const withVersion = (path, version) => {
+  const url = new URL(resolveFromPage(path));
+  url.searchParams.set("v", version);
+  return url.href;
+};
 
 const fetchAppVersion = async () => {
   try {
@@ -10,52 +14,25 @@ const fetchAppVersion = async () => {
     if (!response.ok) return null;
     const config = await response.json();
     return config?.version || null;
-  } catch (error) {
-    return null;
-  }
-};
-
-const applyVersionedAssets = (version) => {
-  const withVersion = (url) => {
-    const absolute = new URL(url, window.location.href);
-    absolute.searchParams.set("v", version);
-    return absolute.href;
-  };
-
-  document.querySelectorAll("[data-versioned]").forEach((el) => {
-    const attr = el.tagName === "LINK" ? "href" : "src";
-    const base = el.getAttribute(attr);
-    if (!base) return;
-    el.setAttribute(attr, withVersion(base));
-  });
-};
-
-const STORAGE_SCHEMA_VERSION = "2026-04-16-record-cleanup-v1";
-
-const safeStorageGet = (storage, key) => {
-  try {
-    return storage?.getItem?.(key) || null;
   } catch {
     return null;
   }
 };
 
-const safeStorageSet = (storage, key, value) => {
-  try {
-    storage?.setItem?.(key, value);
-  } catch {}
+const applyVersionedAssets = (version) => {
+  document.querySelectorAll("[data-versioned]").forEach((el) => {
+    const attr = el.tagName === "LINK" ? "href" : "src";
+    const base = el.getAttribute(attr);
+    if (!base) return;
+    el.setAttribute(attr, withVersion(base, version));
+  });
 };
 
-const safeStorageRemove = (storage, key) => {
-  try {
-    storage?.removeItem?.(key);
-  } catch {}
-};
+const STORAGE_SCHEMA_VERSION = "2026-04-16-record-cleanup-v1";
 
 const cleanupLegacyBrowserState = async () => {
   const schemaKey = "panel_storage_schema_version";
-  const currentSchemaVersion = window.localStorage?.getItem(schemaKey);
-  if (currentSchemaVersion === STORAGE_SCHEMA_VERSION) return;
+  if (window.localStorage?.getItem(schemaKey) === STORAGE_SCHEMA_VERSION) return;
 
   await new Promise((resolve) => {
     try {
@@ -68,11 +45,9 @@ const cleanupLegacyBrowserState = async () => {
     }
   });
 
-  [
-    "loggerMinimized",
-    "preferredCameraId",
-    "preferredCameraLabel",
-  ].forEach((key) => window.localStorage?.removeItem(key));
+  ["loggerMinimized", "preferredCameraId", "preferredCameraLabel"].forEach(
+    (key) => window.localStorage?.removeItem(key),
+  );
 
   window.localStorage?.setItem(schemaKey, STORAGE_SCHEMA_VERSION);
 };
@@ -85,9 +60,7 @@ export const bootstrapPage = async ({ entryModules = [] } = {}) => {
 
   applyVersionedAssets(version);
 
-  if (!Array.isArray(entryModules) || entryModules.length === 0) {
-    return;
-  }
+  if (!Array.isArray(entryModules) || entryModules.length === 0) return;
 
   // 先載入 Logger，避免後續模組輸出早於除錯管線就緒；其餘模組再平行載入以縮短啟動時間。
   const [firstModule, ...remainingModules] = entryModules;

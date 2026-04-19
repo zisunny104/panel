@@ -201,7 +201,6 @@ export async function initializePanelManagers(page) {
     throw new Error("ExperimentActionHandler 未初始化");
   }
 
-  page.experimentActionHandler.disableAutoProgress();
   page.panelSyncManager.updateDependencies({
     experimentFlowManager: page.experimentFlowManager,
     experimentSystemManager: page.experimentSystemManager,

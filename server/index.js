@@ -71,10 +71,20 @@ app.use((req, res, next) => {
 const publicPath = path.join(__dirname, "..");
 Logger.info("初始化靜態檔案服務");
 Logger.debug(`靜態檔案路徑: <cyan>${publicPath}</cyan>`);
+
+const REVALIDATE_EXTS = new Set([".html", ".htm", ".js", ".css"]);
+
 app.use(
   express.static(publicPath, {
     index: "index.html",
     extensions: ["html", "htm"],
+    setHeaders(res, filePath) {
+      const ext = path.extname(filePath).toLowerCase();
+      res.setHeader(
+        "Cache-Control",
+        REVALIDATE_EXTS.has(ext) ? "no-cache" : "public, max-age=86400",
+      );
+    },
   }),
 );
 

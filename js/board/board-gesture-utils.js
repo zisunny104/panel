@@ -205,5 +205,11 @@ export const createBoardGestureUtils = function (deps) {
     }
   };
 
-  return { activateGestureStep, markGesture, goToNextStep, resetGestureSequence };
+  return {
+    activateGestureStep,
+    focusGestureStep,
+    markGesture,
+    goToNextStep,
+    resetGestureSequence,
+  };
 };

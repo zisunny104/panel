@@ -228,6 +228,19 @@ class BoardPageManager {
       this._handleSystemCombinationSelected(combination, experimentId);
     });
 
+    window.addEventListener("experimentSystem:stopRequested", (event) => {
+      if (event.defaultPrevented) return;
+      if (!this.experimentSystemManager?.isExperimentRunning?.()) return;
+
+      Logger.debug("Board: 收到 stopRequested 事件，使用 BoardPageManager.stopExperiment 處理");
+      event.preventDefault();
+      this.stopExperiment({
+        reason: event.detail?.reason || "manual",
+        broadcast: event.detail?.broadcast !== false,
+        source: event.detail?.source || "ui",
+      });
+    });
+
     this.experimentFlowManager.on(
       ExperimentFlowManager.EVENT.STARTED,
       (data) => {
@@ -315,7 +328,8 @@ class BoardPageManager {
 
     this.updateExperimentStats();
 
-    this.gestureUtils?.activateGestureStep(0);
+    // 實驗開始時先聚焦第一步，避免自動啟動計時器
+    this.gestureUtils?.focusGestureStep(0);
 
     const container = document.querySelector(".container");
     const isStackedLayout =
@@ -917,16 +931,6 @@ class BoardPageManager {
     return true;
   }
 
-  handleUnitReorder(arg1, arg2) {
-    Logger.debug("handleUnitReorder called", { arg1, arg2 });
-    if (!this.experimentSystemManager?.requestUnitReorder) {
-      Logger.warn("Unit reorder 已收斂至 ExperimentSystemManager，缺少入口");
-      return;
-    }
-
-    this.experimentSystemManager.requestUnitReorder(arg1, arg2);
-  }
-
   /**
    * 更新全選複選框的狀態
    */
@@ -943,10 +947,6 @@ class BoardPageManager {
     const allItems = Array.from(
       unitList.querySelectorAll("li:not(.power-option-card)"),
     );
-
-    Logger.debug("updateUnitButtonStates: itemCount", {
-      count: allItems.length,
-    });
 
     allItems.forEach((li, index) => {
       const upBtn = li.querySelector(".unit-up-btn");

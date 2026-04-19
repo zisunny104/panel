@@ -50,7 +50,7 @@ class PowerControl {
     document.addEventListener("power_state_changed", (event) => {
       this._handlePowerActionCompletion(event.detail);
     });
-    this.updatePowerUIWithoutSync();
+   this.updatePowerUIWithoutSync();
   }
 
   updateDependencies(deps = {}) {
@@ -251,7 +251,7 @@ class PowerControl {
    * @private
    * @param {object} detail - `power_state_changed` 事件之資料 { powerState, isPowerVideoPlaying, timestamp }
    */
-  _handlePowerActionCompletion(detail) {
+  async _handlePowerActionCompletion(detail) {
     const actionHandler = this.experimentActionHandler;
     const flowManager = this.experimentFlowManager;
     if (!actionHandler) return;
@@ -282,22 +282,22 @@ class PowerControl {
       if (actionHandler.completedActions?.has(actionId)) {
         return;
       }
-      actionHandler.handleCorrectAction(actionId, {
-        source: "power_state",
-        powerState: detail?.powerState,
-      });
 
-      if (this.buttonManager) {
-        this.buttonManager.updateMediaForCurrentAction();
-      }
-
-      if (shouldCompletePowerOff) {
-        this._stopExperimentForShutdown();
+      const systemManager = this.experimentSystemManager;
+      if (systemManager?.handleCorrectAction) {
+        systemManager.handleCorrectAction(actionId, {
+          source: "power_state",
+          powerState: detail?.powerState,
+        });
+      } else {
+        actionHandler.handleCorrectAction(actionId, {
+          source: "power_state",
+          powerState: detail?.powerState,
+        });
       }
 
       const syncCore = this.experimentSyncCore;
       const syncClient = this.syncClient;
-      const systemManager = this.experimentSystemManager;
       const combinationManager = this.experimentCombinationManager;
       const experimentId = systemManager?.getExperimentId?.() || "";
       const currentCombo =
@@ -316,6 +316,18 @@ class PowerControl {
       }).catch((error) => {
         Logger.warn("同步電源 action 完成失敗:", error);
       });
+
+      if (shouldCompletePowerOn && this.buttonManager?.triggerStepCompleteEffect) {
+        Logger.debug("PowerControl: 電源開啟完成，啟動冷卻效果");
+        await this.buttonManager.triggerStepCompleteEffect({
+          advanceStep: false,
+          preserveHighlight: true,
+        });
+      }
+
+      if (shouldCompletePowerOff) {
+        this._stopExperimentForShutdown();
+      }
     }
   }
 
@@ -329,20 +341,40 @@ class PowerControl {
 
     const currentAction = actionHandler.getCurrentAction?.();
     const actionId = currentAction?.actionId || currentAction?.action_id || null;
+    Logger.debug("PowerControl: syncPowerActionWithState", {
+      currentActionId: actionId,
+      isPowerOn: this.isPowerOn,
+      isPowerVideoPlaying: this.isPowerVideoPlaying,
+    });
     if (!actionId) return;
 
+    const systemManager = this.experimentSystemManager;
     if (actionId === ACTION_IDS.POWER_ON && this.isPowerOn) {
-      actionHandler.handleCorrectAction(actionId, {
-        source: "power_state",
-        powerState: true,
-      });
+      if (systemManager?.handleCorrectAction) {
+        systemManager.handleCorrectAction(actionId, {
+          source: "power_state",
+          powerState: true,
+        });
+      } else {
+        actionHandler.handleCorrectAction(actionId, {
+          source: "power_state",
+          powerState: true,
+        });
+      }
     }
 
     if (actionId === ACTION_IDS.POWER_OFF && !this.isPowerOn) {
-      actionHandler.handleCorrectAction(actionId, {
-        source: "power_state",
-        powerState: false,
-      });
+      if (systemManager?.handleCorrectAction) {
+        systemManager.handleCorrectAction(actionId, {
+          source: "power_state",
+          powerState: false,
+        });
+      } else {
+        actionHandler.handleCorrectAction(actionId, {
+          source: "power_state",
+          powerState: false,
+        });
+      }
       this._stopExperimentForShutdown();
     }
   }
@@ -642,7 +674,7 @@ class PowerControl {
         return;
       }
       if (e.detail.powerState !== undefined) {
-        this.applyRemotePowerState(e.detail);
+        //this.applyRemotePowerState(e.detail); 補丁:關閉此功能
       }
     });
 

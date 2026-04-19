@@ -14,7 +14,7 @@
  * - board 端的 gesture step 推進由實驗者本人點擊手勢按鈕觸發，不由遠端驅動
  */
 
-import { RECORD_SOURCES, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { dispatchSessionRestoreEvents } from "../core/session-restore-events.js";
 
@@ -109,32 +109,6 @@ class BoardSyncIO {
       }
     });
 
-    window.addEventListener("experiment_id_broadcasted", async (event) => {
-      const { experimentId, client_id } = event.detail;
-      const page = this.pageManager;
-      const hubManager = page.experimentHubManager;
-
-      if (client_id === hubManager.getClientId()) {
-        return;
-      }
-
-      Logger.debug(`收到遠程實驗ID廣播: ${experimentId}`);
-
-      const currentId = this._getExperimentId();
-      if (experimentId && currentId !== experimentId) {
-        await page.experimentSystemManager?.setExperimentId?.(
-          experimentId,
-          RECORD_SOURCES.SYNC_BROADCAST,
-          {
-            registerToHub: false,
-            broadcast: false,
-            reapplyCombination: true,
-          },
-        );
-        page.experimentId = experimentId;
-        Logger.info(`已同步實驗ID到系統: ${experimentId}`);
-      }
-    });
   }
 
   /**
@@ -314,24 +288,13 @@ class BoardSyncIO {
         combination: currentCombination,
         experimentId,
       });
-      page.currentCombination =
-        page.experimentCombinationManager?.getCurrentCombination?.() ||
-        currentCombination;
+      page.currentCombination = currentCombination;
       if (loadedUnits) {
         page.loadedUnits = loadedUnits;
       }
     }
 
     if (!page.experimentRunning) {
-      if (currentCombination && !page.pendingCombinationUpdate) {
-        page.currentCombination =
-          page.experimentCombinationManager?.getCurrentCombination?.() ||
-          currentCombination;
-      }
-      if (loadedUnits && !page.pendingCombinationUpdate) {
-        page.loadedUnits = loadedUnits;
-      }
-
       page.startExperiment();
     }
   }

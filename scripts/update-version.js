@@ -14,6 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const CONFIG_PATH = path.join(__dirname, "..", "data", "config.json");
+const PACKAGE_PATH = path.join(__dirname, "..", "package.json");
 
 /**
  * 取得 git commit hash
@@ -53,6 +54,33 @@ function writeConfig(config) {
     console.log("config.json 已更新");
   } catch (error) {
     console.error("寫入 config.json 失敗:", error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * 讀取 package.json
+ */
+function readPackageJson() {
+  try {
+    const packageData = fs.readFileSync(PACKAGE_PATH, "utf8");
+    return JSON.parse(packageData);
+  } catch (error) {
+    console.error("讀取 package.json 失敗:", error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * 寫入 package.json
+ */
+function writePackageJson(packageJson) {
+  try {
+    const formattedPackage = JSON.stringify(packageJson, null, 4);
+    fs.writeFileSync(PACKAGE_PATH, formattedPackage + "\n", "utf8");
+    console.log("package.json 已更新");
+  } catch (error) {
+    console.error("寫入 package.json 失敗:", error.message);
     process.exit(1);
   }
 }
@@ -135,6 +163,13 @@ function updateVersion() {
       .replace(/\//g, "-") + ".000Z";
 
   writeConfig(config);
+
+  const packageJson = readPackageJson();
+  if (packageJson.version !== newVersion) {
+    packageJson.version = newVersion;
+    writePackageJson(packageJson);
+  }
+
   return true;
 }
 

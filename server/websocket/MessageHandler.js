@@ -268,11 +268,16 @@ export class MessageHandler {
         return;
       }
 
+      // 電源狀態為即時揮發性資訊，不儲存至 experimentState（避免 session 恢復時意外開機）
+      const isEphemeralState = state.type === "power_state_update";
+
       // 更新工作階段狀態（記憶體層：公開頻道與私人階段皆適用）
-      this.sessionManager.setExperimentState(sessionId, state);
+      if (!isEphemeralState) {
+        this.sessionManager.setExperimentState(sessionId, state);
+      }
 
       // 更新持久層（私人工作階段）
-      if (!sessionId.startsWith(PUBLIC_CHANNEL_PREFIX)) {
+      if (!isEphemeralState && !sessionId.startsWith(PUBLIC_CHANNEL_PREFIX)) {
         try {
           this.sessionService.mergeState(sessionId, state);
           this.sessionService.updateLastActive(sessionId);
@@ -411,8 +416,22 @@ export class MessageHandler {
         return ` | 受試者: <green>${state.participantName || "N/A"}</green>`;
       case "experimentIdUpdate":
         return ` | 實驗ID: <green>${state.experimentId || "N/A"}</green>`;
-      case "combination_selected":
-        return ` | 組合: <green>${state.combination || "N/A"}</green>`;
+      case "combination_selected": {
+        const combo = state.combination;
+        if (typeof combo === "string") {
+          return ` | 組合: <green>${combo || "N/A"}</green>`;
+        }
+        if (combo && typeof combo === "object") {
+          if (combo.combinationName) {
+            return ` | 組合: <green>${combo.combinationName}</green>`;
+          }
+          if (combo.combinationId) {
+            return ` | 組合ID: <green>${combo.combinationId}</green>`;
+          }
+          return ` | 組合: <green>${JSON.stringify(combo)}</green>`;
+        }
+        return ` | 組合: <green>N/A</green>`;
+      }
       case "experimentStateUpdate":
         return ` | 狀態: <green>${state.experimentState || "N/A"}</green>`;
       case "button_pressed":

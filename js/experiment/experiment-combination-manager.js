@@ -611,10 +611,9 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
   /**
    * 處理實驗ID改變事件
    */
-  handleExperimentIdChanged(newExperimentId) {
+  handleExperimentIdChanged(newExperimentId, { skipBroadcast = false } = {}) {
     Logger.debug("ExperimentCombinationManager: 實驗ID已改變", newExperimentId);
 
-    // 如果有目前組合，以新 experimentId 為種子重新計算單元排序
     if (this.currentCombination) {
       this.loadedUnits = this.getCombinationUnitIds(
         this.currentCombination,
@@ -627,15 +626,15 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
         powerOptions: this.currentCombination.powerOptions || null,
       });
 
-      // 觸發組合重新選擇事件，讓 UI 更新排序
       this.emit(ExperimentCombinationManager.EVENT.COMBINATION_SELECTED, {
         combination: this.currentCombination,
         unitIds: this.loadedUnits,
         experimentId: newExperimentId,
       });
 
-      // 廣播重新排序的組合到其他裝置
-      this._broadcastCombinationSelection(this.currentCombination);
+      if (!skipBroadcast) {
+        this._broadcastCombinationSelection(this.currentCombination);
+      }
 
       Logger.debug("組合單元已根據新實驗ID重新排序", {
         combinationName: this.currentCombination.combinationName,

@@ -205,31 +205,30 @@ class RecordView {
 
       <div class="form-group">
         <div id="recordEntriesContainer">
-          <div class="records-list-loading records-list-loading-skeleton" role="status" aria-live="polite">
-            <div class="records-list-loading-header">
-              <div class="skeleton-line w-30"></div>
-              <div class="skeleton-line w-15"></div>
-            </div>
-            <div class="records-skeleton-list">
-              <div class="records-skeleton-item">
-                <div class="skeleton-line w-70"></div>
-                <div class="skeleton-line w-40"></div>
-              </div>
-              <div class="records-skeleton-item">
-                <div class="skeleton-line w-80"></div>
-                <div class="skeleton-line w-45"></div>
-              </div>
-              <div class="records-skeleton-item">
-                <div class="skeleton-line w-65"></div>
-                <div class="skeleton-line w-35"></div>
-              </div>
-            </div>
-            <div class="records-loading-caption">正在準備實驗日誌...</div>
-          </div>
+          ${this._renderRecordListSkeleton()}
         </div>
       </div>`;
 
     this._bindRecordListActions();
+  }
+
+  _renderRecordListSkeleton() {
+    return `
+      <div class="records-list records-list-loading-skeleton" role="list">
+        <div class="records-skeleton-item">
+          <div class="skeleton-line w-70"></div>
+          <div class="skeleton-line w-40"></div>
+        </div>
+        <div class="records-skeleton-item">
+          <div class="skeleton-line w-80"></div>
+          <div class="skeleton-line w-45"></div>
+        </div>
+        <div class="records-skeleton-item">
+          <div class="skeleton-line w-65"></div>
+          <div class="skeleton-line w-35"></div>
+        </div>
+      </div>
+      <div class="records-loading-caption">正在準備實驗日誌...</div>`;
   }
 
   // ─── 即時日誌顯示 ──────────────────────────────────────────────────────────
@@ -573,11 +572,7 @@ class RecordView {
     const container = document.getElementById("recordEntriesContainer");
     if (!container) { this._isLoadingList = false; return; }
 
-    container.innerHTML = `
-      <div class="records-loading">
-        <div class="loading-spinner"></div>
-        <div class="records-loading-text">載入實驗日誌中...</div>
-      </div>`;
+    container.innerHTML = this._renderRecordListSkeleton();
 
     try {
       const logsDir = await this.getRecordsDirectory();
@@ -731,6 +726,25 @@ class RecordView {
     const stats = this.calculateRecordStatistics(experiment.logs);
     const jsonlContent = experiment.logs.map((e) => JSON.stringify(e)).join("\n");
     this.showRecordViewModal(recordId, stats, jsonlContent);
+  }
+
+  _buildCurrentRecordCopyHeader() {
+    const records = Array.isArray(this.recordManager?.records)
+      ? this.recordManager.records
+      : [];
+    const expStart = records.find((record) => record.type === RECORD_TYPES.EXP_START);
+    const experimentId = expStart?.exp_id || "未知";
+    const participantName = expStart?.participant || this.recordManager?.participantName || "";
+    const combinationName = expStart?.combo_name || expStart?.combo_id || this.getCombination?.()?.combinationName || "";
+    const startedAt = expStart?.ts ? new Date(expStart.ts).toISOString() : "";
+
+    const headerLines = ["--- 實驗基本資訊 ---"];
+    headerLines.push(`實驗 ID: ${experimentId}`);
+    if (participantName) headerLines.push(`受試者: ${participantName}`);
+    if (combinationName) headerLines.push(`組合: ${combinationName}`);
+    if (startedAt) headerLines.push(`開始時間: ${startedAt}`);
+    headerLines.push("-------------------");
+    return headerLines;
   }
 
   /**
@@ -893,8 +907,11 @@ class RecordView {
     const lines = entries.map((e) => e.textContent?.trim()).filter(Boolean);
     if (summary?.textContent?.trim()) lines.push(summary.textContent.trim());
 
+    const headerLines = this._buildCurrentRecordCopyHeader();
+    const outputLines = [...headerLines, ...lines];
+
     try {
-      await navigator.clipboard.writeText(lines.join("\n"));
+      await navigator.clipboard.writeText(outputLines.join("\n"));
       if (triggerEl instanceof HTMLElement) {
         triggerEl.classList.add("copied");
         const originalTitle = triggerEl.title;

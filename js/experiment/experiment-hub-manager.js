@@ -1,7 +1,7 @@
 /**
  * ExperimentHubManager - 實驗中樞管理器
  *
- * 負責管理實驗 ID（面板端、Hub 端、組合 ID）和同步模式（Local / Hub / Viewer），
+ * 負責管理實驗 ID 和同步模式（Local / Hub / Viewer），
  * 處理與中樞伺服器的通訊和事件通知，支援多裝置協同實驗。
  */
 
@@ -31,7 +31,6 @@ class ExperimentHubManager extends EventEmitter {
     };
 
     this.ids = {
-      board: null,
       hub: null,
       experiment: null,
       combination: null,
@@ -47,6 +46,9 @@ class ExperimentHubManager extends EventEmitter {
     this.syncClientReady = false;
     this.reconnectTimer = null;
     this.syncManager = config.syncManager || null;
+    this._pendingExperimentIdRegistration = null;
+    this._lastRegisteredExperimentId = null;
+    this._experimentIdSetAfterSyncReady = false;
     this.syncClient = config.syncClient || null;
     this.experimentSyncCore = config.experimentSyncCore || null;
     this.roleConfig = {
@@ -106,33 +108,6 @@ class ExperimentHubManager extends EventEmitter {
   }
 
   /**
-  * 設定面板端 ID
-   */
-  setBoardId(id, options = {}) {
-    const oldId = this.ids.board;
-    this.ids.board = id;
-
-    if (!options.silent) {
-      this.saveIds();
-      this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.ID_CHANGED, {
-        type: "board",
-        oldValue: oldId,
-        newValue: id,
-      });
-    }
-
-    Logger.debug("面板端 ID 已設定", id);
-    return id;
-  }
-
-  /**
-  * 取得面板端 ID
-   */
-  getBoardId() {
-    return this.ids.board;
-  }
-
-  /**
    * 設定 Hub ID
    */
   setHubId(id, options = {}) {
@@ -165,6 +140,9 @@ class ExperimentHubManager extends EventEmitter {
   setExperimentId(id, source = RECORD_SOURCES.LOCAL_INPUT, options = {}) {
     const oldId = this.ids.experiment;
     this.ids.experiment = id;
+    if (this.syncClientReady) {
+      this._experimentIdSetAfterSyncReady = true;
+    }
 
     if (!options.silent) {
       this.saveIds();
@@ -264,12 +242,24 @@ class ExperimentHubManager extends EventEmitter {
         };
 
         this.connection.wsClient.send(message);
+        this._lastRegisteredExperimentId = experimentId;
+        this._pendingExperimentIdRegistration = null;
         Logger.debug("實驗 ID 註冊訊息已發送", message);
         return true;
-      } else {
-        Logger.warn("WebSocket 未連接，無法註冊實驗 ID");
+      }
+
+      if (this.connection.wsClient && !this.connection.connected) {
+        Logger.warn(
+          "WebSocket 尚未連接，將在連線後重新註冊實驗 ID",
+          experimentId,
+        );
+        this._pendingExperimentIdRegistration = experimentId;
         return false;
       }
+
+      Logger.warn("WebSocket 未連接，無法註冊實驗 ID");
+      this._pendingExperimentIdRegistration = experimentId;
+      return false;
     } catch (error) {
       Logger.error("註冊實驗 ID 失敗:", error);
       return false;
@@ -355,7 +345,6 @@ class ExperimentHubManager extends EventEmitter {
     const oldIds = { ...this.ids };
 
     this.ids = {
-      board: null,
       hub: null,
       experiment: null,
       combination: null,
@@ -564,15 +553,16 @@ class ExperimentHubManager extends EventEmitter {
       this.connection.role = syncClient.getRole();
       this.updateModeFromRole();
     }
+
+    this._flushPendingExperimentIdRegistration();
   }
 
   /**
-   * 從 SyncClient 最近一次工作階段快照還原 experimentId，避免初始化時序造成值遺失
+   * 從 SyncClient 快照中擷取可用的 experimentId。
    */
-  hydrateExperimentIdFromSessionState() {
-    const snapshot = this.syncClient?.getLatestSessionState?.();
+  _getExperimentIdFromSessionSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== "object") {
-      return;
+      return null;
     }
 
     const experimentState = snapshot.experimentState;
@@ -584,12 +574,40 @@ class ExperimentHubManager extends EventEmitter {
       topState?.registeredExperimentId ||
       null;
 
-    if (typeof restoredExperimentId !== "string") {
+    return typeof restoredExperimentId === "string"
+      ? restoredExperimentId.trim()
+      : null;
+  }
+
+  _shouldRestoreExperimentIdFromSnapshot(normalized, currentExperimentId) {
+    if (!normalized) {
+      return false;
+    }
+    if (!currentExperimentId) {
+      return true;
+    }
+    if (currentExperimentId === normalized) {
+      return false;
+    }
+    if (this._experimentIdSetAfterSyncReady) {
+      Logger.debug("已有同步就緒後的實驗 ID，跳過從工作階段快照還原舊 ID", {
+        currentExperimentId,
+        restoredExperimentId: normalized,
+      });
+      return false;
+    }
+    return true;
+  }
+
+  hydrateExperimentIdFromSessionState() {
+    const snapshot = this.syncClient?.getLatestSessionState?.();
+    const normalized = this._getExperimentIdFromSessionSnapshot(snapshot);
+    if (!normalized) {
       return;
     }
 
-    const normalized = restoredExperimentId.trim();
-    if (!normalized || this.getExperimentId() === normalized) {
+    const currentExperimentId = this.getExperimentId();
+    if (!this._shouldRestoreExperimentIdFromSnapshot(normalized, currentExperimentId)) {
       return;
     }
 
@@ -613,6 +631,8 @@ class ExperimentHubManager extends EventEmitter {
       this.updateModeFromRole();
       this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.CONNECTED, data);
       Logger.debug("[HubManager] WebSocket 已認證", data);
+      this.hydrateExperimentIdFromSessionState();
+      this._flushPendingExperimentIdRegistration();
     });
 
     ws.on(EXPERIMENT_HUB_CONSTANTS.WS_CLIENT_EVENTS.DISCONNECTED, () => {
@@ -631,6 +651,8 @@ class ExperimentHubManager extends EventEmitter {
       this.updateModeFromRole();
       this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.CONNECTED, data);
       Logger.info("[HubManager] WebSocket 已重新連線", data);
+      this.hydrateExperimentIdFromSessionState();
+      this._flushPendingExperimentIdRegistration();
     });
 
     ws.on(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
@@ -644,24 +666,9 @@ class ExperimentHubManager extends EventEmitter {
       }
     });
 
-    [
-      SYNC_EVENTS.EXPERIMENT_STARTED,
-      SYNC_EVENTS.EXPERIMENT_PAUSED,
-      SYNC_EVENTS.EXPERIMENT_RESUMED,
-      SYNC_EVENTS.EXPERIMENT_STOPPED,
-    ].forEach((eventName) => {
-      ws.on(eventName, (data) => {
-        Logger.debug(`收到 ${eventName}`, data);
-
-        if (eventName === SYNC_EVENTS.EXPERIMENT_STARTED) {
-          this.handleExperimentStartedBroadcast(data);
-        }
-
-        this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.MESSAGE_RECEIVED, {
-          type: eventName,
-          data,
-        });
-      });
+    ws.on(SYNC_EVENTS.EXPERIMENT_STARTED, (data) => {
+      Logger.debug(`收到 ${SYNC_EVENTS.EXPERIMENT_STARTED}`, data);
+      this.handleExperimentStartedBroadcast(data);
     });
   }
 
@@ -720,6 +727,20 @@ class ExperimentHubManager extends EventEmitter {
 
     Logger.debug("等待 Hub 連接...");
     return true;
+  }
+
+  _flushPendingExperimentIdRegistration() {
+    const pendingId = this._pendingExperimentIdRegistration;
+    if (!pendingId) {
+      return;
+    }
+
+    if (!this.connection.wsClient || !this.connection.connected) {
+      return;
+    }
+
+    Logger.debug("連接完成，嘗試重新註冊待處理的實驗 ID", pendingId);
+    this.registerExperimentId(pendingId);
   }
 
   /**
