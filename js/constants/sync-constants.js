@@ -117,14 +117,6 @@ export const SYNC_SESSION_STORAGE_KEYS = {
   ROLE: "sync_role",
 };
 
-// 舊版同步工作階段儲存鍵
-export const SYNC_SESSION_STORAGE_LEGACY_KEYS = {
-  SESSION_ID: "sync_session_id",
-  CLIENT_ID: "sync_client_id",
-  ROLE: "sync_preferred_role",
-  BACKUP: "sync_session_backup",
-};
-
 // 同步客戶端常數
 export const SYNC_CLIENT_CONSTANTS = {
   STORAGE_PREFIX: "panel_sync_",

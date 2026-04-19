@@ -3,6 +3,8 @@
  * 集中管理實驗流程、組合與動作處理所需的事件與預設值。
  */
 
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
+
 // ========== 動作處理 ==========
 export const EXPERIMENT_ACTION_HANDLER_EVENTS = {
   ACTION_VALIDATED: "action:validated",
@@ -91,8 +93,8 @@ export const EXPERIMENT_HUB_CONSTANTS = {
     SYNC_CLIENT_READY_TIMEOUT_MS: 30000,
   },
   MESSAGE_TYPES: {
-    EXPERIMENT_ID_REGISTER: "experiment_id_register",
-    EXPERIMENT_ID_UPDATE: "experiment_id_update",
+    EXPERIMENT_ID_REGISTER: WS_PROTOCOL.C2S.EXPERIMENT_ID_REGISTER,
+    EXPERIMENT_ID_UPDATE: WS_PROTOCOL.C2S.EXPERIMENT_ID_UPDATE,
     SEND_FAILED: "send_failed",
   },
   WS_CLIENT_EVENTS: {

@@ -137,9 +137,3 @@ export function getSyncMaxClients() {
   }
   return SERVER_CONFIG.session.maxClients;
 }
-
-export function getValidCreateCodeDescription() {
-  const config = businessConfig || loadBusinessConfigSync();
-  const description = config.multiScreenSync?.validCreateCodeDescription;
-  return typeof description === "string" ? description : "";
-}

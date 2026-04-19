@@ -557,11 +557,46 @@ class ExperimentHubManager extends EventEmitter {
 
     this.setupEventHandlers();
 
+    this.hydrateExperimentIdFromSessionState();
+
     if (syncClient?.isConnected?.()) {
       this.connection.connected = true;
       this.connection.role = syncClient.getRole();
       this.updateModeFromRole();
     }
+  }
+
+  /**
+   * 從 SyncClient 最近一次工作階段快照還原 experimentId，避免初始化時序造成值遺失
+   */
+  hydrateExperimentIdFromSessionState() {
+    const snapshot = this.syncClient?.getLatestSessionState?.();
+    if (!snapshot || typeof snapshot !== "object") {
+      return;
+    }
+
+    const experimentState = snapshot.experimentState;
+    const topState = snapshot.state;
+    const restoredExperimentId =
+      experimentState?.experimentId ||
+      experimentState?.registeredExperimentId ||
+      topState?.experimentId ||
+      topState?.registeredExperimentId ||
+      null;
+
+    if (typeof restoredExperimentId !== "string") {
+      return;
+    }
+
+    const normalized = restoredExperimentId.trim();
+    if (!normalized || this.getExperimentId() === normalized) {
+      return;
+    }
+
+    this.setExperimentId(normalized, RECORD_SOURCES.HUB_SYNC, {
+      silent: false,
+    });
+    Logger.debug("從工作階段快照還原實驗 ID", normalized);
   }
 
   /**

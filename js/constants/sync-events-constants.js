@@ -3,6 +3,8 @@
  * 統一定義所有同步事件名稱，確保發送端和接收端使用相同的事件名稱
  */
 
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
+
 export const SYNC_EVENTS = {
   // 工作階段事件
   SESSION_CREATED: "sync_session_created",
@@ -104,7 +106,7 @@ export const SYNC_DATA_TYPES = {
 
   // 實驗資訊更新
   PARTICIPANT_NAME_UPDATE: "participant_name_update",
-  EXPERIMENT_ID_UPDATE: "experiment_id_update",
+  EXPERIMENT_ID_UPDATE: WS_PROTOCOL.C2S.EXPERIMENT_ID_UPDATE,
   COMBINATION_SELECTED: "combination_selected",
 
   // 動作與步驟

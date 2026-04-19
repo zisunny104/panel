@@ -16,7 +16,6 @@ import {
 } from "../utils/sync-role-guard.js";
 import {
   getValidCreateCode,
-  getValidCreateCodeDescription,
   getSyncEnableFlag,
   getSyncMaxClients,
 } from "../config/server.js";
@@ -78,7 +77,7 @@ router.post("/session", (req, res) => {
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
       success: false,
       error: ERROR_CODES.INVALID_CREATE_CODE,
-      message: getValidCreateCodeDescription() || "建立代碼無效",
+      message: "建立代碼無效",
     });
   }
 

@@ -43,9 +43,10 @@
 }
 
 /* 統一的可滾動內容區域 */
-border: 2px solid transparent;
-background-clip: padding-box;
-min-height: 40px;
+.sync-panel-body::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
 }
 
 .sync-panel-body::-webkit-scrollbar-thumb:hover {

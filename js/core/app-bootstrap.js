@@ -1,6 +1,4 @@
-import {
-  SYNC_SESSION_STORAGE_LEGACY_KEYS,
-} from "../constants/index.js";
+import { SYNC_SESSION_STORAGE_KEYS } from "../constants/index.js";
 
 const resolveFromPage = (path) => new URL(path, window.location.href).href;
 
@@ -34,6 +32,26 @@ const applyVersionedAssets = (version) => {
 
 const STORAGE_SCHEMA_VERSION = "2026-04-16-record-cleanup-v1";
 
+const safeStorageGet = (storage, key) => {
+  try {
+    return storage?.getItem?.(key) || null;
+  } catch {
+    return null;
+  }
+};
+
+const safeStorageSet = (storage, key, value) => {
+  try {
+    storage?.setItem?.(key, value);
+  } catch {}
+};
+
+const safeStorageRemove = (storage, key) => {
+  try {
+    storage?.removeItem?.(key);
+  } catch {}
+};
+
 const cleanupLegacyBrowserState = async () => {
   const schemaKey = "panel_storage_schema_version";
   const currentSchemaVersion = window.localStorage?.getItem(schemaKey);
@@ -52,10 +70,6 @@ const cleanupLegacyBrowserState = async () => {
 
   [
     "loggerMinimized",
-    SYNC_SESSION_STORAGE_LEGACY_KEYS.BACKUP,
-    SYNC_SESSION_STORAGE_LEGACY_KEYS.SESSION_ID,
-    SYNC_SESSION_STORAGE_LEGACY_KEYS.CLIENT_ID,
-    SYNC_SESSION_STORAGE_LEGACY_KEYS.ROLE,
     "preferredCameraId",
     "preferredCameraLabel",
   ].forEach((key) => window.localStorage?.removeItem(key));

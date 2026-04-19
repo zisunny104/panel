@@ -15,6 +15,8 @@ export const WS_PROTOCOL = {
     HEARTBEAT: "heartbeat",
     STATE_UPDATE: "state_update",
     EXPERIMENT_STATE_REGISTER: "experiment_state_register",
+    EXPERIMENT_ID_REGISTER: "experiment_id_register",
+    EXPERIMENT_ID_UPDATE: "experiment_id_update",
     GET_SESSION_STATE: "get_session_state",
     PING: "ping",
   },

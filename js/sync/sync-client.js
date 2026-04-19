@@ -72,6 +72,7 @@ class SyncClient {
     this.pendingStateUpdate = null;
     this.stateUpdateFlushScheduled = false;
     this.stateUpdateFlushTimer = null;
+    this.latestSessionState = null;
 
     // 如果有儲存的 sessionId，代表之前加入過工作階段
     if (this.sessionId) {
@@ -308,6 +309,7 @@ class SyncClient {
 
     this.wsClient.on(WS_PROTOCOL.S2C.SESSION_STATE, (data) => {
       Logger.debug("收到工作階段狀態", data);
+      this.latestSessionState = data || null;
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.SESSION_STATE, { detail: data }),
       );
@@ -454,6 +456,10 @@ class SyncClient {
     });
 
     if (data.data.state) {
+      this.latestSessionState = {
+        state: data.data.state,
+        source: SYNC_CLIENT_CONSTANTS.JOIN_RESPONSE_SOURCE,
+      };
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.SESSION_STATE, {
           detail: {
@@ -914,6 +920,7 @@ class SyncClient {
       this.sessionId = null;
       this.clientId = null;
       this.role = this.roleConfig.LOCAL;
+      this.latestSessionState = null;
       this.connectionAttempted = false;
 
       Logger.debug("同步狀態已重置");
@@ -1095,6 +1102,14 @@ class SyncClient {
    */
   getRole() {
     return this.role;
+  }
+
+  /**
+   * 取得最近一次工作階段快照（由 join 回應或 WebSocket session_state 更新）
+   * @returns {Object|null}
+   */
+  getLatestSessionState() {
+    return this.latestSessionState || null;
   }
 
   /**

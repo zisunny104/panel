@@ -18,7 +18,6 @@ import {
   GESTURE_ATTEMPT_TYPE_LABELS,
   RECORD_SOURCES,
   SYNC_EVENTS,
-  SYNC_SESSION_STORAGE_LEGACY_KEYS,
 } from "../constants/index.js";
 import { recordStore } from "./record-store.js";
 import { recordRuntime } from "./record-runtime.js";
@@ -539,10 +538,6 @@ class RecordManager {
           this.db = null;
           const keys = [
             "loggerMinimized",
-            SYNC_SESSION_STORAGE_LEGACY_KEYS.BACKUP,
-            SYNC_SESSION_STORAGE_LEGACY_KEYS.SESSION_ID,
-            SYNC_SESSION_STORAGE_LEGACY_KEYS.CLIENT_ID,
-            SYNC_SESSION_STORAGE_LEGACY_KEYS.ROLE,
             "preferredCameraId",
             "preferredCameraLabel",
           ];

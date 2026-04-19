@@ -52,10 +52,6 @@
     box-shadow: 0 8px 16px rgba(102, 126, 234, 0.25) !important;
 }
 
-.gesture-card-inactive {
-    /* 預設狀態，無需額外樣式 */
-}
-
 /* 目前作用中的手勢卡片：外框加粗表示目前位置 */
 .gesture-card-current {
     outline: 3px solid #667eea;

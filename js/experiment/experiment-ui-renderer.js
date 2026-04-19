@@ -874,7 +874,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
             <div class="form-group experiment-control-group">
               <div class="experiment-control-header">
                 <span class="experiment-control-title">實驗控制</span>
-                ${config.showTimer ? `<div id="experimentTimer" class="experiment-timer">00:00.000</div>` : ""}
+                ${config.showTimer ? "<div id=\"experimentTimer\" class=\"experiment-timer\">00:00.000</div>" : ""}
               </div>
               <div id="experimentIdRow" class="experiment-start-row">
                 <button id="startExperimentBtn" class="experiment-start-btn btn-success">▶ 開始實驗</button>

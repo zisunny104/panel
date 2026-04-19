@@ -92,6 +92,7 @@ body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats,
 body.board-page.board-booting[data-board-stage="modules_init"] #recordsList,
 body.board-page.board-booting[data-board-stage="modules_init"] #contentArea {
     visibility: visible;
+    position: relative;
 }
 
 body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings>*:not(h2),
@@ -114,4 +115,91 @@ body.board-page.board-booting[data-board-stage="components_init"] #experimentSta
 body.board-page.board-booting[data-board-stage="components_init"] #recordsList>*,
 body.board-page.board-booting[data-board-stage="components_init"] #contentArea>* {
     visibility: visible;
+}
+
+/* ===== Board 骨架載入動畫 ===== */
+
+@keyframes board-skeleton-sweep {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* 骨架掃光共用：::after 全覆蓋後平移 */
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings::after,
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats::after,
+body.board-page.board-booting[data-board-stage="modules_init"] #recordsList::after,
+body.board-page.board-booting[data-board-stage="modules_init"] #contentArea::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        105deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.45) 50%,
+        transparent 70%
+    );
+    animation: board-skeleton-sweep 1.6s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ── 左側三個 section：大卡片 #f5f5f5，內嵌白色小卡片模擬真實內容區塊 ── */
+
+/* 實驗設定：標題佔位 + 組合選擇（100px）、單元面板（130px）、控制區（100px） */
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings {
+    background:
+        /* 標題佔位 */ linear-gradient(#c8ccd6 100%, transparent 0) 12px  12px / 48% 32px no-repeat,
+        /* 內容卡 1 */ linear-gradient(#fff 100%, transparent 0) 12px  56px / calc(100% - 24px) 100px no-repeat,
+        /* 內容卡 2 */ linear-gradient(#fff 100%, transparent 0) 12px 166px / calc(100% - 24px) 130px no-repeat,
+        /* 內容卡 3 */ linear-gradient(#fff 100%, transparent 0) 12px 306px / calc(100% - 24px) 100px no-repeat,
+        #f5f5f5;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    min-height: 420px;
+    overflow: hidden;
+}
+
+/* 實驗狀態：標題佔位 + 日誌面板（140px）、統計格（70px） */
+body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats {
+    background:
+        /* 標題佔位 */ linear-gradient(#c8ccd6 100%, transparent 0) 12px  12px / 42% 32px no-repeat,
+        /* 內容卡 1 */ linear-gradient(#fff 100%, transparent 0) 12px  56px / calc(100% - 24px) 140px no-repeat,
+        /* 內容卡 2 */ linear-gradient(#fff 100%, transparent 0) 12px 206px / calc(100% - 24px)  70px no-repeat,
+        #f5f5f5;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    min-height: 300px;
+    overflow: hidden;
+}
+
+/* 實驗日誌：標題佔位 + 4 條記錄條目（各 56px，8px gap） */
+body.board-page.board-booting[data-board-stage="modules_init"] #recordsList {
+    background:
+        /* 標題佔位 */ linear-gradient(#c8ccd6 100%, transparent 0) 12px  12px / 44% 32px no-repeat,
+        /* 記錄條 1 */ linear-gradient(#fff 100%, transparent 0) 12px  56px / calc(100% - 24px)  56px no-repeat,
+        /* 記錄條 2 */ linear-gradient(#fff 100%, transparent 0) 12px 122px / calc(100% - 24px)  56px no-repeat,
+        /* 記錄條 3 */ linear-gradient(#fff 100%, transparent 0) 12px 188px / calc(100% - 24px)  56px no-repeat,
+        /* 記錄條 4 */ linear-gradient(#fff 100%, transparent 0) 12px 254px / calc(100% - 24px)  56px no-repeat,
+        #f5f5f5;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    min-height: 340px;
+    overflow: hidden;
+}
+
+/* ── 右側 contentArea：大卡片（與真實卡片同色 #f5f5f5），內嵌白色小卡片 ── */
+body.board-page.board-booting[data-board-stage="modules_init"] #contentArea {
+    /* 大卡片底色同 .input-section */
+    background:
+        /* 標題佔位 */ linear-gradient(#c8ccd6 100%, transparent 0) 12px  12px / 38% 32px no-repeat,
+        /* 手勢卡 1 */ linear-gradient(#fff 100%, transparent 0) 12px  56px / calc(100% - 24px) 200px no-repeat,
+        /* 手勢卡 2 */ linear-gradient(#fff 100%, transparent 0) 12px 264px / calc(100% - 24px) 200px no-repeat,
+        /* 手勢卡 3 */ linear-gradient(#fff 100%, transparent 0) 12px 472px / calc(100% - 24px) 200px no-repeat,
+        /* 手勢卡 4 */ linear-gradient(#fff 100%, transparent 0) 12px 680px / calc(100% - 24px) 200px no-repeat,
+        /* 大卡片底 */ #f5f5f5;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    min-height: 900px;
+    overflow: hidden;
+    gap: 0;
 }

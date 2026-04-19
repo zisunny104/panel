@@ -15,7 +15,6 @@ import {
   SYNC_STATUS_CONFIG,
   SYNC_PAGE_CONFIG,
   SYNC_SESSION_STORAGE_KEYS,
-  SYNC_SESSION_STORAGE_LEGACY_KEYS,
   SYNC_ROLE_TEXTS,
   SYNC_MODE_TEXTS,
   SYNC_STATUS_TEXTS,
@@ -53,7 +52,7 @@ function safeRemove(storage, key) {
 
 /**
  * 建立同步工作階段儲存介面。
- * 支援目前鍵名與舊版鍵名，供同步管理器還原、保存與清除狀態使用。
+ * 使用目前鍵名，供同步管理器還原、保存與清除狀態使用。
  * @param {Object} [param0={}]
  * @param {Storage} [param0.session=window.sessionStorage]
  * @param {Storage} [param0.local=window.localStorage]
@@ -68,26 +67,12 @@ function createSyncSessionStore({
     CLIENT_ID,
     ROLE,
   } = SYNC_SESSION_STORAGE_KEYS;
-  const {
-    SESSION_ID: LEGACY_SESSION_ID,
-    CLIENT_ID: LEGACY_CLIENT_ID,
-    ROLE: LEGACY_ROLE,
-    BACKUP: LEGACY_BACKUP,
-  } = SYNC_SESSION_STORAGE_LEGACY_KEYS;
 
   return {
     load() {
-      const sessionId =
-        safeGet(session, SESSION_ID) ||
-        safeGet(session, LEGACY_SESSION_ID) ||
-        safeGet(local, LEGACY_SESSION_ID);
-
-      const clientId =
-        safeGet(session, CLIENT_ID) ||
-        safeGet(session, LEGACY_CLIENT_ID) ||
-        safeGet(local, LEGACY_CLIENT_ID);
-
-      const role = safeGet(session, ROLE) || safeGet(local, LEGACY_ROLE);
+      const sessionId = safeGet(session, SESSION_ID);
+      const clientId = safeGet(session, CLIENT_ID);
+      const role = safeGet(session, ROLE);
 
       return {
         sessionId: sessionId || null,
@@ -103,13 +88,10 @@ function createSyncSessionStore({
     },
 
     clear() {
-      [SESSION_ID, CLIENT_ID, ROLE].forEach((key) => safeRemove(session, key));
-      [LEGACY_SESSION_ID, LEGACY_CLIENT_ID, LEGACY_ROLE, LEGACY_BACKUP].forEach(
-        (key) => {
-          safeRemove(session, key);
-          safeRemove(local, key);
-        },
-      );
+      [SESSION_ID, CLIENT_ID, ROLE].forEach((key) => {
+        safeRemove(session, key);
+        safeRemove(local, key);
+      });
     },
   };
 }
@@ -229,6 +211,31 @@ class SyncManager {
     }
   }
 
+  _addManagedListener(target, event, handler) {
+    target.addEventListener(event, handler);
+    this.eventListeners.push({ target, event, handler });
+  }
+
+  _finalizeClientInitialization(initStart, serverOnline) {
+    this.initialized = true;
+    this.serverOnline = serverOnline;
+
+    if (this.ui?.initialized) {
+      this.ui.updateIndicator();
+    }
+
+    window.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.CLIENT_INITIALIZED, {
+        detail: { serverOnline },
+      }),
+    );
+
+    const duration = performance.now() - initStart;
+    Logger.debug(
+      `初始化完成，已觸發 CLIENT_INITIALIZED 事件 (<orange>${duration.toFixed(0)} ms</orange>)`,
+    );
+  }
+
   initialize() {
     const initStart = performance.now();
     Logger.debug("開始初始化");
@@ -268,38 +275,12 @@ class SyncManager {
     this.core
       .checkServerHealth()
       .then((online) => {
-        this.initialized = true;
-        this.serverOnline = online;
         Logger.debug("伺服器心跳檢測完成", { online });
-
-        if (this.ui?.initialized) {
-          this.ui.updateIndicator();
-        }
-
-        window.dispatchEvent(
-          new CustomEvent(SYNC_EVENTS.CLIENT_INITIALIZED, {
-            detail: { serverOnline: online },
-          }),
-        );
-
-        const duration = performance.now() - initStart;
-        Logger.debug(
-          `初始化完成，已觸發 CLIENT_INITIALIZED 事件 (<orange>${duration.toFixed(0)} ms</orange>)`,
-        );
+        this._finalizeClientInitialization(initStart, online);
       })
       .catch((error) => {
-        this.initialized = true;
         Logger.warn("伺服器心跳檢測失敗", error);
-        window.dispatchEvent(
-          new CustomEvent(SYNC_EVENTS.CLIENT_INITIALIZED, {
-            detail: { serverOnline: false },
-          }),
-        );
-
-        const duration = performance.now() - initStart;
-        Logger.debug(
-          `初始化完成，已觸發 CLIENT_INITIALIZED 事件 (<orange>${duration.toFixed(0)} ms</orange>)`,
-        );
+        this._finalizeClientInitialization(initStart, false);
       });
 
     const sessionJoinedDynamicHandler = () => {
@@ -315,12 +296,11 @@ class SyncManager {
         this.experimentHubManager.hubClient.tryConnect();
       }
     };
-    window.addEventListener(SYNC_EVENTS.SESSION_JOINED, sessionJoinedDynamicHandler);
-    this.eventListeners.push({
-      target: window,
-      event: SYNC_EVENTS.SESSION_JOINED,
-      handler: sessionJoinedDynamicHandler,
-    });
+    this._addManagedListener(
+      window,
+      SYNC_EVENTS.SESSION_JOINED,
+      sessionJoinedDynamicHandler,
+    );
 
     const serverStatusHandler = (event) => {
       const wasOnline = this.serverOnline;
@@ -330,15 +310,11 @@ class SyncManager {
         this.adjustConnectionCheckInterval();
       }
     };
-    window.addEventListener(
+    this._addManagedListener(
+      window,
       SYNC_EVENTS.SERVER_STATUS_CHANGED,
       serverStatusHandler,
     );
-    this.eventListeners.push({
-      target: window,
-      event: SYNC_EVENTS.SERVER_STATUS_CHANGED,
-      handler: serverStatusHandler,
-    });
   }
 
   async attemptSessionRestore() {
@@ -434,35 +410,29 @@ class SyncManager {
       this.ui.updateIndicator();
       this.ui.updateConnectedSessionInfo();
     };
-    window.addEventListener(SYNC_EVENTS.SESSION_JOINED, sessionJoinedHandler);
-    this.eventListeners.push({
-      target: window,
-      event: SYNC_EVENTS.SESSION_JOINED,
-      handler: sessionJoinedHandler,
-    });
+    this._addManagedListener(
+      window,
+      SYNC_EVENTS.SESSION_JOINED,
+      sessionJoinedHandler,
+    );
 
     const showPanelHandler = () => {
       this.ui.showPanel();
     };
-    window.addEventListener(SYNC_EVENTS.SHOW_SYNC_PANEL, showPanelHandler);
-    this.eventListeners.push({
-      target: window,
-      event: SYNC_EVENTS.SHOW_SYNC_PANEL,
-      handler: showPanelHandler,
-    });
+    this._addManagedListener(
+      window,
+      SYNC_EVENTS.SHOW_SYNC_PANEL,
+      showPanelHandler,
+    );
 
     const stateChangeHandler = (event) => {
       this.syncState(event.detail);
     };
-    document.addEventListener(
+    this._addManagedListener(
+      document,
       SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL,
       stateChangeHandler,
     );
-    this.eventListeners.push({
-      target: document,
-      event: SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL,
-      handler: stateChangeHandler,
-    });
 
     const syncDataClearedHandler = (event) => {
       Logger.warn("監聽到 sync_data_cleared 事件", event.detail);
@@ -484,14 +454,12 @@ class SyncManager {
       Logger.info("已派發 SYNC_DATA_CLEARED 事件");
     };
 
-    window.addEventListener(SYNC_EVENTS.DATA_CLEARED, syncDataClearedHandler);
+    this._addManagedListener(
+      window,
+      SYNC_EVENTS.DATA_CLEARED,
+      syncDataClearedHandler,
+    );
     Logger.debug("已監聽 sync_data_cleared 事件");
-
-    this.eventListeners.push({
-      target: window,
-      event: SYNC_EVENTS.DATA_CLEARED,
-      handler: syncDataClearedHandler,
-    });
 
     const disconnectedHandler = (event) => {
       Logger.warn(
@@ -516,14 +484,13 @@ class SyncManager {
       Logger.info("已派發 sync_connection_lost 事件");
     };
 
-    window.addEventListener(SYNC_EVENTS.DISCONNECTED, disconnectedHandler);
-    this.eventListeners.push({
-      target: window,
-      event: SYNC_EVENTS.DISCONNECTED,
-      handler: disconnectedHandler,
-    });
+    this._addManagedListener(
+      window,
+      SYNC_EVENTS.DISCONNECTED,
+      disconnectedHandler,
+    );
 
-    const connectedHandler = (event) => {
+    const connectedHandler = () => {
       if (this.isSyncMode || this._isRestoring) {
         Logger.debug("收到 sync_connected，但已在同步模式或正在還原中，跳過");
         return;
@@ -553,12 +520,7 @@ class SyncManager {
         });
     };
 
-    window.addEventListener(SYNC_EVENTS.CONNECTED, connectedHandler);
-    this.eventListeners.push({
-      target: window,
-      event: SYNC_EVENTS.CONNECTED,
-      handler: connectedHandler,
-    });
+    this._addManagedListener(window, SYNC_EVENTS.CONNECTED, connectedHandler);
   }
 
   startConnectionCheck() {

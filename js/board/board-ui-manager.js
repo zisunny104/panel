@@ -497,7 +497,7 @@ export const BoardUIManager = class BoardUIManager {
    */
   getCheckedValidUnits() {
     const checkedUnits = document.querySelectorAll(
-      '.unit-checkbox input[type="checkbox"]:checked',
+      ".unit-checkbox input[type=\"checkbox\"]:checked",
     );
     return Array.from(checkedUnits).filter((cb) => {
       const li = cb.closest("li");

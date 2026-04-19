@@ -362,15 +362,9 @@ class BoardSyncIO {
     const { experimentId } = data;
     Logger.debug(`套用遠端實驗ID更新: ${experimentId}`);
 
-    page.experimentSystemManager?.setExperimentId?.(
+    page.experimentSystemManager?.handleSyncExperimentIdUpdate?.({
       experimentId,
-      RECORD_SOURCES.SYNC_BROADCAST,
-      {
-        registerToHub: false,
-        broadcast: false,
-        reapplyCombination: true,
-      },
-    );
+    });
     page.experimentId = experimentId;
     Logger.info(`實驗ID已同步並儲存: ${experimentId}`);
   }
@@ -434,15 +428,9 @@ class BoardSyncIO {
 
     const currentExperimentId = this._getExperimentId();
     if (currentExperimentId !== detail.experimentId) {
-      page.experimentSystemManager?.setExperimentId?.(
-        detail.experimentId,
-        RECORD_SOURCES.SYNC_BROADCAST,
-        {
-          registerToHub: false,
-          broadcast: false,
-          reapplyCombination: true,
-        },
-      );
+      await page.experimentSystemManager?.handleSyncExperimentIdUpdate?.({
+        experimentId: detail.experimentId,
+      });
       page.experimentId = detail.experimentId;
     }
 

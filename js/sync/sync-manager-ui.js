@@ -52,21 +52,14 @@ export class SyncManagerUI {
     return configuredCode ? configuredCode.length : 9;
   }
 
-  getCreateCodeHint() {
-    const fallback = "輸入建立代碼";
-    const text = this.syncBusinessConfig.validCreateCodeDescription;
-    return typeof text === "string" && text.trim().length > 0
-      ? text.trim()
-      : fallback;
-  }
-
   applyCreateCodeInputConfig(createCodeInput) {
     if (!createCodeInput) return;
     const expectedLength = this.getCreateCodeLength();
+    const hint = "輸入建立代碼";
 
     createCodeInput.maxLength = expectedLength;
-    createCodeInput.placeholder = this.getCreateCodeHint();
-    createCodeInput.title = this.getCreateCodeHint();
+    createCodeInput.placeholder = hint;
+    createCodeInput.title = hint;
   }
 
   applySyncAvailabilityState() {
@@ -76,20 +69,15 @@ export class SyncManagerUI {
     const createBtn = document.getElementById("createSessionBtn");
     const joinInput = document.getElementById("sessionCodeInput");
     const joinBtn = document.getElementById("joinSessionBtn");
-    const channelButtons = this.controlPanel?.querySelectorAll?.(
+    const channelButtons = this.controlPanel?.querySelectorAll(
       ".sync-channel-btn",
     );
 
-    if (createCodeInput) createCodeInput.disabled = true;
-    if (createBtn) createBtn.disabled = true;
-    if (joinInput) joinInput.disabled = true;
-    if (joinBtn) joinBtn.disabled = true;
-
-    if (channelButtons?.length) {
-      channelButtons.forEach((button) => {
-        button.disabled = true;
-      });
-    }
+    this._setElementsDisabled(
+      [createCodeInput, createBtn, joinInput, joinBtn],
+      true,
+    );
+    this._setElementsDisabled(channelButtons, true);
 
     this.showStatus("error", "同步功能已停用（config）");
   }
@@ -379,7 +367,7 @@ export class SyncManagerUI {
 
       if (!this._windowListenersBound) {
         this.addWindowListener(SYNC_EVENTS.SESSION_JOINED, (event) => {
-          const detail = event.detail || {};
+          const detail = event.detail ?? {};
           const { shareCode } = detail;
           if (shareCode) {
             this.currentShareCode = shareCode;
@@ -610,18 +598,10 @@ export class SyncManagerUI {
             navigator.clipboard
               .writeText(shareCode)
               .then(() => {
-                const originalHTML = copyShareCodeBtn.innerHTML;
-                copyShareCodeBtn.innerHTML =
-                  "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
-                copyShareCodeBtn.classList.add("copied");
-
-                setTimeout(() => {
-                  copyShareCodeBtn.innerHTML = originalHTML;
-                  copyShareCodeBtn.classList.remove("copied");
-                }, 2000);
+                this._flashCopiedButton(copyShareCodeBtn);
               })
               .catch(() => {
-                alert("複製失敗，請手動複製");
+                this.showStatus("error", "複製失敗，請手動複製");
               });
           }
         });
@@ -703,16 +683,7 @@ export class SyncManagerUI {
             await navigator.clipboard.writeText(shareUrl);
 
             this.showStatus("success", "已複製分享連結");
-
-            const originalHTML = copyShareLinkBtn.innerHTML;
-            copyShareLinkBtn.innerHTML =
-              "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
-            copyShareLinkBtn.classList.add("copied");
-
-            setTimeout(() => {
-              copyShareLinkBtn.innerHTML = originalHTML;
-              copyShareLinkBtn.classList.remove("copied");
-            }, 2000);
+            this._flashCopiedButton(copyShareLinkBtn);
           } catch (error) {
             this.showStatus(
               "error",
@@ -729,36 +700,30 @@ export class SyncManagerUI {
   validateCreateCode(code) {
     const statusDiv = document.getElementById("codeValidationStatus");
     const createBtn = document.getElementById("createSessionBtn");
+
+    if (!statusDiv || !createBtn) return;
+
     const expectedLength = this.getCreateCodeLength();
     const configuredCode = this.getValidCreateCode();
 
     if (code.length === 0) {
-      statusDiv.className = "sync-code-validation-indicator";
-      statusDiv.textContent = "";
-      createBtn.disabled = true;
+      this._setCreateCodeValidationState(statusDiv, createBtn, "idle");
       return;
     }
 
     if (code.length < expectedLength) {
-      statusDiv.className = "sync-code-validation-indicator invalid";
-      statusDiv.innerHTML =
-        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>";
-      createBtn.disabled = true;
-    } else if (code.length === expectedLength) {
-      const isExpectedCode = !configuredCode || code === configuredCode;
-      if (!isExpectedCode) {
-        statusDiv.className = "sync-code-validation-indicator invalid";
-        statusDiv.innerHTML =
-          "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>";
-        createBtn.disabled = true;
-        return;
-      }
-
-      statusDiv.className = "sync-code-validation-indicator valid";
-      statusDiv.innerHTML =
-        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"20,6 9,17 4,12\"></polyline></svg>";
-      createBtn.disabled = false;
+      this._setCreateCodeValidationState(statusDiv, createBtn, "invalid");
+      return;
     }
+
+    if (code.length !== expectedLength) return;
+
+    const isExpectedCode = !configuredCode || code === configuredCode;
+    this._setCreateCodeValidationState(
+      statusDiv,
+      createBtn,
+      isExpectedCode ? "valid" : "invalid",
+    );
   }
 
   async handleCreateSession() {
@@ -789,9 +754,7 @@ export class SyncManagerUI {
       const sessionId = result.sessionId;
 
       this.showStatus("success", "建立成功");
-      this.updateIndicator();
-      this.updateUIState();
-      this.updateConnectedSessionInfo();
+      this.refreshFromCoreState();
 
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.SESSION_CREATED, {
@@ -822,12 +785,7 @@ export class SyncManagerUI {
       return;
     }
 
-    const activeRoleBtn = this.controlPanel.querySelector(
-      ".sync-ch-role-btn.active",
-    );
-    let role = activeRoleBtn
-      ? activeRoleBtn.dataset.role
-      : this.roleConfig.OPERATOR;
+    const role = this._getSelectedChannelRole();
 
     this.showStatus("info", "加入中...");
 
@@ -836,9 +794,7 @@ export class SyncManagerUI {
 
       const roleText = this.getRoleText(role);
       this.showStatus("success", `加入成功（${roleText}）`);
-      this.updateIndicator();
-      this.updateUIState();
-      this.updateConnectedSessionInfo();
+      this.refreshFromCoreState();
 
       input.value = "";
     } catch (error) {
@@ -847,31 +803,24 @@ export class SyncManagerUI {
   }
 
   async handleJoinChannel(channelName) {
-    const activeRoleBtn = this.controlPanel.querySelector(
-      ".sync-ch-role-btn.active",
-    );
-    const role = activeRoleBtn
-      ? activeRoleBtn.dataset.role
-      : this.roleConfig.OPERATOR;
+    const role = this._getSelectedChannelRole();
 
     const roleText = this.getRoleText(role) || role;
     this.showStatus("info", `加入頻道 ${channelName}…`);
 
     const allBtns = this.controlPanel.querySelectorAll(".sync-channel-btn");
-    allBtns.forEach((b) => (b.disabled = true));
+    this._setElementsDisabled(allBtns, true);
 
     try {
       await this.core.joinPublicChannel(channelName, role);
 
       this.showStatus("success", `頻道 ${channelName} 加入成功（${roleText}）`);
-      this.updateIndicator();
-      this.updateUIState();
-      this.updateConnectedSessionInfo();
+      this.refreshFromCoreState();
     } catch (error) {
       this.showStatus("error", error.message || `加入頻道 ${channelName} 失敗`);
       Logger.error("[SyncUI] 加入公開頻道失敗:", error);
     } finally {
-      allBtns.forEach((b) => (b.disabled = false));
+      this._setElementsDisabled(allBtns, false);
     }
   }
 
@@ -906,8 +855,7 @@ export class SyncManagerUI {
         shareSessionToggleBtn.classList.remove("hidden");
       }
 
-      this.updateIndicator();
-      this.updateUIState();
+      this.refreshFromCoreState();
 
       this.showStatus("success", "已退出工作階段");
 
@@ -956,8 +904,7 @@ export class SyncManagerUI {
 
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      this.updateIndicator();
-      this.updateUIState();
+      this.refreshFromCoreState();
     } catch (error) {
       Logger.error("Close current session error:", error);
       this.showStatus(
@@ -1082,21 +1029,13 @@ export class SyncManagerUI {
       const isConnected = this.core.isConnected();
 
       if (isConnected) {
-        if (connectionSection) {
-          connectionSection.classList.add("hidden");
-        }
-        if (connectedSection) {
-          connectedSection.classList.add("show");
-        }
+        this._toggleElementClass(connectionSection, "hidden", true);
+        this._toggleElementClass(connectedSection, "show", true);
 
         this.updateConnectedSessionInfo();
       } else {
-        if (connectionSection) {
-          connectionSection.classList.remove("hidden");
-        }
-        if (connectedSection) {
-          connectedSection.classList.remove("show");
-        }
+        this._toggleElementClass(connectionSection, "hidden", false);
+        this._toggleElementClass(connectedSection, "show", false);
       }
     } catch (error) {
       Logger.warn("updateUIState 錯誤:", error);
@@ -1183,10 +1122,75 @@ export class SyncManagerUI {
     };
   }
 
-  showStatus(type, message) {
-    if (this.indicatorManager) {
-      this.indicatorManager.showStatus(type, message || "", 5000);
+  _getSelectedChannelRole() {
+    const activeRoleBtn = this.controlPanel?.querySelector(
+      ".sync-ch-role-btn.active",
+    );
+    return activeRoleBtn?.dataset?.role || this.roleConfig.OPERATOR;
+  }
+
+  _setCreateCodeValidationState(statusDiv, createBtn, state) {
+    statusDiv.className =
+      state === "idle"
+        ? "sync-code-validation-indicator"
+        : `sync-code-validation-indicator ${state}`;
+
+    if (state === "idle") {
+      statusDiv.textContent = "";
+      createBtn.disabled = true;
+      return;
     }
+
+    statusDiv.innerHTML =
+      state === "valid"
+        ? this._getValidationCheckIconHtml()
+        : this._getValidationCrossIconHtml();
+    createBtn.disabled = state !== "valid";
+  }
+
+  _setElementsDisabled(elements, disabled) {
+    if (!elements) return;
+    if (typeof elements.forEach === "function") {
+      elements.forEach((element) => {
+        if (element) element.disabled = disabled;
+      });
+      return;
+    }
+    elements.disabled = disabled;
+  }
+
+  _toggleElementClass(element, className, enabled) {
+    if (!element) return;
+    element.classList.toggle(className, enabled);
+  }
+
+  _flashCopiedButton(button, durationMs = 2000) {
+    if (!button) return;
+
+    const originalHTML = button.innerHTML;
+    button.innerHTML = this._getCheckmarkIconHtml();
+    button.classList.add("copied");
+
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.classList.remove("copied");
+    }, durationMs);
+  }
+
+  _getCheckmarkIconHtml() {
+    return "<svg class=\"sync-icon sync-icon-checkmark\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>";
+  }
+
+  _getValidationCheckIconHtml() {
+    return "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"20,6 9,17 4,12\"></polyline></svg>";
+  }
+
+  _getValidationCrossIconHtml() {
+    return "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>";
+  }
+
+  showStatus(type, message) {
+    this.indicatorManager?.showStatus(type, message || "", 5000);
   }
 
   refreshFromCoreState() {
@@ -1202,9 +1206,7 @@ export class SyncManagerUI {
       this.createControlPanel();
     }
 
-    if (this.capsuleIndicator) {
-      this.capsuleIndicator.classList.add("is-hidden");
-    }
+    this.capsuleIndicator?.classList.add("is-hidden");
 
     this.controlPanel?.classList.add("active");
     Logger.debug("[SyncManagerUI.showPanel] 已新增 active class");

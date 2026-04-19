@@ -124,7 +124,7 @@ class ExperimentControlsDom {
 
     const items = Array.from(unitList.querySelectorAll("li[data-unit-id]"));
     const filtered = onlyChecked
-      ? items.filter((li) => li.querySelector('input[type="checkbox"]')?.checked)
+      ? items.filter((li) => li.querySelector("input[type=\"checkbox\"]")?.checked)
       : items;
 
     return filtered.map((li) => li.dataset.unitId).filter(Boolean);
@@ -237,7 +237,7 @@ class ExperimentControlsDom {
     if (regenerateIdBtn) regenerateIdBtn.disabled = locked;
 
     document
-      .querySelectorAll('.unit-checkbox input[type="checkbox"]')
+      .querySelectorAll(".unit-checkbox input[type=\"checkbox\"]")
       .forEach((cb) => {
         const isPermaDisabled =
           cb?.dataset?.permaDisabled === "true" ||

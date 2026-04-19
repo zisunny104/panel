@@ -134,7 +134,7 @@ export async function initializePanelManagers(page) {
   });
   page.experimentCombinationManager.on(
     ExperimentCombinationManager.EVENT.COMBINATION_SELECTED,
-    (data) => page.panelMediaManager.onCombinationSelected(data)
+    (data) => page.panelMediaManager.onCombinationSelected(data),
   );
 
   if (!page.timerManager) {

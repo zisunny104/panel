@@ -43,7 +43,8 @@ export class MessageHandler {
       [WS_PROTOCOL.C2S.GET_SESSION_STATE]:
         this.handleGetSessionState.bind(this),
       [WS_PROTOCOL.C2S.PING]: this.handlePing.bind(this),
-      experiment_id_register: this.handleExperimentIdRegister.bind(this),
+      [WS_PROTOCOL.C2S.EXPERIMENT_ID_REGISTER]:
+        this.handleExperimentIdRegister.bind(this),
     };
   }
 
