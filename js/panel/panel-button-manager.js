@@ -165,6 +165,14 @@ class ButtonManager {
     return this._getActionHandler()?.completeCurrentAction?.(actionData) || false;
   }
 
+  _handleCorrectAction(actionId, actionData = {}) {
+    const systemManager = this._getSystemManager();
+    if (systemManager?.handleCorrectAction) {
+      return systemManager.handleCorrectAction(actionId, actionData);
+    }
+    return this._getActionHandler()?.handleCorrectAction?.(actionId, actionData) || false;
+  }
+
   _jumpToActionById(actionId) {
     const systemManager = this._getSystemManager();
     if (systemManager?.jumpToActionById) {
@@ -364,6 +372,8 @@ class ButtonManager {
       );
     }
 
+    const systemManager = this._getSystemManager();
+
     // 實驗模式下檢查是否有對應的動作
     if (this._isExperimentRunning(flowManager)) {
       if (this.checkAndExecuteExperimentAction(buttonId, functionName)) {
@@ -534,23 +544,30 @@ class ButtonManager {
           // 儲存目前 action 用於檢查
           const completedAction = currentAction;
 
-          // 完成目前 action
-          this._completeCurrentAction(actionData);
+          // 使用者操作正確，透過驗證流程完成 action
+          this._handleCorrectAction(this._getActionId(currentAction), actionData);
 
-          const jumpResult = this._jumpToActionById(nextActionId);
+          // handleCorrectAction 內部可能已透過自動跳過推進到 nextActionId 甚至完成序列。
+          // 只有在序列尚未越過目標 action 時才執行 jump，避免倒退已完成的 index 造成重複完成。
+          const actionAfterComplete = this._getCurrentAction();
+          const idAfterComplete = this._getActionId(actionAfterComplete);
+          const jumpResult =
+            idAfterComplete !== nextActionId
+              ? this._jumpToActionById(nextActionId)
+              : { success: true, index: -1, action: actionAfterComplete };
 
           const nextAction = jumpResult.success
             ? jumpResult.action
-            : this._getCurrentAction();
+            : actionAfterComplete;
 
           this._applyCooldownOutcome(completedAction, nextAction);
 
           return true;
         }
       } else {
-        // 沒有定義互動，直接完成並移到下一個
+        // 沒有定義互動，使用者操作正確，透過驗證流程完成 action
         const completedAction = currentAction;
-        this._completeCurrentAction(actionData);
+        this._handleCorrectAction(this._getActionId(currentAction), actionData);
 
         const nextAction = this._getCurrentAction();
 
@@ -688,16 +705,33 @@ class ButtonManager {
       };
     }
 
-    // 同步/本機共用：只要跨 step 都要冷卻
+    // 同步/本機共用：如果下一個動作沒有按鈕，表示沒有使用者互動，應該跳過冷卻。
+    const nextActionHasButtons =
+      nextAction && Array.isArray(nextAction.action_buttons)
+        ? nextAction.action_buttons.length > 0
+        : Boolean(nextAction && String(nextAction.action_buttons).trim());
+
     const stepChanged =
       Boolean(completedStepId) &&
       Boolean(nextStepId) &&
       completedStepId !== nextStepId;
 
+    // 臨時補丁：第一個 step/action 的特殊 case，_1 後綴只有在下一個動作已跨步驟時才應觸發 panel 冷卻。
+    const shouldCooldown =
+      nextActionHasButtons &&
+      (Boolean(nextAction?.isLastActionInStep) ||
+        (String(completedAction?.actionId || "").endsWith("_1") && stepChanged));
+
     return {
-      shouldCooldown: stepChanged,
+      shouldCooldown,
       shouldAdvanceStep: stepChanged,
-      reason: stepChanged ? "跨步驟切換" : "同一步驟內動作",
+      reason: shouldCooldown
+        ? stepChanged
+          ? "跨步驟切換"
+          : "進入步驟最後一個動作"
+        : stepChanged
+        ? "跨步驟切換但不冷卻"
+        : "同一步驟內動作",
       completedStepId,
       nextStepId,
     };
@@ -723,6 +757,13 @@ class ButtonManager {
     }
 
     Logger.debug(`跳過冷卻效果: ${cooldownState.reason} | ${actionSummary}`);
+
+    if (cooldownState.shouldAdvanceStep) {
+      const systemManager = this._getSystemManager();
+      if (systemManager?.advanceToNextStep) {
+        systemManager.advanceToNextStep();
+      }
+    }
 
     this.updateMediaForCurrentAction();
   }
@@ -1013,6 +1054,13 @@ class ButtonManager {
       return;
     }
 
+    Logger.debug("ButtonManager: 更新媒體前目前動作", {
+      actionId: currentAction.actionId || currentAction.action_id || null,
+      actionButtons: currentAction.action_buttons || null,
+      isPowerOn: this.isPowerOn(),
+      isPowerVideoPlaying: powerControl?.isPowerVideoPlaying || false,
+    });
+
     Logger.debug(
       `目前動作: ${currentAction.actionId}, 按鈕: ${currentAction.action_buttons}`,
     );
@@ -1094,6 +1142,12 @@ class ButtonManager {
       const myId = this._getSyncClient()?.clientId;
       if (myId && state.clientId === myId) return;
       if (state.type === SYNC_DATA_TYPES.BUTTON_PRESSED) {
+        Logger.debug("PanelButtonManager: 收到遠端 BUTTON_PRESSED", {
+          button: state.button,
+          function: state.function,
+          clientId: state.clientId,
+          experimentId: state.experimentId,
+        });
         this.handleRemoteButtonPress(state);
       }
     });

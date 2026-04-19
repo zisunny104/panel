@@ -24,6 +24,7 @@ import {
   SYNC_EVENTS,
   ACTION_HANDLER_EVENTS,
   ACTION_HANDLER_DEFAULTS,
+  ACTION_IDS,
 } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { EventEmitter } from "../core/event-emitter.js";
@@ -41,9 +42,6 @@ class ExperimentActionHandler extends EventEmitter {
     // 設定
     this.config = {
       enableRemoteSync: config.enableRemoteSync !== false,
-      enableAutoProgress: config.enableAutoProgress !== false,
-      autoProgressDelay:
-        config.autoProgressDelay || ACTION_HANDLER_DEFAULTS.AUTO_PROGRESS_DELAY_MS,
       ...config,
     };
 
@@ -53,10 +51,6 @@ class ExperimentActionHandler extends EventEmitter {
     this.completedActions = new Set();
     this.actionHistory = [];
 
-    // 自動推進計時器
-    this.autoProgressTimer = null;
-
-    // dependencies
     this.dependencies = {
       flowManager: null,
       syncClient: null,
@@ -65,17 +59,24 @@ class ExperimentActionHandler extends EventEmitter {
     Logger.debug("ExperimentActionHandler 初始化完成");
   }
 
-  // ==================== inject dependencies ====================
+  // ==================== 注入依賴 ====================
 
   /**
-   * inject FlowManager
+   * 注入 FlowManager 依賴。
+   * @param {object} flowManager
+   * @returns {ExperimentActionHandler}
    */
   injectFlowManager(flowManager) {
     this.dependencies.flowManager = flowManager;
-    Logger.debug("FlowManager 已 inject 到 ActionHandler");
+    Logger.debug("FlowManager 已注入到 ActionHandler");
     return this;
   }
 
+  /**
+   * 更新已注入的依賴。
+   * @param {object} deps
+   * @returns {ExperimentActionHandler}
+   */
   updateDependencies(deps = {}) {
     Object.assign(this.dependencies, deps);
     return this;
@@ -104,7 +105,9 @@ class ExperimentActionHandler extends EventEmitter {
   // ==================== 動作序列管理 ====================
 
   /**
-   * 初始化動作序列
+   * 初始化動作序列。
+   * @param {Array<object>} actions
+   * @returns {boolean}
    */
   initializeSequence(actions) {
     if (!Array.isArray(actions)) {
@@ -121,6 +124,10 @@ class ExperimentActionHandler extends EventEmitter {
       actionCount: actions.length,
     });
 
+    Logger.debug("action 序列", {
+      actionIds: actions.map((action) => this._getActionId(action)),
+    });
+
     return true;
   }
 
@@ -133,8 +140,53 @@ class ExperimentActionHandler extends EventEmitter {
     return action.actionId || action.action_id || null;
   }
 
+  _isFirstActionInNewUnit(action) {
+    const actionId = this._getActionId(action);
+    if (!actionId) return false;
+
+    const currentStepInfo = this.actionToStepMap?.get(actionId) || null;
+    if (!currentStepInfo) {
+      return false;
+    }
+
+    const previousAction = this.currentActionSequence[this.currentActionIndex - 1];
+    if (!previousAction) {
+      return true;
+    }
+
+    const previousStepInfo =
+      this.actionToStepMap?.get(this._getActionId(previousAction)) || null;
+    return (
+      !previousStepInfo ||
+      previousStepInfo.unit_id !== currentStepInfo.unit_id
+    );
+  }
+
+  _isFirstActionInStep(action) {
+    const actionId = this._getActionId(action);
+    if (!actionId) return false;
+
+    const currentStepInfo = this.actionToStepMap?.get(actionId) || null;
+    if (!currentStepInfo) {
+      return false;
+    }
+
+    const previousAction = this.currentActionSequence[this.currentActionIndex - 1];
+    if (!previousAction) {
+      return true;
+    }
+
+    const previousStepInfo =
+      this.actionToStepMap?.get(this._getActionId(previousAction)) || null;
+    return (
+      !previousStepInfo ||
+      previousStepInfo.step_id !== currentStepInfo.step_id
+    );
+  }
+
   /**
-   * 取得目前動作
+   * 取得目前動作，若序列已完成則回傳 null。
+   * @returns {object|null}
    */
   getCurrentAction() {
     if (this.currentActionIndex >= this.currentActionSequence.length) {
@@ -144,7 +196,8 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   /**
-   * 取得下一個動作
+   * 取得下一個動作，若已無下一個動作則回傳 null。
+   * @returns {object|null}
    */
   getNextAction() {
     const nextIndex = this.currentActionIndex + 1;
@@ -155,7 +208,8 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   /**
-   * 取得動作序列進度
+   * 取得目前動作序列的進度。
+   * @returns {{current:number,total:number,completed:number,percentage:number}}
    */
   getProgress() {
     return {
@@ -175,7 +229,10 @@ class ExperimentActionHandler extends EventEmitter {
   // ==================== 動作判定 ====================
 
   /**
-   * 驗證動作是否正確
+   * 驗證提供的 actionId 是否對應目前動作。
+   * @param {string} actionId
+   * @param {object} [actionData]
+   * @returns {{valid:boolean,error?:string,expected?:string,actual?:string,action?:object}}
    */
   validateAction(actionId, actionData = {}) {
     const currentAction = this.getCurrentAction();
@@ -211,21 +268,23 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   /**
-   * 處理正確動作（受試者按下正確按鈕時呼叫）
+   * 處理受試者正確完成的動作。
    *
-   * 時序邏輯：
-   * 1. 發出 ACTION_COMPLETED（目前步驟完成）
-   * 2. 推進索引到下一步
-   * 3. 發出 ACTION_ENTERED（進入新步驟）
-   *
-   * 各端的職責：
-   * - Panel（受試者）：本機偵測到正確按鈕 → 推進本機 action 序列 →
-   *   廣播 ACTION_COMPLETED 通知 board（實驗者）；
-   *   透過 ACTION_ENTERED 事件即時更新 MR 顯示（播放下一步媒體）。
-   * - Board（實驗者）：接收 ACTION_COMPLETED → 手勢按鈕顯示綠色（視覺回饋）；
-   *   gesture step 的推進仍由實驗者自行點擊手勢按鈕決定，不由此訊號驅動。
+   * 會驗證目前動作、標記完成、廣播狀態、推進索引，並觸發下一步的 ACTION_ENTERED。
+   * @param {string} actionId
+   * @param {object} [actionData]
+   * @returns {boolean}
    */
   handleCorrectAction(actionId, actionData = {}) {
+    const currentAction = this.getCurrentAction?.();
+    Logger.debug("ExperimentActionHandler.handleCorrectAction", {
+      actionId,
+      source: actionData?.source || null,
+      currentActionId: currentAction?.actionId || currentAction?.action_id || null,
+      currentActionButtons: currentAction?.action_buttons || null,
+      currentActionIndex: this.currentActionIndex,
+    });
+
     const validation = this.validateAction(actionId, actionData);
 
     if (!validation.valid) {
@@ -279,12 +338,14 @@ class ExperimentActionHandler extends EventEmitter {
       });
     }
 
-    this._advanceAfterActionCompletion(normalizedActionId);
     return true;
   }
 
   /**
-   * 處理錯誤動作
+   * 處理動作驗證失敗的情況。
+   * @param {string} actionId
+   * @param {string} error
+   * @returns {boolean}
    */
   handleIncorrectAction(actionId, error) {
     const currentAction = this.getCurrentAction();
@@ -315,8 +376,12 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   /**
-   * 完成目前動作（不進行驗證）
-   * 同樣使用改進的時序邏輯
+   * 直接完成目前動作，不進行動作 ID 驗證。
+   *
+   * 若目前動作沒有 action_buttons，會視為自動跳過；否則視為正常完成。
+   * 若要經過驗證的完成，請改用 handleCorrectAction().
+   * @param {object} [actionData]
+   * @returns {boolean}
    */
   completeCurrentAction(actionData = {}) {
     const currentAction = this.getCurrentAction();
@@ -325,19 +390,39 @@ class ExperimentActionHandler extends EventEmitter {
       return false;
     }
 
-    // 記錄到歷史
+    const isFirstActionInNewUnit = this._isFirstActionInNewUnit(currentAction);
+    Logger.debug("ExperimentActionHandler.completeCurrentAction", {
+      currentActionId: currentAction?.actionId || currentAction?.action_id || null,
+      currentActionIndex: this.currentActionIndex,
+      isFirstActionInNewUnit,
+    });
+
+    // 第一個 action 在完成前先補發 ACTION_ENTERED，讓 panel 端正確進入動作狀態。
+    // 這個補發應該發生在每個單元的第一個 step 的第一個 action，
+    // 以避免 unit 開始時動作直接完成後無法進入新 step 的畫面狀態。
+    if (isFirstActionInNewUnit) {
+      this.emit(ExperimentActionHandler.EVENT.ACTION_ENTERED, {
+        actionId: this._getActionId(currentAction),
+        action: currentAction,
+        progress: this.getProgress(),
+      });
+    }
+
     const normalizedActionId = this._getActionId(currentAction);
+    const skipped = !currentAction.action_buttons;
+
+    // 記錄到歷史
     this.actionHistory.push({
       actionId: normalizedActionId,
       timestamp: Date.now(),
       correct: true, // 直接完成視為正確
-      skipped: true, // 標記為跳過
+      skipped,
     });
 
     // 標記為完成
     this.completedActions.add(normalizedActionId);
 
-    Logger.info("動作已完成（跳過）", {
+    Logger.info(`動作已完成${skipped ? '（跳過）' : ''}`, {
       actionId: normalizedActionId,
       progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`,
     });
@@ -347,14 +432,11 @@ class ExperimentActionHandler extends EventEmitter {
       actionId: normalizedActionId,
       action: currentAction,
       progress: this.getProgress(),
-      skipped: true,
+      skipped,
     });
 
     this._broadcastButtonAction(currentAction, actionData);
-    const nextAction = this.getNextAction();
-    this._broadcastActionCompleted(normalizedActionId, {
-      enteredActionId: this._getActionId(nextAction),
-    });
+    this._scheduleCompletionBroadcast(currentAction, actionData);
     this._advanceAfterActionCompletion(normalizedActionId);
 
     return true;
@@ -437,19 +519,32 @@ class ExperimentActionHandler extends EventEmitter {
     const targetActionId = currentActionId;
     if (!targetActionId) return null;
 
-    const isFirstAction = this.currentActionIndex === 0;
-    const currentStepId = this.actionToStepMap?.get(currentActionId)?.step_id;
-    const nextStepId = nextActionId
-      ? this.actionToStepMap?.get(nextActionId)?.step_id
+    const currentStepInfo = this.actionToStepMap?.get(currentActionId) || null;
+    const nextStepInfo = nextActionId
+      ? this.actionToStepMap?.get(nextActionId) || null
       : null;
-    const isSameStep =
-      currentStepId && nextStepId && currentStepId === nextStepId;
-    const shouldDelay = !isFirstAction && currentStepId && nextStepId && !isSameStep;
+    const currentUnitId = currentStepInfo?.unit_id || null;
+    const nextUnitId = nextStepInfo?.unit_id || null;
+    const shouldDelay =
+      currentUnitId && nextUnitId && currentUnitId !== nextUnitId;
     const delayMs = shouldDelay ? this._resolveCompletionCooldownMs() : 0;
+    const isPowerActionTransition =
+      nextActionId === ACTION_IDS.POWER_ON ||
+      nextActionId === ACTION_IDS.POWER_OFF;
+
+    const shouldSuppressEnteredActionId =
+      this._isFirstActionInStep(action) &&
+      currentStepInfo &&
+      nextStepInfo &&
+      currentStepInfo.step_id !== nextStepInfo.step_id &&
+      currentActionId?.endsWith("_1");
 
     return {
       actionId: targetActionId,
-      enteredActionId: nextActionId || null,
+      enteredActionId:
+        isPowerActionTransition || shouldSuppressEnteredActionId
+          ? null
+          : nextActionId || null,
       delayMs,
     };
   }
@@ -527,7 +622,8 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   /**
-   * 記錄動作歷史
+   * 取得動作歷史紀錄。
+   * @returns {Array<object>}
    */
   getActionHistory() {
     return [...this.actionHistory];
@@ -538,13 +634,15 @@ class ExperimentActionHandler extends EventEmitter {
   // ==================== 步驟轉換 ====================
 
   /**
-   * 執行步驟轉換
+   * 透過已注入的 FlowManager 執行步驟轉換。
+   * @param {string} [toStep]
+   * @returns {boolean}
    */
   executeStepTransition(toStep) {
     const flowManager = this.dependencies.flowManager;
 
     if (!flowManager) {
-      Logger.warn("FlowManager 未 inject，無法執行步驟轉換");
+      Logger.warn("FlowManager 未注入，無法執行步驟轉換");
       return false;
     }
 
@@ -562,7 +660,8 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   /**
-   * 處理序列完成
+   * 處理整個 action 序列完成的流程。
+   * @returns {void}
    */
   handleSequenceCompleted() {
     Logger.info("動作序列已完成");
@@ -591,65 +690,14 @@ class ExperimentActionHandler extends EventEmitter {
 
   // ==================== 自動推進 ====================
 
-  /**
-   * 啟用自動推進
-   */
-  enableAutoProgress(delay = null) {
-    this.config.enableAutoProgress = true;
-    if (delay !== null) {
-      this.config.autoProgressDelay = delay;
-    }
-    Logger.debug("自動推進已啟用", {
-      delay: this.config.autoProgressDelay,
-    });
-  }
-
-  /**
-   * 停用自動推進
-   */
-  disableAutoProgress() {
-    this.config.enableAutoProgress = false;
-    this.clearAutoProgress();
-    Logger.debug("自動推進已停用");
-  }
-
-  /**
-   * 排程自動推進
-   */
-  scheduleAutoProgress() {
-    this.clearAutoProgress();
-
-    this.autoProgressTimer = setTimeout(() => {
-      Logger.debug("自動推進觸發");
-
-      const nextAction = this.getCurrentAction();
-      if (nextAction) {
-        this.emit(ExperimentActionHandler.EVENT.AUTO_PROGRESS, {
-          actionId: this._getActionId(nextAction),
-        });
-
-        // 自動執行下一個動作
-        this.handleCorrectAction(this._getActionId(nextAction), {
-          auto: true,
-        });
-      }
-    }, this.config.autoProgressDelay);
-  }
-
-  /**
-   * 清除自動推進計時器
-   */
-  clearAutoProgress() {
-    if (this.autoProgressTimer) {
-      clearTimeout(this.autoProgressTimer);
-      this.autoProgressTimer = null;
-    }
-  }
 
   // ==================== 錯誤處理 ====================
 
   /**
-   * 處理無效動作
+   * 處理無效動作，並發出錯誤事件。
+   * @param {string} actionId
+   * @param {string} reason
+   * @returns {boolean}
    */
   handleInvalidAction(actionId, reason) {
     Logger.error("無效動作", { actionId, reason });
@@ -664,7 +712,8 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   /**
-   * 處理同步失敗
+   * 處理同步失敗，並發出錯誤事件。
+   * @param {Error|object|string} error
    */
   handleSyncFailure(error) {
     Logger.error("同步失敗", error);
@@ -680,7 +729,8 @@ class ExperimentActionHandler extends EventEmitter {
   // ==================== 工具方法 ====================
 
   /**
-   * 取得處理器狀態
+   * 取得 ActionHandler 的當前狀態。
+   * @returns {{currentActionIndex:number,totalActions:number,completedActions:number,config:object}}
    */
   getState() {
     return {
@@ -692,19 +742,18 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   /**
-   * 重置處理器
+   * 重置處理器為初始狀態。
    */
   reset() {
     this.currentActionSequence = [];
     this.currentActionIndex = 0;
     this.completedActions.clear();
     this.actionHistory = [];
-    this.clearAutoProgress();
     Logger.debug("ActionHandler 已重置");
   }
 
   /**
-   * 銷毀處理器
+   * 銷毀處理器並移除所有事件監聽器。
    */
   destroy() {
     this.reset();
