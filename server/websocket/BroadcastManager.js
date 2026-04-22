@@ -10,13 +10,22 @@
 
 import { Logger } from "../utils/logger.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
-
-const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
+import { ROLE } from "../config/constants.js";
 
 export class BroadcastManager {
   constructor(connectionManager, sessionManager) {
     this.connectionManager = connectionManager;
     this.sessionManager = sessionManager;
+    // 每個 session + 每個 client 的序列號，用於避免跳號警告
+    this._seqCounters = new Map();
+  }
+
+  _nextSeq(sessionId, clientId) {
+    if (!sessionId || !clientId) return 0;
+    const key = `${sessionId}:${clientId}`;
+    const next = (this._seqCounters.get(key) || 0) + 1;
+    this._seqCounters.set(key, next);
+    return next;
   }
 
   /**
@@ -71,8 +80,8 @@ export class BroadcastManager {
       let sent = 0;
       let failed = 0;
 
-      // 新增時間戳和工作階段 ID
-      const messageWithMeta = {
+      // 新增時間戳與工作階段 ID
+      const messageWithMetaBase = {
         ...message,
         sessionId,
         timestamp: message.timestamp || Date.now(),
@@ -95,6 +104,10 @@ export class BroadcastManager {
 
       // 發送訊息給所有目標客戶端
       for (const member of targetMembers) {
+        const messageWithMeta = {
+          ...messageWithMetaBase,
+          seq: this._nextSeq(sessionId, member.clientId),
+        };
         const success = this.sendToClient(member.clientId, messageWithMeta);
         if (success) {
           sent++;

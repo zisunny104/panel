@@ -1,3 +1,6 @@
+import { getApiUrl } from "../core/url-utils.js";
+import { API_ENDPOINTS } from "../constants/index.js";
+
 /**
  * recordRuntime - JSONL 檔案輸出層
  *
@@ -25,7 +28,7 @@ export const recordRuntime = {
       const filename = `${resolvedExperimentId}_${Date.now()}.jsonl`;
       const apiUrl = this._getApiUrl();
 
-      const response = await fetch(`${apiUrl}/record/save`, {
+      const response = await fetch(`${apiUrl}${API_ENDPOINTS.RECORD.SAVE}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename, content: jsonlContent }),
@@ -50,14 +53,6 @@ export const recordRuntime = {
   },
 
   _getApiUrl() {
-    return `${window.location.protocol}//${window.location.host}${this._getApiBasePath()}`;
-  },
-
-  _getApiBasePath() {
-    let basePath = window.location.pathname;
-    if (!basePath.endsWith("/")) {
-      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
-    }
-    return basePath + "api";
+    return getApiUrl();
   },
 };

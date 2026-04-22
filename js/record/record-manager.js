@@ -213,8 +213,9 @@ class RecordManager {
 
     this.experimentId = experimentId;
     const experimentIdInput = document.getElementById("experimentIdInput");
-    if (experimentIdInput && experimentIdInput.value.trim() !== experimentId) {
-      experimentIdInput.value = experimentId;
+    const safeExperimentId = typeof experimentId === "string" ? experimentId : "";
+    if (experimentIdInput && experimentIdInput.value.trim() !== safeExperimentId) {
+      experimentIdInput.value = safeExperimentId;
     }
 
     document.dispatchEvent(new CustomEvent(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, {

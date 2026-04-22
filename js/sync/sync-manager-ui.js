@@ -415,6 +415,10 @@ export class SyncManagerUI {
           this.updateConnectedSessionInfo();
         });
 
+        this.addWindowListener(SYNC_EVENTS.SESSION_STATE_REFRESHED, () => {
+          this.showStatus("info", "已接收伺服器推送的同步狀態");
+        });
+
         this._windowListenersBound = true;
       }
 

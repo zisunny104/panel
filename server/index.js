@@ -8,7 +8,8 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
-import { SERVER_CONFIG } from "./config/server.js";
+import { SERVER_CONFIG, ADMIN_TOKEN } from "./config/server.js";
+import { CHANNEL_CONSTANTS } from "./config/constants.js";
 import { getDatabase, closeDatabase } from "./database/connection.js";
 import { validateSchema } from "./database/schema.js";
 import SessionService from "./services/SessionService.js";
@@ -45,8 +46,18 @@ const httpServer = createServer(app);
 
 // ===== 中間件設定 =====
 app.use(cors(SERVER_CONFIG.cors));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// 安全 HTTP 標頭
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 // 自動取得完整網址 middleware
 app.use((req, res, next) => {
@@ -178,6 +189,8 @@ wsServer.initialize({
 // 將 WebSocket 管理器掛載到 app.locals，供路由使用
 app.locals.sessionManager = sessionManager;
 app.locals.connectionManager = connectionManager;
+app.locals.broadcastManager = broadcastManager;
+app.locals.messageHandler = messageHandler;
 
 Logger.success("WebSocket 系統已初始化");
 
@@ -223,8 +236,8 @@ setInterval(() => {
     let removed = 0;
     for (const s of sessions) {
       const { sessionId } = s;
-      // 公開頻道（__CH_*）不存在 DB，跳過驗證以免誤斷線
-      if (sessionId.startsWith("__CH_")) continue;
+      // 公開頻道不存在 DB，跳過驗證以免誤斷線
+      if (sessionId.startsWith(CHANNEL_CONSTANTS.PREFIX)) continue;
       const session = SessionService.getSession(sessionId);
       if (!session || !session.is_active) {
         Logger.warn(`發現失效 session，正在清理: ${sessionId}`);
@@ -248,6 +261,11 @@ setInterval(() => {
     Logger.error(`Session 驗證排程失敗: ${e.message}`);
   }
 }, sessionValidationInterval);
+
+// 提供管理員 Token 給前端管理介面（區網環境，不加額外限制）
+app.get("/api/sync/admin-token", (req, res) => {
+  res.json({ token: ADMIN_TOKEN });
+});
 
 // 404處理（在所有路由與 middleware 註冊後）
 // 只回傳狀態碼，由 Nginx error_page 處理頁面跳轉
@@ -284,6 +302,9 @@ const server = httpServer.listen(SERVER_CONFIG.port, () => {
   );
   Logger.info(
     `清理任務間隔: <cyan>${SERVER_CONFIG.cleanup.interval / 1000}</cyan> 秒`,
+  );
+  Logger.warn(
+    `管理員 Token: <yellow>${ADMIN_TOKEN}</yellow>  <dim>(設定環境變數 ADMIN_TOKEN 可固定此值)</dim>`,
   );
   Logger.info("");
 });

@@ -194,8 +194,6 @@ class SyncManager {
       indicatorManager: this.indicatorManager,
     });
     this.connectionCheckTimer = null;
-    this.connectionCheckInterval = 5000;
-    this.offlineCheckInterval = 20000;
     this.serverOnline = null;
     this.isCheckingConnection = false;
     this.eventListeners = [];
@@ -290,6 +288,8 @@ class SyncManager {
         Logger.debug("動態初始化 Sessions（已加入工作階段）");
         this.isSyncMode = true;
         this.sessions.initialize();
+        // 新裝置動態加入後啟動 5s 連線檢查，取代 SyncClient 的 30s 獨立 loop
+        this.startConnectionCheck();
       }
 
       if (this.experimentHubManager?.hubClient?.tryConnect) {
@@ -303,12 +303,8 @@ class SyncManager {
     );
 
     const serverStatusHandler = (event) => {
-      const wasOnline = this.serverOnline;
       this.serverOnline = event.detail.online;
-
-      if (wasOnline !== this.serverOnline) {
-        this.adjustConnectionCheckInterval();
-      }
+      // serverOnline 已由 WS 事件即時推送，此處只同步 SyncManager 自身的快取值
     };
     this._addManagedListener(
       window,
@@ -521,6 +517,32 @@ class SyncManager {
     };
 
     this._addManagedListener(window, SYNC_EVENTS.CONNECTED, connectedHandler);
+
+    // 監聽瀏覽器原生網路事件，不依賴 polling 延遲（安卓切換 WiFi/4G 時特別有用）
+    const networkOnlineHandler = () => {
+      Logger.info("瀏覽器偵測到網路恢復（online 事件）");
+      this.serverOnline = null; // 強制下次 checkConnection 重新驗證
+      if (this.isSyncMode) {
+        this.checkConnection();
+      }
+    };
+
+    const networkOfflineHandler = () => {
+      Logger.warn("瀏覽器偵測到網路中斷（offline 事件）");
+      const wasOnline = this.serverOnline;
+      this.serverOnline = false;
+      if (wasOnline !== false) {
+        window.dispatchEvent(
+          new CustomEvent(SYNC_EVENTS.SERVER_STATUS_CHANGED, {
+            detail: { online: false },
+          }),
+        );
+        this.ui?.updateIndicator?.();
+      }
+    };
+
+    this._addManagedListener(window, "online", networkOnlineHandler);
+    this._addManagedListener(window, "offline", networkOfflineHandler);
   }
 
   startConnectionCheck() {
@@ -529,33 +551,17 @@ class SyncManager {
       return;
     }
 
+    // SyncClient 自己的獨立 loop 已不再需要，SyncManager 接管狀態感知
+    this.core.syncClient?.stopHealthCheck?.();
+
     if (this.connectionCheckTimer) {
       clearInterval(this.connectionCheckTimer);
+      this.connectionCheckTimer = null;
     }
 
-    Logger.debug("啟動連線檢查", {
-      interval: this.connectionCheckInterval,
-    });
-
-    this.connectionCheckTimer = setInterval(
-      () => this.checkConnection(),
-      this.connectionCheckInterval,
-    );
-  }
-
-  adjustConnectionCheckInterval() {
-    const newInterval =
-      this.serverOnline === false
-        ? this.offlineCheckInterval
-        : this.connectionCheckInterval;
-
-    if (newInterval !== this.connectionCheckInterval) {
-      Logger.info(
-        `調整連線檢查間隔: ${this.connectionCheckInterval}ms → ${newInterval}ms (伺服器${this.serverOnline ? "線上" : "已離線"})`,
-      );
-      this.connectionCheckInterval = newInterval;
-      this.startConnectionCheck();
-    }
+    // serverOnline 現在由 WS 事件（_updateServerOnline）即時維護，
+    // 不再需要 setInterval 輪詢。呼叫一次 checkConnection() 讓 indicator 反映當前狀態。
+    void this.checkConnection();
   }
 
   async checkConnection() {
@@ -567,6 +573,15 @@ class SyncManager {
       return;
     }
 
+    // WS 已認證：直接更新 indicator，不需要 HTTP
+    const wsAuthenticated = this.core.syncClient?.wsClient?.isAuthenticated === true;
+    if (wsAuthenticated) {
+      this.serverOnline = true;
+      this.ui.updateIndicator();
+      return;
+    }
+
+    // WS 斷線中：做一次 HTTP 確認，提供準確的離線狀態給 UI
     this.isCheckingConnection = true;
     try {
       await this.core.checkServerHealth();

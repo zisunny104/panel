@@ -22,8 +22,8 @@
 import {
   SYNC_DATA_TYPES,
   SYNC_EVENTS,
-  ACTION_HANDLER_EVENTS,
-  ACTION_HANDLER_DEFAULTS,
+  EXPERIMENT_ACTION_HANDLER_EVENTS,
+  EXPERIMENT_ACTION_HANDLER_DEFAULTS,
   ACTION_IDS,
 } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
@@ -33,9 +33,9 @@ class ExperimentActionHandler extends EventEmitter {
   /**
    * 事件類型常數
    */
-  static EVENT = ACTION_HANDLER_EVENTS;
+  static EVENT = EXPERIMENT_ACTION_HANDLER_EVENTS;
 
-  static COMPLETION_COOLDOWN_MS = ACTION_HANDLER_DEFAULTS.COMPLETION_COOLDOWN_MS;
+  static COMPLETION_COOLDOWN_MS = EXPERIMENT_ACTION_HANDLER_DEFAULTS.COMPLETION_COOLDOWN_MS;
 
   constructor(config = {}) {
     super();
@@ -422,7 +422,7 @@ class ExperimentActionHandler extends EventEmitter {
     // 標記為完成
     this.completedActions.add(normalizedActionId);
 
-    Logger.info(`動作已完成${skipped ? '（跳過）' : ''}`, {
+    Logger.info(`動作已完成${skipped ? "（跳過）" : ""}`, {
       actionId: normalizedActionId,
       progress: `${this.currentActionIndex}/${this.currentActionSequence.length}`,
     });

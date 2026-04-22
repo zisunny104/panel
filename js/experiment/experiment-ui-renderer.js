@@ -931,6 +931,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
       }
 
       Logger.debug("實驗控制面板已渲染");
+      this._emit("experiment-controls-rendered");
       return containerEl;
     });
   }

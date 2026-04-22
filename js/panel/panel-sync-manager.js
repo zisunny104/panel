@@ -67,6 +67,14 @@ class PanelSyncManager {
     return this.syncClient?.getRole?.() || this.syncClient?.role || null;
   }
 
+  _getExperimentId() {
+    return this.experimentSystemManager?.getExperimentId?.() || "";
+  }
+
+  _getParticipantName() {
+    return this.experimentSystemManager?.getParticipantName?.()?.trim?.() || "";
+  }
+
   /**
    * 初始化同步管理器
    */
@@ -239,10 +247,8 @@ class PanelSyncManager {
       if (startData.broadcast === false) return;
       if (!this._canBroadcast()) return;
       const currentCombo = this._getExperimentCombo();
-      const experimentId =
-        this.experimentSystemManager?.getExperimentId?.() || "";
-      const participantName =
-        document.getElementById("participantNameInput")?.value?.trim() || "";
+      const experimentId = this._getExperimentId();
+      const participantName = this._getParticipantName();
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_STARTED,
         clientId: this.syncClient?.clientId,
@@ -253,15 +259,14 @@ class PanelSyncManager {
         participantName,
         combinationId: currentCombo?.combinationId || "",
         combinationName: currentCombo?.combinationName || "",
-        })
-        .catch((err) => Logger.warn("廣播實驗開始失敗:", err));
-      }));
+      }).catch((err) => Logger.warn("廣播實驗開始失敗:", err));
+    }));
 
     // 廣播實驗暫停
     unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.PAUSED, (pauseData = {}) => {
       if (pauseData.broadcast === false) return;
       if (!this._canBroadcast()) return;
-      const experimentId = this.experimentSystemManager?.getExperimentId?.() || "";
+      const experimentId = this._getExperimentId();
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
         clientId: this.syncClient?.clientId,
@@ -276,7 +281,7 @@ class PanelSyncManager {
     unsubscribers.push(flowManager.on(ExperimentFlowManager.EVENT.RESUMED, (resumeData = {}) => {
       if (resumeData.broadcast === false) return;
       if (!this._canBroadcast()) return;
-      const experimentId = this.experimentSystemManager?.getExperimentId?.() || "";
+      const experimentId = this._getExperimentId();
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
         clientId: this.syncClient?.clientId,
@@ -298,7 +303,7 @@ class PanelSyncManager {
         return;
       }
       if (!this._canBroadcast()) return;
-      const experimentId = this.experimentSystemManager?.getExperimentId?.() || "";
+      const experimentId = this._getExperimentId();
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
         clientId: this.syncClient?.clientId,
@@ -316,7 +321,7 @@ class PanelSyncManager {
       this._setDeferCompletion(false);
       if (completedData.broadcast === false) return;
       if (!this._canBroadcast()) return;
-      const experimentId = this.experimentSystemManager?.getExperimentId?.() || "";
+      const experimentId = this._getExperimentId();
       this.experimentSyncCore?.safeBroadcast?.({
         type: SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
         clientId: this.syncClient?.clientId,

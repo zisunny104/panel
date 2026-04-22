@@ -3,9 +3,15 @@
  */
 import dotenv from "dotenv";
 import os from "os";
+import crypto from "crypto";
 
 // 載入環境變數
 dotenv.config();
+
+// 管理員 Token：從環境變數讀取，否則每次啟動隨機產生
+// 用於保護高危管理端點（清除、踢人、改角色）
+export const ADMIN_TOKEN =
+  process.env.ADMIN_TOKEN || crypto.randomBytes(16).toString("hex");
 
 export const SERVER_CONFIG = {
   // 環境設定
@@ -28,7 +34,8 @@ export const SERVER_CONFIG = {
       process.env.WS_HEARTBEAT_INTERVAL || "30000",
       10,
     ),
-    heartbeatTimeout: parseInt(process.env.WS_HEARTBEAT_TIMEOUT || "60000", 10),
+    // 90s：安卓瀏覽器背景時 setInterval 可能凍結 30s 以上，需要額外容錯空間
+    heartbeatTimeout: parseInt(process.env.WS_HEARTBEAT_TIMEOUT || "90000", 10),
     // Rate limiting for incoming messages (tokens)
     // 說明：每個連線有獨立 token bucket，用以限制單一連線的速率
     // - capacity：突發可用 token 數

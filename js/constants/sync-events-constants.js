@@ -72,6 +72,7 @@ export const SYNC_EVENTS = {
   // 工作階段失效與狀態事件
   SESSION_INVALID: "sync_session_invalid",
   SESSION_STATE: "sync_session_state",
+  SESSION_STATE_REFRESHED: "sync_session_state_refreshed",
 
   // 連線輔助事件
   RECONNECTED: "sync_reconnected",

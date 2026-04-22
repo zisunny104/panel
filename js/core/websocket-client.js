@@ -53,16 +53,106 @@ class WebSocketClient {
 
     this.heartbeatTimer = null;
     this.reconnectTimer = null;
+    this.lastHeartbeatAck = null;
 
     this.eventHandlers = new Map();
 
     this.messageQueue = [];
     this.maxMessageQueueSize = options.maxMessageQueueSize || 500;
+    this._lastSeq = 0;
+    this._pendingStateRecovery = false;
+    this._stateRecoveryTimer = null;
+    this._stateRecoveryCooldown = options.stateRecoveryCooldown || 8000;
 
     this.handleOpen = this.handleOpen.bind(this);
     this.handleMessage = this.handleMessage.bind(this);
     this.handleClose = this.handleClose.bind(this);
     this.handleError = this.handleError.bind(this);
+    this._handleVisibilityChange = this._handleVisibilityChange.bind(this);
+
+    this._setupVisibilityHandler();
+  }
+
+  /**
+   * 監聽 Page Visibility API，讓安卓瀏覽器從背景返回時立即確認連線狀態。
+   * 安卓 Chrome 在背景時會凍結 setInterval（含 heartbeat），
+   * 返回前景時 server 可能已判斷斷線，需主動重連。
+   */
+  _setupVisibilityHandler() {
+    if (typeof document === "undefined") return;
+    document.addEventListener("visibilitychange", this._handleVisibilityChange);
+  }
+
+  _handleVisibilityChange() {
+    if (document.visibilityState !== "visible") return;
+
+    Logger.debug("[WebSocketClient] 頁面恢復前景，檢查連線狀態");
+
+    if (!this.isAuthenticated || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      if (this.sessionId && this.config.autoReconnect) {
+        Logger.info("[WebSocketClient] 頁面恢復前景，重新建立連線");
+        this.reconnectAttempts = 0;
+        this.connect({
+          sessionId: this.sessionId,
+          clientId: this.clientId,
+          role: this.role,
+          clientType: this.clientType,
+        });
+      }
+      return;
+    }
+
+    // 連線仍開著：送 heartbeat 確認 server 存活，並主動拉取最新狀態
+    // 以防背景期間有狀態更新遺漏
+    this.send({
+      type: WS_PROTOCOL.C2S.HEARTBEAT,
+      data: { clientId: this.clientId, timestamp: Date.now() },
+    });
+
+    if (this.sessionId) {
+      this.send({
+        type: WS_PROTOCOL.C2S.GET_SESSION_STATE,
+        data: { sessionId: this.sessionId, lastSeq: this._lastSeq },
+      });
+      Logger.debug("[WebSocketClient] 頁面恢復前景，主動拉取最新工作階段狀態");
+    }
+
+    this.emit("visibility_restored", { sessionId: this.sessionId, clientId: this.clientId });
+  }
+
+  _clearStateRecoveryLock() {
+    this._pendingStateRecovery = false;
+    if (this._stateRecoveryTimer) {
+      clearTimeout(this._stateRecoveryTimer);
+      this._stateRecoveryTimer = null;
+    }
+  }
+
+  _requestSessionStateRecovery() {
+    if (!this.sessionId || !this.isAuthenticated) {
+      return;
+    }
+
+    if (this._pendingStateRecovery) {
+      Logger.debug(
+        "[WebSocketClient] 已有進行中的狀態回補請求，略過重複請求",
+      );
+      return;
+    }
+
+    this._pendingStateRecovery = true;
+    this._stateRecoveryTimer = setTimeout(() => {
+      this._clearStateRecoveryLock();
+    }, this._stateRecoveryCooldown);
+
+    Logger.info(
+      `[WebSocketClient] 發現序列號遺漏，請求伺服器回補工作階段狀態 (sessionId=${this.sessionId}, lastSeq=${this._lastSeq})`,
+    );
+
+    this.send({
+      type: WS_PROTOCOL.C2S.GET_SESSION_STATE,
+      data: { sessionId: this.sessionId, lastSeq: this._lastSeq },
+    });
   }
 
   /**
@@ -167,6 +257,7 @@ class WebSocketClient {
   handleOpen(event) {
     Logger.info("[WebSocketClient] WebSocket 連接已建立");
     this.reconnectAttempts = 0;
+    this._clearStateRecoveryLock();
   }
 
   /**
@@ -176,7 +267,25 @@ class WebSocketClient {
   handleMessage(event) {
     try {
       const message = JSON.parse(event.data);
-      const { type, data } = message;
+      const { type, data, seq } = message;
+
+      // 序列號追蹤：偵測遺漏訊息
+      if (seq != null && seq > 0) {
+        if (this._lastSeq > 0 && seq !== this._lastSeq + 1) {
+          const missingCount = seq - this._lastSeq - 1;
+          if (missingCount > 0) {
+            Logger.warn(
+              `[WebSocketClient] 訊息序列號不連續：期望 ${this._lastSeq + 1}，收到 ${seq}，可能遺漏 ${missingCount} 筆`,
+            );
+            this._requestSessionStateRecovery();
+          } else {
+            Logger.warn(
+              `[WebSocketClient] 收到過舊或重複的序列號：期望 ${this._lastSeq + 1}，收到 ${seq}`,
+            );
+          }
+        }
+        this._lastSeq = seq;
+      }
 
       const highFrequencyTypes = new Set([
         WS_PROTOCOL.S2C.HEARTBEAT_ACK,
@@ -208,7 +317,23 @@ class WebSocketClient {
           break;
 
         case WS_PROTOCOL.S2C.SESSION_STATE:
+          this._clearStateRecoveryLock();
           this.emit(WS_PROTOCOL.S2C.SESSION_STATE, data);
+          break;
+
+        case WS_PROTOCOL.S2C.REQUEST_CLIENT_STATE:
+          this.emit(WS_PROTOCOL.S2C.REQUEST_CLIENT_STATE, data);
+          break;
+
+        case WS_PROTOCOL.S2C.KICKED:
+          this.handleKicked(data);
+          break;
+
+        case WS_PROTOCOL.S2C.SYNC_STATE:
+          this._clearStateRecoveryLock();
+          Logger.debug("[WebSocketClient] 收到 sync_state 推送，轉換為 session_state 事件");
+          this.emit(WS_PROTOCOL.S2C.SESSION_STATE, data);
+          this.emit(WS_PROTOCOL.S2C.SYNC_STATE, data);
           break;
 
         case WS_PROTOCOL.S2C.SESSION_STATE_UPDATE:
@@ -258,6 +383,15 @@ class WebSocketClient {
   handleConnected(data) {
     this.wsConnectionId = data.wsConnectionId;
     Logger.debug(`[WebSocketClient] WebSocket 連接 ID: ${this.wsConnectionId}`);
+
+    // 以 server 提供的 heartbeat 間隔為準，確保雙端一致
+    if (data.heartbeatInterval && typeof data.heartbeatInterval === "number") {
+      this.config.heartbeatInterval = data.heartbeatInterval;
+      Logger.debug(
+        `[WebSocketClient] 採用 server 心跳間隔: ${data.heartbeatInterval}ms`,
+      );
+    }
+
     this.authenticate();
   }
 
@@ -300,6 +434,9 @@ class WebSocketClient {
     this.clientId = clientId;
     this.role = role;
     this.isAuthenticated = true;
+    if (!isReconnect) {
+      this._lastSeq = 0; // 新連線重置序列號
+    }
 
     this.saveToStorage();
 
@@ -362,13 +499,13 @@ class WebSocketClient {
       `[WebSocketClient] 已派發內部 sync_data_cleared 事件 [${reason}]`,
     );
 
-    Logger.debug("[WebSocketClient] 500ms 後斷開連線...");
+    Logger.debug("[WebSocketClient] 100ms 後斷開連線...");
     setTimeout(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         Logger.info("[WebSocketClient] 斷開 WebSocket 連線");
         this.ws.close(1000, "Session not found, clearing sync data");
       }
-    }, 500);
+    }, 100);
   }
 
   /**
@@ -396,6 +533,7 @@ class WebSocketClient {
       `[WebSocketClient] WebSocket 連接已關閉 [${event.code}]: ${event.reason}`,
     );
 
+    this._clearStateRecoveryLock();
     this.isAuthenticated = false;
     this.stopHeartbeat();
 
@@ -440,12 +578,39 @@ class WebSocketClient {
     this.emit("server_error", data);
   }
 
+  handleKicked(data) {
+    const reason = data?.reason || "admin_kick";
+    Logger.warn(`[WebSocketClient] 收到強制退出通知: ${reason}`);
+
+    // 停用自動重連，並清除本機儲存，避免在斷線後自動恢復同步
+    this.config.autoReconnect = false;
+    this.clearStorage();
+    this.close();
+
+    window.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.WEBSOCKET_SESSION_INVALID, {
+        detail: {
+          reason: "kicked",
+          originalError: data,
+        },
+      }),
+    );
+
+    this.emit("kicked", data);
+  }
+
   /**
    * 排程重新連接。
+   * 使用指數退避＋隨機抖動，避免多裝置同時衝擊 server。
+   * 延遲上限 30 秒：base * 2^(attempt-1) ± 10% jitter。
    */
   scheduleReconnect() {
     this.reconnectAttempts++;
-    const delay = this.config.reconnectInterval * this.reconnectAttempts;
+    const base = this.config.reconnectInterval;
+    const exponential = base * Math.pow(2, this.reconnectAttempts - 1);
+    const capped = Math.min(exponential, 30000);
+    const jitter = capped * 0.1 * (Math.random() * 2 - 1);
+    const delay = Math.round(capped + jitter);
 
     Logger.info(
       `[WebSocketClient] 將在 ${delay}ms 後嘗試重新連接 (第 ${this.reconnectAttempts} 次)`,
@@ -466,17 +631,29 @@ class WebSocketClient {
    */
   startHeartbeat() {
     this.stopHeartbeat();
+    this.lastHeartbeatAck = Date.now();
 
     this.heartbeatTimer = setInterval(() => {
-      if (this.isAuthenticated) {
-        this.send({
-          type: WS_PROTOCOL.C2S.HEARTBEAT,
-          data: {
-            clientId: this.clientId,
-            timestamp: Date.now(),
-          },
-        });
+      if (!this.isAuthenticated) return;
+
+      // 偵測伺服器單向失聯：若超過 3 個心跳週期未收到 ACK，主動重連
+      const silenceTimeout = this.config.heartbeatInterval * 3;
+      if (this.lastHeartbeatAck && Date.now() - this.lastHeartbeatAck > silenceTimeout) {
+        Logger.warn("[WebSocketClient] 心跳 ACK 超時，伺服器可能已失聯，主動重連");
+        this.isAuthenticated = false;
+        if (this.ws) {
+          this.ws.close(4001, "heartbeat_timeout");
+        }
+        return;
       }
+
+      this.send({
+        type: WS_PROTOCOL.C2S.HEARTBEAT,
+        data: {
+          clientId: this.clientId,
+          timestamp: Date.now(),
+        },
+      });
     }, this.config.heartbeatInterval);
 
     Logger.debug(
@@ -498,6 +675,11 @@ class WebSocketClient {
    * 處理心跳確認。
    */
   handleHeartbeatAck(data) {
+    this.lastHeartbeatAck = Date.now();
+    // 用伺服器回傳的時間做時間同步（若有提供）
+    if (data?.serverTime) {
+      this.timeSyncManager?.syncWithWebSocket?.(data.serverTime);
+    }
   }
 
   /**
@@ -697,6 +879,10 @@ class WebSocketClient {
 
     this.config.autoReconnect = false; // 停用自動重連
     this.stopHeartbeat();
+
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this._handleVisibilityChange);
+    }
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);

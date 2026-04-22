@@ -14,11 +14,12 @@
  *   onRecordsSyncedRefresh → ({ reason, data }) => void 廣播刷新前的額外 UI 收尾（可選）
  */
 
-import { RECORD_TYPE_LABELS, RECORD_TYPES } from "../constants/index.js";
+import { RECORD_TYPE_LABELS, RECORD_TYPES, API_ENDPOINTS } from "../constants/index.js";
 import { recordViewFilter } from "./record-view-filter.js";
 import { recordViewModal } from "./record-view-modal.js";
 import { recordViewList } from "./record-view-list.js";
 import { recordViewStats } from "./record-view-stats.js";
+import { getApiUrl } from "../core/url-utils.js";
 
 class RecordView {
   constructor() {
@@ -626,7 +627,7 @@ class RecordView {
         const results = await Promise.all(
           batch.map(async (filename) => {
             try {
-              const response = await fetch(`${apiUrl}/record/read/${filename}`);
+              const response = await fetch(`${apiUrl}${API_ENDPOINTS.RECORD.READ(filename)}`);
               if (!response.ok) return null;
               const result = await response.json();
               if (!result.success || !result.content) return null;
@@ -682,7 +683,7 @@ class RecordView {
    */
   async listFilesInDirectory(_dirPath) {
     try {
-      const response = await fetch(`${this._getApiUrl()}/record/list`);
+      const response = await fetch(`${this._getApiUrl()}${API_ENDPOINTS.RECORD.LIST}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.files) {
@@ -756,7 +757,7 @@ class RecordView {
     if (!experiment?.filename) { Logger.warn(`找不到實驗 ${recordId}`); return; }
 
     try {
-      const response = await fetch(`${this._getApiUrl()}/record/read/${experiment.filename}`);
+      const response = await fetch(`${this._getApiUrl()}${API_ENDPOINTS.RECORD.READ(experiment.filename)}`);
       if (!response.ok) throw new Error(`API 回傳錯誤: ${response.status}`);
       const result = await response.json();
       if (!result.success || !result.content) throw new Error(result.error || "無法讀取");
@@ -777,7 +778,7 @@ class RecordView {
 
     try {
       const response = await fetch(
-        `${this._getApiUrl()}/record/delete/${experiment.filename}`,
+        `${this._getApiUrl()}${API_ENDPOINTS.RECORD.DELETE(experiment.filename)}`,
         { method: "DELETE" },
       );
       const result = await response.json();
@@ -802,7 +803,7 @@ class RecordView {
       const experiment = this._findRecord(recordId);
       if (!experiment?.filename) continue;
       try {
-        const response = await fetch(`${apiUrl}/record/read/${experiment.filename}`);
+        const response = await fetch(`${apiUrl}${API_ENDPOINTS.RECORD.READ(experiment.filename)}`);
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.content) {
@@ -835,7 +836,7 @@ class RecordView {
       if (!experiment?.filename) continue;
       try {
         const response = await fetch(
-          `${apiUrl}/record/delete/${experiment.filename}`,
+          `${apiUrl}${API_ENDPOINTS.RECORD.DELETE(experiment.filename)}`,
           { method: "DELETE" },
         );
         if (response.ok) {
@@ -865,7 +866,7 @@ class RecordView {
     const safeFilename = filename.endsWith(".jsonl") ? filename : `${filename}.jsonl`;
     try {
       const resp = await fetch(
-        `${this._getApiUrl()}/record/update-participant/${encodeURIComponent(safeFilename)}`,
+        `${this._getApiUrl()}${API_ENDPOINTS.RECORD.UPDATE_PARTICIPANT(encodeURIComponent(safeFilename))}`,
         { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ participant: newName }) },
       );
       const result = await resp.json();
@@ -981,13 +982,7 @@ class RecordView {
   }
 
   _getApiUrl() {
-    return `${window.location.protocol}//${window.location.host}${this._getApiBasePath()}`;
-  }
-
-  _getApiBasePath() {
-    let basePath = window.location.pathname;
-    if (!basePath.endsWith("/")) basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
-    return basePath + "api";
+    return getApiUrl();
   }
 }
 

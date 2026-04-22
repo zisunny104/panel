@@ -9,6 +9,36 @@ import { RECORD_SOURCES, SYNC_EVENTS } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { generateExperimentId } from "../core/random-utils.js";
 
+const EXPERIMENT_STATE_KEY_MAP = {
+  experiment_id: "experimentId",
+  participant_name: "participantName",
+  combination_name: "combinationName",
+  loaded_units: "loadedUnits",
+  current_unit_index: "currentUnitIndex",
+  total_units: "totalUnits",
+  current_step_index: "currentStepIndex",
+  total_steps: "totalSteps",
+  unit_ids: "unitIds",
+};
+
+export function normalizeExperimentStatePayload(payload) {
+  if (payload === null || payload === undefined) return payload;
+  if (Array.isArray(payload)) {
+    return payload.map(normalizeExperimentStatePayload);
+  }
+  if (typeof payload !== "object") {
+    return payload;
+  }
+
+  const normalized = {};
+  for (const [key, value] of Object.entries(payload)) {
+    const normalizedKey =
+      EXPERIMENT_STATE_KEY_MAP[key] || key.replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+    normalized[normalizedKey] = normalizeExperimentStatePayload(value);
+  }
+  return normalized;
+}
+
 class ExperimentStateManager {
   constructor({ timeSyncManager = null, recordManager = null } = {}) {
     this.experimentId = null;

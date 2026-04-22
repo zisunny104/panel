@@ -1,589 +1,895 @@
 /**
- * Sync - Sessions 管理樣式
- * 說明：作為工作階段列表與批次操作的樣式集合
+ * Sync Sessions Modal 樣式
+ * 設計基準：與 confirm.css / modal.css 保持一致
  */
 
-.sync-sessions-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-    flex-shrink: 0;
+/* ===== Modal 容器 ===== */
+.sync-sessions-ui {
+    width: 90vw;
+    max-width: 820px;
 }
 
-.sync-action-btn {
-    background: #007bff;
-    color: white;
-    border: none;
-    font-size: 14px;
-    font-weight: 500;
-    padding: 10px 16px;
-    min-width: 120px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.sync-action-btn:hover {
-    background: #0056b3;
-}
-
-.sync-action-btn:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-}
-
-.sync-action-btn-warning {
-    background: #ffc107;
-    color: #212529;
-}
-
-.sync-action-btn-warning:hover {
-    background: #e0a800;
-}
-
-.sync-action-btn-danger {
-    background: #dc3545;
-}
-
-.sync-action-btn-danger:hover {
-    background: #c82333;
-}
-
-/* 批次操作區域 */
-.sync-sessions-batch-actions {
+/* ===== Header：回歸標準 modal-header 樣式，補上副標題 ===== */
+.ssm-header-left {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-
-    padding: 16px;
-    margin-bottom: 20px;
-
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
+    gap: 4px;
 }
 
-.sync-batch-controls {
+.ssm-summary {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* ===== Modal Body ===== */
+.ssm-body {
+    padding: 0 !important;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 16px;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: 80vh;
 }
 
-.sync-batch-checkbox {
+/* ===== 工具列 ===== */
+.ssm-toolbar {
     display: flex;
     align-items: center;
     gap: 8px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 14px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
-}
-
-.sync-batch-checkbox:hover {
-    background: rgba(0, 123, 255, 0.1);
-}
-
-.sync-batch-checkbox input[type="checkbox"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-}
-
-.sync-batch-select-btn {
-    background: #6c757d;
-    color: white;
-    border: none;
-    font-size: 14px;
-    font-weight: 500;
-    padding: 8px 12px;
-    min-width: 120px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.sync-batch-select-btn:hover {
-    background: #5a6268;
-    transform: translateY(-1px);
-}
-
-.sync-batch-operations {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    padding-top: 12px;
-    border-top: 1px solid #dee2e6;
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
     flex-wrap: wrap;
 }
 
-.sync-batch-op-btn {
-    padding: 10px 16px;
+.ssm-toolbar-spacer {
+    flex: 1;
+}
+
+/* 工具列按鈕 — 對齊 confirm.css 的 sync-confirm-btn 風格 */
+.ssm-btn {
+    padding: 8px 16px;
     border: none;
-    border-radius: 6px;
-    cursor: pointer;
+    border-radius: 8px;
     font-size: 14px;
-    font-weight: 500;
-    min-width: 140px;
-    transition: all 0.2s ease;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+    background: #e9ecef;
+    color: #495057;
 }
 
-.sync-batch-op-btn:disabled {
-    background: #6c757d;
+.ssm-btn:hover {
+    background: #dee2e6;
+    color: #212529;
+}
+
+.ssm-btn:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
-    opacity: 0.6;
 }
 
-.sync-batch-op-download {
-    background: #28a745;
+.ssm-btn-warning {
+    background: #667eea;
     color: white;
 }
 
-.sync-batch-op-download:hover {
-    background: #218838;
+.ssm-btn-warning:hover {
+    background: #5568d3;
 }
 
-.sync-batch-op-delete {
+.ssm-btn-danger {
     background: #dc3545;
     color: white;
 }
 
-.sync-batch-op-delete:hover {
+.ssm-btn-danger:hover {
     background: #c82333;
 }
 
-/* 響應式設計 */
-@media (max-width: 768px) {
-    .sync-sessions-actions {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-    }
-
-    .sync-action-btn {
-        min-width: auto;
-        width: 100%;
-    }
-
-    .sync-sessions-batch-actions {
-        padding: 12px;
-        gap: 12px;
-    }
-
-    .sync-batch-controls {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-    }
-
-    .sync-batch-operations {
-        flex-direction: column;
-        gap: 8px;
-        padding-top: 8px;
-    }
-
-    .sync-batch-op-btn {
-        min-width: auto;
-        width: 100%;
-    }
-
-    .sync-batch-select-btn {
-        min-width: auto;
-        width: 100%;
-    }
+.ssm-btn-teal {
+    background: #17a2b8;
+    color: white;
 }
 
-.sync-sessions-list {
+.ssm-btn-teal:hover {
+    background: #138496;
+}
+
+.ssm-btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+/* ===== 批次操作列 ===== */
+.ssm-batch {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 20px;
+    background: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+    flex-shrink: 0;
+}
+
+.ssm-batch-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
     flex: 1;
 }
 
-.sync-session-card {
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    background: white;
-    overflow: hidden;
-}
-
-.sync-session-header {
-    padding: 15px;
-    cursor: pointer;
+.ssm-batch-right {
     display: flex;
-    justify-content: space-between;
+    gap: 8px;
     align-items: center;
 }
 
-.sync-session-header:hover {
-    background: #f8f9fa;
+.ssm-select-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #495057;
+    cursor: pointer;
 }
 
-.sync-session-selection {
-    margin-right: 12px;
+.ssm-checkbox {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: #667eea;
 }
 
-.sync-session-checkbox {
+/* 篩選標籤按鈕 — 對齊 sync-confirm-mode-btn */
+.ssm-tag-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ssm-tag-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+/* ===== 工作階段列表 ===== */
+.ssm-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    background: white;
+}
+
+.ssm-empty {
+    text-align: center;
+    color: #666;
+    padding: 2rem;
+    font-size: 14px;
+    font-style: italic;
+}
+
+/* ===== 工作階段卡片 — 對齊 sync-confirm-item ===== */
+.sync-session-card {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: white;
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sync-session-card:hover {
+    border-color: #999;
+}
+
+.sync-session-card.expanded {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+/* 頻道卡片 */
+.ssm-card-channel {
+    border-color: #78c4d3;
+    background: white;
+    box-shadow: 0 0 0 1px rgba(120, 196, 211, 0.08);
+}
+
+.ssm-card-channel:hover {
+    border-color: #1493ae;
+    box-shadow: 0 3px 12px rgba(20, 147, 174, 0.08);
+}
+
+.ssm-card-channel.expanded {
+    border-color: #1493ae;
+    box-shadow: 0 3px 12px rgba(20, 147, 174, 0.12);
+}
+
+.ssm-card-channel .ssm-card-header {
+    background: linear-gradient(90deg, rgba(225, 250, 254, 0.96), rgba(235, 246, 250, 0.96));
+}
+
+.ssm-card-channel .ssm-card-name {
+    color: #0f5f70;
+}
+
+.ssm-card-channel .ssm-channel-badge {
+    background: #d7f3f7;
+    color: #0b5460;
+    border-color: #9ddce6;
+}
+
+
+/* Channel A 主題 */
+.ssm-card-channel[data-channel="A"] {
+    border-color: #667eea;
+}
+
+.ssm-card-channel[data-channel="A"] .ssm-card-header {
+    background: linear-gradient(90deg, rgba(102, 126, 234, 0.16), rgba(85, 104, 211, 0.10));
+}
+
+.ssm-card-channel[data-channel="A"] .ssm-card-name {
+    color: #3340a1;
+}
+
+.ssm-card-channel[data-channel="A"] .ssm-channel-badge {
+    background: #d7e1ff;
+    color: #2f3f95;
+    border-color: #b4bef7;
+}
+
+/* Channel B 主題 */
+.ssm-card-channel[data-channel="B"] {
+    border-color: #20c997;
+}
+
+.ssm-card-channel[data-channel="B"] .ssm-card-header {
+    background: linear-gradient(90deg, rgba(32, 201, 151, 0.16), rgba(23, 165, 137, 0.10));
+}
+
+.ssm-card-channel[data-channel="B"] .ssm-card-name {
+    color: #116c56;
+}
+
+.ssm-card-channel[data-channel="B"] .ssm-channel-badge {
+    background: #c8f0e4;
+    color: #0f8262;
+    border-color: #9ddcc4;
+}
+
+/* Channel C 主題 */
+.ssm-card-channel[data-channel="C"] {
+    border-color: #fd7e14;
+}
+
+.ssm-card-channel[data-channel="C"] .ssm-card-header {
+    background: linear-gradient(90deg, rgba(253, 126, 20, 0.16), rgba(232, 101, 10, 0.10));
+}
+
+.ssm-card-channel[data-channel="C"] .ssm-card-name {
+    color: #af4e05;
+}
+
+.ssm-card-channel[data-channel="C"] .ssm-channel-badge {
+    background: #ffe7cd;
+    color: #b15a0d;
+    border-color: #f5c89a;
+}
+
+/* 卡片 Header */
+.ssm-card-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    background: #f5f5f5;
+}
+
+.ssm-card-header:hover {
+    background: #eeeeee;
+}
+
+.sync-session-card.expanded .ssm-card-header {
+    background: #f0f2ff;
+    border-bottom: 1px solid #ddd;
+}
+
+.ssm-card-channel.expanded .ssm-card-header {
+    background: linear-gradient(90deg, rgba(214, 243, 248, 0.98), rgba(228, 248, 251, 0.98));
+}
+
+.ssm-card-check {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #d8dee4;
+    border-radius: 5px;
+    background: #f8f9fb;
+}
+
+.ssm-card-check::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: #ffffff;
+}
+
+.ssm-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.ssm-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 3px;
+}
+
+.ssm-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* 頻道徽章 — 對齊 sync-confirm-checksum-status */
+.ssm-channel-badge {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #e0f4f8;
+    color: #0c5460;
+    border: 1px solid #b2e0e8;
+}
+
+.ssm-card-id {
+    display: block;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 5px;
+}
+
+.ssm-session-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    margin-bottom: 8px;
+}
+
+.ssm-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #1f4d5b;
+    background: #eef9fb;
+    border: 1px solid #c7ecf3;
+    border-radius: 999px;
+    padding: 4px 8px;
+}
+
+.ssm-meta-chip-label {
+    font-weight: 700;
+    color: #0f5667;
+}
+
+.ssm-card-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+}
+
+.ssm-meta-item {
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+}
+
+.ssm-meta-lbl {
+    color: #999;
+}
+
+.ssm-meta-sep {
+    font-size: 12px;
+    color: #ddd;
+}
+
+/* 卡片右側 */
+.ssm-card-aside {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    margin-left: 6px;
+}
+
+.ssm-chips {
+    display: flex;
+    gap: 4px;
+}
+
+.ssm-chip {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    border: 1px solid;
+}
+
+.ssm-chip-op {
+    background: #e8eeff;
+    color: #4555bd;
+    border-color: #c5d0ff;
+}
+
+.ssm-chip-view {
+    background: #e6faf5;
+    color: #17a589;
+    border-color: #b3e8d8;
+}
+
+.ssm-chip-empty {
+    background: #f5f5f5;
+    color: #999;
+    border-color: #ddd;
+    font-weight: 400;
+}
+
+.ssm-card-foot {
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.sync-session-checkbox input[type="checkbox"] {
-    margin: 0;
+.ssm-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ccc;
+    flex-shrink: 0;
 }
 
-.sync-session-info {
-    flex: 1;
+.ssm-status-dot.active {
+    background: #28a745;
 }
 
-/* ===== 注意：.sync-card-label / .sync-card-value 的視覺樣式已統一由 "css/sync/indicator.css" 管理 ===== */
-/* 移除會造成與 indicator.css 覆蓋衝突的定義，若 session 卡片需要不同樣式，請改用更具範圍的選擇器 .sync-session-card .sync-card-label */
+.ssm-status-lbl {
+    font-size: 12px;
+    color: #666;
+}
 
-.sync-card-hint {
-    font-size: 14px;
+.ssm-expand-arrow {
+    font-size: 12px;
     color: #999;
+    transition: transform 0.2s ease;
 }
 
-.sync-session-details {
-    padding: 0;
+.ssm-expand-arrow::before {
+    content: "▶";
+}
+
+.sync-session-card.expanded .ssm-expand-arrow {
+    transform: rotate(90deg);
+}
+
+/* ===== 詳細資訊面板 ===== */
+.ssm-card-details {
     max-height: 0;
     overflow: hidden;
-    transition: all 0.3s ease;
-    border-top: 1px solid #eee;
+    transition: max-height 0.25s ease;
 }
 
-.sync-session-card.expanded .sync-session-details {
-    padding: 12px;
-    max-height: 800px;
-    background: white;
+.sync-session-card.expanded .ssm-card-details {
+    max-height: 900px;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: #bbb #f5f5f5;
 }
 
-.sync-session-card.expanded .sync-session-details::-webkit-scrollbar {
-    width: 8px;
+.sync-session-card.expanded .ssm-card-details::-webkit-scrollbar {
+    width: 6px;
 }
 
-.sync-session-card.expanded .sync-session-details::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.sync-session-card.expanded .sync-session-details::-webkit-scrollbar-thumb {
+.sync-session-card.expanded .ssm-card-details::-webkit-scrollbar-thumb {
     background: #bbb;
-    border-radius: 4px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    min-height: 40px;
+    border-radius: 3px;
 }
 
-.sync-session-card.expanded .sync-session-details::-webkit-scrollbar-thumb:hover {
-    background: #999;
-    background-clip: padding-box;
+.ssm-details-inner {
+    padding: 16px;
 }
 
-/* 新的按鈕佈局容器 */
-.sync-session-buttons-container {
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px solid #eee;
+/* 詳細資訊小節 — 對齊 confirm.css 的 label 風格 */
+.ssm-section {
+    margin-bottom: 16px;
 }
 
-/* 分享按鈕獨立行 */
-.sync-session-share-row {
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
+.ssm-section:last-child {
+    margin-bottom: 0;
 }
 
-.sync-session-share-row .sync-share-session-btn {
-    width: 100%;
-    background: #28a745;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    font-size: 14px;
+.ssm-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ssm-count-badge {
+    background: #e9ecef;
+    color: #495057;
+    font-size: 12px;
+    padding: 1px 7px;
+    border-radius: 10px;
     font-weight: 500;
-    transition: background-color 0.2s;
+    text-transform: none;
+    letter-spacing: 0;
+    border: 1px solid #ddd;
 }
 
-.sync-session-share-row .sync-share-session-btn:hover {
-    background: #218838;
+/* ===== 客戶端卡片 — 對齊 sync-confirm-item ===== */
+.ssm-clients-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-/* 其他按鈕行 */
-.sync-session-action-row {
+.ssm-empty-clients {
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+    padding: 6px 2px;
+}
+
+.ssm-client {
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: #f5f5f5;
+    border: 2px solid #ddd;
+}
+
+.ssm-client-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+/* 角色徽章 */
+.ssm-role-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.ssm-role-operator {
+    background: #e8eeff;
+    color: #4555bd;
+    border: 1px solid #c5d0ff;
+}
+
+.ssm-role-viewer {
+    background: #e6faf5;
+    color: #0f8a6e;
+    border: 1px solid #b3e8d8;
+}
+
+.ssm-client-id {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #495057;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 角色分段切換推到右側 */
+.ssm-client-role-group {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.ssm-type-tag {
+    font-size: 12px;
+    color: #666;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 2px 7px;
+    flex-shrink: 0;
+}
+
+.ssm-client-meta {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+/* ===== 客戶端操作按鈕 — 對齊 sync-confirm-mode-btn ===== */
+.ssm-client-btns {
     display: flex;
     gap: 8px;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
+    flex-wrap: wrap;
 }
 
-.sync-session-action-row .sync-edit-session-btn {
-    background: #007bff;
-}
-
-.sync-session-action-row .sync-edit-session-btn:hover {
-    background: #0056b3;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
-}
-
-.sync-session-action-row .sync-copy-session-btn {
-    background: #17a2b8;
-}
-
-.sync-session-action-row .sync-copy-session-btn:hover {
-    background: #138496;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
-}
-
-.sync-session-action-row .sync-delete-session-btn {
-    background: #dc3545;
-}
-
-.sync-session-action-row .sync-delete-session-btn:hover {
-    background: #c82333;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
-}
-
-.sync-delete-session-btn {
-    background: #dc3545;
-    color: white;
-    border: none;
-    padding: 0.375rem 0.75rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.sync-delete-session-btn:hover {
-    background: #c82333;
-}
-
-/* ===== 空狀態樣式 ===== */
-.sync-sessions-empty {
-    text-align: center;
-    color: #666;
-    padding: 20px 0;
-    font-style: italic;
-}
-
-/* 工作階段狀態標籤 */
-.sync-session-status {
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 14px;
-    color: white;
-}
-
-.sync-session-status.active {
-    background: #28a745;
-}
-
-.sync-session-status.inactive {
-    background: #e9ecef;
-    color: #c0392b;
-}
-
-/* 工作階段卡片狀態區域 */
-.sync-session-card-status {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* 展開/收起圖標 */
-.sync-session-expand-icon {
-    font-size: 18px;
-    color: #666;
-}
-
-/* 工作階段客戶端資訊 */
-.sync-session-client {
-    padding: 8px;
-    margin: 5px 0;
-    background: #f8f9fa;
-    border-radius: 4px;
-    border: 2px solid #007bff;
-}
-
-.sync-session-client.operator {
-    border-color: #007bff;
-}
-
-.sync-session-client.viewer {
-    border-color: #28a745;
-}
-
-/* 工作階段詳細資訊區域 */
-.sync-session-details .sync-session-info {
-    margin-bottom: 8px;
-}
-
-.sync-session-share-info {
-    background: #f8f9fa;
-    border: 2px solid #e9ecef;
-    border-radius: 6px;
-    padding: 12px 15px;
-    margin-bottom: 12px;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-}
-
-.sync-session-share-info strong {
-    display: block;
-    margin-bottom: 8px;
-    color: #495057;
+.ssm-client-btn {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
     font-weight: 600;
-}
-
-.sync-session-share-info small {
-    color: #6c757d;
-    font-size: 14px;
-}
-
-.sync-session-info strong {
-    display: block;
-    margin-bottom: 5px;
-}
-
-.sync-session-info-no-code {
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    background: white;
     color: #666;
-}
-
-.sync-session-info-no-state {
-    color: #856404;
-    background: #fff3cd;
-    border-left: 3px solid #ffc107;
-}
-
-.sync-session-status-active {
-    color: #28a745;
-    font-weight: bold;
-}
-
-.sync-session-status-inactive {
-    color: #6c757d;
-    font-style: italic;
-}
-
-.sync-session-clients {
-    margin-top: 8px;
-}
-
-.sync-session-no-clients {
-    color: #666;
-    font-style: italic;
-}
-
-/* ===== 工作階段卡片過渡動畫（從 indicator.css 合併） ===== */
-.sync-session-card {
-    transition: all 0.2s ease;
-}
-
-.sync-session-card:hover {
-    border-color: #007bff;
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
-}
-
-.sync-session-card.expanded {
-    border-color: #007bff;
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
-}
-
-.sync-session-expand-icon {
-    transition: transform 0.2s ease;
-}
-
-.sync-session-card.expanded .sync-session-expand-icon {
-    transform: rotate(90deg);
-}
-
-/* 同步狀態展開/收合 */
-.sync-session-state-toggle {
-    margin-bottom: 1rem;
-}
-
-.sync-session-state-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem;
-    background: #f8f9fa;
-    border: 2px solid #e0e0e0;
-    border-radius: 0.375rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    text-align: center;
+    white-space: nowrap;
 }
 
-.sync-session-state-header:hover {
-    background: #e9ecef;
-    border-color: #007bff;
-}
-
-.sync-state-expand-icon {
-    font-size: 0.875rem;
-    color: #6c757d;
-    transition: transform 0.2s ease;
-}
-
-.sync-session-state-details {
-    margin-top: 0.5rem;
-    padding: 0.75rem;
-    background: #f8f9fa;
-    border: 2px solid #e0e0e0;
-    border-radius: 0.375rem;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.sync-state-json {
-    background: #ffffff;
-    border: 2px solid #dee2e6;
-    border-radius: 0.25rem;
-    padding: 0.75rem;
-    font-family: 'Courier New', monospace;
-    font-size: 0.875rem;
-    line-height: 1.4;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-height: 300px;
-    overflow-y: auto;
-    color: #495057;
-}
-
-/* 刚除按鈕 */
-.sync-delete-session-btn:disabled {
-    background: #6c757d;
+.ssm-client-btn:disabled {
+    opacity: 0.45;
     cursor: not-allowed;
 }
 
-/* 格式化同步狀態樣式 */
+/* 切換角色 — 與 sync-confirm-mode-btn 完全一致 */
+.ssm-btn-role:hover:not(:disabled) {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+/* 推送狀態 */
+.ssm-btn-push:hover:not(:disabled) {
+    border-color: #17a2b8;
+    color: #17a2b8;
+}
+
+/* 強制退出 */
+.ssm-btn-kick:hover:not(:disabled) {
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+/* ===== 分享代碼 ===== */
+.ssm-codes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ssm-no-data {
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+    padding: 4px 2px;
+}
+
+.ssm-no-state {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    color: #856404;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-style: normal;
+    font-size: 13px;
+}
+
+/* 代碼項目 — 對齊 sync-confirm-item */
+.ssm-code-item {
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+    background: #f5f5f5;
+}
+
+.ssm-code-item.valid {
+    border-color: #28a745;
+    background: #f8fff9;
+}
+
+.ssm-code-item.used {
+    opacity: 0.65;
+}
+
+.ssm-code-item.expired {
+    background: #fffbeb;
+    border-color: #ffc107;
+    opacity: 0.8;
+}
+
+.ssm-code-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.ssm-code-val {
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: #667eea;
+    letter-spacing: 2px;
+    flex: 1;
+}
+
+.ssm-code-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    border: 1px solid;
+}
+
+.ssm-code-badge.valid {
+    background: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.ssm-code-badge.used {
+    background: #e9ecef;
+    color: #495057;
+    border-color: #dee2e6;
+}
+
+.ssm-code-badge.expired {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffc107;
+}
+
+.ssm-code-meta {
+    font-size: 12px;
+    color: #666;
+}
+
+/* ===== 同步狀態摺疊區塊 ===== */
+.ssm-state-hdr {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    background: #f5f5f5;
+    border-radius: 6px;
+    border: 2px solid #ddd;
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    transition: border-color 0.2s ease;
+}
+
+.ssm-state-hdr:hover {
+    border-color: #999;
+}
+
+.sync-session-state-toggle:hover .ssm-state-hdr {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.ssm-state-count {
+    margin-left: auto;
+    font-size: 12px;
+    color: #666;
+    font-weight: 400;
+}
+
+.ssm-state-arrow {
+    font-size: 11px;
+    color: #999;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.ssm-state-arrow::before {
+    content: "▶";
+}
+
+.ssm-state-body {
+    margin-top: 6px;
+    border-radius: 6px;
+    border: 2px solid #ddd;
+    overflow: hidden;
+}
+
+.is-hidden {
+    display: none !important;
+}
+
+/* ===== 詳細資訊底部操作 ===== */
+.ssm-detail-footer {
+    padding-top: 14px;
+    margin-top: 4px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 8px;
+}
+
+/* 底部操作按鈕 — 對齊 modal-btn */
+.ssm-footer-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    border: none;
+}
+
+.ssm-footer-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.ssm-btn-gray {
+    background: #6c757d;
+    color: white;
+}
+
+.ssm-btn-gray:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+.ssm-btn-danger-ol {
+    background: #dc3545;
+    color: white;
+}
+
+.ssm-btn-danger-ol:hover:not(:disabled) {
+    background: #c82333;
+}
+
+/* ===== 同步狀態 JSON 格式化（深色程式碼風） ===== */
 .sync-state-formatted {
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
-    font-size: 0.875rem;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
     line-height: 1.5;
-    background: #f8f9fa;
-    border: 2px solid #e9ecef;
-    border-radius: 0.375rem;
-    padding: 1rem;
+    background: #f5f5f5;
+    color: #333;
+    padding: 12px;
     overflow-x: auto;
     white-space: pre-wrap;
     word-break: break-word;
 }
 
 .sync-state-null {
-    color: #6c757d;
-    font-style: italic;
+    color: #999;
 }
 
 .sync-state-boolean {
@@ -610,76 +916,80 @@
 }
 
 .sync-state-object {
-    color: #fd7e14;
+    color: #e8650a;
 }
 
 .sync-state-empty {
-    color: #6c757d;
+    color: #999;
     font-style: italic;
 }
 
 .sync-state-unknown {
-    color: #6c757d;
+    color: #999;
     font-style: italic;
-    background: #fff3cd;
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.125rem;
 }
 
-/* ===== 工作階段響應式設計 ===== */
-@media (max-width: 768px) {
-    .sync-sessions-panel {
-        max-height: 90vh;
+/* ===== 頻道與工作階段相關保留類（事件處理用） ===== */
+.sync-session-channel-badge {
+    display: none;
+}
+
+/* 由 ssm-channel-badge 取代 */
+.sync-session-selection-placeholder {
+    width: 18px;
+    flex-shrink: 0;
+}
+
+/* ===== 響應式 ===== */
+@media (max-width: 640px) {
+    .ssm-toolbar {
+        gap: 6px;
+        padding: 10px 14px;
     }
 
-    .sync-sessions-list {
-        max-height: 70vh;
+    .ssm-toolbar-spacer {
+        display: none;
     }
 
-    .sync-session-header {
+    .ssm-btn {
+        flex: 1;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .ssm-batch {
         flex-direction: column;
         align-items: flex-start;
-        gap: 0.5rem;
     }
 
-    .sync-session-card-status {
-        align-self: flex-end;
+    .ssm-batch-right {
+        width: 100%;
     }
 
-    .sync-session-state-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
+    .ssm-batch-right .ssm-btn {
+        flex: 1;
     }
 
-    .sync-state-formatted {
-        font-size: 0.75rem;
-        padding: 0.75rem;
+    .ssm-card-aside {
+        display: none;
     }
 
-    .sync-session-action-row {
-        flex-wrap: wrap;
+    .ssm-client-btns {
         gap: 6px;
     }
 
-    .sync-session-action-row button {
+    .ssm-client-btn {
+        min-width: 0;
         flex: 1;
-        min-width: 120px;
-        font-size: 14px;
-        padding: 8px 10px;
     }
 }
 
-@media (max-width: 480px) {
-    .sync-session-action-row {
+@media (max-width: 400px) {
+    .ssm-client-btns {
         flex-direction: column;
-        gap: 4px;
     }
 
-    .sync-session-action-row button {
-        width: 100%;
-        min-width: auto;
-        font-size: 14px;
-        padding: 10px 12px;
+    .ssm-details-inner {
+        padding: 12px;
     }
 }

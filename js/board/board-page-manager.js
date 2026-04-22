@@ -49,19 +49,11 @@ class BoardPageManager {
   }
 
   _getExperimentId() {
-    return (
-      this.experimentSystemManager?.getExperimentId?.() ||
-      this.experimentId ||
-      ""
-    );
+    return this.experimentSystemManager?.getExperimentId?.() || "";
   }
 
   _getParticipantName() {
-    return (
-      this.experimentSystemManager?.getParticipantName?.() ||
-      this.participantName ||
-      ""
-    );
+    return this.experimentSystemManager?.getParticipantName?.() || "";
   }
 
   _buildHubExperimentState(type, isRunning) {

@@ -16,6 +16,7 @@ import { generateExperimentId } from "../core/random-utils.js";
 import { Logger } from "../core/console-manager.js";
 import { EventEmitter } from "../core/event-emitter.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
+import { getApiUrl } from "../core/url-utils.js";
 
 class ExperimentHubManager extends EventEmitter {
   constructor(config = {}) {
@@ -83,28 +84,7 @@ class ExperimentHubManager extends EventEmitter {
    * 取得預設 API URL
    */
   getDefaultApiUrl() {
-    const protocol = window.location.protocol;
-    const host = window.location.host;
-    const basePath = this.getApiBasePath();
-    return `${protocol}//${host}${basePath}`;
-  }
-
-  /**
-   * 取得 API 路徑前綴
-   */
-  getApiBasePath() {
-    const pathname = window.location.pathname;
-    let basePath = pathname;
-
-    if (!basePath.endsWith("/")) {
-      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
-    }
-
-    if (!basePath.endsWith("/")) {
-      basePath += "/";
-    }
-
-    return basePath + "api";
+    return getApiUrl();
   }
 
   /**
@@ -138,8 +118,20 @@ class ExperimentHubManager extends EventEmitter {
    * 設定實驗 ID
    */
   setExperimentId(id, source = RECORD_SOURCES.LOCAL_INPUT, options = {}) {
+    const normalizedId = typeof id === "string" ? id.trim() : id;
+    const validation = this.validateId(normalizedId, "experiment");
+    if (!validation.valid) {
+      Logger.warn("無效的實驗 ID，跳過設定", {
+        id,
+        normalizedId,
+        source,
+        reason: validation.error,
+      });
+      return null;
+    }
+
     const oldId = this.ids.experiment;
-    this.ids.experiment = id;
+    this.ids.experiment = normalizedId;
     if (this.syncClientReady) {
       this._experimentIdSetAfterSyncReady = true;
     }
@@ -149,7 +141,7 @@ class ExperimentHubManager extends EventEmitter {
       this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.ID_CHANGED, {
         type: "experiment",
         oldValue: oldId,
-        newValue: id,
+        newValue: normalizedId,
         source: source,
       });
 
@@ -159,12 +151,12 @@ class ExperimentHubManager extends EventEmitter {
         source !== RECORD_SOURCES.SYNC_BROADCAST &&
         source !== RECORD_SOURCES.HUB_SYNC
       ) {
-        this.syncExperimentIdToHub(id, source);
+        this.syncExperimentIdToHub(normalizedId, source);
       }
     }
 
-    Logger.debug("實驗 ID 已設定", { id, source });
-    return id;
+    Logger.debug("實驗 ID 已設定", { id: normalizedId, source });
+    return normalizedId;
   }
 
   /**
@@ -319,17 +311,26 @@ class ExperimentHubManager extends EventEmitter {
    * 驗證 ID 有效性
    */
   validateId(id, type = "experiment") {
-    if (!id || typeof id !== "string") {
+    if (id === undefined || id === null) {
+      return { valid: false, error: "ID 不能為 null 或 undefined" };
+    }
+
+    if (typeof id !== "string") {
       return { valid: false, error: "ID 必須是字串" };
     }
 
-    if (id.trim().length === 0) {
+    const normalized = id.trim();
+    if (normalized.length === 0) {
       return { valid: false, error: "ID 不能為空" };
+    }
+
+    if (normalized === "undefined" || normalized === "null") {
+      return { valid: false, error: "ID 不能是無效文字" };
     }
 
     switch (type) {
       case "experiment":
-        if (!/^[A-Z0-9]{6}$/.test(id) && !/^[A-Za-z0-9_-]+$/.test(id)) {
+        if (!/^[A-Z0-9]{6}$/.test(normalized) && !/^[A-Za-z0-9_-]+$/.test(normalized)) {
           return { valid: false, error: "實驗 ID 格式不正確" };
         }
         break;
@@ -382,11 +383,35 @@ class ExperimentHubManager extends EventEmitter {
   restoreIds() {
     try {
       const saved = localStorage.getItem(EXPERIMENT_HUB_CONSTANTS.STORAGE_KEY);
-      if (saved) {
-        const ids = JSON.parse(saved);
-        this.ids = { ...this.ids, ...ids };
-        Logger.debug("已從 localStorage 還原 ID", this.ids);
+      if (!saved) {
+        return;
       }
+
+      const ids = JSON.parse(saved);
+      const validIds = { ...this.ids };
+
+      if (ids && typeof ids === "object") {
+        if (ids.hub !== undefined && ids.hub !== null) {
+          validIds.hub = ids.hub;
+        }
+        if (ids.experiment !== undefined && ids.experiment !== null) {
+          const validation = this.validateId(ids.experiment, "experiment");
+          if (validation.valid) {
+            validIds.experiment = ids.experiment.trim();
+          } else {
+            Logger.warn("從 localStorage 還原時忽略無效 experimentId", {
+              experimentId: ids.experiment,
+              reason: validation.error,
+            });
+          }
+        }
+        if (ids.combination !== undefined && ids.combination !== null) {
+          validIds.combination = ids.combination;
+        }
+      }
+
+      this.ids = validIds;
+      Logger.debug("已從 localStorage 還原 ID", this.ids);
     } catch (error) {
       Logger.error("還原 ID 失敗", error);
     }

@@ -7,16 +7,19 @@
 
 import {
   SYNC_EVENTS,
+  SYNC_DATA_TYPES,
   SYNC_MANAGER_CONSTANTS,
   SYNC_CLIENT_CONSTANTS,
   SYNC_PAGE_CONFIG,
   SYNC_ROLE_CONFIG,
   SYNC_STATUS_CONFIG,
   getSyncPagePath,
+  API_ENDPOINTS,
 } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 import { WebSocketClient } from "../core/websocket-client.js";
+import { getApiUrl } from "../core/url-utils.js";
 
 class SyncClient {
   /**
@@ -78,7 +81,9 @@ class SyncClient {
     if (this.sessionId) {
       Logger.info("偵測到儲存的工作階段，準備恢復連線");
     } else {
-      this.startHeartbeatCheck();
+      // 無 session 時只做一次初始檢查，讓 UI 知道 server 是否可達。
+      // 後續狀態由 WS 事件（_updateServerOnline）維護，不需要持續 polling。
+      void this.checkServerHealth();
     }
 
     // 監聽全域工作階段失效事件
@@ -144,26 +149,7 @@ class SyncClient {
    * @returns {string}
    */
   getDefaultApiUrl() {
-    const protocol = window.location.protocol;
-    const host = window.location.host;
-    const basePath = this.getApiBasePath();
-    return `${protocol}//${host}${basePath}`;
-  }
-
-  /**
-   * 取得 API 路徑前綴
-   * @returns {string}
-   */
-  getApiBasePath() {
-    const pathname = window.location.pathname;
-    let basePath = pathname;
-    if (!basePath.endsWith("/")) {
-      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
-    }
-    if (!basePath.endsWith("/")) {
-      basePath += "/";
-    }
-    return basePath + "api";
+    return getApiUrl();
   }
 
   detectClientType() {
@@ -187,6 +173,8 @@ class SyncClient {
       this.role = data.role;
       this.saveState();
 
+      this._updateServerOnline(true);
+
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.CONNECTED, { detail: data }),
       );
@@ -197,6 +185,8 @@ class SyncClient {
       this.connected = true;
       this.connectionAttempted = false;
 
+      this._updateServerOnline(true);
+
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.RECONNECTED, { detail: data }),
       );
@@ -206,6 +196,8 @@ class SyncClient {
       Logger.info("WebSocket 已斷線", data);
       this.connected = false;
       this.connectionAttempted = true;
+
+      this._updateServerOnline(false);
 
       window.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.DISCONNECTED, { detail: data }),
@@ -314,6 +306,49 @@ class SyncClient {
         new CustomEvent(SYNC_EVENTS.SESSION_STATE, { detail: data }),
       );
     });
+
+    this.wsClient.on(WS_PROTOCOL.S2C.REQUEST_CLIENT_STATE, (data) => {
+      const requestId = data?.requestId;
+      if (!requestId) {
+        Logger.warn("收到缺少 requestId 的請求客戶端狀態訊息");
+        return;
+      }
+
+      const latestState = this.getLatestSessionState();
+      let state = latestState || {
+        sessionId: this.sessionId,
+        clientId: this.clientId,
+        role: this.role,
+      };
+
+      if (latestState && typeof latestState === "object") {
+        state = this._flattenSessionState(latestState);
+      }
+
+      const localClientState = this._getLocalExperimentState();
+      if (localClientState && typeof localClientState === "object") {
+        state = { ...state, ...localClientState };
+      }
+
+      this.wsClient.send({
+        type: WS_PROTOCOL.C2S.CLIENT_STATE_RESPONSE,
+        data: {
+          requestId,
+          state,
+          sessionId: this.sessionId,
+          clientId: this.clientId,
+        },
+      });
+
+      Logger.debug("已回傳客戶端狀態回應", { requestId, clientId: this.clientId });
+    });
+
+    this.wsClient.on(WS_PROTOCOL.S2C.SYNC_STATE, (data) => {
+      Logger.debug("收到伺服器同步狀態推送 (sync_state)", data);
+      window.dispatchEvent(
+        new CustomEvent(SYNC_EVENTS.SESSION_STATE_REFRESHED, { detail: data }),
+      );
+    });
   }
 
   // ==================== 工作階段管理 ====================
@@ -332,7 +367,7 @@ class SyncClient {
       throw new Error("伺服器離線，無法建立工作階段");
     }
 
-    const response = await fetch(`${this.apiBaseUrl}/sync/session`, {
+    const response = await fetch(`${this.apiBaseUrl}${API_ENDPOINTS.SYNC.SESSION}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ createCode }),
@@ -375,7 +410,7 @@ class SyncClient {
     }
 
     const response = await fetch(
-      `${this.apiBaseUrl}/sync/generate_share_code`,
+      `${this.apiBaseUrl}${API_ENDPOINTS.SYNC.GENERATE_SHARE_CODE}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -393,11 +428,11 @@ class SyncClient {
 
     const data = await response.json();
 
-    Logger.debug("分享代碼已產生:", data.data.share_code);
+    Logger.debug("分享代碼已產生:", data.data.shareCode);
 
     return {
-      shareCode: data.data.share_code,
-      expiresAt: data.data.expires_at,
+      shareCode: data.data.shareCode,
+      expiresAt: data.data.expiresAt,
     };
   }
 
@@ -425,7 +460,7 @@ class SyncClient {
       throw new Error("伺服器離線，無法加入工作階段");
     }
 
-    const response = await fetch(`${this.apiBaseUrl}/sync/join`, {
+    const response = await fetch(`${this.apiBaseUrl}${API_ENDPOINTS.SYNC.JOIN}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -492,7 +527,7 @@ class SyncClient {
       throw new Error("伺服器離線，無法加入頻道");
     }
 
-    const response = await fetch(`${this.apiBaseUrl}/sync/channel`, {
+    const response = await fetch(`${this.apiBaseUrl}${API_ENDPOINTS.SYNC.CHANNEL}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -546,7 +581,7 @@ class SyncClient {
       throw new Error("伺服器離線，無法關閉頻道");
     }
 
-    const response = await fetch(`${this.apiBaseUrl}/sync/channel/close`, {
+    const response = await fetch(`${this.apiBaseUrl}${API_ENDPOINTS.SYNC.CHANNEL_CLOSE}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId: targetSessionId }),
@@ -578,7 +613,7 @@ class SyncClient {
     }
 
     const response = await fetch(
-      `${this.apiBaseUrl}/sync/session/${encodeURIComponent(targetSessionId)}`,
+      `${this.apiBaseUrl}${API_ENDPOINTS.SYNC.SESSION_TARGET(targetSessionId)}`,
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -622,7 +657,7 @@ class SyncClient {
     );
     if (!isPublicChannel) {
       const response = await fetch(
-        `${this.apiBaseUrl}/sync/session/${this.sessionId}/validate?clientId=${this.clientId}`,
+        `${this.apiBaseUrl}${API_ENDPOINTS.SYNC.SESSION_VALIDATE(this.sessionId, this.clientId)}`,
       );
 
       if (!response.ok) {
@@ -676,7 +711,7 @@ class SyncClient {
    */
   async getShareCodeInfo(shareCode) {
     const response = await fetch(
-      `${this.apiBaseUrl}/sync/share-code/${shareCode}`,
+      `${this.apiBaseUrl}${API_ENDPOINTS.SYNC.SHARE_CODE(shareCode)}`,
     );
 
     if (!response.ok) {
@@ -702,7 +737,7 @@ class SyncClient {
     }
 
     const response = await fetch(
-      `${this.apiBaseUrl}/sync/session/${this.sessionId}/share-code`,
+      `${this.apiBaseUrl}${API_ENDPOINTS.SYNC.SESSION_SHARE_CODE(this.sessionId)}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -732,7 +767,7 @@ class SyncClient {
     }
 
     const response = await fetch(
-      `${this.apiBaseUrl}/sync/session/${this.sessionId}/clients`,
+      `${this.apiBaseUrl}${API_ENDPOINTS.SYNC.SESSION_CLIENTS(this.sessionId)}`,
     );
 
     if (!response.ok) {
@@ -780,10 +815,10 @@ class SyncClient {
 
       // 動作相關事件不能被同幀合併，否則連續 action 完成會被覆蓋遺失
       const nonCoalescedTypes = new Set([
-        SYNC_EVENTS.ACTION_COMPLETED,
-        SYNC_EVENTS.ACTION_CANCELLED,
-        SYNC_EVENTS.BUTTON_ACTION,
-        SYNC_EVENTS.BUTTON_PRESSED,
+        SYNC_DATA_TYPES.ACTION_COMPLETED,
+        SYNC_DATA_TYPES.ACTION_CANCELLED,
+        SYNC_DATA_TYPES.BUTTON_ACTION,
+        SYNC_DATA_TYPES.BUTTON_PRESSED,
       ]);
       if (parsedState?.type && nonCoalescedTypes.has(parsedState.type)) {
         const event = new CustomEvent(SYNC_EVENTS.STATE_UPDATE, {
@@ -950,6 +985,31 @@ class SyncClient {
   // ==================== 健康檢查 ====================
 
   /**
+   * 由 WS 事件直接更新 serverOnline，並在狀態改變時派發 SERVER_STATUS_CHANGED。
+   * 這是事件驅動的核心：不需要 HTTP polling，WS 連線/斷線本身就是最即時的信號。
+   */
+  _updateServerOnline(online) {
+    const prev = this.serverOnline;
+    if (prev === online) return;
+
+    this.serverOnline = online;
+    this.previousServerOnline = prev;
+    this.lastHealthCheckTime = Date.now(); // 讓 cache 保持有效，避免事件後立即觸發多餘的 HTTP
+
+    window.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.SERVER_STATUS_CHANGED, {
+        detail: {
+          online,
+          previousOnline: prev,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    );
+
+    Logger.debug(`伺服器狀態變化（WS 事件）: ${prev} → ${online}`);
+  }
+
+  /**
    * 檢查伺服器健康狀態
    * @returns {Promise<boolean>}
    */
@@ -960,7 +1020,7 @@ class SyncClient {
     }
 
     try {
-      const response = await fetch(`${this.apiBaseUrl}/health`, {
+      const response = await fetch(`${this.apiBaseUrl}${API_ENDPOINTS.SYNC.HEALTH}`, {
         method: "HEAD",
         signal: AbortSignal.timeout(
           SYNC_CLIENT_CONSTANTS.DEFAULT_SERVER_HEALTH_TIMEOUT_MS,
@@ -1105,17 +1165,92 @@ class SyncClient {
   }
 
   /**
-   * 取得最近一次工作階段快照（由 join 回應或 WebSocket session_state 更新）
-   * @returns {Object|null}
+   * Flatten wrapped session snapshot to a usable state object.
+   * @param {Object} rawState
+   * @returns {Object}
    */
-  getLatestSessionState() {
-    return this.latestSessionState || null;
+  _flattenSessionState(rawState) {
+    if (!rawState || typeof rawState !== "object") {
+      return rawState;
+    }
+
+    if (
+      !rawState.experimentState &&
+      !rawState.state &&
+      !rawState.lastState
+    ) {
+      return rawState;
+    }
+
+    return {
+      ...(typeof rawState.state === "object" && rawState.state ? rawState.state : {}),
+      ...(typeof rawState.experimentState === "object" && rawState.experimentState ? rawState.experimentState : {}),
+      ...(typeof rawState.lastState === "object" && rawState.lastState ? rawState.lastState : {}),
+    };
   }
 
   /**
-   * 檢查是否可以操作
-   * @returns {boolean}
+   * 取得最近一次工作階段快照（由 join 回應或 WebSocket session_state 更新）
+   * @returns {Object|null}
    */
+  _getLocalExperimentState() {
+    if (typeof window === "undefined") return null;
+
+    const pageManager =
+      window.boardPageManager || window.panelPageManager || null;
+    if (!pageManager) return null;
+
+    const experimentSystemManager = pageManager.experimentSystemManager;
+    const experimentStateManager = pageManager.experimentStateManager;
+
+    const experimentId =
+      experimentSystemManager?.getExperimentId?.() ||
+      experimentStateManager?.getExperimentId?.() ||
+      "";
+    const participantName =
+      experimentSystemManager?.getParticipantName?.() ||
+      experimentStateManager?.getParticipantName?.() ||
+      "";
+
+    const currentCombination =
+      experimentSystemManager?.getCurrentCombination?.() ||
+      experimentStateManager?.getCurrentCombination?.() ||
+      pageManager?.currentCombination ||
+      null;
+
+    const combinationName =
+      currentCombination?.combinationName ||
+      currentCombination?.name ||
+      "";
+
+    const unitIds =
+      experimentSystemManager?.getCurrentUnitIds?.() ||
+      currentCombination?.unitIds ||
+      currentCombination?.unit_ids ||
+      [];
+
+    const localUnitOrder = Array.isArray(unitIds)
+      ? unitIds.join("→")
+      : typeof unitIds === "string"
+      ? unitIds
+      : "";
+
+    const isRunning =
+      Boolean(experimentSystemManager?.isExperimentRunning?.()) ||
+      Boolean(experimentStateManager?.isExperimentRunning);
+
+    return {
+      experimentId,
+      participantName,
+      combinationName,
+      unitOrder: localUnitOrder,
+      isRunning,
+    };
+  }
+
+  getLatestSessionState() {
+    return this.latestSessionState || null;
+  }
   canOperate() {
     return this.connected && this.role === this.roleConfig.OPERATOR;
   }
@@ -1135,6 +1270,11 @@ class SyncClient {
   getStatusText() {
     if (this.connected && this.sessionId) {
       return this.role;
+    }
+
+    // 完全退出（sessionId 已清除）→ 一律回到未同步，不受 serverOnline 影響
+    if (!this.sessionId) {
+      return SYNC_STATUS_CONFIG.IDLE;
     }
 
     if (this.sessionId && !this.connected) {

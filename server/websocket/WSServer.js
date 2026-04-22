@@ -98,7 +98,17 @@ export class WSServer {
         // 這樣可阻止單一使用者或惡意代理將 CPU 時間佔滿。
         ws.on("message", (data) => {
           try {
-            const res = this.connectionManager.allowMessage(wsConnectionId);
+            // AUTH 訊息豁免 rate limit：新裝置/重連時第一個訊息必定是 auth，
+            // 若也被 token bucket 擋住，裝置將永遠無法加入。
+            let messageType = null;
+            try {
+              messageType = JSON.parse(data.toString())?.type;
+            } catch (_) {}
+            const isAuthMessage = messageType === WS_PROTOCOL.C2S.AUTH;
+
+            const res = isAuthMessage
+              ? { allowed: true }
+              : this.connectionManager.allowMessage(wsConnectionId);
             if (!res.allowed) {
               // 回傳速率限制錯誤
               this.sendError(ws, "RATE_LIMIT_EXCEEDED", "Too many messages");

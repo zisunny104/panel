@@ -16,12 +16,9 @@ import {
   normalizeClientType,
 } from "../utils/sync-role-guard.js";
 import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
+import { ROLE, CHANNEL_CONSTANTS } from "../config/constants.js";
 
-// 本檔使用的角色常數，避免硬編碼字串
-const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
-
-// 公開頻道 sessionId 前綴（不需 DB ，純記憶體內存在）
-const PUBLIC_CHANNEL_PREFIX = "__CH_";
+const PUBLIC_CHANNEL_PREFIX = CHANNEL_CONSTANTS.PREFIX;
 
 export class MessageHandler {
   constructor(connectionManager, sessionManager, broadcastManager) {
@@ -32,6 +29,7 @@ export class MessageHandler {
     // Services (實例化)
     this.sessionService = SessionService;
     this.shareCodeService = ShareCodeService;
+    this.pendingClientStateRequests = new Map();
 
     // 訊息處理器映射
     this.handlers = {
@@ -42,6 +40,8 @@ export class MessageHandler {
         this.handleExperimentStateRegister.bind(this),
       [WS_PROTOCOL.C2S.GET_SESSION_STATE]:
         this.handleGetSessionState.bind(this),
+      [WS_PROTOCOL.C2S.CLIENT_STATE_RESPONSE]:
+        this.handleClientStateResponse.bind(this),
       [WS_PROTOCOL.C2S.PING]: this.handlePing.bind(this),
       [WS_PROTOCOL.C2S.EXPERIMENT_ID_REGISTER]:
         this.handleExperimentIdRegister.bind(this),
@@ -58,24 +58,31 @@ export class MessageHandler {
     const { type, data } = message;
 
     try {
-      // 檢查訊息類型
-      if (!type) {
-        throw new Error("訊息缺少 type 欄位");
+      if (!type || typeof type !== "string" || type.length > 64) {
+        throw new Error("訊息 type 欄位無效");
       }
 
-      // 查找處理器
-      const handler = this.handlers[type];
+      if (data !== undefined && (typeof data !== "object" || Array.isArray(data))) {
+        throw new Error("訊息 data 欄位必須為物件");
+      }
 
+      // 防止超大字串欄位（state 更新的 string value 限 8KB）
+      if (data) {
+        for (const [key, val] of Object.entries(data)) {
+          if (typeof val === "string" && val.length > 8192) {
+            throw new Error(`欄位 ${key} 超過最大長度限制 (8192)`);
+          }
+        }
+      }
+
+      const handler = this.handlers[type];
       if (!handler) {
         throw new Error(`未知的訊息類型: ${type}`);
       }
 
-      // 執行處理器
-      await handler(wsConnectionId, data, ws);
+      await handler(wsConnectionId, data ?? {}, ws);
     } catch (error) {
       Logger.error(`處理訊息失敗 [${wsConnectionId}]: ${error.message}`);
-
-      // 發送錯誤回應
       this.sendErrorResponse(ws, "HANDLER_ERROR", error.message);
     }
   }
@@ -123,7 +130,9 @@ export class MessageHandler {
         }
       }
 
-      if (resolvedRole === ROLE.OPERATOR) {
+      let effectiveRole = resolvedRole;
+
+      if (effectiveRole === ROLE.OPERATOR) {
         if (!normalizedClientType) {
           throw new Error("認證失敗: 操作者必須提供 clientType (panel 或 board)");
         }
@@ -139,6 +148,19 @@ export class MessageHandler {
             `認證失敗: ${normalizedClientType} 操作者已存在 (${conflict.clientId})`,
           );
         }
+
+        // Q3 寬鬆模式：clientId 不在 connectionManager 已知清單（非重連）
+        // 且工作階段已有其他連線 → 可疑，降為 VIEWER 並記錄
+        const isKnown = this.connectionManager.clientIdMap.has(clientId);
+        if (!isKnown && !isPublicChannel) {
+          const existingClients = this.sessionManager.getClients(sessionId);
+          if (existingClients.length > 0) {
+            Logger.warn(
+              `未知 clientId 嘗試以 OPERATOR 加入非空工作階段，已降為 VIEWER | clientId=${clientId} session=${sessionId}`,
+            );
+            effectiveRole = ROLE.VIEWER;
+          }
+        }
       }
 
       // 在 ConnectionManager 中認證連線（會自動處理重新連線）
@@ -150,7 +172,7 @@ export class MessageHandler {
 
       // 加入工作階段（如果是重新連線，會更新 metadata）
       const sessionInfo = this.sessionManager.addClient(sessionId, clientId, {
-        role: resolvedRole,
+        role: effectiveRole,
         clientType: normalizedClientType,
         isReconnect,
       });
@@ -164,7 +186,7 @@ export class MessageHandler {
       this.sendResponse(ws, WS_PROTOCOL.S2C.AUTH_SUCCESS, {
         sessionId,
         clientId,
-        role: resolvedRole,
+        role: effectiveRole,
         clientType: normalizedClientType,
         sessionInfo,
         isReconnect,
@@ -174,7 +196,7 @@ export class MessageHandler {
       // 只在首次加入時廣播（重新連線不廣播，避免重複通知）
       if (!isReconnect) {
         this.broadcastManager.broadcastClientJoined(sessionId, clientId, {
-          role: resolvedRole,
+          role: effectiveRole,
           clientType: normalizedClientType,
         });
       } else {
@@ -182,7 +204,7 @@ export class MessageHandler {
           sessionId,
           {
             type: WS_PROTOCOL.S2C.CLIENT_RECONNECTED,
-            data: { clientId, role: resolvedRole, clientType: normalizedClientType },
+            data: { clientId, role: effectiveRole, clientType: normalizedClientType },
           },
           { excludeClientId: clientId },
         );
@@ -291,10 +313,12 @@ export class MessageHandler {
         excludeClientId: clientId,
       });
 
-      // 發送確認回應
+      // 發送確認回應（stateUpdatedAt 讓客戶端感知是否被後來的更新覆蓋）
+      const session = this.sessionManager.activeSessions.get(sessionId);
       this.sendResponse(ws, WS_PROTOCOL.S2C.STATE_UPDATE_ACK, {
         sessionId,
         timestamp: Date.now(),
+        stateUpdatedAt: session?.stateUpdatedAt ?? Date.now(),
       });
 
       // 記錄狀態更新詳情
@@ -324,10 +348,72 @@ export class MessageHandler {
     try {
       const state = this.getSessionState(sessionId);
 
-      this.sendResponse(ws, WS_PROTOCOL.S2C.SESSION_STATE, state);
+      // 為了讓客戶端在遺失訊息後能夠自動重建狀態，
+      // 將 GET_SESSION_STATE 的回覆視為一次完整的同步狀態刷新。
+      this.sendResponse(ws, WS_PROTOCOL.S2C.SYNC_STATE, state);
     } catch (error) {
       throw new Error(`取得狀態失敗: ${error.message}`);
     }
+  }
+
+  async requestClientState(clientId, timeoutMs = 5000) {
+    if (!clientId) {
+      throw new Error("缺少 clientId");
+    }
+
+    const ws = this.connectionManager.getConnectionByClientId(clientId);
+    if (!ws || ws.readyState !== 1) {
+      throw new Error(`客戶端 ${clientId} 未連線`);
+    }
+
+    const requestId = `req_client_state_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingClientStateRequests.delete(requestId);
+        reject(new Error("等待客戶端回應逾時"));
+      }, timeoutMs);
+
+      this.pendingClientStateRequests.set(requestId, { resolve, reject, timeout });
+
+      const sent = this.broadcastManager.sendToClient(clientId, {
+        type: WS_PROTOCOL.S2C.REQUEST_CLIENT_STATE,
+        data: { requestId },
+      });
+
+      if (!sent) {
+        clearTimeout(timeout);
+        this.pendingClientStateRequests.delete(requestId);
+        reject(new Error(`無法發送請求給客戶端 ${clientId}`));
+      }
+    });
+  }
+
+  async handleClientStateResponse(wsConnectionId, data, ws) {
+    const { requestId, state, error } = data || {};
+    if (!requestId) {
+      this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
+        code: "INVALID_PARAMS",
+        message: "缺少 requestId",
+      });
+      return;
+    }
+
+    const pending = this.pendingClientStateRequests.get(requestId);
+    if (!pending) {
+      Logger.warn(`收到未知的客戶端狀態回覆 requestId=${requestId}`);
+      return;
+    }
+
+    clearTimeout(pending.timeout);
+    this.pendingClientStateRequests.delete(requestId);
+
+    if (error) {
+      pending.reject(new Error(error.message || error || "客戶端回應錯誤"));
+      return;
+    }
+
+    pending.resolve(state ?? {});
   }
 
   /**

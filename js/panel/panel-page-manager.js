@@ -494,6 +494,7 @@ class PanelPageManager {
 
 // 自動初始化頁面（當 DOM 完全載入時）
 const panelPageManager = new PanelPageManager();
+window.panelPageManager = panelPageManager;
 
 const initializePanel = async () => {
   await panelPageManager.initialize();

@@ -18,6 +18,7 @@ export const WS_PROTOCOL = {
     EXPERIMENT_ID_REGISTER: "experiment_id_register",
     EXPERIMENT_ID_UPDATE: "experiment_id_update",
     GET_SESSION_STATE: "get_session_state",
+    CLIENT_STATE_RESPONSE: "client_state_response",
     PING: "ping",
   },
 
@@ -29,6 +30,7 @@ export const WS_PROTOCOL = {
     HEARTBEAT_ACK: "heartbeat_ack",
     PONG: "pong",
     SESSION_STATE: "session_state",
+    SYNC_STATE: "sync_state",
     SESSION_STATE_UPDATE: "session_state_update",
     STATE_UPDATE_ACK: "state_update_ack",
     CLIENT_JOINED: "client_joined",
@@ -39,6 +41,8 @@ export const WS_PROTOCOL = {
     EXPERIMENT_RESUMED: "experiment_resumed",
     EXPERIMENT_STOPPED: "experiment_stopped",
     EXPERIMENT_ID_CHANGED: "experiment_id_changed",
+    REQUEST_CLIENT_STATE: "request_client_state",
+    KICKED: "kicked",
     ERROR: "error",
   },
 };

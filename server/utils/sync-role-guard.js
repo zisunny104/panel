@@ -1,4 +1,4 @@
-const ROLE = { OPERATOR: "operator" };
+import { ROLE } from "../config/constants.js";
 const CLIENT_TYPE = { PANEL: "panel", BOARD: "board" };
 
 export function normalizeClientType(clientType) {

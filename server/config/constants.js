@@ -28,11 +28,24 @@ export const EXPERIMENT_ID_CONSTANTS = {
   // VALID_CREATE_CODE 從 SERVER_CONFIG 讀取
 };
 
+// 客戶端角色
+export const ROLE = {
+  OPERATOR: "operator",
+  VIEWER: "viewer",
+};
+
+// 公開頻道常數
+export const CHANNEL_CONSTANTS = {
+  PREFIX: "__CH_",
+  VALID_NAMES: ["A", "B", "C"],
+};
+
 // HTTP響應碼
 export const HTTP_STATUS = {
   OK: 200,
   CREATED: 201,
   BAD_REQUEST: 400,
+  FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
   INTERNAL_ERROR: 500,
@@ -40,6 +53,7 @@ export const HTTP_STATUS = {
 
 // 錯誤碼
 export const ERROR_CODES = {
+  INVALID_REQUEST: "INVALID_REQUEST",
   INVALID_SESSION_ID: "INVALID_SESSION_ID",
   SESSION_NOT_FOUND: "SESSION_NOT_FOUND",
   INVALID_SHARE_CODE: "INVALID_SHARE_CODE",

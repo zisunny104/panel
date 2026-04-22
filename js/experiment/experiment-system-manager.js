@@ -478,9 +478,10 @@ class ExperimentSystemManager {
   _updateExperimentIdUI(experimentId) {
     try {
       const idInput = document.getElementById("experimentIdInput");
-      if (idInput && idInput.value !== experimentId) {
-        idInput.value = experimentId;
-        Logger.debug("實驗 ID 已更新到 UI:", experimentId);
+      const safeExperimentId = typeof experimentId === "string" ? experimentId : "";
+      if (idInput && idInput.value !== safeExperimentId) {
+        idInput.value = safeExperimentId;
+        Logger.debug("實驗 ID 已更新到 UI:", safeExperimentId);
       }
     } catch (error) {
       Logger.warn("更新實驗 ID UI 失敗:", error);
@@ -498,8 +499,9 @@ class ExperimentSystemManager {
     if (!idInput) return;
 
     // 先同步最新 ID 到 DOM（即使已綁定過）
-    const currentId = this.getExperimentId();
-    if (currentId && idInput.value.trim() !== currentId) {
+    const rawCurrentId = this.getExperimentId();
+    const currentId = typeof rawCurrentId === "string" ? rawCurrentId : "";
+    if (idInput.value.trim() !== currentId) {
       idInput.value = currentId;
       Logger.debug("面板展開時同步實驗ID到UI:", currentId);
     }
@@ -901,12 +903,18 @@ class ExperimentSystemManager {
   }
 
   handleSyncExperimentPaused(syncData = {}) {
-    if (!this.isExperimentRunning()) return false;
+    const flow = this._getFlow();
+    if (!this.isExperimentRunning() || flow?.isPaused) {
+      return false;
+    }
     return this.pauseExperiment({ ...syncData, broadcast: false, source: "sync" });
   }
 
   handleSyncExperimentResumed(syncData = {}) {
-    if (!this.isExperimentRunning()) return false;
+    const flow = this._getFlow();
+    if (!this.isExperimentRunning() || !flow?.isPaused) {
+      return false;
+    }
     return this.resumeExperiment({ ...syncData, broadcast: false, source: "sync" });
   }
 
@@ -1094,8 +1102,10 @@ class ExperimentSystemManager {
   _syncExperimentIdInputFromSystem() {
     const idInput = document.getElementById("experimentIdInput");
     if (!idInput) return;
-    const systemId = this.getExperimentId() || "";
-    if (systemId && idInput.value.trim() !== systemId) idInput.value = systemId;
+    const systemId = typeof this.getExperimentId() === "string" ? this.getExperimentId() : "";
+    if (idInput.value.trim() !== systemId) {
+      idInput.value = systemId;
+    }
   }
 
   _bindExperimentIdUiSyncGuards() {

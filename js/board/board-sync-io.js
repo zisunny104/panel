@@ -25,21 +25,11 @@ class BoardSyncIO {
   }
 
   _getExperimentId() {
-    const page = this.pageManager;
-    return (
-      page.experimentSystemManager?.getExperimentId?.() ||
-      page.experimentId ||
-      ""
-    );
+    return this.pageManager?.experimentSystemManager?.getExperimentId?.() || "";
   }
 
   _getParticipantName() {
-    const page = this.pageManager;
-    return (
-      page.experimentSystemManager?.getParticipantName?.() ||
-      page.participantName ||
-      ""
-    );
+    return this.pageManager?.experimentSystemManager?.getParticipantName?.() || "";
   }
 
   startReceive() {
@@ -197,8 +187,12 @@ class BoardSyncIO {
       }, 2000);
     };
 
-    markSyncedAction(actionId);
-    markSyncedAction(enteredActionId);
+    if (actionId) {
+      markSyncedAction(actionId);
+    }
+    if (enteredActionId && enteredActionId !== actionId) {
+      markSyncedAction(enteredActionId);
+    }
   }
 
   receiveActionCancelled(syncData) {
@@ -267,14 +261,11 @@ class BoardSyncIO {
       await page.experimentSystemManager?.handleSyncExperimentIdUpdate?.({
         experimentId,
       });
-      page.experimentId = experimentId;
       Logger.info(`從機台面板同步的實驗ID: ${experimentId}`);
     }
 
     if (participantName) {
       page.experimentSystemManager?.setParticipantName?.(participantName);
-      page.participantName = participantName;
-      page.lastSavedParticipantName = participantName;
     }
 
     if (currentCombination) {
@@ -308,8 +299,6 @@ class BoardSyncIO {
 
     const { participantName } = data;
     page.experimentSystemManager?.setParticipantName?.(participantName);
-    page.participantName = participantName;
-    page.lastSavedParticipantName = participantName;
   }
 
   receiveExperimentIdUpdate(data) {
@@ -328,7 +317,6 @@ class BoardSyncIO {
     page.experimentSystemManager?.handleSyncExperimentIdUpdate?.({
       experimentId,
     });
-    page.experimentId = experimentId;
     Logger.info(`實驗ID已同步並儲存: ${experimentId}`);
   }
 
@@ -394,15 +382,12 @@ class BoardSyncIO {
       await page.experimentSystemManager?.handleSyncExperimentIdUpdate?.({
         experimentId: detail.experimentId,
       });
-      page.experimentId = detail.experimentId;
     }
 
     if (detail.participantName) {
       const currentParticipantName = this._getParticipantName();
       if (!currentParticipantName) {
         page.experimentSystemManager?.setParticipantName?.(detail.participantName);
-        page.participantName = detail.participantName;
-        page.lastSavedParticipantName = detail.participantName;
       }
     }
 

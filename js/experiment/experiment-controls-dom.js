@@ -22,8 +22,9 @@ class ExperimentControlsDom {
    */
   setExperimentIdInput(value) {
     const input = document.getElementById("experimentIdInput");
-    if (input && input.value.trim() !== value) {
-      input.value = value;
+    const safeValue = typeof value === "string" ? value : "";
+    if (input && input.value.trim() !== safeValue) {
+      input.value = safeValue;
     }
   }
 

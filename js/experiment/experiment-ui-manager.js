@@ -103,15 +103,21 @@ class ExperimentUIManager extends ExperimentUIRenderer {
     document.addEventListener("experimentState:experimentIdChanged", (e) => {
       const { experimentId } = e.detail || {};
       if (experimentId == null) return;
+      const safeExperimentId = typeof experimentId === "string" ? experimentId : "";
       const input = document.getElementById("experimentIdInput");
-      if (input && input.value.trim() !== experimentId) input.value = experimentId;
+      if (input && input.value.trim() !== safeExperimentId) {
+        input.value = safeExperimentId;
+      }
     });
 
     document.addEventListener("experimentState:participantNameChanged", (e) => {
       const { participantName } = e.detail || {};
       if (participantName == null) return;
+      const safeName = typeof participantName === "string" ? participantName : "";
       const input = document.getElementById("participantNameInput");
-      if (input && input.value.trim() !== participantName) input.value = participantName;
+      if (input && input.value.trim() !== safeName) {
+        input.value = safeName;
+      }
     });
   }
 

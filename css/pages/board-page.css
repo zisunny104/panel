@@ -78,35 +78,29 @@ body.board-page.board-booting .right-panel {
     position: relative;
 }
 
-/* 第一階段：只顯示框架（左右面板），隱藏區塊內容 */
+/* 第一、二階段：顯示骨架（JS 異常時也看得到），隱藏子元素內容 */
 body.board-page.board-booting[data-board-stage="dependency_ready"] #experimentSettings,
 body.board-page.board-booting[data-board-stage="dependency_ready"] #experimentStats,
 body.board-page.board-booting[data-board-stage="dependency_ready"] #recordsList,
-body.board-page.board-booting[data-board-stage="dependency_ready"] #contentArea {
-    visibility: hidden;
-}
-
-/* 第二階段：顯示區塊框，不顯示區塊內部細節 */
+body.board-page.board-booting[data-board-stage="dependency_ready"] #contentArea,
 body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings,
 body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats,
 body.board-page.board-booting[data-board-stage="modules_init"] #recordsList,
 body.board-page.board-booting[data-board-stage="modules_init"] #contentArea {
     visibility: visible;
     position: relative;
+    min-height: 110px;
 }
 
+body.board-page.board-booting[data-board-stage="dependency_ready"] #experimentSettings > *,
+body.board-page.board-booting[data-board-stage="dependency_ready"] #experimentStats > *,
+body.board-page.board-booting[data-board-stage="dependency_ready"] #recordsList > *,
+body.board-page.board-booting[data-board-stage="dependency_ready"] #contentArea > *,
 body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings>*:not(h2),
 body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats>*:not(.stats-header),
 body.board-page.board-booting[data-board-stage="modules_init"] #recordsList>*,
 body.board-page.board-booting[data-board-stage="modules_init"] #contentArea>* {
     visibility: hidden;
-}
-
-body.board-page.board-booting[data-board-stage="modules_init"] #experimentSettings,
-body.board-page.board-booting[data-board-stage="modules_init"] #experimentStats,
-body.board-page.board-booting[data-board-stage="modules_init"] #recordsList,
-body.board-page.board-booting[data-board-stage="modules_init"] #contentArea {
-    min-height: 110px;
 }
 
 /* 第三階段開始（components_init）之後交由實際內容接管 */

@@ -6,8 +6,14 @@ import SessionService from "../services/SessionService.js";
 import ShareCodeService from "../services/ShareCodeService.js";
 import { generateClientId } from "../utils/idGenerator.js";
 import { validateChecksum } from "../utils/checksum.js";
-import { HTTP_STATUS, ERROR_CODES } from "../config/constants.js";
-import { SHARE_CODE_CONSTANTS } from "../config/constants.js";
+import {
+  HTTP_STATUS,
+  ERROR_CODES,
+  SHARE_CODE_CONSTANTS,
+  ROLE,
+  CHANNEL_CONSTANTS,
+} from "../config/constants.js";
+import { WS_PROTOCOL } from "../../shared/ws-protocol-constants.js";
 import Logger from "../utils/logger.js";
 import { query, execute } from "../database/connection.js";
 import {
@@ -18,14 +24,28 @@ import {
   getValidCreateCode,
   getSyncEnableFlag,
   getSyncMaxClients,
+  ADMIN_TOKEN,
 } from "../config/server.js";
 
-// 本檔使用的角色常數，避免在多處硬編碼
-const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
-const PUBLIC_CHANNEL_PREFIX = "__CH_";
-const VALID_CHANNELS = ["A", "B", "C"];
+const { PREFIX: PUBLIC_CHANNEL_PREFIX, VALID_NAMES: VALID_CHANNELS } = CHANNEL_CONSTANTS;
 
 const router = express.Router();
+
+/**
+ * 管理員 Token 驗證 middleware
+ * 套用於高危端點：清除工作階段、踢出裝置、變更角色
+ */
+function requireAdminToken(req, res, next) {
+  const token = req.headers["x-admin-token"];
+  if (!token || token !== ADMIN_TOKEN) {
+    Logger.warn(`管理端點未授權存取 | ip=${req.ip} | path=${req.path}`);
+    return res.status(HTTP_STATUS.FORBIDDEN).json({
+      success: false,
+      message: "需要管理員授權（缺少或無效的 X-Admin-Token）",
+    });
+  }
+  next();
+}
 
 function closeSessionEverywhere(
   app,
@@ -94,8 +114,8 @@ router.post("/session", (req, res) => {
       data: {
         sessionId: session.sessionId,
         clientId: session.clientId,
-        role: ROLE.OPERATOR, // 建立者預設為操作者
-        created_at: session.created_at,
+        role: ROLE.OPERATOR,
+        createdAt: session.created_at,
         maxClients: getSyncMaxClients(),
       },
     });
@@ -138,17 +158,16 @@ router.post("/generate_share_code", (req, res) => {
       });
     }
 
-    // 產生分享代碼
     const codeData = ShareCodeService.generateCode(sessionId, clientId);
-
-    // 組裝完整分享 URL
     const shareUrl = `${req.baseUrl}/index.html?shareCode=${encodeURIComponent(codeData.share_code)}&role=${ROLE.VIEWER}`;
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
       data: {
-        ...codeData,
-        shareUrl: shareUrl, // 返回完整分享 URL
+        shareCode: codeData.share_code,
+        sessionId: codeData.session_id,
+        expiresAt: codeData.expires_at,
+        shareUrl,
       },
     });
   } catch (error) {
@@ -464,7 +483,7 @@ router.get("/session/:sessionId", (req, res) => {
 
 /**
  * GET /api/sync/sessions
- * 取得所有活動中的工作階段列表
+ * 取得所有活動中的工作階段列表（含公開頻道）
  *
  * Response: { sessions: [...] }
  */
@@ -472,9 +491,67 @@ router.get("/sessions", (req, res) => {
   try {
     const sessions = SessionService.getActiveSessions();
 
+    // 將公開頻道以相同結構附加到列表末尾
+    const sessionManager = req.app?.locals?.sessionManager;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const channelSessions = VALID_CHANNELS.map((name) => {
+      const sessionId = `${PUBLIC_CHANNEL_PREFIX}${name}__`;
+      const clients = sessionManager ? sessionManager.getClients(sessionId) : [];
+      const info = sessionManager?.getSessionInfo?.(sessionId);
+      return {
+        id: sessionId,
+        created: info ? Math.floor(info.createdAt / 1000) : nowSec,
+        lastActivity: nowSec,
+        maxClients: null,
+        clients: clients.map((c) => ({
+          id: c.clientId,
+          role: c.role,
+          clientType: c.clientType,
+          joinedAt: Math.floor((c.joinedAt || Date.now()) / 1000),
+          lastActivity: nowSec,
+        })),
+        shareCodes: [],
+        state: null,
+        isChannel: true,
+        channelName: name,
+      };
+    });
+
+    const normalizedSessions = sessions.map((s) => {
+      const clients = sessionManager
+        ? sessionManager.getClients(s.session_id).map((c) => ({
+            id: c.clientId,
+            role: c.role,
+            clientType: c.clientType,
+            joinedAt: Math.floor((c.joinedAt || Date.now()) / 1000),
+          }))
+        : [];
+      let shareCodes = [];
+      try {
+        shareCodes = ShareCodeService.getCodesBySession(s.session_id).map((c) => ({
+          code: c.code,
+          expiresAt: c.expires_at,
+          used: c.used === 1,
+        }));
+      } catch {}
+      let state = null;
+      try { state = s.data ? JSON.parse(s.data) : null; } catch {}
+      return {
+        id: s.session_id,
+        created: s.created_at,
+        lastActivity: s.last_active_at,
+        maxClients: getSyncMaxClients(),
+        clients,
+        shareCodes,
+        state,
+        isChannel: false,
+        channelName: null,
+      };
+    });
+
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: sessions,
+      data: [...channelSessions, ...normalizedSessions],
     });
   } catch (error) {
     Logger.error("查詢工作階段列表失敗:", error.message);
@@ -492,7 +569,7 @@ router.get("/sessions", (req, res) => {
  *
  * Response: { success: true }
  */
-router.delete("/session/:sessionId", (req, res) => {
+router.delete("/session/:sessionId", requireAdminToken, (req, res) => {
   const { sessionId } = req.params;
 
   try {
@@ -532,7 +609,7 @@ router.delete("/session/:sessionId", (req, res) => {
  *
  * Response: { success: true, deletedCount: number }
  */
-router.post("/sessions/clear", (req, res) => {
+router.post("/sessions/clear", requireAdminToken, (req, res) => {
   try {
     // 取得所有工作階段
     const sessions = query(`SELECT session_id FROM sessions`);
@@ -713,6 +790,33 @@ router.post("/channel", (req, res) => {
 });
 
 /**
+ * GET /api/sync/channels
+ * 取得所有公開頻道的即時狀態（記憶體中）
+ *
+ * Response: { channels: [{ channelName, sessionId, clientCount, clients, active }] }
+ */
+router.get("/channels", (req, res) => {
+  const sessionManager = req.app?.locals?.sessionManager;
+
+  const channels = VALID_CHANNELS.map((name) => {
+    const sessionId = `${PUBLIC_CHANNEL_PREFIX}${name}__`;
+    const clients = sessionManager ? sessionManager.getClients(sessionId) : [];
+    return {
+      channelName: name,
+      sessionId,
+      clientCount: clients.length,
+      clients,
+      active: clients.length > 0,
+    };
+  });
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: channels,
+  });
+});
+
+/**
  * POST /api/sync/channel/close
  * 關閉公開頻道所有連線
  *
@@ -777,6 +881,188 @@ router.post("/channel/close", (req, res) => {
       error: "CHANNEL_CLOSE_FAILED",
       message: "關閉公開頻道失敗",
     });
+  }
+});
+
+/**
+ * POST /api/sync/client/:clientId/kick
+ * 強制退出指定客戶端
+ */
+router.post("/client/:clientId/kick", requireAdminToken, (req, res) => {
+  const { clientId } = req.params;
+  const connectionManager = req.app?.locals?.connectionManager;
+  const sessionManager = req.app?.locals?.sessionManager;
+  const broadcastManager = req.app?.locals?.broadcastManager;
+
+  if (!connectionManager || !sessionManager) {
+    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "WebSocket 系統尚未初始化" });
+  }
+
+  const wsConnectionId = connectionManager.clientIdMap.get(clientId);
+  if (!wsConnectionId) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({ success: false, message: "找不到該裝置的連線" });
+  }
+
+  try {
+    if (broadcastManager) {
+      broadcastManager.sendToClient(clientId, { type: WS_PROTOCOL.S2C.KICKED, reason: "admin_kick" });
+    }
+
+    const removedSessionId = sessionManager?.removeClientById?.(clientId);
+    if (removedSessionId && broadcastManager?.broadcastClientLeft) {
+      broadcastManager.broadcastClientLeft(removedSessionId, clientId);
+    }
+
+    connectionManager.unregister(wsConnectionId);
+    Logger.event("red", "!", `管理員強制退出 | clientId=${clientId}`);
+    res.json({ success: true, data: { clientId } });
+  } catch (error) {
+    Logger.error("強制退出失敗:", error.message);
+    res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "強制退出失敗" });
+  }
+});
+
+/**
+ * POST /api/sync/client/:clientId/role
+ * 調整指定客戶端的角色
+ * Body: { role: "operator" | "viewer" }
+ */
+router.post("/client/:clientId/role", requireAdminToken, (req, res) => {
+  const { clientId } = req.params;
+  const { role } = req.body;
+  const sessionManager = req.app?.locals?.sessionManager;
+  const broadcastManager = req.app?.locals?.broadcastManager;
+
+  if (!sessionManager) {
+    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "WebSocket 系統尚未初始化" });
+  }
+
+  if (![ROLE.OPERATOR, ROLE.VIEWER].includes(role)) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, message: "角色無效，必須為 operator 或 viewer" });
+  }
+
+  const sessionId = sessionManager.getSessionByClientId(clientId);
+  if (!sessionId) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({ success: false, message: "找不到該裝置所在的工作階段" });
+  }
+
+  try {
+    // 更新 SessionManager 記憶體中的角色
+    const session = sessionManager.activeSessions.get(sessionId);
+    if (session?.clients.has(clientId)) {
+      const meta = session.clients.get(clientId);
+      session.clients.set(clientId, { ...meta, role });
+    }
+
+    // 通知該裝置角色已變更
+    if (broadcastManager) {
+      broadcastManager.sendToClient(clientId, { type: "role_changed", role, sessionId });
+      // 廣播給工作階段內其他人知道成員角色變更
+      broadcastManager.broadcastToRoom(sessionId, { type: "member_role_changed", clientId, role }, { excludeClientId: clientId });
+    }
+
+    Logger.event("blue", "~", `管理員調整角色 | clientId=${clientId} | role=${role}`);
+    res.json({ success: true, data: { clientId, sessionId, role } });
+  } catch (error) {
+    Logger.error("調整角色失敗:", error.message);
+    res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "調整角色失敗" });
+  }
+});
+
+/**
+ * GET /api/sync/admin-token
+ * 提供管理員 Token 給前端管理介面
+ */
+router.get("/admin-token", (req, res) => {
+  try {
+    res.json({ token: ADMIN_TOKEN });
+  } catch (error) {
+    Logger.error("取得管理員 Token 失敗:", error.message);
+    res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "取得管理員 Token 失敗" });
+  }
+});
+
+/**
+ * POST /api/sync/client/:clientId/request-state
+ * 向指定客戶端請求當前狀態並等待回覆
+ */
+router.post("/client/:clientId/request-state", requireAdminToken, async (req, res) => {
+  const { clientId } = req.params;
+  const messageHandler = req.app?.locals?.messageHandler;
+  const sessionManager = req.app?.locals?.sessionManager;
+
+  if (!messageHandler || !sessionManager) {
+    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "WebSocket 系統尚未初始化" });
+  }
+
+  const sessionId = sessionManager.getSessionByClientId(clientId);
+  if (!sessionId) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({ success: false, message: "找不到該裝置所在的工作階段" });
+  }
+
+  try {
+    let state = await messageHandler.requestClientState(clientId, 7000);
+
+    if (
+      !state ||
+      (typeof state === "object" && Object.keys(state).length === 0)
+    ) {
+      const session = SessionService.getSession(sessionId);
+      if (session?.data) {
+        try {
+          const sessionData = typeof session.data === "string"
+            ? JSON.parse(session.data)
+            : session.data || {};
+          state = {
+            ...(typeof sessionData.state === "object" && sessionData.state ? sessionData.state : {}),
+            ...(typeof sessionData.experimentState === "object" && sessionData.experimentState ? sessionData.experimentState : {}),
+            ...(typeof sessionData.lastState === "object" && sessionData.lastState ? sessionData.lastState : {}),
+          };
+        } catch (parseError) {
+          Logger.warn("無法解析工作階段快取資料，將保留空回應", parseError.message);
+        }
+      }
+    }
+
+    Logger.event("cyan", "~", `管理員請求客戶端狀態 | clientId=${clientId}`);
+    res.json({ success: true, data: { clientId, sessionId, state } });
+  } catch (error) {
+    Logger.error("請求客戶端狀態失敗:", error.message);
+    res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/sync/client/:clientId/refresh
+ * 推送最新同步狀態給指定客戶端
+ */
+router.post("/client/:clientId/refresh", (req, res) => {
+  const { clientId } = req.params;
+  const sessionManager = req.app?.locals?.sessionManager;
+  const broadcastManager = req.app?.locals?.broadcastManager;
+
+  if (!sessionManager || !broadcastManager) {
+    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "WebSocket 系統尚未初始化" });
+  }
+
+  const sessionId = sessionManager.getSessionByClientId(clientId);
+  if (!sessionId) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({ success: false, message: "找不到該裝置所在的工作階段" });
+  }
+
+  try {
+    const state = sessionManager.getExperimentState(sessionId);
+    const sent = broadcastManager.sendToClient(clientId, {
+      type: "sync_state",
+      sessionId,
+      state: state || {},
+    });
+
+    Logger.event("cyan", "~", `管理員推送狀態 | clientId=${clientId}`);
+    res.json({ success: true, data: { clientId, sent } });
+  } catch (error) {
+    Logger.error("推送狀態失敗:", error.message);
+    res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "推送狀態失敗" });
   }
 });
 

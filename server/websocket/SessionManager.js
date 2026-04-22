@@ -9,8 +9,7 @@
  */
 
 import { Logger } from "../utils/logger.js";
-
-const ROLE = { OPERATOR: "operator", VIEWER: "viewer" };
+import { ROLE } from "../config/constants.js";
 
 export class SessionManager {
   constructor(connectionManager, sessionService) {
@@ -283,8 +282,10 @@ export class SessionManager {
   setExperimentState(sessionId, state) {
     if (!this.activeSessions.has(sessionId)) return;
     const session = this.activeSessions.get(sessionId);
-    // 合併現有狀態，以免覆蓋無關欄位
-    session.experimentState = { ...(session.experimentState || {}), ...state };
+    const updatedAt = Date.now();
+    // 合併現有狀態，以免覆蓋無關欄位；_updatedAt 供客戶端感知覆蓋時序
+    session.experimentState = { ...(session.experimentState || {}), ...state, _updatedAt: updatedAt };
+    session.stateUpdatedAt = updatedAt;
   }
 
   /**
