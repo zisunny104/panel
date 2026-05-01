@@ -14,7 +14,8 @@
  *   onRecordsSyncedRefresh → ({ reason, data }) => void 廣播刷新前的額外 UI 收尾（可選）
  */
 
-import { RECORD_TYPE_LABELS, RECORD_TYPES, API_ENDPOINTS } from "../constants/index.js";
+import { RECORD_TYPE_LABELS, RECORD_TYPES, GESTURE_ATTEMPT_TYPE_LABELS, API_ENDPOINTS } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
 import { recordViewFilter } from "./record-view-filter.js";
 import { recordViewModal } from "./record-view-modal.js";
 import { recordViewList } from "./record-view-list.js";
@@ -246,15 +247,9 @@ class RecordView {
     if (recentLogs.length === 0) return;
 
     const gesturesData = this.getGesturesData?.() ?? {};
-    const GESTURE_ATTEMPT_TYPE_LABELS = { t: "正確", f: "錯誤", n: "未知" };
-
     const entriesHtml = recentLogs.map((log) => {
       const date = new Date(log.ts);
-      const time = [
-        String(date.getHours()).padStart(2, "0"),
-        String(date.getMinutes()).padStart(2, "0"),
-        String(date.getSeconds()).padStart(2, "0"),
-      ].join(":") + "." + String(date.getMilliseconds()).padStart(3, "0");
+      const time = date.toTimeString().slice(0, 8) + "." + String(date.getMilliseconds()).padStart(3, "0");
 
       const typeLabel = RECORD_TYPE_LABELS[log.type] ?? log.type;
       const detailParts = [];
@@ -580,9 +575,12 @@ class RecordView {
       const experiments = await this.loadRecordListFromDirectory(logsDir);
 
       // 重新載入時重置篩選條件
-      this.recordCountFilter.min = 0; this.recordCountFilter.max = null;
-      this.durationFilter.min = 0; this.durationFilter.max = null;
-      this.timeFilter.min = null; this.timeFilter.max = null;
+      this.recordCountFilter.min = 0;
+      this.recordCountFilter.max = null;
+      this.durationFilter.min = 0;
+      this.durationFilter.max = null;
+      this.timeFilter.min = null;
+      this.timeFilter.max = null;
 
       this.displayRecordList(experiments);
     } catch (error) {
@@ -619,7 +617,7 @@ class RecordView {
     try {
       const files = await this.listFilesInDirectory(dirPath);
       const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
-      const apiUrl = this._getApiUrl();
+      const apiUrl = getApiUrl();
       const concurrency = 4;
 
       for (let i = 0; i < jsonlFiles.length; i += concurrency) {
@@ -683,7 +681,7 @@ class RecordView {
    */
   async listFilesInDirectory(_dirPath) {
     try {
-      const response = await fetch(`${this._getApiUrl()}${API_ENDPOINTS.RECORD.LIST}`);
+      const response = await fetch(`${getApiUrl()}${API_ENDPOINTS.RECORD.LIST}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.files) {
@@ -716,9 +714,7 @@ class RecordView {
   * @param {string} recordId - 實驗 ID 或 filename
    */
   async viewRecordDetails(recordId) {
-    const experiment = this.currentRecords.find(
-      (exp) => exp.filename === recordId || exp.actualExperimentId === recordId || exp.experimentId === recordId,
-    );
+    const experiment = this._findRecord(recordId);
     if (!experiment?.logs?.length) {
       Logger.warn(`找不到實驗 ${recordId} 的日誌資料`);
       return;
@@ -757,7 +753,7 @@ class RecordView {
     if (!experiment?.filename) { Logger.warn(`找不到實驗 ${recordId}`); return; }
 
     try {
-      const response = await fetch(`${this._getApiUrl()}${API_ENDPOINTS.RECORD.READ(experiment.filename)}`);
+      const response = await fetch(`${getApiUrl()}${API_ENDPOINTS.RECORD.READ(experiment.filename)}`);
       if (!response.ok) throw new Error(`API 回傳錯誤: ${response.status}`);
       const result = await response.json();
       if (!result.success || !result.content) throw new Error(result.error || "無法讀取");
@@ -778,7 +774,7 @@ class RecordView {
 
     try {
       const response = await fetch(
-        `${this._getApiUrl()}${API_ENDPOINTS.RECORD.DELETE(experiment.filename)}`,
+        `${getApiUrl()}${API_ENDPOINTS.RECORD.DELETE(experiment.filename)}`,
         { method: "DELETE" },
       );
       const result = await response.json();
@@ -795,7 +791,7 @@ class RecordView {
    */
   async downloadSelectedRecords() {
     if (this.selectedRecords.size === 0) return;
-    const apiUrl = this._getApiUrl();
+    const apiUrl = getApiUrl();
     let allContent = "";
     let successCount = 0;
 
@@ -828,7 +824,7 @@ class RecordView {
    */
   async deleteSelectedRecords() {
     if (this.selectedRecords.size === 0) return;
-    const apiUrl = this._getApiUrl();
+    const apiUrl = getApiUrl();
     let deletedCount = 0;
 
     for (const recordId of this.selectedRecords) {
@@ -866,7 +862,7 @@ class RecordView {
     const safeFilename = filename.endsWith(".jsonl") ? filename : `${filename}.jsonl`;
     try {
       const resp = await fetch(
-        `${this._getApiUrl()}${API_ENDPOINTS.RECORD.UPDATE_PARTICIPANT(encodeURIComponent(safeFilename))}`,
+        `${getApiUrl()}${API_ENDPOINTS.RECORD.UPDATE_PARTICIPANT(encodeURIComponent(safeFilename))}`,
         { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ participant: newName }) },
       );
       const result = await resp.json();
@@ -890,7 +886,7 @@ class RecordView {
       if (cached) {
         cached.participantName = newName;
         cached.logs?.forEach((entry) => {
-          if (entry.type === "exp_start" || entry.type === "exp_end") entry.participant = newName;
+          if (entry.type === RECORD_TYPES.EXP_START || entry.type === RECORD_TYPES.EXP_END) entry.participant = newName;
         });
       }
     } catch (error) {
@@ -981,9 +977,6 @@ class RecordView {
     window.URL.revokeObjectURL(url);
   }
 
-  _getApiUrl() {
-    return getApiUrl();
-  }
 }
 
 // 混入 UI 子模組

@@ -24,9 +24,20 @@ export function buildBoardGestureScript({
   }
 
   const gestureList = scenariosData.gesture_list || [];
-  const section = scenariosData.sections?.[0];
+  const section = scenariosData.sections[0];
   const findGesture = (gestureId) =>
     gestureList.find((g) => g.gesture_id === gestureId);
+
+  // 將常用手勢物件 + 自訂欄位合併推入 script.gestures
+  const pushGesture = (gestureObj, overrides) => {
+    script.gestures.push({
+      step: script.gestures.length + 1,
+      gesture: gestureObj.gesture_id,
+      name: gestureObj.gesture_name,
+      description: gestureObj.gesture_description,
+      ...overrides,
+    });
+  };
 
   const confirmGesture = findGesture("confirm");
   const nextGesture = findGesture("next");
@@ -34,21 +45,11 @@ export function buildBoardGestureScript({
   const openGesture = findGesture("open");
 
   const powerOptions = combination?.powerOptions || {};
-  const includeStartup =
-    typeof powerOptions.includeStartup === "boolean"
-      ? powerOptions.includeStartup
-      : true;
-  const includeShutdown =
-    typeof powerOptions.includeShutdown === "boolean"
-      ? powerOptions.includeShutdown
-      : true;
+  const includeStartup = powerOptions.includeStartup ?? true;
+  const includeShutdown = powerOptions.includeShutdown ?? true;
 
   if (openGesture) {
-    script.gestures.push({
-      step: 1,
-      gesture: "open",
-      name: openGesture.gesture_name,
-      description: openGesture.gesture_description,
+    pushGesture(openGesture, {
       reason: "[num1] + [num2] | 開啟教學維護系統，進入章節列表",
       step_id: "SYSTEM_OPEN",
       step_name: "開啟教學維護系統",
@@ -57,11 +58,7 @@ export function buildBoardGestureScript({
   }
 
   if (confirmGesture && section) {
-    script.gestures.push({
-      step: script.gestures.length + 1,
-      gesture: "confirm",
-      name: confirmGesture.gesture_name,
-      description: confirmGesture.gesture_description,
+    pushGesture(confirmGesture, {
       reason: `進入章節：${section.section_name}`,
       step_id: "SECTION_ENTER",
       step_name: `確認進入「${section.section_name}」`,
@@ -77,11 +74,7 @@ export function buildBoardGestureScript({
     );
 
     if (firstUnitIndexInJson > 0 && nextGesture) {
-      script.gestures.push({
-        step: script.gestures.length + 1,
-        gesture: "next",
-        name: nextGesture.gesture_name,
-        description: nextGesture.gesture_description,
+      pushGesture(nextGesture, {
         reason: `[num6] x${firstUnitIndexInJson} | 導航至「${firstUnit.unit_name}」 | 列表 -> ${firstUnitId}`,
         step_id: "FIRST_UNIT_NAV",
         step_name: `單元列表導航 ([num6] x${firstUnitIndexInJson})`,
@@ -91,11 +84,7 @@ export function buildBoardGestureScript({
 
     if (confirmGesture && firstUnit?.steps?.length > 0) {
       const step0 = firstUnit.steps[0];
-      script.gestures.push({
-        step: script.gestures.length + 1,
-        gesture: "confirm",
-        name: confirmGesture.gesture_name,
-        description: confirmGesture.gesture_description,
+      pushGesture(confirmGesture, {
         unit_name: firstUnit.unit_name,
         reason: `開始單元：${firstUnit.unit_name}`,
         step_id: step0.step_id || `UNIT_ENTER_${firstUnitId}`,
@@ -118,11 +107,7 @@ export function buildBoardGestureScript({
     if (unitId === "SA04") {
       const reloadGesture = findGesture("reload");
       if (reloadGesture) {
-        script.gestures.push({
-          step: script.gestures.length + 1,
-          gesture: "reload",
-          name: reloadGesture.gesture_name,
-          description: reloadGesture.gesture_description,
+        pushGesture(reloadGesture, {
           unit_name: unit.unit_name,
           reason: "[num5] | 重新開始顯示此次教學步驟提示",
           step_id: "SA04_REVIEW_RELOAD",
@@ -133,17 +118,10 @@ export function buildBoardGestureScript({
     }
 
     if (unit.steps) {
-      unit.steps.forEach((step, stepIdx) => {
-        if (stepIdx === 0) return;
-
-        const gestureId = step.gesture || "next";
-        const gesture = findGesture(gestureId);
+      unit.steps.slice(1).forEach((step) => {
+        const gesture = findGesture(step.gesture || "next");
         if (gesture) {
-          script.gestures.push({
-            step: script.gestures.length + 1,
-            gesture: gesture.gesture_id,
-            name: gesture.gesture_name,
-            description: gesture.gesture_description,
+          pushGesture(gesture, {
             unit_name: unit.unit_name,
             reason: step.step_description || null,
             step_id: step.step_id || null,
@@ -155,11 +133,7 @@ export function buildBoardGestureScript({
     }
 
     if (nextGesture) {
-      script.gestures.push({
-        step: script.gestures.length + 1,
-        gesture: "next",
-        name: nextGesture.gesture_name,
-        description: nextGesture.gesture_description,
+      pushGesture(nextGesture, {
         unit_name: unit.unit_name,
         reason: `完成「${unit.unit_name}」單元`,
         step_id: `UNIT_COMPLETE_${unitId}`,
@@ -175,11 +149,7 @@ export function buildBoardGestureScript({
       if (unitIdx === 0) {
         const zoomInGesture = findGesture("zoom_in");
         if (zoomInGesture) {
-          script.gestures.push({
-            step: script.gestures.length + 1,
-            gesture: "zoom_in",
-            name: zoomInGesture.gesture_name,
-            description: zoomInGesture.gesture_description,
+          pushGesture(zoomInGesture, {
             reason: "[num9] x2 | 完成第一個教學單元後，操作放大說明文字",
             step_id: "FIRST_UNIT_ZOOM_IN",
             step_name: "文字放大操作",
@@ -189,11 +159,7 @@ export function buildBoardGestureScript({
       }
 
       if (prevGesture) {
-        script.gestures.push({
-          step: script.gestures.length + 1,
-          gesture: "prev",
-          name: prevGesture.gesture_name,
-          description: prevGesture.gesture_description,
+        pushGesture(prevGesture, {
           reason: `完成「${unit.unit_name}」後回傳單元列表`,
           step_id: `UNIT_EXIT_${unitId}`,
           step_name: "回傳單元列表",
@@ -207,12 +173,8 @@ export function buildBoardGestureScript({
       const navGesture = dist > 0 ? nextGesture : prevGesture;
 
       if (navGesture && dist !== 0) {
-        script.gestures.push({
-          step: script.gestures.length + 1,
-          gesture: navGesture.gesture_id,
-          name: navGesture.gesture_name,
-          description: navGesture.gesture_description,
-          reason: `[${dist > 0 ? "num6" : "num4"}] x${Math.abs(dist)} | 導航至「${nextUnit.unit_name}」 | ${unitId} -> ${nextUnitId}`,
+        pushGesture(navGesture, {
+          reason: `[${dist > 0 ? "num6" : "num4"}] x${Math.abs(dist)} | 導航至「${nextUnit?.unit_name}」 | ${unitId} -> ${nextUnitId}`,
           step_id: `UNIT_NAV_${unitId}_TO_${nextUnitId}`,
           step_name: `單元列表導航 ([${dist > 0 ? "num6" : "num4"}] x${Math.abs(dist)})`,
           actions: [],
@@ -221,11 +183,7 @@ export function buildBoardGestureScript({
 
       if (confirmGesture && nextUnit?.steps?.length > 0) {
         const nextStep0 = nextUnit.steps[0];
-        script.gestures.push({
-          step: script.gestures.length + 1,
-          gesture: "confirm",
-          name: confirmGesture.gesture_name,
-          description: confirmGesture.gesture_description,
+        pushGesture(confirmGesture, {
           unit_name: nextUnit.unit_name,
           reason: `開始單元：${nextUnit.unit_name}`,
           step_id: nextStep0.step_id || `UNIT_ENTER_${nextUnitId}`,
@@ -238,11 +196,7 @@ export function buildBoardGestureScript({
 
   const zoomOutGesture = findGesture("zoom_out");
   if (zoomOutGesture) {
-    script.gestures.push({
-      step: script.gestures.length + 1,
-      gesture: "zoom_out",
-      name: zoomOutGesture.gesture_name,
-      description: zoomOutGesture.gesture_description,
+    pushGesture(zoomOutGesture, {
       reason: "[num7] x2 | 完成最後一個教學單元後，操作縮小說明文字",
       step_id: "LAST_UNIT_ZOOM_OUT",
       step_name: "文字縮小操作",
@@ -252,11 +206,7 @@ export function buildBoardGestureScript({
 
   const captureGesture = findGesture("capture");
   if (captureGesture) {
-    script.gestures.push({
-      step: script.gestures.length + 1,
-      gesture: "capture",
-      name: captureGesture.gesture_name,
-      description: captureGesture.gesture_description,
+    pushGesture(captureGesture, {
       reason: "[num8] | 完成所有教學單元後，拍攝機台最終狀態作為記錄",
       step_id: "FINAL_CAPTURE",
       step_name: "拍攝機台狀態",
@@ -266,11 +216,7 @@ export function buildBoardGestureScript({
 
   const closeGesture = findGesture("close");
   if (closeGesture) {
-    script.gestures.push({
-      step: script.gestures.length + 1,
-      gesture: "close",
-      name: closeGesture.gesture_name,
-      description: closeGesture.gesture_description,
+    pushGesture(closeGesture, {
       reason: "[num1] + [num3] | 關閉教學維護系統並回傳正常操作模式",
       step_id: "SYSTEM_CLOSE",
       step_name: "關閉教學維護系統",

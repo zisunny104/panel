@@ -146,8 +146,8 @@ class ExperimentControlsDom {
     if (!container) return;
     const startRow = container.querySelector("#experimentIdRow");
     const controlBtns = container.querySelector("#experimentControlButtons");
-    if (startRow) startRow.style.display = "none";
-    if (controlBtns) controlBtns.style.display = "flex";
+    if (startRow) startRow.classList.add("is-hidden");
+    if (controlBtns) controlBtns.classList.remove("is-hidden");
     const pauseBtn = container.querySelector("#pauseExperimentBtn");
     if (pauseBtn) {
       pauseBtn.textContent = "⏸ 暫停";
@@ -204,8 +204,8 @@ class ExperimentControlsDom {
     if (!container) return;
     const startRow = container.querySelector("#experimentIdRow");
     const controlBtns = container.querySelector("#experimentControlButtons");
-    if (startRow) startRow.style.display = "block";
-    if (controlBtns) controlBtns.style.display = "none";
+    if (startRow) startRow.classList.remove("is-hidden");
+    if (controlBtns) controlBtns.classList.add("is-hidden");
   }
 
   // ==========================================

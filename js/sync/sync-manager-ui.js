@@ -844,8 +844,6 @@ export class SyncManagerUI {
       this.showStatus("info", "正在退出工作階段...");
       this.core.disconnect();
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
       const shareSessionContent = document.getElementById(
         "shareSessionContent",
       );
@@ -905,8 +903,6 @@ export class SyncManagerUI {
         "success",
         `${isPublicChannel ? "公開頻道" : "工作階段"}已關閉（已斷線 ${result.closedCount || 0} 筆）`,
       );
-
-      await new Promise((resolve) => setTimeout(resolve, 200));
 
       this.refreshFromCoreState();
     } catch (error) {

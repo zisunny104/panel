@@ -5,6 +5,7 @@
  */
 
 import { RECORD_SOURCES, SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
 
 function dispatchBroadcastState(detail) {
   if (!detail) return;

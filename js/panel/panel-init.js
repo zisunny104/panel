@@ -1,6 +1,7 @@
 import { MediaManager } from "./panel-media-manager.js";
 import { PowerControl } from "./panel-power-control.js";
 import { PanelLogger } from "./panel-logger.js";
+import { Logger } from "../core/console-manager.js";
 import { ExperimentSyncCore } from "../sync/experiment-sync-core.js";
 import { PanelUIManager } from "./panel-ui-manager.js";
 import { PanelSyncManager } from "./panel-sync-manager.js";
@@ -46,7 +47,6 @@ export async function initializePanelManagers(page) {
   page.panelMediaManager = new MediaManager({
     panelUIManager: page.panelUIManager,
     powerControl: page.powerControl,
-    experimentFlowManager: page.experimentFlowManager,
     configManager: page.configManager,
   });
   logInitDuration("PanelMediaManager 已初始化", mediaStart);
@@ -141,7 +141,6 @@ export async function initializePanelManagers(page) {
     const timerStart = performance.now();
     page.timerManager = new ExperimentTimerManager({
       timeSyncManager: page.syncManager?.core?.timeSyncManager,
-      recordManager: null,
       stateManager: page.experimentStateManager,
       getCurrentCombination: () =>
         page.experimentCombinationManager?.getCurrentCombination?.() || null,
@@ -186,7 +185,6 @@ export async function initializePanelManagers(page) {
     flowManager: page.experimentFlowManager,
     timerManager: page.timerManager,
     pageManager: page,
-    recordManager: null,
   });
   await page.experimentSystemManager.initialize();
   logInitDuration("ExperimentSystemManager 已初始化", systemStart);

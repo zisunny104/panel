@@ -207,6 +207,43 @@ class ExperimentActionHandler extends EventEmitter {
     return this.currentActionSequence[nextIndex];
   }
 
+  getActionByIndex(index) {
+    if (index < 0 || index >= this.currentActionSequence.length) return null;
+    return this.currentActionSequence[index] ?? null;
+  }
+
+  findActionIndexById(actionId) {
+    if (!actionId) return -1;
+    return this.currentActionSequence.findIndex(
+      (action) => this._getActionId(action) === actionId,
+    );
+  }
+
+  setCurrentActionIndex(index) {
+    if (index < 0 || index >= this.currentActionSequence.length) return false;
+    this.currentActionIndex = index;
+    return true;
+  }
+
+  jumpToActionById(actionId) {
+    const index = this.findActionIndexById(actionId);
+    if (index < 0) return { success: false, index: -1, action: null };
+    if (!this.setCurrentActionIndex(index)) return { success: false, index: -1, action: null };
+    return { success: true, index, action: this.getActionByIndex(index) };
+  }
+
+  getActionSequenceLength() {
+    return this.currentActionSequence.length;
+  }
+
+  getCurrentActionIndex() {
+    return this.currentActionIndex;
+  }
+
+  getPreviousAction() {
+    return this.getActionByIndex(Math.max(0, this.currentActionIndex - 1));
+  }
+
   /**
    * 取得目前動作序列的進度。
    * @returns {{current:number,total:number,completed:number,percentage:number}}
@@ -629,8 +666,6 @@ class ExperimentActionHandler extends EventEmitter {
     return [...this.actionHistory];
   }
 
-  // ==================== 手勢處理 ====================
-
   // ==================== 步驟轉換 ====================
 
   /**
@@ -688,9 +723,6 @@ class ExperimentActionHandler extends EventEmitter {
     }
   }
 
-  // ==================== 自動推進 ====================
-
-
   // ==================== 錯誤處理 ====================
 
   /**
@@ -723,8 +755,6 @@ class ExperimentActionHandler extends EventEmitter {
       error,
     });
   }
-
-  // ==================== 事件通知 ====================
 
   // ==================== 工具方法 ====================
 

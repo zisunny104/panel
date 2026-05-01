@@ -179,6 +179,7 @@ class BoardSyncIO {
         `.gesture-action-button[data-action-id="${targetActionId}"]`,
       );
       if (!targetButton) return;
+      if (targetButton.getAttribute("data-completed") === "true") return;
 
       page._markActionCompleted(targetButton, targetActionId, gestureIndex, true);
       targetButton.classList.add("sync-action-completed");
@@ -208,7 +209,7 @@ class BoardSyncIO {
     const actionButton = document.querySelector(
       `.gesture-action-button[data-action-id="${actionId}"]`,
     );
-    if (actionButton) {
+    if (actionButton && actionButton.getAttribute("data-completed") === "true") {
       page._cancelActionCompletion(actionButton, actionId, gestureIndex);
     }
   }

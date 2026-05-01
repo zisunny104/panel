@@ -63,29 +63,12 @@ export class SyncManagerCore {
    * @returns {string} 以斜線結尾的基礎 URL
    */
   getBaseUrl() {
-    try {
-      const u = new URL(window.location.href);
-      let basePath = u.pathname;
-
-      if (!basePath.endsWith("/")) {
-        basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1) || "/";
-      }
-
-      return `${u.origin}${basePath}`;
-    } catch (error) {
-      const protocol = window.location.protocol;
-      const host = window.location.host;
-      let pathname = window.location.pathname;
-
-      if (!pathname.endsWith("/")) {
-        pathname = pathname.substring(0, pathname.lastIndexOf("/") + 1);
-      }
-      if (!pathname.endsWith("/")) {
-        pathname += "/";
-      }
-
-      return `${protocol}//${host}${pathname}`;
+    const u = new URL(window.location.href);
+    let basePath = u.pathname;
+    if (!basePath.endsWith("/")) {
+      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1) || "/";
     }
+    return `${u.origin}${basePath}`;
   }
 
   /**

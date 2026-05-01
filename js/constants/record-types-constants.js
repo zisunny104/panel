@@ -18,6 +18,7 @@ export const RECORD_TYPES = {
 
   // 其他事件
   ACTION: "action",
+  BUTTON_ACTION: "button_action",
 };
 
 /**
@@ -33,6 +34,7 @@ export const RECORD_TYPE_LABELS = {
   [RECORD_TYPES.GESTURE_STEP_PAUSE]: "步驟暫停",
   [RECORD_TYPES.GESTURE_ATTEMPT]: "手勢嘗試",
   [RECORD_TYPES.ACTION]: "動作",
+  [RECORD_TYPES.BUTTON_ACTION]: "按鈕操作",
 };
 
 /**

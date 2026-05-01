@@ -6,6 +6,7 @@
  */
 
 import { getSharedConfig } from "./config.js";
+import { Logger } from "./console-manager.js";
 
 class TimeSyncManager {
   constructor() {
@@ -36,93 +37,11 @@ class TimeSyncManager {
   }
 
   /**
-   * 初始化時間同步
-   */
-  async initialize() {
-    Logger.debug("初始化時間同步...");
-
-    try {
-      await this.syncWithServer();
-      Logger.debug("時間同步初始化完成");
-    } catch (error) {
-      Logger.warn("時間同步初始化失敗:", error);
-      this.isSynced = false;
-    }
-  }
-
-  /**
-   * 取得應用程式時區設定
-   * @returns {string} 時區字串
-   */
-  static getTimezone() {
-    return getSharedConfig()?.timezone || "Asia/Taipei";
-  }
-
-  /**
-   * 根據時間偏差取得延遲等級顏色
-   * @param {number} offsetMs - 時間偏差（毫秒）
-   * @returns {string} 顏色標記
-   */
-  static getLatencyColor(offsetMs) {
-    const absOffset = Math.abs(offsetMs);
-
-    if (absOffset <= 50) {
-      return "green"; // 優秀：0-50ms
-    } else if (absOffset <= 100) {
-      return "yellow"; // 良好：51-100ms
-    } else if (absOffset <= 200) {
-      return "orange"; // 一般：101-200ms
-    } else {
-      return "red"; // 較差：201ms以上
-    }
-  }
-
-  /**
-   * 格式化時間偏差顯示
-   * @param {number} offsetMs - 時間偏差（毫秒）
-   * @returns {string} 格式化的時間偏差字串
-   */
-  static formatTimeOffset(offsetMs) {
-    const color = this.getLatencyColor(offsetMs);
-    const sign = offsetMs >= 0 ? "+" : "";
-    return `<${color}>${sign}${offsetMs} ms</${color}>`;
-  }
-
-  /**
-   * 與伺服器同步時間
-   * 使用本機時間，時間偏差固定為 0
-   */
-  async syncWithServer() {
-    try {
-      // 不需要與伺服器同步
-      // 所有裝置使用各自的本機時間，透過 WebSocket 進行事件同步
-      this.timeOffset = 0;
-      this.isSynced = true;
-      this.lastSyncTime = Date.now();
-
-      Logger.debug(
-        `[TimeSyncManager] 使用本機時間，時間偏差 = ${TimeSyncManager.formatTimeOffset(this.timeOffset)}`,
-      );
-    } catch (error) {
-      Logger.warn("[TimeSyncManager] 時間初始化失敗:", error.message);
-      this.isSynced = false;
-    }
-  }
-
-  /**
    * 取得校正後的伺服器時間（毫秒級）
    * 應該在所有需要參考時間的地方使用此方法
    */
   getServerTime() {
-    // 伺服器時間 = 本機時間 - 時間偏差
     return Date.now() - this.timeOffset;
-  }
-
-  /**
-   * 取得目前時間偏差（毫秒）
-   */
-  getTimeOffset() {
-    return this.timeOffset;
   }
 
   /**
@@ -137,6 +56,15 @@ class TimeSyncManager {
    * @param {number} serverTime - 伺服器時間戳（毫秒）
    */
   syncWithWebSocket(serverTime) {
+    // 必須是合理的 Unix ms 時間戳（2001 年後），避免 serverTime=0 或 undefined
+    // 導致 offset ≈ Date.now()（~1.775e12），使所有時間戳變成接近 epoch 的錯誤值
+    if (!serverTime || typeof serverTime !== "number" || serverTime < 1_000_000_000_000) {
+      Logger.warn(
+        `[TimeSyncManager] 收到無效的 serverTime，略過校時: ${serverTime}`,
+      );
+      return;
+    }
+
     const clientTime = Date.now();
     const offset = clientTime - serverTime;
 
@@ -164,16 +92,6 @@ class TimeSyncManager {
       `[TimeSyncManager] WebSocket 校時完成: 偏差=${this.timeOffset}ms`,
     );
   }
-  /**
-   * 格式化為 ISO 8601 格式
-   * @param {Date|number} dateInput - 日期物件或時間戳
-   * @returns {string} ISO 格式字串
-   */
-  formatISO(dateInput) {
-    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
-    return date.toISOString();
-  }
-
   /**
    * 格式化時間長度（持續時間）
    * @param {number} milliseconds - 毫秒數

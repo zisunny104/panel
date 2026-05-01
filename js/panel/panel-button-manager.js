@@ -174,11 +174,8 @@ class ButtonManager {
   }
 
   _jumpToActionById(actionId) {
-    const systemManager = this._getSystemManager();
-    if (systemManager?.jumpToActionById) {
-      return systemManager.jumpToActionById(actionId);
-    }
-    return { success: false, index: -1, action: null };
+    return this._getActionHandler()?.jumpToActionById(actionId)
+      ?? { success: false, index: -1, action: null };
   }
 
   _isExperimentRunning(flowManager = this._getFlowManager()) {
@@ -377,10 +374,11 @@ class ButtonManager {
     // 實驗模式下檢查是否有對應的動作
     if (this._isExperimentRunning(flowManager)) {
       if (this.checkAndExecuteExperimentAction(buttonId, functionName)) {
-        const totalActions = systemManager?.getActionSequenceLength?.() || 0;
+        const actionHandler = this._getActionHandler();
+        const totalActions = actionHandler?.getActionSequenceLength() ?? 0;
         if (totalActions > 0) {
-          const currentActionIndex = systemManager?.getCurrentActionIndex?.() || 0;
-          const prevAction = systemManager?.getPreviousAction?.();
+          const currentActionIndex = actionHandler?.getCurrentActionIndex() ?? 0;
+          const prevAction = actionHandler?.getPreviousAction();
           const logMessage = `按鈕 "${buttonId}" → 功能 "${functionName}" | 動作: ${
             prevAction?.actionId || "未知"
           } [${currentActionIndex}/${totalActions}]`;
@@ -450,9 +448,7 @@ class ButtonManager {
     }
 
     // 如果動作序列為空，記錄警告但繼續處理
-    const totalActions = this._getSystemManager()?.getActionSequenceLength?.()
-      ?? actionHandler.getProgress?.().total
-      ?? 0;
+    const totalActions = actionHandler.getActionSequenceLength?.() ?? 0;
     if (totalActions === 0) {
       Logger.warn("動作序列為空，無法處理動作");
       return false;

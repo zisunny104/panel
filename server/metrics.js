@@ -1,10 +1,10 @@
-// 簡易的 Prometheus 格式 metrics 實作（不依賴外部套件）
-//
-// 說明：
-// - 為了保持部署簡單，本模組輸出 Prometheus text 格式的指標，
-//   可由 Prometheus server 透過 HTTP 抓取（/metrics）。
-// - 本實作僅包含必要的伺服器指標（連線數、速率限制、心跳遺失、記憶體等），
-//   方便觀察系統健康狀態與制定告警規則。
+/**
+ * metrics - Prometheus 格式指標模組（不依賴外部套件）
+ *
+ * - 輸出 Prometheus text 格式指標，可由 Prometheus server 透過 HTTP 抓取（/metrics）
+ * - 涵蓋連線數、速率限制、心跳遺失、記憶體等必要伺服器指標
+ * - 供健康狀態觀察與告警規則制定使用
+ */
 
 let _wsTotalConnections = 0;
 let _wsAuthenticatedConnections = 0;

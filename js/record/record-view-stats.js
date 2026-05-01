@@ -8,6 +8,8 @@
  *   getCombination()  → Object  目前組合（含 gestures 陣列）
  */
 
+import { RECORD_TYPES } from "../constants/index.js";
+
 export const recordViewStats = {
   /**
    * 計算記錄統計資訊
@@ -29,11 +31,10 @@ export const recordViewStats = {
 
     const unitsStarted = new Set();
 
-    // 第二輪：統計計算
     entries.forEach((entry) => {
       if (!entry || typeof entry !== "object") return;
 
-      if (entry.type === "exp_start") {
+      if (entry.type === RECORD_TYPES.EXP_START) {
         stats.experimentId = entry.exp_id || "";
         stats.participantName = entry.participant || "";
         stats.experimentCombination = entry.combo_name || "";
@@ -42,11 +43,11 @@ export const recordViewStats = {
         }
       }
 
-      if (entry.type === "exp_end" && entry.ts) {
+      if (entry.type === RECORD_TYPES.EXP_END && entry.ts) {
         stats.endTime = new Date(typeof entry.ts === "string" ? parseInt(entry.ts, 10) : entry.ts);
       }
 
-      if (entry.type === "gesture_step_start") {
+      if (entry.type === RECORD_TYPES.GESTURE_STEP_START) {
         if (entry.s_id) {
           const unitId = entry.s_id.split("_")[0];
           if (/[0-9]/.test(unitId)) unitsStarted.add(unitId);

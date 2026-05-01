@@ -1,11 +1,12 @@
 /**
-* ExperimentCombinationManager - 實驗組合管理器
-*
-* 負責組合載入、隨機化、快取與同步處理。
-*/
+ * ExperimentCombinationManager - 實驗組合管理器
+ *
+ * 負責組合載入、隨機化、快取與同步處理。
+ */
 
 import {
   SYNC_DATA_TYPES,
+  SYNC_ROLE_CONFIG,
   EXPERIMENT_COMBINATION_EVENTS,
 } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
@@ -13,7 +14,7 @@ import { EventEmitter } from "../core/event-emitter.js";
 import { getSharedConfig } from "../core/config.js";
 import { createSeededRandom, shuffleArray } from "../core/random-utils.js";
 
-export const ExperimentCombinationManager = class ExperimentCombinationManager extends EventEmitter {
+export class ExperimentCombinationManager extends EventEmitter {
   static activeInstance = null;
   static EVENT = EXPERIMENT_COMBINATION_EVENTS;
 
@@ -40,7 +41,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
     this.currentCombination = null;
     this.loadedUnits = [];
     this.isInitialized = false;
-    this.readyPromise = null; // Promise to wait for initialization
+    this.readyPromise = null;
     this._selectionSignature = null;
     this._comboSignatureCache = null;
     this.dependencies = {
@@ -117,12 +118,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
 
     const normalizedExperimentId = experimentId || "";
     const nextUnits = this.getCombinationUnitIds(combination, experimentId);
-    const nextSignature = JSON.stringify({
-      experimentId: normalizedExperimentId,
-      combinationId: combination.combinationId || "",
-      unitIds: nextUnits,
-      powerOptions: combination.powerOptions || null,
-    });
+    const nextSignature = this._buildSelectionSignature(combination, normalizedExperimentId, nextUnits);
     if (this._selectionSignature === nextSignature) {
       this.currentCombination = combination;
       this.loadedUnits = nextUnits;
@@ -338,7 +334,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
   }
 
   /**
-  * 使用種子洗牌陣列（使用 random-utils）
+   * 使用種子洗牌陣列（使用 random-utils）
    */
   shuffleWithSeed(array, seed) {
     const seededRandom = createSeededRandom(seed);
@@ -359,7 +355,7 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
     const syncClient =
       this.dependencies.syncClient || this.dependencies.syncManager?.core?.syncClient;
     const role = syncClient?.getRole?.() || syncClient?.role;
-    if (role && role !== "operator") return false;
+    if (role && role !== SYNC_ROLE_CONFIG.OPERATOR) return false;
 
     const experimentId = this.dependencies.hubManager?.getExperimentId?.() || null;
     const unitIds = Array.isArray(this.loadedUnits) ? [...this.loadedUnits] : [];
@@ -422,7 +418,13 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
     const raw = localStorage.getItem("experimentCurrentCombination");
     if (!raw) return false;
 
-    const cacheData = JSON.parse(raw);
+    let cacheData;
+    try {
+      cacheData = JSON.parse(raw);
+    } catch {
+      this.clearCache();
+      return false;
+    }
     const combination = this.getCombinationById(cacheData.combinationId);
 
     if (!combination) {
@@ -562,6 +564,15 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
 
   // ==================== 驗證與工具 ====================
 
+  _buildSelectionSignature(combination, experimentId, unitIds) {
+    return JSON.stringify({
+      experimentId: experimentId || "",
+      combinationId: combination.combinationId || "",
+      unitIds,
+      powerOptions: combination.powerOptions || null,
+    });
+  }
+
   /**
    * 驗證組合有效性
    */
@@ -619,12 +630,11 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
         this.currentCombination,
         newExperimentId,
       );
-      this._selectionSignature = JSON.stringify({
-        experimentId: newExperimentId || "",
-        combinationId: this.currentCombination.combinationId || "",
-        unitIds: this.loadedUnits,
-        powerOptions: this.currentCombination.powerOptions || null,
-      });
+      this._selectionSignature = this._buildSelectionSignature(
+        this.currentCombination,
+        newExperimentId || "",
+        this.loadedUnits,
+      );
 
       this.emit(ExperimentCombinationManager.EVENT.COMBINATION_SELECTED, {
         combination: this.currentCombination,
@@ -642,6 +652,4 @@ export const ExperimentCombinationManager = class ExperimentCombinationManager e
       });
     }
   }
-
-};
-
+}

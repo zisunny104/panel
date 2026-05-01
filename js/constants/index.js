@@ -14,8 +14,6 @@ import {
   SYNC_EVENTS,
   SYNC_DATA_TYPES,
   getEventName,
-  isSyncEvent,
-  getAllSyncEvents,
 } from "./sync-events-constants.js";
 
 import { RECORD_SOURCES } from "./record-source-constants.js";
@@ -60,8 +58,6 @@ export {
   SYNC_EVENTS,
   SYNC_DATA_TYPES,
   getEventName,
-  isSyncEvent,
-  getAllSyncEvents,
   RECORD_SOURCES,
   ACTION_IDS,
   ACTION_BUTTONS,

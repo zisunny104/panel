@@ -7,7 +7,6 @@ import {
   ACTION_IDS,
   POWER_BUTTON_STATES,
   SYNC_DATA_TYPES,
-  SYNC_EVENTS,
 } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 
@@ -42,15 +41,17 @@ class PowerControl {
     this.quickPowerOnBtn = document.getElementById("quickPowerOnBtn");
     this.powerKnob = document.getElementById("powerKnob");
     this.powerLightOn = document.getElementById("powerLightOn");
-    this.powerLightArea = document.getElementById("powerLightArea");    this.mediaArea = document.getElementById("mediaArea");
+    this.powerLightArea = document.getElementById("powerLightArea");
+    this.mediaArea = document.getElementById("mediaArea");
     this.powerSwitchArea = document.getElementById("powerSwitchArea");
     this.buttonOverlays = document.querySelectorAll(".button-overlay");
-    this._debounceTimers = {};    this.setupEventListeners();
+    this._debounceTimers = {};
+    this.setupEventListeners();
     // 監聽電源狀態變化，用於電源動作完成回報
     document.addEventListener("power_state_changed", (event) => {
       this._handlePowerActionCompletion(event.detail);
     });
-   this.updatePowerUIWithoutSync();
+    this.updatePowerUIWithoutSync();
   }
 
   updateDependencies(deps = {}) {
@@ -129,7 +130,6 @@ class PowerControl {
    * @param {boolean} shouldDispatch - 是否派送電源狀態變化事件（預設 false）
    */
   _updatePowerKnobUI(shouldDispatch = false) {
-    const consoleLogger = Logger;
     const buttonManager = this.buttonManager;
     // 確保在元素尚未建立時能重新查詢，避免初始化時因 DOM 延遲造成顯示不同步
     if (!this.powerKnob) this.powerKnob = document.getElementById("powerKnob");
@@ -142,15 +142,10 @@ class PowerControl {
     }
 
     if (this.powerLightOn) {
-      if (this.isPowerOn) {
-        this.powerLightOn.classList.remove("is-hidden");
-        consoleLogger.debug("電源燈號已亮起 (isPowerOn:", this.isPowerOn, ")");
-      } else {
-        this.powerLightOn.classList.add("is-hidden");
-        consoleLogger.debug("電源燈號已熄滅 (isPowerOn:", this.isPowerOn, ")");
-      }
+      this.powerLightOn.classList.toggle("is-hidden", !this.isPowerOn);
+      Logger.debug(`電源燈號已${this.isPowerOn ? "亮起" : "熄滅"} (isPowerOn: ${this.isPowerOn})`);
     } else {
-      consoleLogger.warn("powerLightOn 元素未找到");
+      Logger.warn("powerLightOn 元素未找到");
     }
 
     this.updateMediaControlButtons();
@@ -202,10 +197,8 @@ class PowerControl {
     }
     this.setPowerSwitchHighlight(false);
     if (buttonManager) {
-      document.querySelectorAll(".button-overlay").forEach((btn) => {
-        btn.classList.remove("next-step-highlight");
-        btn.classList.remove("next-step-highlight-secondary");
-        btn.classList.remove("next-step-highlight-shift");
+      this.buttonOverlays.forEach((btn) => {
+        btn.classList.remove("next-step-highlight", "next-step-highlight-secondary", "next-step-highlight-shift");
       });
     }
     this.updatePowerUIWithoutSync();
@@ -283,18 +276,10 @@ class PowerControl {
         return;
       }
 
-      const systemManager = this.experimentSystemManager;
-      if (systemManager?.handleCorrectAction) {
-        systemManager.handleCorrectAction(actionId, {
-          source: "power_state",
-          powerState: detail?.powerState,
-        });
-      } else {
-        actionHandler.handleCorrectAction(actionId, {
-          source: "power_state",
-          powerState: detail?.powerState,
-        });
-      }
+      this._dispatchCorrectAction(actionId, {
+        source: "power_state",
+        powerState: detail?.powerState,
+      });
 
       const syncCore = this.experimentSyncCore;
       const syncClient = this.syncClient;
@@ -348,35 +333,25 @@ class PowerControl {
     });
     if (!actionId) return;
 
-    const systemManager = this.experimentSystemManager;
     if (actionId === ACTION_IDS.POWER_ON && this.isPowerOn) {
-      if (systemManager?.handleCorrectAction) {
-        systemManager.handleCorrectAction(actionId, {
-          source: "power_state",
-          powerState: true,
-        });
-      } else {
-        actionHandler.handleCorrectAction(actionId, {
-          source: "power_state",
-          powerState: true,
-        });
-      }
+      this._dispatchCorrectAction(actionId, { source: "power_state", powerState: true });
     }
 
     if (actionId === ACTION_IDS.POWER_OFF && !this.isPowerOn) {
-      if (systemManager?.handleCorrectAction) {
-        systemManager.handleCorrectAction(actionId, {
-          source: "power_state",
-          powerState: false,
-        });
-      } else {
-        actionHandler.handleCorrectAction(actionId, {
-          source: "power_state",
-          powerState: false,
-        });
-      }
+      this._dispatchCorrectAction(actionId, { source: "power_state", powerState: false });
       this._stopExperimentForShutdown();
     }
+  }
+
+  /**
+   * 路由 handleCorrectAction：優先委派給 ExperimentSystemManager，否則直接呼叫 ActionHandler
+   * @private
+   */
+  _dispatchCorrectAction(actionId, ctx) {
+    const handler = this.experimentSystemManager?.handleCorrectAction
+      ? this.experimentSystemManager
+      : this.experimentActionHandler;
+    handler?.handleCorrectAction(actionId, ctx);
   }
 
   /**
@@ -424,9 +399,7 @@ class PowerControl {
 
       if (buttonManager) {
         this.buttonOverlays.forEach((btn) => {
-          btn.classList.remove("next-step-highlight");
-          btn.classList.remove("next-step-highlight-secondary");
-          btn.classList.remove("next-step-highlight-shift");
+          btn.classList.remove("next-step-highlight", "next-step-highlight-secondary", "next-step-highlight-shift");
         });
       }
 
@@ -593,11 +566,7 @@ class PowerControl {
     };
     if (this.powerKnob) {
       this.powerKnob.addEventListener("click", () => {
-        if (this.isPowerOn || this.isPowerVideoPlaying) {
-          this.setPowerState(false, "knob");
-        } else {
-          this.setPowerState(true, "knob");
-        }
+        this.setPowerState(!(this.isPowerOn || this.isPowerVideoPlaying), "knob");
       });
     }
 
@@ -618,15 +587,11 @@ class PowerControl {
     }
 
     if (this.emergencyStopBtn) {
-      this.emergencyStopBtn.addEventListener("click", () => {
-        this.emergencyStop();
-      });
+      this.emergencyStopBtn.addEventListener("click", () => this.emergencyStop());
     }
 
     if (this.quickPowerOnBtn) {
-      this.quickPowerOnBtn.addEventListener("click", () => {
-        this.quickPowerOn();
-      });
+      this.quickPowerOnBtn.addEventListener("click", () => this.quickPowerOn());
     }
 
     bindQuickPowerTarget({
@@ -662,22 +627,6 @@ class PowerControl {
       this.handleSyncPowerState(e.detail);
     });
 
-    window.addEventListener(SYNC_EVENTS.STATE_UPDATE, (e) => {
-      if (!e.detail) return;
-      const myId = this.syncClient?.clientId;
-      // ================= Anti-Echo 檢查（工作階段恢復例外）=================
-      // 通常忽略本機發出的事件（clientId 一致），避免無限迴圈
-      // 例外：當 _sessionRestore = true 時，允許本機事件通過
-      // 原因：工作階段恢復時需要派發本機的 clientId 事件來恢復狀態
-      //      若完全拒絕就會導致狀態無法恢復
-      if (myId && e.detail.clientId === myId && !e.detail._sessionRestore) {
-        return;
-      }
-      if (e.detail.powerState !== undefined) {
-        //this.applyRemotePowerState(e.detail); 補丁:關閉此功能
-      }
-    });
-
     document.addEventListener("deviceModeChanged", (e) => {
       this.handleDeviceModeChanged(e.detail);
     });
@@ -698,10 +647,7 @@ class PowerControl {
       this.quickPowerOnBtn,
     ];
     powerButtons.forEach((button) => {
-      if (button) {
-        if (isInteractive) button.classList.remove("is-hidden");
-        else button.classList.add("is-hidden");
-      }
+      button?.classList.toggle("is-hidden", !isInteractive);
     });
 
     if (this.powerKnob) {
@@ -719,10 +665,7 @@ class PowerControl {
     const logger = this.panelLogger;
     if (mediaManager) {
       mediaManager.stopHomePageLoop();
-      if (mediaManager.mediaArea) {
-        mediaManager.mediaArea.innerHTML = "";
-        mediaManager.mediaArea.classList.remove("loading");
-      }
+      this._clearMediaArea();
     }
 
     this.isPowerOn = false;
@@ -834,7 +777,6 @@ class PowerControl {
     }
 
     this.updateMediaAreaPowerIndicator();
-    const consoleLogger = Logger;
     const syncClient = this.syncClient;
     const syncCore = this.experimentSyncCore;
     if (syncClient?.connected) {
@@ -849,13 +791,10 @@ class PowerControl {
       if (broadcastPromise?.then) {
         broadcastPromise
           .then((result) => {
-            const msg = result
-              ? "電源狀態已成功廣播"
-              : "作為本機模式，電源狀態僅儲存本機";
-            consoleLogger.debug(msg);
+            Logger.debug(result ? "電源狀態已成功廣播" : "作為本機模式，電源狀態僅儲存本機");
           })
           .catch((error) => {
-            consoleLogger.warn("同步電源狀態失敗:", error);
+            Logger.warn("同步電源狀態失敗:", error);
           });
       }
     }
@@ -868,11 +807,7 @@ class PowerControl {
   updateMediaAreaPowerIndicator() {
     const mediaArea = document.getElementById("mediaArea");
     if (!mediaArea) return;
-    if (this.isPowerOn) {
-      mediaArea.classList.remove("power-off");
-    } else {
-      mediaArea.classList.add("power-off");
-    }
+    mediaArea.classList.toggle("power-off", !this.isPowerOn);
   }
 
   /**
@@ -894,11 +829,7 @@ class PowerControl {
       // 3. 直接恢復為最終狀態（ON 或 OFF），避免重播開機動畫造成 UI 不一致
       //
       // 非工作階段恢復時保留原來的 isPowerVideoPlaying 值，用於同步遠端的動畫狀態
-      this.isPowerVideoPlaying = isSessionRestore
-        ? false
-        : typeof data.isPowerVideoPlaying === "boolean"
-          ? data.isPowerVideoPlaying
-          : false;
+      this.isPowerVideoPlaying = !isSessionRestore && (data.isPowerVideoPlaying ?? false);
 
       this.updatePowerUIWithoutSync();
 
@@ -929,62 +860,7 @@ class PowerControl {
     this.updateMediaAreaPowerIndicator();
   }
 
-  /**
-   * 套用遠端電源狀態（不觸發本機事件）
-   * @param {object} state - 遠端狀態 { powerState, isPowerVideoPlaying }
-   * @private
-   */
-  applyRemotePowerState(state) {
-    const consoleLogger = Logger;
-    const mediaManager = this.panelMediaManager;
-    const buttonManager = this.buttonManager;
-    const logger = this.panelLogger;
-    const oldPowerState = this.isPowerOn;
-    const oldVideoPlaying = this.isPowerVideoPlaying;
-
-    this.isPowerOn = state.powerState;
-    // 遠端同步不重播動畫
-    this.isPowerVideoPlaying = false;
-
-    if (
-      oldPowerState !== this.isPowerOn ||
-      oldVideoPlaying !== this.isPowerVideoPlaying
-    ) {
-      consoleLogger.debug(
-        `套用遠端電源狀態: ${oldPowerState} -> ${this.isPowerOn}`,
-      );
-
-      this.updatePowerUIWithoutSync();
-
-      if (oldVideoPlaying) {
-        if (mediaManager) {
-          mediaManager.stopHomePageLoop();
-          this._clearMediaArea();
-        }
-      }
-
-      if (buttonManager) {
-        buttonManager.updateMediaForCurrentAction();
-      }
-
-      this._ensureMediaFallbackIfNeeded();
-
-      if (logger?.logAction) {
-        logger.logAction(
-          `[遠端同步] 電源狀態已更新為: ${this.isPowerOn ? "開啟" : "關閉"}`,
-          "power_sync",
-          null,
-          false,
-          false,
-          false,
-          null,
-          { oldState: oldPowerState, newState: this.isPowerOn },
-        );
-      }
-    }
-  }
 }
 
-// ES6 模組匯出
-export default PowerControl;
+
 export { PowerControl };

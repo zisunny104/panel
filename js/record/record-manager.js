@@ -117,7 +117,7 @@ class RecordManager {
       if (experimentIdInput.value.trim()) this.experimentId = experimentIdInput.value.trim();
     }
 
-    document.addEventListener("experiment_id_updated", (event) => {
+    document.addEventListener(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (event) => {
       this.experimentId = event.detail.experimentId;
     });
   }
@@ -428,7 +428,7 @@ class RecordManager {
     const experimentId = this._getCurrentExperimentId();
     const logEntry = {
       ts: this._getTimestamp(),
-      type: "button_action",
+      type: RECORD_TYPES.BUTTON_ACTION,
       exp_id: experimentId,
       participant: this.participantName || `受試者_${experimentId}`,
       button,
@@ -450,15 +450,10 @@ class RecordManager {
   async flushPendingLogs() {
     if (this.pendingRecords.length === 0) return false;
     const flushedCount = this.pendingRecords.length;
-    Logger.info(`立即 flush ${flushedCount} 筆快取記錄`);
-    try {
-      this.pendingRecords = [];
-      this._broadcastMessage("recordsFlushed", { count: flushedCount, timestamp: Date.now() });
-      return true;
-    } catch (error) {
-      Logger.error("flush 日誌失敗:", error);
-      return false;
-    }
+    Logger.debug(`flush ${flushedCount} 筆快取記錄`);
+    this.pendingRecords = [];
+    this._broadcastMessage("recordsFlushed", { count: flushedCount, timestamp: Date.now() });
+    return true;
   }
 
   /**

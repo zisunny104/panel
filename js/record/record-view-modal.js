@@ -169,7 +169,7 @@ export const recordViewModal = {
     const input = document.getElementById("modal-participant-input");
     if (input) input.style.display = "none";
     if (display) { display.style.display = ""; }
-    const show = (id, display) => { const el = document.getElementById(id); if (el) el.style.display = display; };
+    const show = (id, value) => { const el = document.getElementById(id); if (el) el.style.display = value; };
     show("modal-participant-edit-btn", "");
     show("modal-participant-save-btn", "none");
     show("modal-participant-cancel-btn", "none");

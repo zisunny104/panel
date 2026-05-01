@@ -5,6 +5,8 @@
  * 作為 mixin 混入 RecordManager。
  */
 
+import { Logger } from "../core/console-manager.js";
+
 export const recordStore = {
   /**
    * 取得所有日誌（記憶體 + IndexedDB）
@@ -200,7 +202,7 @@ export const recordStore = {
     await new Promise((resolve, reject) => {
       request.onsuccess = (event) => {
         const logsToDelete = (event.target.result || []).filter(
-          (log) => log.exp_id === experimentId,
+          (log) => log.exp_id === experimentId || log.experimentId === experimentId,
         );
         if (logsToDelete.length === 0) { resolve(); return; }
 
@@ -210,8 +212,8 @@ export const recordStore = {
           req.onsuccess = () => {
             if (++deletedCount === logsToDelete.length) {
               Logger.debug(`已清除 IndexedDB 中實驗 ${experimentId} 的 ${deletedCount} 筆日誌`);
-              this.records = this.records.filter((record) => record.exp_id !== experimentId);
-              this.pendingRecords = this.pendingRecords.filter((record) => record.exp_id !== experimentId);
+              this.records = this.records.filter((record) => record.exp_id !== experimentId && record.experimentId !== experimentId);
+              this.pendingRecords = this.pendingRecords.filter((record) => record.exp_id !== experimentId && record.experimentId !== experimentId);
               resolve();
             }
           };

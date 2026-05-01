@@ -56,12 +56,8 @@ class ExperimentStateManager {
     this.experimentStartTime = null;
     this.experimentElapsed = 0;
 
-    // 時間同步管理器
     this.timeSyncManager = timeSyncManager;
-
-    // dependencies
     this.recordManager = recordManager;
-    // 初始化 hub 同步事件監聽
     this.setupHubSync();
   }
 
@@ -93,37 +89,18 @@ class ExperimentStateManager {
     }
     if (state.loadedUnits !== undefined) {
       this.loadedUnits = [...state.loadedUnits];
-
-    }
-    if (state.flowState !== undefined) {
-      this.flowState = state.flowState;
-    }
-    if (state.flowLocked !== undefined) {
-      this.flowLocked = state.flowLocked;
-    }
-    if (state.currentUnitIndex !== undefined) {
-      this.currentUnitIndex = state.currentUnitIndex;
-    }
-    if (state.currentStepIndex !== undefined) {
-      this.currentStepIndex = state.currentStepIndex;
     }
     if (state.completedUnits !== undefined) {
       this.completedUnits = new Set(state.completedUnits);
     }
-    if (state.deferCompletion !== undefined) {
-      this.deferCompletion = state.deferCompletion;
-    }
-    if (state.isExperimentRunning !== undefined) {
-      this.isExperimentRunning = state.isExperimentRunning;
-    }
-    if (state.experimentPaused !== undefined) {
-      this.experimentPaused = state.experimentPaused;
-    }
-    if (state.experimentStartTime !== undefined) {
-      this.experimentStartTime = state.experimentStartTime;
-    }
-    if (state.experimentElapsed !== undefined) {
-      this.experimentElapsed = state.experimentElapsed;
+
+    // 純量屬性直接賦值
+    for (const prop of [
+      "flowState", "flowLocked", "currentUnitIndex", "currentStepIndex",
+      "deferCompletion", "isExperimentRunning", "experimentPaused",
+      "experimentStartTime", "experimentElapsed",
+    ]) {
+      if (state[prop] !== undefined) this[prop] = state[prop];
     }
   }
 
@@ -133,7 +110,7 @@ class ExperimentStateManager {
       Logger.info(`實驗ID已更新 (${source}): ${experimentId}`);
 
       document.dispatchEvent(
-        new CustomEvent("experimentState:experimentIdChanged", {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_ID_CHANGED, {
           detail: { experimentId },
         }),
       );
@@ -154,7 +131,7 @@ class ExperimentStateManager {
       Logger.info(`受試者名稱已更新 (${source}): ${participantName}`);
 
       document.dispatchEvent(
-        new CustomEvent("experimentState:participantNameChanged", {
+        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_PARTICIPANT_CHANGED, {
           detail: { participantName },
         }),
       );
@@ -166,9 +143,7 @@ class ExperimentStateManager {
   }
 
   setCurrentCombination(combination, source = "unknown") {
-    if (
-      JSON.stringify(this.currentCombination) !== JSON.stringify(combination)
-    ) {
+    if (this.currentCombination?.combinationId !== combination?.combinationId) {
       this.currentCombination = combination;
       Logger.info(`目前組合已更新 (${source}): ${combination?.combinationName || "null"}`);
     }
@@ -194,7 +169,6 @@ class ExperimentStateManager {
         );
         this.recordManager.logExperimentStart();
       }
-
     }
   }
 
@@ -208,10 +182,8 @@ class ExperimentStateManager {
 
       if (this.recordManager) {
         this.recordManager.logExperimentEnd();
-        this.recordManager.flushAll &&
-          this.recordManager.flushAll();
+        this.recordManager.flushAll?.();
       }
-
     }
   }
 
@@ -225,7 +197,6 @@ class ExperimentStateManager {
       if (this.recordManager) {
         this.recordManager.logExperimentPause();
       }
-
     }
   }
 
@@ -239,7 +210,6 @@ class ExperimentStateManager {
       if (this.recordManager) {
         this.recordManager.logExperimentResume();
       }
-
     }
   }
 
@@ -270,6 +240,4 @@ class ExperimentStateManager {
   }
 }
 
-// ES6 模組匯出
-export default ExperimentStateManager;
 export { ExperimentStateManager };

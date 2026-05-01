@@ -313,8 +313,3 @@ class Logger {
 // ES6 模組匯出
 export default Logger;
 export { Logger };
-
-// 全域暴露（用於HTML直接引用和舊式script）
-if (typeof window !== "undefined") {
-  window.Logger = Logger;
-}

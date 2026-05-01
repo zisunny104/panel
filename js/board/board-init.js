@@ -2,6 +2,7 @@
  * BoardInit - board 管理器初始化協調
  */
 
+import { Logger } from "../core/console-manager.js";
 import { experimentSyncManager } from "./board-experiment-sync.js";
 import { createBoardGestureUtils } from "./board-gesture-utils.js";
 import { RecordManager, recordView } from "../record/index.js";
@@ -40,13 +41,6 @@ export async function initializeBoardManagers(page) {
       logInitDuration("ExperimentSyncCore 已初始化", syncCoreStart);
     }
 
-    experimentSyncManager.updateDependencies({
-      syncManager: page.syncManager,
-      syncClient: page.syncManager?.core?.syncClient,
-      experimentSyncCore: page.experimentSyncCore,
-      experimentHubManager: page.experimentHubManager,
-    });
-
     if (!page.configManager) {
       const configStart = performance.now();
       page.configManager = new ConfigManager();
@@ -79,6 +73,9 @@ export async function initializeBoardManagers(page) {
     });
 
     experimentSyncManager.updateDependencies({
+      syncManager: page.syncManager,
+      syncClient: page.syncManager?.core?.syncClient,
+      experimentSyncCore: page.experimentSyncCore,
       experimentHubManager: page.experimentHubManager,
     });
 

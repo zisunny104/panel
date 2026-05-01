@@ -58,10 +58,6 @@ export class SyncSessionsModal {
     return new Date(timestampMs).toLocaleString();
   }
 
-  getRoleText(role) {
-    return this.syncManager?.getRoleText?.(role) || role;
-  }
-
   getApiUrl() {
     return getApiUrl();
   }
@@ -252,10 +248,6 @@ export class SyncSessionsModal {
         ${this._renderButton({ id: "stopAllActiveSessionsBtn", className: "ssm-btn ssm-btn-warning", label: "結束活動中" })}
         ${this._renderButton({ id: "clearAllSessionsBtn", className: "ssm-btn ssm-btn-danger", label: "清除工作階段" })}
       </div>`;
-  }
-
-  _renderSessionCheckbox(isChannel, sessionId) {
-    return "<div class=\"ssm-card-check ssm-card-check-ph\"></div>";
   }
 
   _renderChannelBadge(isChannel) {
@@ -485,7 +477,7 @@ export class SyncSessionsModal {
     const isChannel = !!session.isChannel;
     const clientCount = session.clients?.length || 0;
     const maxClients = session.maxClients != null ? session.maxClients : "—";
-    const isActive = isChannel ? clientCount > 0 : Date.now() / 1000 - session.lastActivity < 600;
+    const isActive = isChannel ? clientCount > 0 : Date.now() / 1000 - session.lastActivity < SESSION_ACTIVE_THRESHOLD_S;
 
     const createdTime = this.formatDateTime(session.created * 1000);
     const lastActivity = this.formatDateTime(session.lastActivity * 1000);
@@ -496,7 +488,6 @@ export class SyncSessionsModal {
       isChannel ? "ssm-card-channel" : (isActive ? "ssm-card-active" : "ssm-card-inactive"),
     ].filter(Boolean).join(" ");
 
-    const checkbox = this._renderSessionCheckbox(isChannel, session.id);
     const channelBadge = this._renderChannelBadge(isChannel);
     const label = this._renderSessionLabel(isChannel, session.channelName);
     const displayId = session.id;
@@ -509,7 +500,7 @@ export class SyncSessionsModal {
     return `
       <div class="${cardClass}" data-session-id="${session.id}" data-channel="${this._escapeHtml(session.channelName || "")}">
         <div class="sync-session-header ssm-card-header">
-          ${checkbox}
+          <div class="ssm-card-check ssm-card-check-ph"></div>
           <div class="ssm-card-body">
             <div class="ssm-card-title-row">
               <span class="ssm-card-name">${label}</span>
@@ -655,6 +646,7 @@ export class SyncSessionsModal {
     clearAllBtn.addEventListener("click", async () => {
       if (!confirm("確定要刪除所有工作階段嗎？此操作無法還原。\n（公開頻道不受影響）")) return;
 
+      this._ensureOriginalText(clearAllBtn);
       clearAllBtn.disabled = true;
       clearAllBtn.textContent = "刪除中...";
 
@@ -685,7 +677,7 @@ export class SyncSessionsModal {
       }
 
       clearAllBtn.disabled = false;
-      clearAllBtn.textContent = "刪除所有工作階段";
+      this._restoreOriginalText(clearAllBtn);
     });
 
     const stopAllActiveBtn = this.el.querySelector("#stopAllActiveSessionsBtn");
@@ -709,11 +701,36 @@ export class SyncSessionsModal {
       stopAllActiveBtn.disabled = true;
       stopAllActiveBtn.textContent = "處理中...";
 
+      let successCount = 0;
+      let failCount = 0;
       try {
+        const headers = await this._adminHeaders();
+        for (const session of activeSessions) {
+          try {
+            const res = await fetch(`${this.getApiUrl()}${API_ENDPOINTS.SYNC.SESSION_TARGET(session.id)}`, {
+              method: "DELETE",
+              headers,
+            });
+            const data = await res.json();
+            if (data.success) {
+              successCount++;
+            } else {
+              failCount++;
+              Logger.warn(`結束工作階段 ${session.id} 失敗:`, data.message);
+            }
+          } catch (e) {
+            failCount++;
+            Logger.error(`結束工作階段 ${session.id} 異常:`, e);
+          }
+        }
+
+        const msg = failCount === 0
+          ? `已結束 ${successCount} 個活動中工作階段`
+          : `結束 ${successCount} 個，失敗 ${failCount} 個`;
         if (this.indicatorManager) {
-          this.indicatorManager.showStatus("success", `已結束 ${activeSessions.length} 個活動中工作階段`);
+          this.indicatorManager.showStatus(failCount === 0 ? "success" : "error", msg);
         } else {
-          alert(`已結束 ${activeSessions.length} 個活動中工作階段`);
+          alert(msg);
         }
         await this.refreshSessionsList();
       } catch (error) {

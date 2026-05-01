@@ -6,6 +6,7 @@
  */
 
 import { ACTION_IDS } from "../constants/index.js";
+import { Logger } from "../core/console-manager.js";
 
 export const BoardUIManager = class BoardUIManager {
   /**
@@ -154,93 +155,45 @@ export const BoardUIManager = class BoardUIManager {
         );
     };
 
+    const getCardStyle = (gesture) => {
+      const sid = gesture.step_id || "";
+      const g = gesture.gesture || "";
+      if (sid === "SYSTEM_OPEN" || g === "open")
+        return { borderColor: "#4caf50", bgColor: "#e8f5e9", accentColor: "#4caf50", tagBg: "#4caf50", tagText: "教學系統", isSpecialType: true };
+      if (sid === "SYSTEM_CLOSE" || g === "close")
+        return { borderColor: "#f44336", bgColor: "#ffebee", accentColor: "#f44336", tagBg: "#f44336", tagText: "教學系統", isSpecialType: true };
+      if (sid === "FINAL_CAPTURE" || g === "capture")
+        return { borderColor: "#9c27b0", bgColor: "#f3e5f5", accentColor: "#9c27b0", tagBg: "#9c27b0", tagText: "拍攝記錄", isSpecialType: true };
+      if (sid === "FIRST_UNIT_ZOOM_IN" || g === "zoom_in")
+        return { borderColor: "#00bcd4", bgColor: "#e0f7fa", accentColor: "#00bcd4", tagBg: "#00bcd4", tagText: "放大操作", isSpecialType: true };
+      if (sid === "LAST_UNIT_ZOOM_OUT" || g === "zoom_out")
+        return { borderColor: "#00bcd4", bgColor: "#e0f7fa", accentColor: "#00bcd4", tagBg: "#00bcd4", tagText: "縮小操作", isSpecialType: true };
+      if (sid.startsWith("UNIT_EXIT_") || sid.startsWith("UNIT_NAV_") || sid.startsWith("UNIT_ENTER_"))
+        return { borderColor: "#ff9800", bgColor: "#fff3e0", accentColor: "#ff9800", tagBg: "#ff9800", tagText: "單元切換", isSpecialType: true };
+      return { borderColor: "#e0e0e0", bgColor: "#f0f4ff", accentColor: "#667eea", tagBg: "#667eea", tagText: "", isSpecialType: false };
+    };
+
     let html = "<div class=\"right-section\"><h2>實驗手勢序列</h2>";
     if (script.gestures) {
       html +=
         "<div style=\"display: grid; grid-template-columns: 1fr; gap: 12px;\">";
 
       script.gestures.forEach((gesture, idx) => {
-        const isSystemOpen =
-          gesture.step_id === "SYSTEM_OPEN" || gesture.gesture === "open";
-        const isSystemClose =
-          gesture.step_id === "SYSTEM_CLOSE" || gesture.gesture === "close";
-        const isCapture =
-          gesture.step_id === "FINAL_CAPTURE" || gesture.gesture === "capture";
-        const isZoomIn =
-          gesture.step_id === "FIRST_UNIT_ZOOM_IN" ||
-          gesture.gesture === "zoom_in";
-        const isZoomOut =
-          gesture.step_id === "LAST_UNIT_ZOOM_OUT" ||
-          gesture.gesture === "zoom_out";
-        const isUnitSwitch =
-          gesture.step_id?.startsWith("UNIT_EXIT_") ||
-          gesture.step_id?.startsWith("UNIT_NAV_") ||
-          gesture.step_id?.startsWith("UNIT_ENTER_");
-        const hasPowerAction =
-          Array.isArray(gesture.actions) &&
-          gesture.actions.some(
-            (action) =>
-              action.action_id === ACTION_IDS.POWER_ON ||
-              action.action_id === ACTION_IDS.POWER_OFF,
-          );
+        const { borderColor, bgColor, accentColor, tagBg, tagText, isSpecialType } = getCardStyle(gesture);
+        const hasPowerAction = Array.isArray(gesture.actions) &&
+          gesture.actions.some((a) => a.action_id === ACTION_IDS.POWER_ON || a.action_id === ACTION_IDS.POWER_OFF);
+        const badgeLabel = tagText || gesture.unit_name || "";
+        const badgeBg = tagText ? tagBg : "#667eea";
+        const showActionSection = (!isSpecialType || hasPowerAction) &&
+          !!(gesture.step_name || gesture.actions?.length);
 
-        let borderColor = "#e0e0e0";
-        let bgColor = "#f0f4ff";
-        let accentColor = "#667eea";
-        let tagBg = "#667eea";
-        let tagText = "";
-
-        if (isSystemOpen) {
-          borderColor = "#4caf50";
-          bgColor = "#e8f5e9";
-          accentColor = "#4caf50";
-          tagBg = "#4caf50";
-          tagText = "教學系統";
-        } else if (isSystemClose) {
-          borderColor = "#f44336";
-          bgColor = "#ffebee";
-          accentColor = "#f44336";
-          tagBg = "#f44336";
-          tagText = "教學系統";
-        } else if (isCapture) {
-          borderColor = "#9c27b0";
-          bgColor = "#f3e5f5";
-          accentColor = "#9c27b0";
-          tagBg = "#9c27b0";
-          tagText = "拍攝記錄";
-        } else if (isZoomIn || isZoomOut) {
-          borderColor = "#00bcd4";
-          bgColor = "#e0f7fa";
-          accentColor = "#00bcd4";
-          tagBg = "#00bcd4";
-          tagText = isZoomIn ? "放大操作" : "縮小操作";
-        } else if (isUnitSwitch) {
-          borderColor = "#ff9800";
-          bgColor = "#fff3e0";
-          accentColor = "#ff9800";
-          tagBg = "#ff9800";
-          tagText = "單元切換";
-        }
-
-        let gestureNameEn = "";
-        if (
-          gesture.gesture &&
-          core.gesturesData &&
-          core.gesturesData[gesture.gesture]
-        ) {
-          gestureNameEn = core.gesturesData[gesture.gesture].en || "";
-        }
+        const gestureNameEn = core.gesturesData?.[gesture.gesture]?.en || "";
 
         html += `
                     <div id="gesture-card-${idx}" class="gesture-card-inactive" style="position: relative; background: white; border: 2px solid ${borderColor}; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden;">
                         ${
-                          gesture.unit_name
-                            ? `<div style="position: absolute; top: 10px; right: 10px; background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; z-index: 10;">${gesture.unit_name}</div>`
-                            : ""
-                        }
-                        ${
-                          tagText
-                            ? `<div style="position: absolute; top: 10px; right: 10px; background: ${tagBg}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; z-index: 10;">${tagText}</div>`
+                          badgeLabel
+                            ? `<div style="position: absolute; top: 10px; right: 10px; background: ${badgeBg}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; z-index: 10;">${badgeLabel}</div>`
                             : ""
                         }
 
@@ -316,15 +269,7 @@ export const BoardUIManager = class BoardUIManager {
                         }
 
                         ${
-                          ((!isSystemOpen &&
-                            !isSystemClose &&
-                            !isCapture &&
-                            !isZoomIn &&
-                            !isZoomOut &&
-                            !isUnitSwitch) ||
-                            hasPowerAction) &&
-                          (gesture.step_name ||
-                            (gesture.actions && gesture.actions.length > 0))
+                          showActionSection
                             ? `
                             <div class="gesture-info-section action-info">
                                 ${

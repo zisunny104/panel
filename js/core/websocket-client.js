@@ -174,16 +174,9 @@ class WebSocketClient {
    */
   getWebSocketBasePath() {
     const pathname = window.location.pathname;
-
-    let basePath = pathname;
-    if (!basePath.endsWith("/")) {
-      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
-    }
-
-    if (!basePath.endsWith("/")) {
-      basePath += "/";
-    }
-
+    let basePath = pathname.endsWith("/")
+      ? pathname
+      : pathname.substring(0, pathname.lastIndexOf("/") + 1);
     return basePath + "ws";
   }
 
@@ -471,8 +464,6 @@ class WebSocketClient {
     this.config.autoReconnect = false;
     Logger.debug("[WebSocketClient] 已停用自動重連");
 
-    this.clearLocalSyncData();
-
     const clearEvent = new CustomEvent(SYNC_EVENTS.DATA_CLEARED, {
       detail: {
         reason,
@@ -506,22 +497,6 @@ class WebSocketClient {
         this.ws.close(1000, "Session not found, clearing sync data");
       }
     }, 100);
-  }
-
-  /**
-   * 清除舊版固定前綴的本機同步資訊。
-   * 這個方法保留是為了清理早期版本寫入的 sessionStorage 鍵。
-   */
-  clearLocalSyncData() {
-    try {
-      ["sessionId", "clientId", "role", "timestamp"].forEach((key) => {
-        sessionStorage.removeItem(`syncClientState_${key}`);
-      });
-
-      Logger.info("[WebSocketClient] 本機同步數據已清除");
-    } catch (error) {
-      Logger.error("[WebSocketClient] 清除本機同步數據失敗:", error);
-    }
   }
 
   /**

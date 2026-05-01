@@ -27,7 +27,7 @@ class ExperimentSyncCore {
     );
   }
 
-  async _onRemoteStateUpdate(detail) {
+  _onRemoteStateUpdate(detail) {
     if (!detail) return;
     window.dispatchEvent(
       new CustomEvent(SYNC_EVENTS.STATE_BROADCAST, { detail }),
@@ -65,68 +65,30 @@ class ExperimentSyncCore {
   }
 
   // 廣播方法（純封裝，不操作 DOM）
-  async broadcastExperimentStart(details) {
-    const payload = Object.assign(
-      {
-        type: SYNC_DATA_TYPES.EXPERIMENT_STARTED,
-        clientId: this.syncClient?.clientId,
-        timestamp: Date.now(),
-      },
-      details || {},
-    );
-    await this.safeBroadcast(payload);
+  _broadcast(type, data) {
+    return this.safeBroadcast({
+      type,
+      clientId: this.syncClient?.clientId,
+      timestamp: Date.now(),
+      ...(data || {}),
+    });
   }
 
-  async broadcastExperimentPause(details) {
-    const payload = Object.assign(
-      {
-        type: SYNC_DATA_TYPES.EXPERIMENT_PAUSED,
-        clientId: this.syncClient?.clientId,
-        timestamp: Date.now(),
-      },
-      details || {},
-    );
-    await this.safeBroadcast(payload);
+  broadcastExperimentStart(details) {
+    return this._broadcast(SYNC_DATA_TYPES.EXPERIMENT_STARTED, details);
   }
 
-  async broadcastExperimentResume(details) {
-    const payload = Object.assign(
-      {
-        type: SYNC_DATA_TYPES.EXPERIMENT_RESUMED,
-        clientId: this.syncClient?.clientId,
-        timestamp: Date.now(),
-      },
-      details || {},
-    );
-    await this.safeBroadcast(payload);
+  broadcastExperimentPause(details) {
+    return this._broadcast(SYNC_DATA_TYPES.EXPERIMENT_PAUSED, details);
   }
 
-  async broadcastExperimentStop(details) {
-    const payload = Object.assign(
-      {
-        type: SYNC_DATA_TYPES.EXPERIMENT_STOPPED,
-        clientId: this.syncClient?.clientId,
-        timestamp: Date.now(),
-      },
-      details || {},
-    );
-    await this.safeBroadcast(payload);
+  broadcastExperimentResume(details) {
+    return this._broadcast(SYNC_DATA_TYPES.EXPERIMENT_RESUMED, details);
   }
 
-  async broadcastExperimentAction(actionData) {
-    const payload = Object.assign(
-      {
-        type: SYNC_DATA_TYPES.EXPERIMENT_ACTION,
-        clientId: this.syncClient?.clientId,
-        timestamp: Date.now(),
-      },
-      actionData || {},
-    );
-    await this.safeBroadcast(payload);
+  broadcastExperimentStop(details) {
+    return this._broadcast(SYNC_DATA_TYPES.EXPERIMENT_STOPPED, details);
   }
 }
 
-// ES6 模組匯出
-export default ExperimentSyncCore;
 export { ExperimentSyncCore };
-

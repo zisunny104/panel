@@ -190,10 +190,8 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
   updatePauseIndicator(isPaused) {
     const el = this.elements.get("pauseIndicator");
     if (!el) return;
-    try {
-      if (isPaused) this.showElement(el, "block");
-      else this.hideElement(el);
-    } catch (e) {}
+    if (isPaused) this.showElement(el);
+    else this.hideElement(el);
     el.textContent = isPaused ? "⏸ 暫停中" : "";
     this._emit("pause-indicator-updated", { isPaused });
   }
@@ -235,7 +233,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
   // 元件顯示/隱藏
   // ==========================================
 
-  showElement(elementOrSelector, displayType = "block") {
+  showElement(elementOrSelector) {
     const el = this._getElement(elementOrSelector);
     if (!el) return;
     el.classList.remove("is-hidden");
@@ -251,16 +249,16 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
     this._emit("element-hidden", { element: el, selector: elementOrSelector });
   }
 
-  toggleElement(elementOrSelector, displayType = "block") {
+  toggleElement(elementOrSelector) {
     const el = this._getElement(elementOrSelector);
     if (!el) return;
     el.classList.contains("is-hidden")
-      ? this.showElement(el, displayType)
+      ? this.showElement(el)
       : this.hideElement(el);
   }
 
-  showElements(elements, displayType = "block") {
-    elements.forEach((el) => this.showElement(el, displayType));
+  showElements(elements) {
+    elements.forEach((el) => this.showElement(el));
   }
 
   hideElements(elements) {
@@ -306,7 +304,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
 
   openExperimentPanel() {
     const panel = this.elements.get("experimentPanel");
-    if (panel) { this.showElement(panel, "block"); this._emit("experiment-panel-opened"); }
+    if (panel) { this.showElement(panel); this._emit("experiment-panel-opened"); }
   }
 
   closeExperimentPanel() {
@@ -730,6 +728,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
 
     let draggedLi = null;
     let placeholder = null;
+    let dragWidth = 0, dragHeight = 0, rafId = null, _dragX = 0, _dragY = 0;
 
     unitList.querySelectorAll("li:not(.power-option-card) .unit-drag-handle").forEach((handle) => {
       handle.addEventListener("mousedown", (e) => { e.preventDefault(); startDrag(handle, e.clientX, e.clientY); });
@@ -744,16 +743,18 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
       draggedLi = handle.closest("li");
       if (!draggedLi) return;
 
+      dragWidth = draggedLi.offsetWidth;
+      dragHeight = draggedLi.offsetHeight;
       placeholder = Object.assign(document.createElement("li"), { className: "drag-placeholder" });
-      placeholder.style.height = `${draggedLi.offsetHeight}px`;
+      placeholder.style.height = `${dragHeight}px`;
 
       const origStyle = draggedLi.style.cssText;
       draggedLi.setAttribute("data-original-style", origStyle);
       Object.assign(draggedLi.style, {
         position: "fixed", zIndex: "1000", pointerEvents: "none",
-        width: `${draggedLi.offsetWidth}px`,
-        left: `${x - draggedLi.offsetWidth / 2}px`,
-        top: `${y - draggedLi.offsetHeight / 2}px`,
+        width: `${dragWidth}px`,
+        left: `${x - dragWidth / 2}px`,
+        top: `${y - dragHeight / 2}px`,
       });
       draggedLi.classList.add("dragging");
       handle.classList.add("dragging-handle");
@@ -763,6 +764,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
       document.addEventListener("mouseup", onDrop);
       document.addEventListener("touchmove", onTouchMove, { passive: false });
       document.addEventListener("touchend", onDrop);
+      window.addEventListener("blur", onDrop);
     };
 
     const onMove = (e) => draggedLi && updatePos(e.clientX, e.clientY);
@@ -774,25 +776,32 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
     };
 
     const updatePos = (x, y) => {
-      draggedLi.style.left = `${x - draggedLi.offsetWidth / 2}px`;
-      draggedLi.style.top = `${y - draggedLi.offsetHeight / 2}px`;
+      _dragX = x;
+      _dragY = y;
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (!draggedLi) return;
+        draggedLi.style.left = `${_dragX - dragWidth / 2}px`;
+        draggedLi.style.top = `${_dragY - dragHeight / 2}px`;
 
-      const items = Array.from(unitList.children).filter(
-        (i) => !i.classList.contains("power-option-card") && i !== draggedLi && i !== placeholder,
-      );
-      const insertBefore = items.find((i) => {
-        const r = i.getBoundingClientRect();
-        return y < r.top + r.height / 2;
-      }) ?? null;
+        const items = Array.from(unitList.children).filter(
+          (i) => !i.classList.contains("power-option-card") && i !== draggedLi && i !== placeholder,
+        );
+        const insertBefore = items.find((i) => {
+          const r = i.getBoundingClientRect();
+          return _dragY < r.top + r.height / 2;
+        }) ?? null;
 
-      const startup = unitList.querySelector(".startup-card");
-      const shutdown = unitList.querySelector(".shutdown-card");
+        const startup = unitList.querySelector(".startup-card");
+        const shutdown = unitList.querySelector(".shutdown-card");
 
-      if (insertBefore) {
-        unitList.insertBefore(placeholder, insertBefore === startup ? startup.nextSibling : insertBefore);
-      } else {
-        unitList.insertBefore(placeholder, shutdown ?? null);
-      }
+        if (insertBefore) {
+          unitList.insertBefore(placeholder, insertBefore === startup ? startup.nextSibling : insertBefore);
+        } else {
+          unitList.insertBefore(placeholder, shutdown ?? null);
+        }
+      });
     };
 
     const onDrop = () => {
@@ -801,6 +810,8 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
       document.removeEventListener("mouseup", onDrop);
       document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", onDrop);
+      window.removeEventListener("blur", onDrop);
+      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
 
       draggedLi.classList.remove("dragging");
       draggedLi.style.cssText = draggedLi.getAttribute("data-original-style") || "";
@@ -818,6 +829,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
 
       draggedLi = null;
       placeholder = null;
+      dragWidth = 0; dragHeight = 0;
     };
 
     Logger.debug("單元拖曳功能已啟用");
@@ -891,7 +903,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
       if (config.onStart) {
         containerEl.querySelector("#startExperimentBtn")?.addEventListener("click", () => {
           this.hideElement(containerEl.querySelector("#experimentIdRow"));
-          this.showElement(containerEl.querySelector("#experimentControlButtons"), "flex");
+          this.showElement(containerEl.querySelector("#experimentControlButtons"));
           if (config.showTimer) this.startExperimentTimer();
           config.onStart();
         });
@@ -915,7 +927,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
             pauseBtn.classList.replace("btn-secondary", "btn-primary");
             pauseBtn.dataset.isPaused = "false";
           }
-          this.showElement(containerEl.querySelector("#experimentIdRow"), "flex");
+          this.showElement(containerEl.querySelector("#experimentIdRow"));
           this.hideElement(containerEl.querySelector("#experimentControlButtons"));
           if (config.showTimer) {
             const timerEl = containerEl.querySelector("#experimentTimer");

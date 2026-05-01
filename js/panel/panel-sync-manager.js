@@ -135,9 +135,9 @@ class PanelSyncManager {
       if (state.type === SYNC_DATA_TYPES.EXPERIMENT_STARTED) {
         this.handleSyncExperimentStart(state);
       } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_PAUSED) {
-        this.handleSyncExperimentPaused(state);
+        this.experimentSystemManager?.handleSyncExperimentPaused?.(state);
       } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_RESUMED) {
-        this.handleSyncExperimentResumed(state);
+        this.experimentSystemManager?.handleSyncExperimentResumed?.(state);
       } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_STOPPED) {
         this.handleSyncExperimentStopped(state);
       } else if (state.type === SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE) {
@@ -189,20 +189,6 @@ class PanelSyncManager {
         }, 500);
       }
     }
-  }
-
-  /**
-   * 處理同步的實驗暫停狀態
-   */
-  handleSyncExperimentPaused(syncData) {
-    return this.experimentSystemManager?.handleSyncExperimentPaused?.(syncData);
-  }
-
-  /**
-   * 處理同步的實驗還原狀態
-   */
-  handleSyncExperimentResumed(syncData) {
-    return this.experimentSystemManager?.handleSyncExperimentResumed?.(syncData);
   }
 
   /**

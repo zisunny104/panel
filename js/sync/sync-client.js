@@ -32,7 +32,7 @@ class SyncClient {
       ...config.roleConfig,
     };
     // API 端點設定
-    this.apiBaseUrl = config.apiBaseUrl || this.getDefaultApiUrl();
+    this.apiBaseUrl = config.apiBaseUrl || getApiUrl();
     this.clientType = this.detectClientType();
 
     // WebSocket 客戶端（延遲初始化）
@@ -63,8 +63,6 @@ class SyncClient {
     this.healthCheckTimer = null;
     this.healthCheckInterval =
       SYNC_CLIENT_CONSTANTS.DEFAULT_HEALTH_CHECK_INTERVAL_MS;
-    this.healthCheckMethod =
-      SYNC_CLIENT_CONSTANTS.HEALTH_CHECK_METHOD_LIGHTWEIGHT;
     this.lastHealthCheckTime = 0;
     this.healthCheckCacheTtl =
       SYNC_CLIENT_CONSTANTS.DEFAULT_HEALTH_CHECK_CACHE_TTL_MS;
@@ -134,22 +132,11 @@ class SyncClient {
     });
     this.setupWebSocketHandlers();
 
-    this.healthCheckMethod =
-      SYNC_CLIENT_CONSTANTS.HEALTH_CHECK_METHOD_WEBSOCKET;
-
     this.initialized = true;
     const duration = performance.now() - initStart;
     Logger.info(
       `同步功能初始化完成，切換到 WebSocket 狀態監聽 (<orange>${duration.toFixed(0)} ms</orange>)`,
     );
-  }
-
-  /**
-   * 取得預設 API URL
-   * @returns {string}
-   */
-  getDefaultApiUrl() {
-    return getApiUrl();
   }
 
   detectClientType() {
@@ -209,28 +196,17 @@ class SyncClient {
       this.triggerStateUpdate(data.state);
     });
 
-    this.wsClient.on(WS_PROTOCOL.S2C.CLIENT_JOINED, (data) => {
-      Logger.debug("新客戶端加入", data);
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.CLIENT_JOINED, { detail: data }),
-      );
-    });
-
-    this.wsClient.on(WS_PROTOCOL.S2C.CLIENT_LEFT, (data) => {
-      Logger.debug("客戶端退出", data);
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.CLIENT_LEFT, { detail: data }),
-      );
-    });
-
-    this.wsClient.on(WS_PROTOCOL.S2C.CLIENT_RECONNECTED, (data) => {
-      Logger.debug("客戶端重新連接", data);
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.CLIENT_RECONNECTED, {
-          detail: data,
-        }),
-      );
-    });
+    // 純轉發的 WS 客戶端事件（收到後直接派發至 DOM，不做額外處理）
+    for (const [wsEvent, domEvent, label] of [
+      [WS_PROTOCOL.S2C.CLIENT_JOINED, SYNC_EVENTS.CLIENT_JOINED, "新客戶端加入"],
+      [WS_PROTOCOL.S2C.CLIENT_LEFT, SYNC_EVENTS.CLIENT_LEFT, "客戶端退出"],
+      [WS_PROTOCOL.S2C.CLIENT_RECONNECTED, SYNC_EVENTS.CLIENT_RECONNECTED, "客戶端重新連接"],
+    ]) {
+      this.wsClient.on(wsEvent, (data) => {
+        Logger.debug(label, data);
+        window.dispatchEvent(new CustomEvent(domEvent, { detail: data }));
+      });
+    }
 
     this.wsClient.on(SYNC_CLIENT_CONSTANTS.EVENT_NAMES.SERVER_ERROR, (data) => {
       Logger.error("伺服器錯誤", data);
@@ -256,48 +232,19 @@ class SyncClient {
       );
     });
 
-    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_STARTED, (data) => {
-      Logger.debug("收到實驗開始事件", data);
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
-          detail: data,
-        }),
-      );
-    });
-
-    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_PAUSED, (data) => {
-      Logger.debug("收到實驗暫停事件", data);
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.EXPERIMENT_PAUSED, { detail: data }),
-      );
-    });
-
-    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_RESUMED, (data) => {
-      Logger.debug("收到實驗繼續事件", data);
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.EXPERIMENT_RESUMED, {
-          detail: data,
-        }),
-      );
-    });
-
-    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_STOPPED, (data) => {
-      Logger.debug("收到實驗停止事件", data);
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, {
-          detail: data,
-        }),
-      );
-    });
-
-    this.wsClient.on(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
-      Logger.debug("收到實驗ID變化事件", data);
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, {
-          detail: data,
-        }),
-      );
-    });
+    // 純轉發的實驗狀態事件
+    for (const [event, label] of [
+      [SYNC_EVENTS.EXPERIMENT_STARTED, "收到實驗開始事件"],
+      [SYNC_EVENTS.EXPERIMENT_PAUSED, "收到實驗暫停事件"],
+      [SYNC_EVENTS.EXPERIMENT_RESUMED, "收到實驗繼續事件"],
+      [SYNC_EVENTS.EXPERIMENT_STOPPED, "收到實驗停止事件"],
+      [SYNC_EVENTS.EXPERIMENT_ID_CHANGED, "收到實驗ID變化事件"],
+    ]) {
+      this.wsClient.on(event, (data) => {
+        Logger.debug(label, data);
+        window.dispatchEvent(new CustomEvent(event, { detail: data }));
+      });
+    }
 
     this.wsClient.on(WS_PROTOCOL.S2C.SESSION_STATE, (data) => {
       Logger.debug("收到工作階段狀態", data);
@@ -909,12 +856,8 @@ class SyncClient {
    * @param {string} role - 角色
    */
   saveRole(role) {
-    try {
-      this.role = role;
-      this.saveState();
-    } catch (error) {
-      Logger.error("儲存角色失敗:", error);
-    }
+    this.role = role;
+    this.saveState();
   }
 
   /**
@@ -947,21 +890,15 @@ class SyncClient {
    * 清除外部儲存器狀態
    */
   clearState() {
-    try {
-      if (this.sessionStore && typeof this.sessionStore.clear === "function") {
-        this.sessionStore.clear();
-      }
-
-      this.sessionId = null;
-      this.clientId = null;
-      this.role = this.roleConfig.LOCAL;
-      this.latestSessionState = null;
-      this.connectionAttempted = false;
-
-      Logger.debug("同步狀態已重置");
-    } catch (error) {
-      Logger.error("清除狀態失敗:", error);
+    if (typeof this.sessionStore?.clear === "function") {
+      this.sessionStore.clear();
     }
+    this.sessionId = null;
+    this.clientId = null;
+    this.role = this.roleConfig.LOCAL;
+    this.latestSessionState = null;
+    this.connectionAttempted = false;
+    Logger.debug("同步狀態已重置");
   }
 
   /**
@@ -1028,91 +965,13 @@ class SyncClient {
       });
 
       this.lastHealthCheckTime = Date.now();
-
-      const newOnlineStatus = response.ok;
-
-      if (this.serverOnline !== newOnlineStatus) {
-        this.previousServerOnline = this.serverOnline;
-        this.serverOnline = newOnlineStatus;
-
-        window.dispatchEvent(
-          new CustomEvent(SYNC_EVENTS.SERVER_STATUS_CHANGED, {
-            detail: {
-              online: this.serverOnline,
-              previousOnline: this.previousServerOnline,
-              timestamp: new Date().toISOString(),
-            },
-          }),
-        );
-
-        Logger.debug(
-          `伺服器狀態變化: ${this.previousServerOnline} → ${this.serverOnline}`,
-        );
-      }
-
+      this._updateServerOnline(response.ok);
       return this.serverOnline;
-    } catch (error) {
+    } catch {
       this.lastHealthCheckTime = Date.now();
-      const wasOnline = this.serverOnline;
-      this.serverOnline = false;
-
-      if (wasOnline !== false) {
-        this.previousServerOnline = wasOnline;
-        window.dispatchEvent(
-          new CustomEvent(SYNC_EVENTS.SERVER_STATUS_CHANGED, {
-            detail: {
-              online: false,
-              previousOnline: wasOnline,
-              timestamp: new Date().toISOString(),
-              error: error.message,
-            },
-          }),
-        );
-        Logger.warn(`伺服器狀態變化: ${wasOnline} → 離線`);
-      }
-
+      this._updateServerOnline(false);
       return false;
     }
-  }
-
-  /**
-   * 啟動心跳檢測
-   */
-  startHeartbeatCheck() {
-    if (this.healthCheckLoopActive) return;
-
-    const runHealthCheck = async () => {
-      if (!this.healthCheckLoopActive) return;
-
-      // 避免檢查重疊導致主執行緒尖峰
-      if (this.healthCheckInProgress) {
-        this.healthCheckTimer = setTimeout(
-          runHealthCheck,
-          this.healthCheckInterval,
-        );
-        return;
-      }
-
-      this.healthCheckInProgress = true;
-      try {
-        await this.checkServerHealth();
-      } finally {
-        this.healthCheckInProgress = false;
-      }
-
-      if (!this.healthCheckLoopActive) return;
-      this.healthCheckTimer = setTimeout(
-        runHealthCheck,
-        this.healthCheckInterval,
-      );
-    };
-
-    Logger.debug(
-      `啟動心跳檢測 (${Math.round(this.healthCheckInterval / 1000)}秒間隔)`,
-    );
-    this.healthCheckLoopActive = true;
-
-    void runHealthCheck();
   }
 
   /**
@@ -1182,10 +1041,11 @@ class SyncClient {
       return rawState;
     }
 
+    const toObj = (v) => (v && typeof v === "object" ? v : {});
     return {
-      ...(typeof rawState.state === "object" && rawState.state ? rawState.state : {}),
-      ...(typeof rawState.experimentState === "object" && rawState.experimentState ? rawState.experimentState : {}),
-      ...(typeof rawState.lastState === "object" && rawState.lastState ? rawState.lastState : {}),
+      ...toObj(rawState.state),
+      ...toObj(rawState.experimentState),
+      ...toObj(rawState.lastState),
     };
   }
 
@@ -1194,8 +1054,6 @@ class SyncClient {
    * @returns {Object|null}
    */
   _getLocalExperimentState() {
-    if (typeof window === "undefined") return null;
-
     const pageManager =
       window.boardPageManager || window.panelPageManager || null;
     if (!pageManager) return null;
@@ -1251,6 +1109,7 @@ class SyncClient {
   getLatestSessionState() {
     return this.latestSessionState || null;
   }
+
   canOperate() {
     return this.connected && this.role === this.roleConfig.OPERATOR;
   }
@@ -1277,7 +1136,7 @@ class SyncClient {
       return SYNC_STATUS_CONFIG.IDLE;
     }
 
-    if (this.sessionId && !this.connected) {
+    if (!this.connected) {
       return this.connectionAttempted
         ? SYNC_STATUS_CONFIG.OFFLINE
         : SYNC_STATUS_CONFIG.IDLE;
@@ -1291,6 +1150,4 @@ class SyncClient {
   }
 }
 
-// ES6 模組匯出
-export default SyncClient;
 export { SyncClient };

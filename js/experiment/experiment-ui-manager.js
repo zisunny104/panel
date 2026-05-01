@@ -12,9 +12,8 @@
  * 初始化與流程協調   → ExperimentUIManager（本檔）
  */
 
-import { SYNC_DATA_TYPES, SYNC_EVENTS, RECORD_SOURCES } from "../constants/index.js";
+import { RECORD_SOURCES, SYNC_EVENTS } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
-import { generateExperimentId } from "../core/random-utils.js";
 import ExperimentUIRenderer from "./experiment-ui-renderer.js";
 
 class ExperimentUIManager extends ExperimentUIRenderer {
@@ -50,7 +49,6 @@ class ExperimentUIManager extends ExperimentUIRenderer {
       highlightedButtons: new Set(),
       lockedElements: new Set(),
       hiddenElements: new Set(),
-      panelUIInitialized: false,
     };
 
     // DOM 元素快取（供 ExperimentUIRenderer 方法讀寫）
@@ -100,7 +98,7 @@ class ExperimentUIManager extends ExperimentUIRenderer {
    * @private
    */
   _setupStateInputSync() {
-    document.addEventListener("experimentState:experimentIdChanged", (e) => {
+    document.addEventListener(SYNC_EVENTS.EXPERIMENT_STATE_ID_CHANGED, (e) => {
       const { experimentId } = e.detail || {};
       if (experimentId == null) return;
       const safeExperimentId = typeof experimentId === "string" ? experimentId : "";
@@ -110,7 +108,7 @@ class ExperimentUIManager extends ExperimentUIRenderer {
       }
     });
 
-    document.addEventListener("experimentState:participantNameChanged", (e) => {
+    document.addEventListener(SYNC_EVENTS.EXPERIMENT_STATE_PARTICIPANT_CHANGED, (e) => {
       const { participantName } = e.detail || {};
       if (participantName == null) return;
       const safeName = typeof participantName === "string" ? participantName : "";
@@ -238,17 +236,6 @@ class ExperimentUIManager extends ExperimentUIRenderer {
   }
 
   // ==========================================
-  // Panel UI 初始化
-  // ==========================================
-
-  /**
-   * 初始化 Panel 頁面的 UI 元件（組合選擇器等由 ExperimentSystemManager 處理）
-   */
-  async initializePanelUI() {
-    if (this.state.panelUIInitialized) return;
-    this.state.panelUIInitialized = true;
-  }
-
   // ==========================================
   // 流程事件處理
   // ==========================================
@@ -268,72 +255,6 @@ class ExperimentUIManager extends ExperimentUIRenderer {
       this.updateHighlightVisibility();
       Logger.debug("實驗開始：視覺提示已啟用並更新高亮");
     }
-  }
-
-  // ==========================================
-  // 實驗 ID 重新產生與廣播
-  // ==========================================
-
-  /** @private */
-  async _handleRegenerateId() {
-    Logger.debug("重新產生實驗 ID");
-    try {
-      const sys = this.dependencies.experimentSystemManager;
-      if (sys?.regenerateExperimentId) {
-        await sys.regenerateExperimentId();
-        return;
-      }
-
-      const newId = this._generateExperimentId();
-      if (!newId || typeof newId !== "string" || newId.trim().length === 0) {
-        Logger.error("重新產生實驗 ID 失敗：產生的 ID 無效或為空", { generatedId: newId });
-        return;
-      }
-      Logger.debug("已成功重新產生實驗 ID:", newId);
-      const idInput = document.querySelector("#experimentIdInput");
-      if (idInput) {
-        idInput.value = newId;
-      } else {
-        Logger.warn("找不到實驗 ID 輸入框元素");
-      }
-      this._broadcastExperimentIdUpdate(newId);
-      const combinationManager = this.dependencies.combinationManager;
-      combinationManager?.handleExperimentIdChanged?.(newId);
-    } catch (error) {
-      Logger.error("重新產生實驗ID失敗:", error);
-    }
-  }
-
-  /** @private */
-  _generateExperimentId() {
-    const hub = this.dependencies.hubManager;
-    return hub?.generateExperimentId ? hub.generateExperimentId() : generateExperimentId();
-  }
-
-  /** @private */
-  _broadcastExperimentIdUpdate(experimentId) {
-    const syncManager = this.dependencies.syncManager;
-    if (!syncManager?.core?.isConnected?.()) return;
-
-    const syncClient = this.dependencies.syncClient || syncManager?.core?.syncClient;
-    const experimentSyncCore = this.dependencies.experimentSyncCore;
-
-    const updateData = {
-      type: SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE,
-      clientId: syncClient?.clientId || "experiment_panel",
-      timestamp: Date.now(),
-      experimentId,
-    };
-
-    experimentSyncCore?.safeBroadcast?.(updateData).catch((err) => {
-      Logger.warn("同步實驗 ID 更新失敗:", err);
-    });
-
-    document.dispatchEvent(
-      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STATE_CHANGE_LOCAL, { detail: updateData }),
-    );
-
-    Logger.debug("已廣播實驗 ID 更新:", experimentId);
   }
 
   // ==========================================

@@ -65,7 +65,7 @@ export const recordViewList = {
         ${filteredRecords.map((record) => this._renderRecordItem(record)).join("")}
       </div>`;
 
-    this.updateDeleteButton();
+    this.updateBatchActionButtons();
   },
 
   /**
@@ -124,11 +124,11 @@ export const recordViewList = {
   toggleRecordSelection(recordId) {
     if (this.selectedRecords.has(recordId)) this.selectedRecords.delete(recordId);
     else this.selectedRecords.add(recordId);
-    this.updateDeleteButton();
+    this.updateBatchActionButtons();
   },
 
   /** 根據目前選取數量更新批次刪除與下載按鈕的顯示狀態 */
-  updateDeleteButton() {
+  updateBatchActionButtons() {
     const count = this.selectedRecords.size;
     const deleteBtn = document.getElementById("deleteSelectedRecordsBtn");
     const downloadBtn = document.getElementById("downloadSelectedRecordsBtn");

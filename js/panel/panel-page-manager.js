@@ -1,9 +1,10 @@
 /**
-* PanelPageManager - 機台面板頁面管理器
-*
-* 頁面腳本的載入與初始化。
-*/
+ * PanelPageManager - 機台面板頁面管理器
+ *
+ * 頁面腳本的載入與初始化。
+ */
 
+import { Logger } from "../core/console-manager.js";
 import { loadUnitsFromScenarios } from "../core/data-loader.js";
 import { ButtonManager } from "./panel-button-manager.js";
 import { ExperimentFlowManager } from "../experiment/experiment-flow-manager.js";
@@ -46,8 +47,8 @@ class PanelPageManager {
   }
 
   /**
-  * 開始初始化流程區段
-  * @param {string} stage - 流程名稱
+   * 開始初始化流程區段
+   * @param {string} stage - 流程名稱
    */
   startStage(stage) {
     this.currentStage = stage;
@@ -56,7 +57,7 @@ class PanelPageManager {
   }
 
   /**
-  * 結束目前初始化流程
+   * 結束目前初始化流程
    */
   endStage() {
     if (this.currentStage && this.stageStartTime) {
@@ -86,13 +87,8 @@ class PanelPageManager {
     try {
       Logger.debug("PanelPageManager 開始初始化");
 
-      await this._runInitStage(this.initStages.MODULES_INIT, async () => {
-        await this.initializeModules();
-      });
-
-      await this._runInitStage(this.initStages.COMPONENTS_INIT, async () => {
-        await this.initializeRemainingComponents();
-      });
+      await this._runInitStage(this.initStages.MODULES_INIT, () => this.initializeModules());
+      await this._runInitStage(this.initStages.COMPONENTS_INIT, () => this.initializeRemainingComponents());
 
       this.currentStage = this.initStages.COMPLETE;
       Logger.debug(
@@ -360,7 +356,7 @@ class PanelPageManager {
       buttonManager: this.buttonManager,
     });
     this.panelUIManager?.updateStepCooldown?.(
-      localStorage.getItem("stepCooldownMs") ?? 3000,
+      this.configManager?.userSettings?.stepCooldownMs ?? 3000,
     );
 
     this.buttonManager.on("button:action-clicked", (data) => {
@@ -391,7 +387,7 @@ class PanelPageManager {
     const actionData = allActions.map((action, index) => ({
       actionId: action.action_id || action.actionId || `action_${index}`,
       buttonId: action.action_buttons || `B${index + 1}`,
-      action: action,
+      action,
     }));
 
     this.buttonManager.handleExperimentActionsLoaded?.({
@@ -410,25 +406,18 @@ class PanelPageManager {
 
     Logger.debug(`處理按鈕動作點擊: ${buttonId}`, { actionId, action });
 
+    const timestamp = Date.now();
     const validation = this.experimentActionHandler.validateAction(actionId, {
       buttonId,
-      timestamp: Date.now(),
+      timestamp,
     });
 
     if (validation.valid) {
-      const systemManager = this.experimentSystemManager;
-      if (systemManager?.handleCorrectAction) {
-        systemManager.handleCorrectAction(actionId, {
-          buttonId,
-          timestamp: Date.now(),
-        });
-      } else {
-        this.experimentActionHandler.handleCorrectAction(actionId, {
-          buttonId,
-          timestamp: Date.now(),
-        });
-      }
-
+      const ctx = { buttonId, timestamp };
+      const handler = this.experimentSystemManager?.handleCorrectAction
+        ? this.experimentSystemManager
+        : this.experimentActionHandler;
+      handler.handleCorrectAction(actionId, ctx);
       this.buttonManager.showActionFeedback(buttonId, "correct");
       Logger.info(`動作正確: ${buttonId}`);
       return;
@@ -471,13 +460,8 @@ class PanelPageManager {
   async _handleExperimentSystemFlowStopped(data = {}) {
     Logger.info("Panel: 處理實驗系統停止後續邏輯", data);
 
-    if (
-      this.panelMediaManager &&
-      typeof this.panelMediaManager.playSound === "function"
-    ) {
-      this.panelMediaManager.playSound("experimentEnd");
-      Logger.debug("Panel: 已播放實驗結束音效");
-    }
+    this.panelMediaManager?.playSound?.("experimentEnd");
+    Logger.debug("Panel: 已播放實驗結束音效");
 
     if (data?.reason === "power_off" && this.panelLogger?.exportLog) {
       this.panelLogger.exportLog();
@@ -489,23 +473,23 @@ class PanelPageManager {
   setExperimentControlsLocked(_locked) {
     // Panel 的通用控制鎖定已由 ExperimentSystemManager DOM 控制主導。
   }
-
-};
+}
 
 // 自動初始化頁面（當 DOM 完全載入時）
 const panelPageManager = new PanelPageManager();
 window.panelPageManager = panelPageManager;
 
 const initializePanel = async () => {
-  await panelPageManager.initialize();
-  Logger.info("Panel 頁面已自動初始化");
+  try {
+    await panelPageManager.initialize();
+    Logger.info("Panel 頁面已自動初始化");
+  } catch (error) {
+    Logger.error("Panel 頁面自動初始化失敗:", error);
+  }
 };
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initializePanel);
-
 } else {
-
   initializePanel();
-
 }

@@ -162,8 +162,7 @@ class PanelUIManager {
       );
       panel.element.style.bottom = `${bottomPx}px`;
     } catch (e) {
-      // 如果出現任何錯誤，優雅地忽略並保留 CSS 預設值
-      Logger && Logger.warn && Logger.warn("alignPanelToButton failed:", e);
+      Logger.warn("alignPanelToButton failed:", e);
     }
   }
 
@@ -289,6 +288,7 @@ class PanelUIManager {
   // 直接用 JS 切換 experimentPanelButton 底色
   setExperimentPanelButtonColor(status) {
     const btn = document.getElementById("experimentPanelButton");
+    if (!btn) return;
 
     if (status === "running") {
       btn.style.setProperty("background", "#27ae60", "important");
@@ -489,13 +489,10 @@ class PanelUIManager {
 
     if (!visible) {
       buttonOverlays.forEach((button) =>
-        button.classList.remove("touch-active"),
+        button.classList.remove("touch-active", "next-step-highlight"),
       );
       shiftButtonOverlay?.classList.remove("shift-active");
       powerSwitchArea?.classList.remove("next-step-highlight");
-      document.querySelectorAll(".button-overlay").forEach((btn) => {
-        btn.classList.remove("next-step-highlight");
-      });
       mediaArea?.classList.add("hidden-indicator");
     } else {
       mediaArea?.classList.remove("hidden-indicator");
@@ -804,7 +801,7 @@ class PanelUIManager {
    * 載入初始設定
    */
   loadInitialSettings() {
-    document.getElementById("refCard")?.classList.add("is-hidden");
+    this.refCard?.classList.add("is-hidden");
   }
 
   /**
@@ -852,21 +849,6 @@ class PanelUIManager {
     this.updateTouchVisuals(showTouchVisuals);
     this.updateMediaAreaMarkerVisibility(showMediaAreaMarker);
     this.updateMediaContentVisibility(showMediaContent);
-
-    // 同步設定面板的開關狀態
-    const toggleButtonLabels = document.getElementById("toggleButtonLabels");
-    if (toggleButtonLabels) toggleButtonLabels.checked = showButtonLabels;
-    const toggleButtonColors = document.getElementById("toggleButtonColors");
-    if (toggleButtonColors) toggleButtonColors.checked = showButtonColors;
-    const toggleTouchVisuals = document.getElementById("toggleTouchVisuals");
-    if (toggleTouchVisuals) toggleTouchVisuals.checked = showTouchVisuals;
-    const toggleMediaAreaMarker = document.getElementById(
-      "toggleMediaAreaMarker",
-    );
-    if (toggleMediaAreaMarker)
-      toggleMediaAreaMarker.checked = showMediaAreaMarker;
-    const toggleMediaContent = document.getElementById("toggleMediaContent");
-    if (toggleMediaContent) toggleMediaContent.checked = showMediaContent;
 
     // 套用音量設定
     const beepVolume =
@@ -1028,6 +1010,4 @@ class PanelUIManager {
 
 }
 
-// ES6 模組匯出
-export default PanelUIManager;
 export { PanelUIManager };

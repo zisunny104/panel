@@ -17,8 +17,7 @@ class ConfigManager {
   constructor() {
     this.defaultSettings = {};
     this.userSettings = {};
-    this.resetLanguageOnLoad = true;
-    this.configData = {}; // 儲存完整的 config.json 資料
+    this.configData = {};
     this.panelUIManager = null;
   }
 
@@ -319,99 +318,9 @@ class ConfigManager {
    */
   loadVersionInfo() {
     const versionElement = document.getElementById("appVersion");
-
     if (versionElement && this.configData.version) {
       versionElement.textContent = this.configData.version;
     }
-    // 版本元素在某些頁面（如 experiment.html）上可能不存在，這是正常的
-  }
-
-  /**
-   * 產生新的版本號 (格式: major.minor.patch)
-   * patch 部分會使用時間戳轉換的短代碼
-   */
-  generateNewVersion(currentVersion = "1.1.0") {
-    const versionParts = currentVersion.split(".");
-    const major = parseInt(versionParts[0]) || 1;
-    const minor = parseInt(versionParts[1]) || 1;
-
-    // 產生基於時間戳的短代碼 (7位字符)
-    const timestamp = Date.now();
-    const shortCode = this.timestampToShortCode(timestamp);
-
-    return `${major}.${minor}.${shortCode}`;
-  }
-
-  /**
-   * 將時間戳轉換為7位短代碼
-   * 優先使用 git commit hash，如果無法取得則使用時間戳
-   */
-  timestampToShortCode(timestamp) {
-    try {
-      // 嘗試取得 git commit hash
-      const gitHash = this.getGitCommitHash();
-      if (gitHash && gitHash.length >= 7) {
-        return gitHash.substring(0, 7);
-      }
-    } catch (error) {
-      // git 不可用時不中斷，靜默回退到時間戳
-    }
-
-    // 回退到時間戳轉換（原邏輯）
-    const shortened = timestamp.toString(36).slice(-7);
-    return shortened;
-  }
-
-  /**
-   * 取得 git commit hash
-   */
-  getGitCommitHash() {
-    // 從 config 中讀取 git commit hash
-    if (this.configData && this.configData.git_commit_hash) {
-      return this.configData.git_commit_hash;
-    }
-    return null;
-  }
-
-  /**
-   * 更新版本號
-   */
-  async updateVersion() {
-    try {
-      const currentVersion = this.configData.version || "1.1.0";
-      const newVersion = this.generateNewVersion(currentVersion);
-      const updateTime = new Date().toISOString();
-
-      // 在生產環境中，這裡需要向後端發送請求來更新 config.json
-      // 這裡我們先更新本機資料
-      this.configData.version = newVersion;
-      this.configData.updated_at = updateTime;
-
-      // 更新 UI 顯示
-      this.loadVersionInfo();
-
-      return {
-        oldVersion: currentVersion,
-        newVersion: newVersion,
-        updateTime: updateTime,
-      };
-    } catch (error) {
-      Logger.error("版本更新失敗:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 取得版本資訊
-   */
-  getVersionInfo() {
-    return {
-      version: this.configData.version,
-      author: this.configData.author,
-      created_at: this.configData.created_at,
-      updated_at: this.configData.updated_at,
-      description: this.configData.description,
-    };
   }
 }
 

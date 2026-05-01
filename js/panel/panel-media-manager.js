@@ -9,6 +9,7 @@ import { loadScenariosData } from "../core/data-loader.js";
 import { SYNC_EVENTS, SYNC_DATA_TYPES } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { getSharedConfig } from "../core/config.js";
+
 class MediaManager {
   /**
    * 建構子 - 初始化媒體管理器
@@ -83,15 +84,9 @@ class MediaManager {
 
     // 等待 DOM 完全載入後，再延遲開始預載，避免搶占首屏資源
     if (document.readyState === "complete") {
-      setTimeout(() => {
-        startPreload();
-      }, initialDelay);
+      setTimeout(startPreload, initialDelay);
     } else {
-      window.addEventListener("load", () => {
-        setTimeout(() => {
-          startPreload();
-        }, initialDelay);
-      });
+      window.addEventListener("load", () => setTimeout(startPreload, initialDelay));
     }
   }
 
@@ -288,7 +283,6 @@ class MediaManager {
 
     // 儲存原始路徑供錯誤處理使用
     const originalSrc = src;
-    const _resolvedSrc = finalSrc;
 
     video.addEventListener("error", (e) => {
       // 檢查是否為真正的載入錯誤（排除空 src 或被清除的情況）
@@ -705,35 +699,24 @@ class MediaManager {
    */
   analyzePossibleCauses(src, errorInfo) {
     // 檢查錯誤代碼特定原因
-    if (errorInfo.errorCode === 2) {
-      return ["網路連線問題"];
-    } else if (errorInfo.errorCode === 4) {
-      return ["檔案不存在或無法存取"];
-    } else if (errorInfo.errorCode === 3) {
-      return ["檔案格式錯誤"];
-    }
+    if (errorInfo.errorCode === 2) return ["網路連線問題"];
+    if (errorInfo.errorCode === 4) return ["檔案不存在或無法存取"];
+    if (errorInfo.errorCode === 3) return ["檔案格式錯誤"];
 
     // 檢查檔案副檔名
     const extension = src.split(".").pop().toLowerCase();
     const supportedVideo = ["mp4", "webm", "ogg"];
     const supportedImage = ["jpg", "jpeg", "png", "gif", "webp"];
 
-    if (
-      errorInfo.mediaType === "video" &&
-      !supportedVideo.includes(extension)
-    ) {
+    if (errorInfo.mediaType === "video" && !supportedVideo.includes(extension)) {
       return [`不支援的影片格式: ${extension}`];
-    } else if (
-      errorInfo.mediaType === "img" &&
-      !supportedImage.includes(extension)
-    ) {
+    }
+    if (errorInfo.mediaType === "img" && !supportedImage.includes(extension)) {
       return [`不支援的圖片格式: ${extension}`];
     }
 
     // 檢查網路狀態
-    if (!navigator.onLine) {
-      return ["裝置離線狀態"];
-    }
+    if (!navigator.onLine) return ["裝置離線狀態"];
 
     return ["檔案載入失敗"];
   }
@@ -806,7 +789,7 @@ class MediaManager {
       const successfulFiles = [];
       const failedFiles = [];
 
-      for (const batch of batches) {
+      for (const [batchIdx, batch] of batches.entries()) {
         const results = await Promise.allSettled(
           batch.map((file) => this.preloadMediaFile(file)),
         );
@@ -824,7 +807,7 @@ class MediaManager {
         });
 
         // 批次間短暫延遲，讓出主線程
-        if (batches.indexOf(batch) < batches.length - 1) {
+        if (batchIdx < batches.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
       }
@@ -987,7 +970,7 @@ class MediaManager {
       const successfulFiles = [];
       const failedFiles = [];
 
-      for (const batch of batches) {
+      for (const [batchIdx, batch] of batches.entries()) {
         const results = await Promise.allSettled(
           batch.map((file) => this.preloadMediaFile(file)),
         );
@@ -1005,7 +988,7 @@ class MediaManager {
         });
 
         // 批次間短暫延遲
-        if (batches.indexOf(batch) < batches.length - 1) {
+        if (batchIdx < batches.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
       }
@@ -1056,21 +1039,14 @@ class MediaManager {
       }
 
       if (scenariosData?.sections) {
+        const allUnits = scenariosData.sections.flatMap((s) => s.units || []);
         for (const unitId of unitIds) {
-          const unit = scenariosData.sections
-            .flatMap((section) => section.units || [])
-            .find((u) => u.unit_id === unitId);
-          if (unit && unit.steps) {
-            unit.steps.forEach((step) => {
-              if (step.actions) {
-                step.actions.forEach((action) => {
-                  if (action.media_file) {
-                    mediaFiles.add(action.media_file);
-                  }
-                });
-              }
+          const unit = allUnits.find((u) => u.unit_id === unitId);
+          unit?.steps
+            ?.flatMap((step) => step.actions || [])
+            .forEach((action) => {
+              if (action.media_file) mediaFiles.add(action.media_file);
             });
-          }
         }
       }
     } catch (error) {
@@ -1128,54 +1104,40 @@ class MediaManager {
    * 實際執行媒體檔案預先載入
    */
   async doPreloadMediaFile(src) {
-    return new Promise(async (resolve, reject) => {
-      let element;
-      let timeoutId;
+    const isAudio = src.endsWith(".mp3") || src.endsWith(".wav") || src.endsWith(".ogg");
 
-      // 對於音訊檔案，先檢查檔案是否存在
-      if (
-        src.endsWith(".mp3") ||
-        src.endsWith(".wav") ||
-        src.endsWith(".ogg")
-      ) {
-        try {
-          // 先用 fetch 檢查檔案是否存在
-          const response = await fetch(src, { method: "HEAD" });
-          if (!response.ok) {
-            reject(new Error(`File not found: ${src}`));
-            return;
-          }
-        } catch (error) {
-          reject(new Error(`Failed to access ${src}: ${error.message}`));
-          return;
-        }
+    if (isAudio) {
+      try {
+        const response = await fetch(src, { method: "HEAD" });
+        if (!response.ok) throw new Error(`File not found: ${src}`);
+      } catch (error) {
+        throw new Error(`Failed to access ${src}: ${error.message}`);
       }
+    }
 
-      // 根據檔案類型建立相應元素
-      if (
-        src.endsWith(".mp3") ||
-        src.endsWith(".wav") ||
-        src.endsWith(".ogg")
-      ) {
-        // 音訊檔案
+    return new Promise((resolve, reject) => {
+      let element;
+      if (isAudio) {
         element = new Audio();
-        element.preload = "metadata"; // 只載入元資料，不載入整個檔案
+        element.preload = "metadata";
       } else if (src.endsWith(".mp4") || src.endsWith(".webm")) {
-        // 影片檔案 - 只載入元資料
         element = document.createElement("video");
         element.preload = "metadata";
       } else {
-        // 圖片檔案
         element = new Image();
       }
 
+      let timeoutId;
       const cleanup = () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
+        clearTimeout(timeoutId);
         element.onload = null;
         element.onerror = null;
       };
+
+      timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Preload timeout for ${src}`));
+      }, 15000);
 
       element.onload = () => {
         cleanup();
@@ -1184,20 +1146,9 @@ class MediaManager {
 
       element.onerror = (error) => {
         cleanup();
-        reject(
-          new Error(
-            `Failed to preload ${src}: ${error.message || "Unknown error"}`,
-          ),
-        );
+        reject(new Error(`Failed to preload ${src}: ${error.message || "Unknown error"}`));
       };
 
-      // 設定更長的超時時間
-      timeoutId = setTimeout(() => {
-        cleanup();
-        reject(new Error(`Preload timeout for ${src}`));
-      }, 15000); // 15秒超時
-
-      // 設定來源
       element.src = src;
     });
   }
@@ -1260,6 +1211,4 @@ class MediaManager {
   }
 }
 
-// ES6 模組匯出
-export default MediaManager;
 export { MediaManager };

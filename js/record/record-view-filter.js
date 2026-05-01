@@ -63,7 +63,7 @@ export const recordViewFilter = {
       const checkbox = document.getElementById(`record-${record.filename}`);
       if (checkbox) checkbox.checked = true;
     });
-    this.updateDeleteButton();
+    this.updateBatchActionButtons();
   },
 
   /** 重置所有篩選條件為初始值，並重新渲染日誌列表 */

@@ -8,7 +8,9 @@
 import {
   RECORD_SOURCES,
   SYNC_EVENTS,
+  SYNC_ROLE_CONFIG,
   EXPERIMENT_HUB_CONSTANTS,
+  EXPERIMENT_COMBINATION_EVENTS,
 } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 import { experimentSyncManager } from "../board/board-experiment-sync.js";
@@ -46,7 +48,6 @@ class ExperimentSystemManager {
       pendingParticipantName: null,
     };
 
-    this.listeners = new Map();
     this._unsubscribers = [];
     this._experimentIdUiSyncBound = false;
 
@@ -107,6 +108,15 @@ class ExperimentSystemManager {
       }
     });
     this._unsubscribers = [];
+
+    if (this._experimentIdUiSyncBound) {
+      window.removeEventListener("focus", this._syncFromSystemHandler);
+      document.removeEventListener("visibilitychange", this._visibilityHandler);
+      this._syncFromSystemHandler = null;
+      this._visibilityHandler = null;
+      this._experimentIdUiSyncBound = false;
+    }
+
     this.state.initialized = false;
   }
 
@@ -225,30 +235,13 @@ class ExperimentSystemManager {
    * @param {Array} units - 單元數據
    */
   async _initializeUnitPanel(container, units) {
+    const currentUnitIds = this.combinationManager.getCurrentUnitIds();
     const preparedUnits = units.map((unit) => {
-      // 計算動作數量：遍歷 step.actions[].interactions
-      let actionCount = 0;
-      if (unit.steps && Array.isArray(unit.steps)) {
-        unit.steps.forEach((step) => {
-          if (step.actions && Array.isArray(step.actions)) {
-            step.actions.forEach((action) => {
-              if (
-                action.interactions &&
-                typeof action.interactions === "object"
-              ) {
-                actionCount += Object.keys(action.interactions).length;
-              }
-            });
-          }
-        });
-      }
-
       const prepared = {
         id: unit.unit_id,
         title: unit.unit_name || unit.unit_id,
         stepCount: unit.steps ? unit.steps.length : 0,
-        actionCount: actionCount,
-        checked: this.combinationManager.getCurrentUnitIds().includes(unit.unit_id),
+        checked: currentUnitIds.includes(unit.unit_id),
       };
 
       Logger.debug(`準備單元數據: ${prepared.id}`, prepared);
@@ -258,7 +251,7 @@ class ExperimentSystemManager {
     const rendered = this.uiManager.renderUnitsPanel(
       container,
       preparedUnits,
-      this.combinationManager.getCurrentUnitIds(),
+      currentUnitIds,
       {
         showHeader: true,
         headerTitle: "教學單元",
@@ -283,7 +276,7 @@ class ExperimentSystemManager {
     );
     this._bindPowerOptionListeners();
 
-    setTimeout(() => this._tryCallPageManager("updateSelectAllState"), 100);
+    requestAnimationFrame(() => this._tryCallPageManager("updateSelectAllState"));
 
     Logger.debug("單元面板已初始化");
     if (rendered) {
@@ -307,7 +300,7 @@ class ExperimentSystemManager {
       onPause: () => this._handleExperimentPause(),
       onResume: () => this._handleExperimentResume(),
       onStop: () => this._handleExperimentStop(),
-      onRegenerateId: () => this._handleRegenerateId(),
+      onRegenerateId: () => this.regenerateExperimentId(),
     });
 
     Logger.debug("實驗控制面板已初始化");
@@ -358,21 +351,13 @@ class ExperimentSystemManager {
   _setupEventListeners() {
     const sub = (fn) => this._unsubscribers.push(fn);
 
-    sub(this.combinationManager.on("combination:selected", (data) => {
+    sub(this.combinationManager.on(EXPERIMENT_COMBINATION_EVENTS.COMBINATION_SELECTED, (data) => {
       this._handleCombinationSelected(data);
     }));
 
-    sub(this.flowManager.on(ExperimentFlowManager.EVENT.STARTED, (data) => {
-      this._handleFlowStarted(data);
-    }));
-
-    sub(this.flowManager.on(ExperimentFlowManager.EVENT.PAUSED, (data) => {
-      this._handleFlowPaused(data);
-    }));
-
-    sub(this.flowManager.on(ExperimentFlowManager.EVENT.RESUMED, (data) => {
-      this._handleFlowResumed(data);
-    }));
+    sub(this.flowManager.on(ExperimentFlowManager.EVENT.STARTED, () => this._handleFlowStarted()));
+    sub(this.flowManager.on(ExperimentFlowManager.EVENT.PAUSED, () => this._handleFlowPaused()));
+    sub(this.flowManager.on(ExperimentFlowManager.EVENT.RESUMED, () => this._handleFlowResumed()));
 
     sub(this.flowManager.on(ExperimentFlowManager.EVENT.STOPPED, (data) => {
       this._handleFlowStopped(data);
@@ -400,10 +385,6 @@ class ExperimentSystemManager {
       this._bindExperimentIdInputListener();
     }));
 
-    sub(this.uiManager.on("experiment-controls-rendered-delayed", () => {
-      this._bindExperimentIdInputListener();
-    }));
-
     const onCombinationSelected = (event) => this._handleRemoteCombinationSelected(event?.detail);
     window.addEventListener(SYNC_EVENTS.COMBINATION_SELECTED, onCombinationSelected);
     sub(() => window.removeEventListener(SYNC_EVENTS.COMBINATION_SELECTED, onCombinationSelected));
@@ -422,7 +403,6 @@ class ExperimentSystemManager {
       return;
     }
 
-    // 檢查是否正在進行實驗
     const isExperimentRunning = this.flowManager.isRunning;
 
     if (isExperimentRunning) {
@@ -445,46 +425,15 @@ class ExperimentSystemManager {
   }
 
   /**
-   * 當實驗 ID 變化時重新初始化組合資訊
-   * @private
-   */
-  async _reinitializeCombinationForNewExperimentId(experimentId) {
-    try {
-      const combo = this.combinationManager.getCurrentCombination();
-      if (!combo) {
-        Logger.debug("沒有目前組合，僅更新實驗ID後略過組合重繪");
-        return;
-      }
-
-      const unitIds = this.combinationManager.getCombinationUnitIds(combo, experimentId) || [];
-      Logger.debug("準備使用新實驗 ID 重繪組合資訊:", {
-        experimentId, combinationId: combo.combinationId, unitIds,
-      });
-
-      this._updateUIForCombination(combo, unitIds);
-
-      window.dispatchEvent(
-        new CustomEvent("experimentSystem:shouldRefreshPanel", { detail: { experimentId } }),
-      );
-    } catch (error) {
-      Logger.warn("重新初始化組合資訊失敗:", error);
-    }
-  }
-
-  /**
    * 更新 UI 中的實驗 ID 顯示
    * @private
    */
   _updateExperimentIdUI(experimentId) {
-    try {
-      const idInput = document.getElementById("experimentIdInput");
-      const safeExperimentId = typeof experimentId === "string" ? experimentId : "";
-      if (idInput && idInput.value !== safeExperimentId) {
-        idInput.value = safeExperimentId;
-        Logger.debug("實驗 ID 已更新到 UI:", safeExperimentId);
-      }
-    } catch (error) {
-      Logger.warn("更新實驗 ID UI 失敗:", error);
+    const idInput = document.getElementById("experimentIdInput");
+    const safeExperimentId = typeof experimentId === "string" ? experimentId : "";
+    if (idInput && idInput.value !== safeExperimentId) {
+      idInput.value = safeExperimentId;
+      Logger.debug("實驗 ID 已更新到 UI:", safeExperimentId);
     }
   }
 
@@ -498,7 +447,6 @@ class ExperimentSystemManager {
     const idInput = document.getElementById("experimentIdInput");
     if (!idInput) return;
 
-    // 先同步最新 ID 到 DOM（即使已綁定過）
     const rawCurrentId = this.getExperimentId();
     const currentId = typeof rawCurrentId === "string" ? rawCurrentId : "";
     if (idInput.value.trim() !== currentId) {
@@ -506,13 +454,11 @@ class ExperimentSystemManager {
       Logger.debug("面板展開時同步實驗ID到UI:", currentId);
     }
 
-    // 若尚未綁定事件監聽，則進行綁定（避免重複綁定）
     if (!idInput._experimentSystemBound) {
       this._setupExperimentIdInputListener(idInput);
       Logger.debug("實驗ID輸入框事件監聽已綁定");
     }
 
-    // 確保無論何時開啟面板，輸入框都會從系統狀態拉取最新 ID。
     this._syncExperimentIdInputFromSystem();
   }
 
@@ -562,32 +508,6 @@ class ExperimentSystemManager {
   }
 
   /**
-   * 套用預設組合
-   * @private
-   */
-  async _applyDefaultCombination() {
-    try {
-      const success = await this.combinationManager.applyDefaultCombination();
-      if (success) {
-        const currentCombo = this.combinationManager.getCurrentCombination();
-        const currentUnitIds = this.combinationManager.getCurrentUnitIds();
-        Logger.debug("預設組合已套用:", currentCombo?.combinationName);
-        Logger.debug(
-          `【<cyan>排序追蹤</cyan>】<blue>預設組合自動套用</blue> [組合: ${currentCombo?.combinationName}] [順序: ${currentUnitIds.join("→")}]`,
-          { 來源: "_applyDefaultCombination", combinationId: currentCombo?.combinationId, combinationName: currentCombo?.combinationName, unitIds: currentUnitIds },
-        );
-        if (this.state.containers?.combinationSelector) {
-          this._updateUIForCombination(currentCombo, currentUnitIds);
-        }
-      }
-      return success;
-    } catch (error) {
-      Logger.error("套用預設組合失敗:", error);
-      return false;
-    }
-  }
-
-  /**
    * 更新 UI 以符合組合（委派給 UIManager）
    * @private
    */
@@ -604,8 +524,10 @@ class ExperimentSystemManager {
         unitIds,
         { combinationName: combination?.combinationName, combinationId: combination?.combinationId },
       );
-      setTimeout(() => this._tryCallPageManager("updateSelectAllState"), 50);
-      setTimeout(() => this._tryCallPageManager("updateUnitButtonStates"), 50);
+      requestAnimationFrame(() => {
+        this._tryCallPageManager("updateSelectAllState");
+        this._tryCallPageManager("updateUnitButtonStates");
+      });
     }
   }
 
@@ -616,7 +538,7 @@ class ExperimentSystemManager {
   _handleUnitToggle(event) {
     const selectedUnitIds = this._getUnitIdsFromUi({ onlyChecked: true });
     this._applyCustomUnitSelection(selectedUnitIds);
-    setTimeout(() => this._tryCallPageManager("updateSelectAllState"), 10);
+    requestAnimationFrame(() => this._tryCallPageManager("updateSelectAllState"));
   }
 
   /**
@@ -689,7 +611,7 @@ class ExperimentSystemManager {
   }
 
   _getFlow() {
-    return this.flowManager || null;
+    return this.flowManager ?? null;
   }
 
   getFlowProgressSnapshot() {
@@ -757,69 +679,8 @@ class ExperimentSystemManager {
     return this.actionHandler?.handleCorrectAction?.(actionId, actionData) || false;
   }
 
-  findActionIndexById(actionId) {
-    if (!actionId || !this.actionHandler?.currentActionSequence) return -1;
-    return this.actionHandler.currentActionSequence.findIndex(
-      (action) => action?.actionId === actionId,
-    );
-  }
-
-  getActionByIndex(index) {
-    const sequence = this.actionHandler?.currentActionSequence;
-    if (!Array.isArray(sequence) || index < 0 || index >= sequence.length) {
-      return null;
-    }
-    return sequence[index] || null;
-  }
-
-  setCurrentActionIndex(index) {
-    const sequence = this.actionHandler?.currentActionSequence;
-    if (!Array.isArray(sequence) || index < 0 || index >= sequence.length) {
-      return false;
-    }
-    this.actionHandler.currentActionIndex = index;
-    return true;
-  }
-
-  jumpToActionById(actionId) {
-    const index = this.findActionIndexById(actionId);
-    if (index < 0) {
-      return { success: false, index: -1, action: null };
-    }
-
-    const success = this.setCurrentActionIndex(index);
-    if (!success) {
-      return { success: false, index: -1, action: null };
-    }
-
-    return {
-      success: true,
-      index,
-      action: this.getActionByIndex(index),
-    };
-  }
-
-  getActionSequenceLength() {
-    return Array.isArray(this.actionHandler?.currentActionSequence)
-      ? this.actionHandler.currentActionSequence.length
-      : 0;
-  }
-
-  getCurrentActionIndex() {
-    return Number.isInteger(this.actionHandler?.currentActionIndex)
-      ? this.actionHandler.currentActionIndex
-      : 0;
-  }
-
-  getPreviousAction() {
-    const idx = this.getCurrentActionIndex();
-    const prevIndex = Math.max(0, idx - 1);
-    return this.getActionByIndex(prevIndex);
-  }
-
   isExperimentRunning() {
-    const flow = this._getFlow();
-    return flow ? (flow.isExperimentRunning?.() ?? Boolean(flow.isRunning)) : false;
+    return this.flowManager?.isRunning ?? false;
   }
 
   async startExperiment(options = {}) {
@@ -861,17 +722,13 @@ class ExperimentSystemManager {
     return flow.isPaused ? this.resumeExperiment() : this.pauseExperiment();
   }
 
-  stopFlowExperiment(...args) {
-    return this._getFlow()?.stopExperiment?.(...args) || false;
-  }
-
   stopExperiment(...args) {
-    return this.stopFlowExperiment(...args);
+    return this._getFlow()?.stopExperiment?.(...args) || false;
   }
 
   async startExperimentFromSync(syncData = {}) {
     const remoteComboId = syncData?.combinationId;
-    const currentCombo = this.combinationManager?.getCurrentCombination?.();
+    const currentCombo = this.combinationManager.getCurrentCombination();
 
     if (
       remoteComboId &&
@@ -903,18 +760,12 @@ class ExperimentSystemManager {
   }
 
   handleSyncExperimentPaused(syncData = {}) {
-    const flow = this._getFlow();
-    if (!this.isExperimentRunning() || flow?.isPaused) {
-      return false;
-    }
+    if (!this.isExperimentRunning() || this._getFlow()?.isPaused) return false;
     return this.pauseExperiment({ ...syncData, broadcast: false, source: "sync" });
   }
 
   handleSyncExperimentResumed(syncData = {}) {
-    const flow = this._getFlow();
-    if (!this.isExperimentRunning() || !flow?.isPaused) {
-      return false;
-    }
+    if (!this.isExperimentRunning() || !this._getFlow()?.isPaused) return false;
     return this.resumeExperiment({ ...syncData, broadcast: false, source: "sync" });
   }
 
@@ -984,11 +835,7 @@ class ExperimentSystemManager {
   _handleExperimentStart() {
     this.startExperiment();
     Logger.debug("實驗開始 - 透過 ExperimentSystemManager");
-
-    // 通知 UI 管理器處理實驗開始（關閉所有面板等）
-    if (this.uiManager) {
-      this.uiManager._handleExperimentStart();
-    }
+    this.uiManager._handleExperimentStart();
   }
 
   /**
@@ -1020,17 +867,9 @@ class ExperimentSystemManager {
     });
     window.dispatchEvent(stopEvent);
     if (!stopEvent.defaultPrevented) {
-      this.stopFlowExperiment({ reason: "manual", broadcast: true, source: "ui" });
+      this.stopExperiment({ reason: "manual", broadcast: true, source: "ui" });
     }
     Logger.debug("實驗停止請求已發出，若無 pageManager 處理則直接停止流程");
-  }
-
-  /**
-   * 處理重新產生ID事件（由 UI 按鈕回呼觸發）
-   * @private
-   */
-  async _handleRegenerateId() {
-    await this.regenerateExperimentId();
   }
 
   /**
@@ -1102,7 +941,8 @@ class ExperimentSystemManager {
   _syncExperimentIdInputFromSystem() {
     const idInput = document.getElementById("experimentIdInput");
     if (!idInput) return;
-    const systemId = typeof this.getExperimentId() === "string" ? this.getExperimentId() : "";
+    const rawId = this.getExperimentId();
+    const systemId = typeof rawId === "string" ? rawId : "";
     if (idInput.value.trim() !== systemId) {
       idInput.value = systemId;
     }
@@ -1113,13 +953,14 @@ class ExperimentSystemManager {
       return;
     }
 
-    const syncFromSystem = () => this._syncExperimentIdInputFromSystem();
-    window.addEventListener("focus", syncFromSystem);
-    document.addEventListener("visibilitychange", () => {
+    this._syncFromSystemHandler = () => this._syncExperimentIdInputFromSystem();
+    this._visibilityHandler = () => {
       if (document.visibilityState === "visible") {
-        syncFromSystem();
+        this._syncFromSystemHandler();
       }
-    });
+    };
+    window.addEventListener("focus", this._syncFromSystemHandler);
+    document.addEventListener("visibilitychange", this._visibilityHandler);
 
     this._experimentIdUiSyncBound = true;
   }
@@ -1149,14 +990,8 @@ class ExperimentSystemManager {
     newId = newId.trim();
     Logger.debug("設定實驗ID:", newId);
 
-    const stateManager = this.pageManager?.experimentStateManager;
-    if (stateManager?.setExperimentId || this.hubManager?.setExperimentId) {
-      this._applyExperimentIdToManagers(newId, source);
-    } else {
-      Logger.warn("setExperimentId: 找不到可用的狀態管理器");
-    }
+    this._applyExperimentIdToManagers(newId, source);
 
-    // 同步模式下註冊到中樞
     const isSync = this.hubManager?.isInSyncMode?.() || false;
     const registerFlag = registerToHub === undefined
       ? true
@@ -1188,7 +1023,6 @@ class ExperimentSystemManager {
 
     this._updateExperimentIdUI(newId);
 
-    // 重新計算組合排序
     if (reapplyCombination) {
       await this._reapplyCombinationWithCurrentId({ skipBroadcast: skipCombinationBroadcast });
     }
@@ -1249,7 +1083,7 @@ class ExperimentSystemManager {
     const combo = this.combinationManager.getCurrentCombination();
     const unitIds = this.combinationManager.getCurrentUnitIds();
     if (combo && unitIds.length > 0) {
-      setTimeout(() => this._updateUIForCombination(combo, unitIds), 0);
+      requestAnimationFrame(() => this._updateUIForCombination(combo, unitIds));
     }
 
     if (this.pageManager?.experimentStateManager?.setupInputSync) {
@@ -1258,10 +1092,8 @@ class ExperimentSystemManager {
   }
 
   _applyPendingUiUpdates() {
-    // 將目前系統實驗 ID 同步回 UI 的輸入框
     this._syncExperimentIdInputFromSystem();
 
-    // 將先前暫存的受試者名稱套用到輸入欄位
     if (this.state.pendingParticipantName) {
       const input = document.getElementById("participantNameInput");
       if (input) {
@@ -1310,7 +1142,6 @@ class ExperimentSystemManager {
       }
     }
 
-    // 產生新 ID
     const newId = generateExperimentId();
     await this.setExperimentId(newId, RECORD_SOURCES.LOCAL_GENERATE);
     Logger.debug("新實驗ID已產生:", newId);
@@ -1326,7 +1157,6 @@ class ExperimentSystemManager {
     let experimentId = null;
     const isSync = this.hubManager?.isInSyncMode?.() || false;
 
-    // 先嘗試從 Hub 取得實驗 ID
     if (isSync) {
       try {
         experimentId = await this.hubManager.getExperimentId();
@@ -1338,7 +1168,6 @@ class ExperimentSystemManager {
       }
     }
 
-    // 再檢查 localStorage 快取（由 HubManager 讀取）
     if (!experimentId && this.hubManager) {
       const cachedId = this.hubManager.getExperimentId();
       if (cachedId) {
@@ -1347,7 +1176,6 @@ class ExperimentSystemManager {
       }
     }
 
-    // 如果 UI input 已存在，則檢查其值
     const idInput = document.getElementById("experimentIdInput");
     if (!experimentId && idInput) {
       const inputVal = idInput.value.trim();
@@ -1357,18 +1185,21 @@ class ExperimentSystemManager {
       }
     }
 
-    // 若仍無 ID，則產生新 ID
     if (!experimentId) {
       experimentId = generateExperimentId();
       Logger.debug(`實驗ID來源：新產生 (${experimentId})`);
     }
 
-    // 套用（不重複廣播，避免初始化時的雜訊）
+    // 只有 operator 才有資格向 Hub 登記或廣播初始 ID，
+    // 避免 viewer/board 搶先以本地產生的 ID 覆蓋 Hub 狀態。
+    const role = this.hubManager?.getRole?.();
+    const isOperator = !role || role === SYNC_ROLE_CONFIG.OPERATOR;
     await this.setExperimentId(
       experimentId,
       RECORD_SOURCES.LOCAL_INITIALIZE,
       {
-        broadcast: isSync,
+        registerToHub: isOperator,
+        broadcast: isSync && isOperator,
         reapplyCombination: false,
       },
     );
@@ -1376,7 +1207,6 @@ class ExperimentSystemManager {
     this._syncExperimentIdInputFromSystem();
     this._bindExperimentIdUiSyncGuards();
 
-    // 綁定輸入框 change 事件（如果元素存在）
     if (idInput) {
       this._setupExperimentIdInputListener(idInput);
     } else {
@@ -1406,10 +1236,8 @@ class ExperimentSystemManager {
     });
   }
 
-  _handleFlowStarted(data) {
-    // 日誌記錄：board 端持久化（panel 端 recordManager 為 null，自動跳過）
-    // initialize() 由 board-page-manager._handleFlowStarted 負責（先訂閱先執行），
-    // 此處只記錄 EXP_START 狀態日誌。
+  _handleFlowStarted() {
+    // board 端持久化；panel 端 recordManager 為 null，自動跳過
     this.recordManager?.logExperimentStart();
     this._applyExperimentLockState({ locked: true, allowParticipantEdit: false });
     this._updateExperimentControlsForStarted();
@@ -1417,8 +1245,8 @@ class ExperimentSystemManager {
     Logger.debug("【<green>FLOW STARTED</green>】回應實驗開始事件，UI已更新");
   }
 
-  _handleFlowPaused(data) {
-    // 日誌記錄：board 端持久化（panel 端 recordManager 為 null，自動跳過）
+  _handleFlowPaused() {
+    // board 端持久化；panel 端 recordManager 為 null，自動跳過
     this.recordManager?.logExperimentPause();
     this._applyExperimentLockState({ locked: true, allowParticipantEdit: true });
     this._updateExperimentControlsForPaused();
@@ -1426,8 +1254,8 @@ class ExperimentSystemManager {
     Logger.debug("【<yellow>FLOW PAUSED</yellow>】回應實驗暫停事件，UI和計時器已更新");
   }
 
-  _handleFlowResumed(data) {
-    // 日誌記錄：board 端持久化（panel 端 recordManager 為 null，自動跳過）
+  _handleFlowResumed() {
+    // board 端持久化；panel 端 recordManager 為 null，自動跳過
     this.recordManager?.logExperimentResume();
     this._applyExperimentLockState({ locked: true, allowParticipantEdit: false });
     this._updateExperimentControlsForResumed();
@@ -1436,8 +1264,7 @@ class ExperimentSystemManager {
   }
 
   _handleFlowStopped(data) {
-    // 日誌記錄：board 端持久化（panel 端 recordManager 為 null，自動跳過）
-    // 此處用於統一處理實驗結束狀態，包含 STOPPED 與 COMPLETED 兩種結束來源
+    // board 端持久化；panel 端 recordManager 為 null，自動跳過
     this.recordManager?.logExperimentEnd();
     this._applyExperimentLockState({ locked: false, allowParticipantEdit: true });
     this._updateExperimentControlsForStopped();
@@ -1456,7 +1283,6 @@ class ExperimentSystemManager {
 
   /**
    * 將實驗控制 UI 重置為已停止狀態。
-   * 供外部呼叫，例如 resetGestureSequenceForRecordSync。
    * @public
    */
   resetControlsToStopped() {
@@ -1488,22 +1314,14 @@ class ExperimentSystemManager {
     );
   }
 
-  _setUILocked(locked) {
-    this.uiManager.setUILocked(locked, {
+  _applyExperimentLockState({ locked, allowParticipantEdit }) {
+    this.uiManager.setUILocked(!!locked, {
       combinationSelector: this.state.containers?.combinationSelector ?? null,
     });
     if (typeof this.pageManager?.setExperimentControlsLocked === "function") {
-      this.pageManager.setExperimentControlsLocked(locked);
+      this.pageManager.setExperimentControlsLocked(!!locked);
     }
-  }
-
-  _setParticipantEditAllowed(allowed) {
-    this.uiManager.setParticipantEditAllowed(allowed);
-  }
-
-  _applyExperimentLockState({ locked, allowParticipantEdit }) {
-    this._setUILocked(!!locked);
-    this._setParticipantEditAllowed(!!allowParticipantEdit);
+    this.uiManager.setParticipantEditAllowed(!!allowParticipantEdit);
   }
 
   _tryCallPageManager(methodName, ...args) {

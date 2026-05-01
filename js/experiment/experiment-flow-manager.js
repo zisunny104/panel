@@ -50,17 +50,6 @@ class ExperimentFlowManager extends EventEmitter {
       deferCompletion: false,
     };
 
-    this.state = ExperimentFlowManager.STATE.IDLE;
-    this.isRunning = false;
-    this.isPaused = false;
-    this.locked = false;
-
-    this.currentUnitIndex = 0;
-    this.currentStepIndex = 0;
-    this.loadedUnits = [];
-    this.completedUnits = new Set();
-    this.deferCompletion = false;
-
     this.autoProgressTimer = null;
     this.pausedByVisibility = false;
 
@@ -69,8 +58,6 @@ class ExperimentFlowManager extends EventEmitter {
   }
 
   _setupVisibilityHandler() {
-    if (typeof document === "undefined") return;
-
     document.addEventListener(EXPERIMENT_FLOW_DOM_EVENTS.VISIBILITY_CHANGE, () => {
       if (document.hidden) {
         if (this.isRunning && !this.isPaused) {
@@ -240,7 +227,7 @@ class ExperimentFlowManager extends EventEmitter {
       this.currentStepIndex = 0;
       this.completedUnits.clear();
 
-      if (this.actionHandler && typeof window !== "undefined") {
+      if (this.actionHandler) {
         const unitIds =
           this.loadedUnits.length > 0
             ? this.loadedUnits
@@ -295,7 +282,7 @@ class ExperimentFlowManager extends EventEmitter {
         newState: this.state,
       });
 
-      if (broadcast && typeof window !== "undefined") {
+      if (broadcast) {
         document.dispatchEvent(
           new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
             detail: startData,
@@ -354,7 +341,7 @@ class ExperimentFlowManager extends EventEmitter {
       newState: this.state,
     });
 
-    if (broadcast && typeof window !== "undefined") {
+    if (broadcast) {
       document.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.EXPERIMENT_PAUSED, {
           detail: pauseData,
@@ -401,7 +388,7 @@ class ExperimentFlowManager extends EventEmitter {
       newState: this.state,
     });
 
-    if (broadcast && typeof window !== "undefined") {
+    if (broadcast) {
       document.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.EXPERIMENT_RESUMED, {
           detail: resumeData,
@@ -447,7 +434,7 @@ class ExperimentFlowManager extends EventEmitter {
       newState: this.state,
     });
 
-    if (broadcast && typeof window !== "undefined") {
+    if (broadcast) {
       document.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, {
           detail: stopData,
@@ -493,7 +480,7 @@ class ExperimentFlowManager extends EventEmitter {
       newState: this.state,
     });
 
-    if (broadcast && typeof window !== "undefined") {
+    if (broadcast) {
       document.dispatchEvent(
         new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, {
           detail: completedData,
@@ -669,10 +656,6 @@ class ExperimentFlowManager extends EventEmitter {
       return unitsData.find((u) => u.unit_id === unitId) || null;
     }
 
-    if (typeof window !== "undefined" && window._allUnits) {
-      return window._allUnits.find((u) => u.unit_id === unitId) || null;
-    }
-
     return null;
   }
 
@@ -707,20 +690,6 @@ class ExperimentFlowManager extends EventEmitter {
    */
   isUnitCompleted(unitIndex) {
     return this.completedUnits.has(unitIndex);
-  }
-
-  /**
-   * 檢查實驗是否進行中
-   */
-  isExperimentRunning() {
-    return this.isRunning;
-  }
-
-  /**
-   * 檢查實驗是否暫停
-   */
-  isExperimentPaused() {
-    return this.isPaused;
   }
 
   /**

@@ -193,7 +193,6 @@ class SyncManager {
       statusConfig: SyncManager.STATUS,
       indicatorManager: this.indicatorManager,
     });
-    this.connectionCheckTimer = null;
     this.serverOnline = null;
     this.isCheckingConnection = false;
     this.eventListeners = [];
@@ -342,11 +341,7 @@ class SyncManager {
       }
 
       try {
-        const result = await this.core.syncClient.restoreSession(
-          sessionId,
-          clientId,
-          role,
-        );
+        const result = await this.core.syncClient.restoreSession();
         if (result && result.success !== false) {
           Logger.debug("工作階段還原成功", {
             sessionId,
@@ -431,23 +426,12 @@ class SyncManager {
     );
 
     const syncDataClearedHandler = (event) => {
-      Logger.warn("監聽到 sync_data_cleared 事件", event.detail);
-
       const { reason, message } = event.detail || {};
       Logger.warn(`同步數據已清除 [${reason}]: ${message}`);
 
       this.isSyncMode = false;
-      Logger.info("已切換為本機模式");
-
       this.ui?.hidePanel();
       this.ui?.updateIndicator();
-
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.DATA_CLEARED, {
-          detail: { reason, message, timestamp: Date.now() },
-        }),
-      );
-      Logger.info("已派發 SYNC_DATA_CLEARED 事件");
     };
 
     this._addManagedListener(
@@ -455,7 +439,6 @@ class SyncManager {
       SYNC_EVENTS.DATA_CLEARED,
       syncDataClearedHandler,
     );
-    Logger.debug("已監聽 sync_data_cleared 事件");
 
     const disconnectedHandler = (event) => {
       Logger.warn(
@@ -554,13 +537,6 @@ class SyncManager {
     // SyncClient 自己的獨立 loop 已不再需要，SyncManager 接管狀態感知
     this.core.syncClient?.stopHealthCheck?.();
 
-    if (this.connectionCheckTimer) {
-      clearInterval(this.connectionCheckTimer);
-      this.connectionCheckTimer = null;
-    }
-
-    // serverOnline 現在由 WS 事件（_updateServerOnline）即時維護，
-    // 不再需要 setInterval 輪詢。呼叫一次 checkConnection() 讓 indicator 反映當前狀態。
     void this.checkConnection();
   }
 
@@ -613,10 +589,6 @@ class SyncManager {
     this.eventListeners.forEach(({ target, event, handler }) => {
       target.removeEventListener(event, handler);
     });
-
-    if (this.connectionCheckTimer) {
-      clearInterval(this.connectionCheckTimer);
-    }
 
     this.ui?.cleanup();
     this.sessions?.cleanup();

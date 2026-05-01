@@ -8,7 +8,7 @@
  */
 import { Logger } from "../core/console-manager.js";
 import { RECORD_TYPES } from "../constants/index.js";
-import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
+import { ExperimentFlowManager } from "../experiment/experiment-flow-manager.js";
 
 class PanelLogger {
   // ==================== 建構子與初始化 ====================
@@ -23,7 +23,6 @@ class PanelLogger {
     buttonManager,
   } = {}) {
     this.logEntries = [];
-    this.logger = Logger;
     this.timeSyncManager = timeSyncManager;
     this.experimentFlowManager = experimentFlowManager;
     this.experimentActionHandler = experimentActionHandler;
@@ -270,6 +269,22 @@ class PanelLogger {
 
   // ==================== 顯示層 ====================
 
+  _formatEntryText(entry) {
+    const tsm = this.timeSyncManager;
+    const time = tsm?.formatDateTime
+      ? tsm.formatDateTime(new Date(entry.ts))
+      : new Date(entry.ts).toISOString();
+    const actionId = entry.a_id ? ` [${entry.a_id}]` : "";
+    return `[${time}]${actionId} ${entry.msg || entry.type}`;
+  }
+
+  _flashButton(id, cls, durationMs) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.add(cls);
+    setTimeout(() => btn.classList.remove(cls), durationMs);
+  }
+
   /**
    * 在日誌面板中顯示一筆日誌條目
    */
@@ -278,15 +293,7 @@ class PanelLogger {
 
     const logElement = document.createElement("div");
     logElement.className = `log-entry ${logEntry.type}`;
-
-    const tsm = this.timeSyncManager;
-    const time = tsm?.formatDateTime
-      ? tsm.formatDateTime(new Date(logEntry.ts))
-      : new Date(logEntry.ts).toISOString();
-
-    const label = logEntry.msg || logEntry.type;
-    const actionId = logEntry.a_id ? ` [${logEntry.a_id}]` : "";
-    logElement.textContent = `[${time}]${actionId} ${label}`;
+    logElement.textContent = this._formatEntryText(logEntry);
 
     this.logContent.appendChild(logElement);
     this.logContent.scrollTop = this.logContent.scrollHeight;
@@ -296,26 +303,19 @@ class PanelLogger {
 
   clearLog() {
     this.logEntries = [];
-    if (this.logContent) {
-      this.logContent.innerHTML = "";
-    }
+    if (this.logContent) this.logContent.innerHTML = "";
     this.logAction("日誌已清空");
-
-    const mediaManager = this.panelMediaManager;
-    if (mediaManager) {
-      mediaManager.reset();
-    }
-
-    const buttonManager = this.buttonManager;
-    if (buttonManager) {
-      buttonManager.buttonFunctionsMap = {};
-      buttonManager.loadButtonFunctions();
+    this.panelMediaManager?.reset();
+    const bm = this.buttonManager;
+    if (bm) {
+      bm.buttonFunctionsMap = {};
+      bm.loadButtonFunctions();
     }
   }
 
   exportLog() {
     if (this.logEntries.length === 0) {
-      this.logger.warn("沒有日誌內容可匯出");
+      Logger.warn("沒有日誌內容可匯出");
       return;
     }
 
@@ -380,99 +380,55 @@ class PanelLogger {
   }
 
   _getExperimentOnlyLogs(entries = []) {
+    const lifecycleTypes = new Set([
+      RECORD_TYPES.EXP_START,
+      RECORD_TYPES.EXP_END,
+      RECORD_TYPES.EXP_PAUSE,
+      RECORD_TYPES.EXP_RESUME,
+    ]);
     return entries.filter((entry) => {
-      const type = entry?.type;
-      const actionId = entry?.a_id;
-
-      return (
-        type === RECORD_TYPES.EXP_START ||
-        type === RECORD_TYPES.EXP_END ||
-        type === RECORD_TYPES.EXP_PAUSE ||
-        type === RECORD_TYPES.EXP_RESUME ||
-        (
-          type === RECORD_TYPES.ACTION &&
-          Boolean(actionId) &&
-          actionId !== "export_log"
-        )
-      );
+      if (!entry) return false;
+      if (lifecycleTypes.has(entry.type)) return true;
+      return entry.type === RECORD_TYPES.ACTION && Boolean(entry.a_id) && entry.a_id !== "export_log";
     });
   }
 
   copyLog() {
     if (this.logEntries.length === 0) {
-      this.logger.warn("沒有日誌內容可複製");
+      Logger.warn("沒有日誌內容可複製");
       return;
     }
 
-    const tsm = this.timeSyncManager;
-    const logText = this.logEntries
-      .map((entry) => {
-        const time = tsm?.formatDateTime
-          ? tsm.formatDateTime(new Date(entry.ts))
-          : new Date(entry.ts).toISOString();
-        const label = entry.msg || entry.type;
-        const actionId = entry.a_id ? ` [${entry.a_id}]` : "";
-        return `[${time}]${actionId} ${label}`;
-      })
-      .join("\n");
+    const logText = this.logEntries.map((entry) => this._formatEntryText(entry)).join("\n");
 
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    if (navigator.clipboard?.writeText) {
       navigator.clipboard
         .writeText(logText)
         .then(() => {
-          this.logger.debug("日誌已複製到剪貼簿");
+          Logger.debug("日誌已複製到剪貼簿");
           this.logAction("日誌已複製到剪貼簿");
-          this.showCopySuccess();
+          this._flashButton("copyLogButton", "copy-success", 1500);
         })
-        .catch(() => {
-          this.handleCopyError("複製失敗");
-        });
+        .catch(() => this._handleCopyError("複製失敗"));
     } else {
-      this.handleCopyError(
-        "瀏覽器不支援自動複製功能，請手動選取並複製日誌內容",
-      );
+      this._handleCopyError("瀏覽器不支援自動複製功能，請手動選取並複製日誌內容");
     }
   }
 
-  handleCopyError(errorMessage) {
-    this.logger.error("複製功能錯誤:", errorMessage);
-    this.showCopyError();
-  }
-
-  showCopySuccess() {
-    const copyButton = document.getElementById("copyLogButton");
-    if (copyButton) {
-      copyButton.classList.add("copy-success");
-      setTimeout(() => copyButton.classList.remove("copy-success"), 1500);
-    }
-  }
-
-  showCopyError() {
-    const copyButton = document.getElementById("copyLogButton");
-    if (copyButton) {
-      copyButton.classList.add("copy-error");
-      setTimeout(() => copyButton.classList.remove("copy-error"), 3000);
-    }
+  _handleCopyError(errorMessage) {
+    Logger.error("複製功能錯誤:", errorMessage);
+    this._flashButton("copyLogButton", "copy-error", 3000);
   }
 
   setupEventListeners() {
-    const clearLogButton = document.getElementById("clearLogButton");
-    if (clearLogButton) {
-      clearLogButton.addEventListener("click", () => this.clearLog());
-    }
-
-    const exportLogButton = document.getElementById("exportLogButton");
-    if (exportLogButton) {
-      exportLogButton.addEventListener("click", () => this.exportLog());
-    }
-
-    const copyLogButton = document.getElementById("copyLogButton");
-    if (copyLogButton) {
-      copyLogButton.addEventListener("click", () => this.copyLog());
-    }
+    [
+      ["clearLogButton", () => this.clearLog()],
+      ["exportLogButton", () => this.exportLog()],
+      ["copyLogButton", () => this.copyLog()],
+    ].forEach(([id, handler]) => {
+      document.getElementById(id)?.addEventListener("click", handler);
+    });
   }
 }
 
-// ES6 模組匯出
-export default PanelLogger;
 export { PanelLogger };

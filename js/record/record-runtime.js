@@ -26,9 +26,7 @@ export const recordRuntime = {
         this.records.find((record) => record?.exp_id)?.exp_id ||
         "unknown_experiment";
       const filename = `${resolvedExperimentId}_${Date.now()}.jsonl`;
-      const apiUrl = this._getApiUrl();
-
-      const response = await fetch(`${apiUrl}${API_ENDPOINTS.RECORD.SAVE}`, {
+      const response = await fetch(`${getApiUrl()}${API_ENDPOINTS.RECORD.SAVE}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename, content: jsonlContent }),
@@ -50,9 +48,5 @@ export const recordRuntime = {
       Logger.warn("儲存到 runtime 資料夾失敗（僅儲存於 IndexedDB）:", error.message);
       return false;
     }
-  },
-
-  _getApiUrl() {
-    return getApiUrl();
   },
 };

@@ -5,6 +5,7 @@
  * 初始化各個管理器模組，並協調頁面各元件間的互動。
  */
 
+import { Logger } from "../core/console-manager.js";
 import {
   loadScenariosData,
   loadUnitsFromScenarios,
@@ -16,7 +17,7 @@ import {
 } from "../constants/index.js";
 import { experimentSyncManager } from "./board-experiment-sync.js";
 import { BoardSyncIO } from "./board-sync-io.js";
-import ExperimentFlowManager from "../experiment/experiment-flow-manager.js";
+import { ExperimentFlowManager } from "../experiment/experiment-flow-manager.js";
 import { buildBoardGestureScript } from "../experiment/experiment-script-builder.js";
 import { BoardUIManager } from "./board-ui-manager.js";
 import { generateExperimentId } from "../core/random-utils.js";
@@ -118,9 +119,9 @@ class BoardPageManager {
         await this.initializeModules();
       });
 
-      await this._runInitStage(this.initStages.COMPONENTS_INIT, async () => {
-        this.initializeRemainingComponents();
-      });
+      await this._runInitStage(this.initStages.COMPONENTS_INIT, () =>
+        this.initializeRemainingComponents(),
+      );
 
       // 完成
       this.currentStage = this.initStages.COMPLETE;
@@ -137,12 +138,12 @@ class BoardPageManager {
       );
       // 即使失敗也嘗試繼續基本功能
       try {
-        this.initializeRemainingComponents();
+        await this.initializeRemainingComponents();
       } catch (e) {
         Logger.error("初始化其他元件失敗:", e);
       }
 
-      // 即使初始化途中失敗，也結束 booting 狀態，避免頁面長時間停留在骨架畫面
+      // 確保 UI 渲染完成後才結束骨架載入狀態
       document.body?.setAttribute("data-board-stage", this.initStages.COMPLETE);
       document.body?.classList.remove("board-booting");
       document.body?.classList.add("board-ready");
@@ -170,7 +171,7 @@ class BoardPageManager {
   /**
    * 初始化其餘元件（在管理器初始化之後）
    */
-  initializeRemainingComponents() {
+  async initializeRemainingComponents() {
     // 保留 modules_init 階段已載入的資料，避免重複載入造成啟動成本上升。
     Object.assign(this, {
       scenariosData: this.scenariosData || null,
@@ -188,7 +189,6 @@ class BoardPageManager {
       pendingParticipantNameUpdate: null,
       actionsMap: this.actionsMap || new Map(),
       actionToStepMap: this.actionToStepMap || new Map(),
-      completedActions: new Set(),
       processedRemoteActions: new Map(),
     });
     this._lastCombinationRenderSignature = null;
@@ -198,7 +198,7 @@ class BoardPageManager {
     this.boardUIManager = new BoardUIManager(this);
     this.boardUIManager.init();
     Logger.debug("BoardUIManager 已初始化");
-    this.init();
+    await this.init();
   }
 
   /**
@@ -898,32 +898,6 @@ class BoardPageManager {
   }
 
   /**
-   * 完成目前 action（由 experiment-simulator 呼叫）
-   * @param {string} actionId - 完成的action ID
-   */
-  completeAction(actionId) {
-    const action = this.actionsMap.get(actionId);
-    if (!action) {
-      Logger.warn("未找到action:", actionId);
-      return false;
-    }
-
-    this.completedActions.add(actionId);
-
-    const stepInfo = this.actionToStepMap.get(actionId);
-    if (this.recordManager?.logAction) {
-      this.recordManager.logAction(actionId, null, stepInfo?.step_id);
-    }
-    Logger.debug(`Action完成: ${action.action_name}`, {
-      action_id: actionId,
-      step_id: stepInfo?.step_id,
-      unit_id: stepInfo?.unit_id,
-    });
-
-    return true;
-  }
-
-  /**
    * 更新全選複選框的狀態
    */
   updateSelectAllState() {
@@ -981,10 +955,6 @@ class BoardPageManager {
       Logger.warn("請輸入實驗ID");
       this.boardUIManager.focusExperimentIdInput();
       return false;
-    }
-
-    if (!this.experimentId) {
-      this.experimentId = experimentId;
     }
 
     if (
@@ -1110,10 +1080,10 @@ class BoardPageManager {
       this.timerManager.stopExperimentTimer();
     }
 
-    // stopFlowExperiment() 同步觸發 STOPPED 事件 →
+    // stopExperiment() 同步觸發 STOPPED 事件 →
     // ExperimentSystemManager._handleFlowStopped 同步寫入 EXP_END，
     // 之後 flushAll() 才能確保 EXP_END 已存在於 records
-    systemManager.stopFlowExperiment(options.reason || "manual", options);
+    systemManager.stopExperiment(options.reason || "manual", options);
 
     if (this.recordManager) {
       try {

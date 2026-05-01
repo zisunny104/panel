@@ -132,7 +132,10 @@ class ExperimentHubManager extends EventEmitter {
 
     const oldId = this.ids.experiment;
     this.ids.experiment = normalizedId;
-    if (this.syncClientReady) {
+    // 只有本地主動設定才算「已明確設定」，避免 reconnect 時遠端新 ID 被擋住
+    if (this.syncClientReady
+        && source !== RECORD_SOURCES.SYNC_BROADCAST
+        && source !== RECORD_SOURCES.HUB_SYNC) {
       this._experimentIdSetAfterSyncReady = true;
     }
 
@@ -240,16 +243,7 @@ class ExperimentHubManager extends EventEmitter {
         return true;
       }
 
-      if (this.connection.wsClient && !this.connection.connected) {
-        Logger.warn(
-          "WebSocket 尚未連接，將在連線後重新註冊實驗 ID",
-          experimentId,
-        );
-        this._pendingExperimentIdRegistration = experimentId;
-        return false;
-      }
-
-      Logger.warn("WebSocket 未連接，無法註冊實驗 ID");
+      Logger.warn("WebSocket 未連接，將在連線後重新註冊實驗 ID", experimentId);
       this._pendingExperimentIdRegistration = experimentId;
       return false;
     } catch (error) {
@@ -703,24 +697,20 @@ class ExperimentHubManager extends EventEmitter {
    * @param {Object} data - 實驗開始事件資料
    */
   handleExperimentStartedBroadcast(data) {
-    try {
-      Logger.debug("處理實驗開始廣播轉發", data);
+    Logger.debug("處理實驗開始廣播轉發", data);
 
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
-          detail: {
-            ...data,
-            broadcasted: true,
-            timestamp: Date.now(),
-          },
-        }),
-      );
+    window.dispatchEvent(
+      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
+        detail: {
+          ...data,
+          broadcasted: true,
+          timestamp: Date.now(),
+        },
+      }),
+    );
 
-      if (this.connection.role === SYNC_ROLE_CONFIG.OPERATOR) {
-        Logger.debug("操作者收到實驗開始廣播，更新本機狀態");
-      }
-    } catch (error) {
-      Logger.error("處理實驗開始廣播轉發失敗:", error);
+    if (this.connection.role === SYNC_ROLE_CONFIG.OPERATOR) {
+      Logger.debug("操作者收到實驗開始廣播，更新本機狀態");
     }
   }
 
@@ -863,6 +853,13 @@ class ExperimentHubManager extends EventEmitter {
    */
   getClientId() {
     return this.syncClient?.clientId || EXPERIMENT_HUB_CONSTANTS.DEFAULTS.CLIENT_ID;
+  }
+
+  /**
+   * 取得目前角色
+   */
+  getRole() {
+    return this.connection.role || null;
   }
 
   /**

@@ -1,4 +1,5 @@
 import { ACTION_IDS, ACTION_BUTTONS } from "../constants/action-constants.js";
+import { Logger } from "./console-manager.js";
 
 let scenariosDataCache = null;
 let scenariosDataPromise = null;

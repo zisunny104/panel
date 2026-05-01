@@ -87,6 +87,8 @@ export const SYNC_EVENTS = {
 
   // 本機 DOM 事件（dispatched on document，僅限頁面內部使用，非 WebSocket 同步）
   EXPERIMENT_STATE_CHANGE_LOCAL: "experiment_state_change_local",
+  EXPERIMENT_STATE_ID_CHANGED: "experimentState:experimentIdChanged",
+  EXPERIMENT_STATE_PARTICIPANT_CHANGED: "experimentState:participantNameChanged",
 
   // 同步狀態廣播事件（由 ExperimentSyncCore 派發，使用端直接監聽）
   STATE_BROADCAST: "state_broadcast",
@@ -150,18 +152,4 @@ export const SYNC_DATA_TYPES = {
  */
 export function getEventName(eventKey) {
   return SYNC_EVENTS[eventKey] || eventKey;
-}
-
-/**
- * 檢查事件是否為同步事件
- */
-export function isSyncEvent(eventName) {
-  return Object.values(SYNC_EVENTS).includes(eventName);
-}
-
-/**
- * 取得所有同步事件列表
- */
-export function getAllSyncEvents() {
-  return Object.values(SYNC_EVENTS);
 }

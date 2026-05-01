@@ -5,6 +5,7 @@
  * 與短暫狀態訊息（toast），支援 success/error/info/warning 四種類型。
  */
 import { Logger } from "../core/console-manager.js";
+
 class IndicatorManager {
   constructor() {
     this.capsule = null;
@@ -57,10 +58,8 @@ class IndicatorManager {
       </div>`;
 
     const indicator = this.capsule.querySelector(".sync-status-indicator");
-    if (indicator) {
-      indicator.addEventListener("click", (e) => {
-        if (typeof onClickCallback === "function") onClickCallback(e);
-      });
+    if (indicator && typeof onClickCallback === "function") {
+      indicator.addEventListener("click", onClickCallback);
     }
 
     document.body.appendChild(this.capsule);
@@ -109,7 +108,7 @@ class IndicatorManager {
       return;
     }
 
-    const queued = this.pendingStatusQueue.splice(0, this.pendingStatusQueue.length);
+    const queued = this.pendingStatusQueue.splice(0);
     queued.forEach(({ type, message }) => {
       this._appendStatusMessage(type, message);
     });
@@ -118,13 +117,7 @@ class IndicatorManager {
   _appendStatusMessage(type, message) {
     if (!message || !this.statusContainer) return;
 
-    const now = new Date();
-    const ts =
-      String(now.getHours()).padStart(2, "0") +
-      ":" +
-      String(now.getMinutes()).padStart(2, "0") +
-      ":" +
-      String(now.getSeconds()).padStart(2, "0");
+    const ts = new Date().toTimeString().slice(0, 8);
 
     const msg = document.createElement("div");
     msg.className = `indicator-status ${type || "info"}`;
@@ -159,6 +152,4 @@ class IndicatorManager {
   }
 }
 
-// ES6 模組匯出
-export default IndicatorManager;
 export { IndicatorManager };

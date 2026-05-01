@@ -1,12 +1,12 @@
 /**
-* ExperimentTimerManager - 實驗計時器管理器
-*
-* 提供實驗總計時與步驟計時功能。
-*/
+ * ExperimentTimerManager - 實驗計時器管理器
+ *
+ * 提供實驗總計時與步驟計時功能。
+ */
 
 import { TimeSyncManager } from "../core/time-sync-manager.js";
 
-export const ExperimentTimerManager = class ExperimentTimerManager {
+export class ExperimentTimerManager {
   constructor(options = {}) {
     this.stateManager = options.stateManager || null;
     this._localTimerState = {
@@ -15,9 +15,6 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
       experimentPaused: false,
     };
 
-    this.experimentStartTime = null;
-    this.experimentElapsedMs = 0;
-    this.experimentPaused = false;
     this.experimentInterval = null;
 
     this.timeSyncManager =
@@ -62,18 +59,15 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
     if (store === this.stateManager) {
       return Number(store.experimentElapsed) || 0;
     }
-
     return Number(store.experimentElapsedMs) || 0;
   }
 
   _writeExperimentElapsedMs(store, value) {
     const normalizedValue = Number(value) || 0;
-
     if (store === this.stateManager) {
       store.experimentElapsed = normalizedValue;
       return;
     }
-
     store.experimentElapsedMs = normalizedValue;
   }
 
@@ -101,22 +95,25 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
     this._getTimerStateStore().experimentPaused = Boolean(value);
   }
 
-  // ===== 實驗計時 =====
-  startExperimentTimer() {
-    if (this.experimentInterval) return;
-    this.experimentStartTime = Date.now();
-    this.experimentElapsedMs = 0;
-    this.experimentPaused = false;
+  _getTimerElement() {
+    return (
+      document.getElementById("experimentTimer") ||
+      document.getElementById("experiment-timer")
+    );
+  }
 
+  // ===== 實驗計時 =====
+
+  // 僅重啟 interval，不重置狀態（供 resume 使用）
+  _startTimerInterval() {
+    if (this.experimentInterval) return;
     this.experimentInterval = setInterval(() => {
       if (!this.experimentPaused) {
         this.experimentElapsedMs = Date.now() - this.experimentStartTime;
         if (typeof this.onExperimentTick === "function") {
           this.onExperimentTick(this.experimentElapsedMs);
         }
-        const el =
-          document.getElementById("experimentTimer") ||
-          document.getElementById("experiment-timer");
+        const el = this._getTimerElement();
         if (el) {
           el.textContent = this.timeSyncManager.formatStopwatch(
             this.experimentElapsedMs,
@@ -124,6 +121,14 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
         }
       }
     }, 50);
+  }
+
+  startExperimentTimer() {
+    if (this.experimentInterval) return;
+    this.experimentStartTime = Date.now();
+    this.experimentElapsedMs = 0;
+    this.experimentPaused = false;
+    this._startTimerInterval();
   }
 
   pauseExperimentTimer() {
@@ -149,9 +154,10 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
       this.startExperimentTimer();
       return;
     }
+    // 調整虛擬起始點，使 elapsed = now - startTime 仍保持累積值
     this.experimentStartTime = Date.now() - this.experimentElapsedMs;
     this.experimentPaused = false;
-    this.startExperimentTimer();
+    this._startTimerInterval();
   }
 
   stopExperimentTimer() {
@@ -162,9 +168,7 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
     }
     this.experimentStartTime = null;
     this.experimentElapsedMs = 0;
-    const el =
-      document.getElementById("experimentTimer") ||
-      document.getElementById("experiment-timer");
+    const el = this._getTimerElement();
     if (el) el.textContent = this.timeSyncManager.formatStopwatch(0);
 
     // 停止所有手勢時間卡片計時器並重置狀態
@@ -286,6 +290,7 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
   resetIndexedTimer(idx) {
     if (this.timerIntervals[idx]) {
       clearInterval(this.timerIntervals[idx]);
+      this.timerIntervals[idx] = null;
     }
     this._clearTimerOutline(idx);
     this.timerStates[idx] = {
@@ -323,5 +328,4 @@ export const ExperimentTimerManager = class ExperimentTimerManager {
     }
     return Math.floor((state.elapsedTime || 0) / 1000);
   }
-};
-
+}
