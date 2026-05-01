@@ -1,20 +1,26 @@
 # Node
 node_modules/
 package-lock.json
-npm-debug.log
+npm-debug.log*
 
 # Runtime data
 runtime/
-runtime/database/
-runtime/experiment-data/
 *.db
 *.db-shm
 *.db-wal
 *.jsonl
+*.backup
 
 # Editor
 .vscode/
+*.code-workspace
 .DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
 
 # Local AI tool settings
 .claude/
