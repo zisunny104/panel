@@ -1179,7 +1179,8 @@ class ExperimentSystemManager {
     const idInput = document.getElementById("experimentIdInput");
     if (!experimentId && idInput) {
       const inputVal = idInput.value.trim();
-      if (inputVal && inputVal !== "載入中...") {
+      const isInvalidStr = inputVal === "null" || inputVal === "undefined" || inputVal === "載入中...";
+      if (inputVal && !isInvalidStr) {
         experimentId = inputVal;
         Logger.debug(`實驗ID來源：輸入框 (${experimentId})`);
       }

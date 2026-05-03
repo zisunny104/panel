@@ -22,13 +22,13 @@ class ExperimentHubManager extends EventEmitter {
   constructor(config = {}) {
     super();
     this.config = {
+      ...config,
       apiBaseUrl: config.apiBaseUrl || this.getDefaultApiUrl(),
       autoReconnect:
         config.autoReconnect ?? EXPERIMENT_HUB_CONSTANTS.DEFAULTS.AUTO_RECONNECT,
       reconnectInterval:
         config.reconnectInterval ||
         EXPERIMENT_HUB_CONSTANTS.DEFAULTS.RECONNECT_INTERVAL_MS,
-      ...config,
     };
 
     this.ids = {

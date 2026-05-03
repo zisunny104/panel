@@ -509,11 +509,11 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
 
     return this._renderWhenVisible(containerEl, () => {
       const config = {
+        ...options,
         showTitle: options.showTitle !== false,
         title: options.title || "單元組合",
         activeId: options.activeId || null,
         onSelect: options.onSelect || null,
-        ...options,
       };
 
       const comboHtml = (combo) => `
@@ -571,6 +571,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
 
     return this._renderWhenVisible(containerEl, () => {
       const config = {
+        ...options,
         showHeader: options.showHeader !== false,
         headerTitle: options.headerTitle || "實驗單元",
         showSelectAll: options.showSelectAll !== false,
@@ -580,7 +581,6 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
         enableSorting: options.enableSorting !== false,
         onUnitToggle: options.onUnitToggle || null,
         onReorder: options.onReorder || null,
-        ...options,
       };
 
       // 依 unitIds 排序與勾選
@@ -845,6 +845,7 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
 
     return this._renderWhenVisible(containerEl, () => {
       const config = {
+        ...options,
         showExperimentId: options.showExperimentId !== false,
         showParticipantName: options.showParticipantName !== false,
         showTimer: options.showTimer !== false,
@@ -854,7 +855,6 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
         onPause: options.onPause || null,
         onStop: options.onStop || null,
         onRegenerateId: options.onRegenerateId || null,
-        ...options,
       };
 
       containerEl.innerHTML = `

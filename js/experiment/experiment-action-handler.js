@@ -41,8 +41,8 @@ class ExperimentActionHandler extends EventEmitter {
     super();
     // 設定
     this.config = {
-      enableRemoteSync: config.enableRemoteSync !== false,
       ...config,
+      enableRemoteSync: config.enableRemoteSync !== false,
     };
 
     // 動作序列狀態

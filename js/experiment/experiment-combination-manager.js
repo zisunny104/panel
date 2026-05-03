@@ -28,13 +28,13 @@ export class ExperimentCombinationManager extends EventEmitter {
   constructor(config = {}) {
     super();
     this.config = {
+      ...config,
       dataPath: config.dataPath || "data/scenarios.json",
       defaultCombinationId:
         config.defaultCombinationId ||
         getSharedConfig()?.experiment?.defaultCombinationId,
       enableRandomization: config.enableRandomization !== false,
       cacheEnabled: config.cacheEnabled !== false,
-      ...config,
     };
 
     this.scriptData = null;
