@@ -55,6 +55,17 @@ panel/
 
 ## 更新日誌
 
+#### v2.6.fd602b4 - 系統穩定性修正與架構收斂
+
+- 修正實驗控制按鈕（暫停／停止）在實驗開始後消失的問題（CSS `display` 與 `is-hidden` 機制衝突）
+- Panel 控制容器移出面板 DOM，實驗進行中持續可見，不受面板關閉影響
+- 修正電源動作（POWER_ON／OFF）廣播未觸發，board 端卡片不變綠
+- 修正 board 斷線後 SessionManager 殘留 stale operator，導致重連被拒（`認證失敗: board 操作者已存在`）
+- `ConnectionManager.unregister()` 成為所有清理的唯一入口，heartbeat timeout 與 close 事件路徑一致
+- 修正 board 頁面 ConfigManager 初始化等待 `window.load` 造成 17 秒延遲
+- 實驗 ID 初始化與設定選項合併修正
+- 同步面板 modal 底部新增版本號小字顯示
+
 #### v2.5.f184499 - 調整部分系統流程與修正錯誤
 - 新增/修正日誌與錯誤處理
 - 同步機制與 UI 初始化流程調整
