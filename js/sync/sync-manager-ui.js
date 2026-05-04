@@ -178,6 +178,8 @@ export class SyncManagerUI {
   }
 
   _renderControlPanelModal() {
+    const version = getSharedConfig()?.version || "";
+    const versionLabel = version ? `v${version}` : "";
     return `
       <div class="modal-overlay active" id="syncControlPanel">
         <div class="modal-container sync-control-panel">
@@ -188,6 +190,7 @@ export class SyncManagerUI {
               ${this._renderConnectedSection()}
               <div id="syncStatusMessage"></div>
             </div>
+            ${versionLabel ? `<div class="sync-panel-version">${versionLabel}</div>` : ""}
           </div>
         </div>
       </div>

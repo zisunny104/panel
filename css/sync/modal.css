@@ -172,6 +172,16 @@
     border-radius: 0 0 0.75rem 0.75rem;
 }
 
+/* 同步面板版本號小字 */
+.sync-panel-version {
+    text-align: center;
+    font-size: 0.7rem;
+    color: #bbb;
+    padding-top: 0.5rem;
+    letter-spacing: 0.03em;
+    user-select: none;
+}
+
 /* 模態視窗底部按鈕區域 */
 .modal-footer {
     padding: 1rem 1.5rem;
