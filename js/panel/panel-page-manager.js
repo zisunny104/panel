@@ -330,6 +330,9 @@ class PanelPageManager {
 
     this._notifyButtonManagerForActions(unitIds);
     this.panelUIManager.setExperimentPanelButtonColor("running");
+    this.panelUIManager.closePanel("experiment");
+    this.panelUIManager.closePanel("logger");
+    this.panelUIManager.closePanel("settings");
     this.buttonManager?.updateMediaForCurrentAction?.();
 
     Logger.debug("實驗開始處理完成");

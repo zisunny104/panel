@@ -1,5 +1,33 @@
 /* ===== 實驗控制區域 ===== */
 
+/*
+ * Panel 頁面（非 board）：實驗控制區獨立固定於右下角。
+ * 與 .experiment-panel 同位置，但 z-index 較高，面板開啟時疊於面板上方；
+ * 面板關閉後仍持續可見，不受 closePanel() 影響。
+ */
+body:not(.board-page) #experimentControlsContainer {
+    position: fixed;
+    right: 4rem;
+    bottom: 4.5rem;
+    width: 23.75rem;
+    max-height: 85vh;
+    overflow-y: auto;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.97);
+    color: #444;
+    border-radius: 0.875rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    border: 1px solid #ddd;
+    box-sizing: border-box;
+    min-height: 0;
+    min-width: 0;
+}
+
+body:not(.board-page) #experimentControlsContainer:empty {
+    display: none;
+}
+
 /* 實驗ID輸入區域 */
 .experiment-id-group {
     display: flex;

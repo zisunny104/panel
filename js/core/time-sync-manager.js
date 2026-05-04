@@ -51,14 +51,29 @@ class TimeSyncManager {
     return this.isSynced;
   }
 
+  normalizeServerTime(serverTime) {
+    if (typeof serverTime !== "number" || Number.isNaN(serverTime)) {
+      return null;
+    }
+
+    // WebSocket 可能傳回秒級時間戳，此時轉成毫秒
+    if (serverTime >= 1_000_000_000 && serverTime < 1_000_000_000_000) {
+      Logger.warn(
+        `[TimeSyncManager] serverTime 似乎為秒級，轉換為毫秒: ${serverTime} -> ${serverTime * 1000}`,
+      );
+      return serverTime * 1000;
+    }
+
+    return serverTime;
+  }
+
   /**
    * 透過 WebSocket 進行一次性校時
    * @param {number} serverTime - 伺服器時間戳（毫秒）
    */
   syncWithWebSocket(serverTime) {
-    // 必須是合理的 Unix ms 時間戳（2001 年後），避免 serverTime=0 或 undefined
-    // 導致 offset ≈ Date.now()（~1.775e12），使所有時間戳變成接近 epoch 的錯誤值
-    if (!serverTime || typeof serverTime !== "number" || serverTime < 1_000_000_000_000) {
+    const normalizedServerTime = this.normalizeServerTime(serverTime);
+    if (!normalizedServerTime || normalizedServerTime < 1_000_000_000_000) {
       Logger.warn(
         `[TimeSyncManager] 收到無效的 serverTime，略過校時: ${serverTime}`,
       );
@@ -66,7 +81,7 @@ class TimeSyncManager {
     }
 
     const clientTime = Date.now();
-    const offset = clientTime - serverTime;
+    const offset = clientTime - normalizedServerTime;
 
     // 記錄樣本
     this.syncSamples.push({

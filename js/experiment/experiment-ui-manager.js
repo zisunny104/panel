@@ -36,7 +36,6 @@ class ExperimentUIManager extends ExperimentUIRenderer {
       flowManager: null,
       combinationManager: null,
       hubManager: null,
-      panelUIManager: null,
       experimentSystemManager: null,
       syncManager: null,
       syncClient: null,
@@ -243,13 +242,6 @@ class ExperimentUIManager extends ExperimentUIRenderer {
   /** @private */
   _handleExperimentStart() {
     Logger.debug("開始實驗");
-    const panelUIManager = this.dependencies.panelUIManager;
-    if (panelUIManager) {
-      panelUIManager.closePanel("experiment");
-      panelUIManager.closePanel("logger");
-      panelUIManager.closePanel("settings");
-      Logger.debug("實驗開始：已關閉所有面板");
-    }
     const toggle = this.elements.get("visualHintsToggle");
     if (toggle && this.isVisualHintsEnabled()) {
       this.updateHighlightVisibility();

@@ -596,7 +596,11 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   _scheduleCompletionBroadcast(action, actionData) {
-    if (!actionData?.buttonId) return;
+    const currentActionId = this._getActionId(action);
+    const isPowerAction =
+      currentActionId === ACTION_IDS.POWER_ON ||
+      currentActionId === ACTION_IDS.POWER_OFF;
+    if (!actionData?.buttonId && !isPowerAction) return;
 
     const target = this._getCompletionBroadcastTarget(action, actionData);
     if (!target) return;

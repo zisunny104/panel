@@ -4,6 +4,7 @@
  * 提供手勢標記、步驟切換與統計相關的共用函式。
  */
 
+import { Logger } from "../core/console-manager.js";
 import { SYNC_DATA_TYPES } from "../constants/index.js";
 
 export const createBoardGestureUtils = function (deps) {

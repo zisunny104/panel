@@ -169,7 +169,6 @@ export async function initializePanelManagers(page) {
     syncManager: page.syncManager,
     syncClient: page.syncManager?.core?.syncClient,
     experimentSyncCore: page.experimentSyncCore,
-    panelUIManager: page.panelUIManager,
   });
   logInitDuration("ExperimentUIManager 已初始化", uiStart);
   page.panelUIManager.updateDependencies({
