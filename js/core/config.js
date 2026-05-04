@@ -103,10 +103,12 @@ class ConfigManager {
    * @param {Object} settings 設定物件
    */
   async applySettings(settings) {
-    // 等待 DOM 完全載入
-    if (document.readyState !== "complete") {
+    // 等待 DOM 解析完成（DOMContentLoaded）。
+    // ES modules 執行時 DOM 通常已 interactive，此條件很少觸發。
+    // 不等 window.load（所有資源載入），避免大量媒體資源導致長時間阻塞。
+    if (document.readyState === "loading") {
       await new Promise((resolve) =>
-        window.addEventListener("load", resolve, { once: true }),
+        document.addEventListener("DOMContentLoaded", resolve, { once: true }),
       );
     }
 

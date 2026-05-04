@@ -166,9 +166,9 @@ body:not(.board-page) #experimentControlsContainer:empty {
     box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
 }
 
-/* 實驗控制按鈕 */
+/* 實驗控制按鈕：預設透過 .is-hidden 隱藏，showElement() 移除後以 flex 顯示 */
 .experiment-control-buttons {
-    display: none;
+    display: flex;
     gap: 8px;
     flex-direction: row;
     margin-top: 10px;
