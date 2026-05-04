@@ -160,7 +160,9 @@ export class ConnectionManager {
   }
 
   /**
-   * 移除 WebSocket 連線
+   * 移除 WebSocket 連線，並同步清理 SessionManager 成員。
+   * 無論觸發來源（close 事件、heartbeat timeout、rate limit），
+   * 都由此方法統一執行所有清理，避免 stale session state。
    * @param {string} wsConnectionId - WebSocket 連線 ID
    */
   unregister(wsConnectionId) {
@@ -171,6 +173,14 @@ export class ConnectionManager {
     }
 
     const { clientId, sessionId } = connection;
+
+    // 同步清理 SessionManager：確保無論何種斷線路徑都不殘留 stale operator
+    if (clientId && sessionId && this.sessionManager) {
+      const removed = this.sessionManager.removeClient(sessionId, clientId);
+      if (removed) {
+        this.onClientLeft?.(sessionId, clientId);
+      }
+    }
 
     // 移除客戶端ID映射
     if (clientId) {

@@ -179,6 +179,11 @@ const messageHandler = new MessageHandler(
   broadcastManager,
 );
 
+// 任何斷線（含 heartbeat timeout）從 SessionManager 移除後廣播 clientLeft
+connectionManager.onClientLeft = (sessionId, clientId) => {
+  broadcastManager.broadcastClientLeft(sessionId, clientId);
+};
+
 // 建立 WebSocket 伺服器
 const wsServer = new WSServer(httpServer);
 wsServer.initialize({

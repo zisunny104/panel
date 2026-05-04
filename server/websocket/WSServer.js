@@ -204,43 +204,15 @@ export class WSServer {
 
   /**
    * 處理連線關閉
+   * Session 成員清理與 clientLeft 廣播由 ConnectionManager.unregister() 統一處理，
+   * 無論來源為 close 事件或 heartbeat timeout 皆一致。
    * @param {string} wsConnectionId - 連線 ID
    * @param {number} code - 關閉代碼
    * @param {string} reason - 關閉原因
    */
   handleClose(wsConnectionId, code, reason) {
     Logger.debug(`連線關閉 [${wsConnectionId}]: ${code} - ${reason}`);
-
-    const connInfo = this.connectionManager?.getConnectionInfo?.(wsConnectionId);
-    const clientId = connInfo?.clientId || null;
-    const sessionId = connInfo?.sessionId || null;
-    const shouldCleanupSessionMember = Boolean(
-      clientId &&
-      sessionId &&
-      this.connectionManager?.isActiveClientConnection?.(wsConnectionId, clientId),
-    );
-
     this.connectionManager.unregister(wsConnectionId);
-
-    if (shouldCleanupSessionMember) {
-      try {
-        const removed = this.messageHandler?.sessionManager?.removeClient?.(
-          sessionId,
-          clientId,
-        );
-
-        if (removed) {
-          this.messageHandler?.broadcastManager?.broadcastClientLeft?.(
-            sessionId,
-            clientId,
-          );
-        }
-      } catch (error) {
-        Logger.warn(
-          `清理工作階段客戶端失敗 [${wsConnectionId}] ${clientId} -> ${sessionId}: ${error.message}`,
-        );
-      }
-    }
   }
 
   /**
