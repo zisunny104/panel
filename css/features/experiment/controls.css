@@ -1,9 +1,10 @@
 /* ===== 實驗控制區域 ===== */
 
 /*
- * Panel 頁面（非 board）：實驗控制區獨立固定於右下角。
- * 與 .experiment-panel 同位置，但 z-index 較高，面板開啟時疊於面板上方；
- * 面板關閉後仍持續可見，不受 closePanel() 影響。
+ * Panel 頁面（非 board）：實驗控制區固定於右下角，
+ * 移出 .experiment-panel 因此不受面板關閉影響。
+ * pointer-events: none 讓容器透明空間不攔截點擊（正確語義），
+ * 子元件透過 > * 恢復互動。
  */
 body:not(.board-page) #experimentControlsContainer {
     position: fixed;
@@ -20,12 +21,15 @@ body:not(.board-page) #experimentControlsContainer {
     padding: 1rem;
     border: 1px solid #ddd;
     box-sizing: border-box;
-    min-height: 0;
-    min-width: 0;
+    pointer-events: none;
 }
 
 body:not(.board-page) #experimentControlsContainer:empty {
     display: none;
+}
+
+body:not(.board-page) #experimentControlsContainer > * {
+    pointer-events: auto;
 }
 
 /* 實驗ID輸入區域 */
