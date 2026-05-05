@@ -108,9 +108,6 @@ export async function initializeBoardManagers(page) {
       timeSyncManager: page.syncManager?.core?.timeSyncManager,
     });
     logInitDuration("ExperimentStateManager 已初始化", stateStart);
-    page.experimentFlowManager.injectDependencies({
-      stateManager: page.experimentStateManager,
-    });
 
     if (!page.recordManager) {
       const logStart = performance.now();
@@ -135,11 +132,9 @@ export async function initializeBoardManagers(page) {
         getCurrentCombination: () => page.currentCombination,
       });
     }
-    page.timerManager.injectStateManager(page.experimentStateManager);
-
     if (!page.uiManager) {
       const uiStart = performance.now();
-      page.uiManager = new ExperimentUIManager({ timerManager: page.timerManager });
+      page.uiManager = new ExperimentUIManager({});
       page.uiManager.initialize();
       page.uiManager.injectFlowManager(page.experimentFlowManager);
       page.uiManager.updateDependencies({
@@ -175,6 +170,7 @@ export async function initializeBoardManagers(page) {
         syncLogsNow: () => page.recordManager?.flushAll?.(),
         onRecordsSyncedRefresh: () =>
           page.resetGestureSequenceForRecordSync?.(),
+        getExperimentIsPaused: () => page.experimentFlowManager?.isPaused ?? false,
       });
       if (!recordView._initialized) {
         recordView.initialize();

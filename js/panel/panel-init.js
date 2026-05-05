@@ -160,7 +160,7 @@ export async function initializePanelManagers(page) {
   });
 
   const uiStart = performance.now();
-  page.uiManager = new ExperimentUIManager({ timerManager: page.timerManager });
+  page.uiManager = new ExperimentUIManager({});
   page.uiManager.initialize();
   page.uiManager.injectFlowManager(page.experimentFlowManager);
   page.uiManager.updateDependencies({

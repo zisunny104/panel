@@ -29,8 +29,6 @@ class ExperimentUIManager extends ExperimentUIRenderer {
       selectors: config.selectors || {},
     };
 
-    this.timerManager = config.timerManager || null;
-
     // dependencies container
     this.dependencies = {
       flowManager: null,
@@ -198,43 +196,6 @@ class ExperimentUIManager extends ExperimentUIRenderer {
     selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
   }
 
-  // ==========================================
-  // 計時器委派（給 experimentTimerManager）
-  // ==========================================
-
-  startExperimentTimer() {
-    this.timerManager.startExperimentTimer();
-    Logger.debug("實驗計時器已啟動");
-  }
-
-  pauseExperimentTimer() {
-    const etm = this.timerManager;
-    if (!etm.experimentStartTime) { Logger.warn("計時器未在執行中"); return false; }
-    if (etm.experimentPaused) { Logger.warn("計時器已處於暫停狀態"); return false; }
-    etm.pauseExperimentTimer();
-    Logger.debug("實驗計時器已暫停");
-    return true;
-  }
-
-  resumeExperimentTimer() {
-    const etm = this.timerManager;
-    if (!etm.experimentStartTime) { Logger.warn("計時器未在執行中"); return false; }
-    if (!etm.experimentPaused) { Logger.warn("計時器未在暫停狀態"); return false; }
-    etm.resumeExperimentTimer();
-    Logger.debug("實驗計時器已繼續");
-    return true;
-  }
-
-  stopExperimentTimer() {
-    this.timerManager.stopExperimentTimer();
-    Logger.debug("實驗計時器已停止");
-  }
-
-  getElapsedTime() {
-    return this.timerManager.getExperimentElapsedMs();
-  }
-
-  // ==========================================
   // ==========================================
   // 流程事件處理
   // ==========================================

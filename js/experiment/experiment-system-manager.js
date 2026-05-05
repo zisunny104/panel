@@ -45,7 +45,6 @@ class ExperimentSystemManager {
         unitPanel: false,
         experimentControls: false,
       },
-      pendingParticipantName: null,
     };
 
     this._unsubscribers = [];
@@ -425,41 +424,32 @@ class ExperimentSystemManager {
   }
 
   /**
-   * 更新 UI 中的實驗 ID 顯示
+   * 將系統持有的實驗 ID 同步到 UI 輸入框
    * @private
    */
-  _updateExperimentIdUI(experimentId) {
+  _syncExperimentIdToUI() {
     const idInput = document.getElementById("experimentIdInput");
-    const safeExperimentId = typeof experimentId === "string" ? experimentId : "";
-    if (idInput && idInput.value !== safeExperimentId) {
-      idInput.value = safeExperimentId;
-      Logger.debug("實驗 ID 已更新到 UI:", safeExperimentId);
+    if (!idInput) return;
+    const currentId = this.getExperimentId() ?? "";
+    if (idInput.value.trim() !== currentId) {
+      idInput.value = currentId;
     }
   }
 
   /**
    * 綁定實驗ID輸入框監聽器（可重入，避免重複綁定）
-   * 分離了「綁定事件監聽」和「同步 ID 值」
-   * 以確保每次面板打開時都能同步最新 ID
    * @private
    */
   _bindExperimentIdInputListener() {
     const idInput = document.getElementById("experimentIdInput");
     if (!idInput) return;
 
-    const rawCurrentId = this.getExperimentId();
-    const currentId = typeof rawCurrentId === "string" ? rawCurrentId : "";
-    if (idInput.value.trim() !== currentId) {
-      idInput.value = currentId;
-      Logger.debug("面板展開時同步實驗ID到UI:", currentId);
-    }
-
     if (!idInput._experimentSystemBound) {
       this._setupExperimentIdInputListener(idInput);
       Logger.debug("實驗ID輸入框事件監聽已綁定");
     }
 
-    this._syncExperimentIdInputFromSystem();
+    this._syncExperimentIdToUI();
   }
 
   /**
@@ -789,7 +779,7 @@ class ExperimentSystemManager {
       reapplyCombination: true,
       skipCombinationBroadcast: true,
     });
-    this._updateExperimentIdUI(experimentId);
+    this._syncExperimentIdToUI();
     return true;
   }
 
@@ -912,40 +902,21 @@ class ExperimentSystemManager {
   }
 
   getExperimentId() {
-    const isSync = this.hubManager?.isInSyncMode?.() || false;
-    if (isSync) {
-      return (
-        this.hubManager?.getExperimentId?.() ||
-        this.pageManager?.experimentStateManager?.getExperimentId?.() ||
-        document.getElementById("experimentIdInput")?.value?.trim() ||
-        null
-      );
-    }
-
-    const stateManager = this.pageManager?.experimentStateManager;
+    // StateManager 是唯一 truth source；
+    // 同步模式下 HubManager 可能更先取得 ID，作為 fallback。
     return (
-      stateManager?.getExperimentId?.() ||
+      this.pageManager?.experimentStateManager?.getExperimentId() ||
       this.hubManager?.getExperimentId?.() ||
-      document.getElementById("experimentIdInput")?.value?.trim() ||
       null
     );
   }
 
   getParticipantName() {
-    if (this.state.pendingParticipantName?.trim()) {
-      return this.state.pendingParticipantName.trim();
-    }
-    return document.getElementById("participantNameInput")?.value?.trim() || null;
-  }
-
-  _syncExperimentIdInputFromSystem() {
-    const idInput = document.getElementById("experimentIdInput");
-    if (!idInput) return;
-    const rawId = this.getExperimentId();
-    const systemId = typeof rawId === "string" ? rawId : "";
-    if (idInput.value.trim() !== systemId) {
-      idInput.value = systemId;
-    }
+    return (
+      this.pageManager?.experimentStateManager?.getParticipantName() ||
+      document.getElementById("participantNameInput")?.value?.trim() ||
+      null
+    );
   }
 
   _bindExperimentIdUiSyncGuards() {
@@ -953,7 +924,7 @@ class ExperimentSystemManager {
       return;
     }
 
-    this._syncFromSystemHandler = () => this._syncExperimentIdInputFromSystem();
+    this._syncFromSystemHandler = () => this._syncExperimentIdToUI();
     this._visibilityHandler = () => {
       if (document.visibilityState === "visible") {
         this._syncFromSystemHandler();
@@ -1021,7 +992,7 @@ class ExperimentSystemManager {
       experimentSyncManager.broadcastExperimentIdUpdate(newId);
     }
 
-    this._updateExperimentIdUI(newId);
+    this._syncExperimentIdToUI();
 
     if (reapplyCombination) {
       await this._reapplyCombinationWithCurrentId({ skipBroadcast: skipCombinationBroadcast });
@@ -1030,23 +1001,12 @@ class ExperimentSystemManager {
     return true;
   }
 
-  updateParticipantNameUi(participantName) {
-    if (!participantName) return;
-    if (document.getElementById("participantNameInput")) {
-      this.uiManager.setParticipantNameInput(participantName);
-      this.state.pendingParticipantName = null;
-    } else {
-      this.state.pendingParticipantName = participantName;
-    }
-  }
-
   setParticipantName(participantName) {
     if (typeof participantName !== "string") return false;
     const normalized = participantName.trim();
-    this.updateParticipantNameUi(normalized);
 
-    const stateManager = this.pageManager?.experimentStateManager;
-    stateManager?.setParticipantName?.(normalized, "system");
+    // StateManager 是 truth source，dispatch 事件後 UIManager._setupStateInputSync 同步到輸入框
+    this.pageManager?.experimentStateManager?.setParticipantName?.(normalized, "system");
 
     window.dispatchEvent(
       new CustomEvent("experimentSystem:participantNameChanged", {
@@ -1086,21 +1046,17 @@ class ExperimentSystemManager {
       requestAnimationFrame(() => this._updateUIForCombination(combo, unitIds));
     }
 
-    if (this.pageManager?.experimentStateManager?.setupInputSync) {
-      this.pageManager.experimentStateManager.setupInputSync();
-    }
   }
 
   _applyPendingUiUpdates() {
-    this._syncExperimentIdInputFromSystem();
+    this._syncExperimentIdToUI();
 
-    if (this.state.pendingParticipantName) {
+    // 從 StateManager 讀取受試者名稱，同步到輸入框（若面板尚未渲染則略過）
+    const participantName = this.pageManager?.experimentStateManager?.getParticipantName?.();
+    if (participantName) {
       const input = document.getElementById("participantNameInput");
-      if (input) {
-        if (input.value.trim() !== this.state.pendingParticipantName) {
-          input.value = this.state.pendingParticipantName;
-        }
-        this.state.pendingParticipantName = null;
+      if (input && input.value.trim() !== participantName) {
+        input.value = participantName;
       }
     }
 
@@ -1205,7 +1161,7 @@ class ExperimentSystemManager {
       },
     );
 
-    this._syncExperimentIdInputFromSystem();
+    this._syncExperimentIdToUI();
     this._bindExperimentIdUiSyncGuards();
 
     if (idInput) {
@@ -1225,15 +1181,15 @@ class ExperimentSystemManager {
       const newVal = idInput.value.trim();
       if (!newVal) {
         await this.regenerateExperimentId();
-        this._syncExperimentIdInputFromSystem();
+        this._syncExperimentIdToUI();
         return;
       }
       await this.setExperimentId(newVal, RECORD_SOURCES.LOCAL_INPUT);
-      this._syncExperimentIdInputFromSystem();
+      this._syncExperimentIdToUI();
     });
 
     idInput.addEventListener("blur", () => {
-      this._syncExperimentIdInputFromSystem();
+      this._syncExperimentIdToUI();
     });
   }
 
@@ -1269,7 +1225,7 @@ class ExperimentSystemManager {
     this.recordManager?.logExperimentEnd();
     this._applyExperimentLockState({ locked: false, allowParticipantEdit: true });
     this._updateExperimentControlsForStopped();
-    this.uiManager?.stopExperimentTimer?.();
+    this.timerManager?.stopExperimentTimer?.();
     window.dispatchEvent(
       new CustomEvent("experimentSystem:flowStopped", {
         detail: {

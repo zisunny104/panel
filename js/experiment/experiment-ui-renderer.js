@@ -904,7 +904,6 @@ class ExperimentUIRenderer extends ExperimentControlsDom {
         containerEl.querySelector("#startExperimentBtn")?.addEventListener("click", () => {
           this.hideElement(containerEl.querySelector("#experimentIdRow"));
           this.showElement(containerEl.querySelector("#experimentControlButtons"));
-          if (config.showTimer) this.startExperimentTimer();
           config.onStart();
         });
       }

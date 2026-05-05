@@ -33,6 +33,7 @@ class RecordView {
     this.getCombination = null;
     this.syncLogsNow = null;
     this.onRecordsSyncedRefresh = null;
+    this.getExperimentIsPaused = null;
     this._syncNowInProgress = false;
 
     this._isLoadingList = false;
@@ -243,6 +244,8 @@ class RecordView {
     const logsContent = document.querySelector("#recordContainer .records-live-content");
     if (!logsContent) return;
 
+    this._currentLogs = logs;
+
     const recentLogs = logs.slice(-20);
     if (recentLogs.length === 0) return;
 
@@ -282,7 +285,7 @@ class RecordView {
 
     const statusIndicator = logsContent.closest("#recordContainer")?.querySelector(".record-status-indicator");
     if (statusIndicator) {
-      const isPaused = document.querySelector("#pauseExperimentBtn")?.dataset.isPaused === "true";
+      const isPaused = this.getExperimentIsPaused?.() ?? false;
       statusIndicator.className = `record-status-indicator ${isPaused ? "paused" : "running"}`;
       statusIndicator.textContent = `${isPaused ? "已暫停" : "進行中"} · ${logs.length} 筆`;
     }
@@ -895,14 +898,31 @@ class RecordView {
   }
 
   async copyCurrentRecordsToClipboard(triggerEl = null) {
-    const entries = Array.from(
-      document.querySelectorAll("#recordContainer .current-record-entry"),
-    );
-    if (entries.length === 0) return false;
+    const logs = this._currentLogs;
+    if (!Array.isArray(logs) || logs.length === 0) return false;
 
-    const summary = document.querySelector("#recordContainer .records-summary");
-    const lines = entries.map((e) => e.textContent?.trim()).filter(Boolean);
-    if (summary?.textContent?.trim()) lines.push(summary.textContent.trim());
+    const gesturesData = this.getGesturesData?.() ?? {};
+    const lines = logs.map((log) => {
+      const date = new Date(log.ts);
+      const time = date.toTimeString().slice(0, 8) + "." + String(date.getMilliseconds()).padStart(3, "0");
+      const typeLabel = RECORD_TYPE_LABELS[log.type] ?? log.type;
+      const detailParts = [];
+      let gestureMeta = "";
+      if (log.g_id) {
+        const gestureName = gesturesData[log.g_id]?.zh;
+        gestureMeta = gestureName ? `${gestureName} (${log.g_id})` : log.g_id;
+      }
+      if (log.g_idx !== undefined) {
+        const gestureIndexLabel = `手勢#${log.g_idx + 1}`;
+        detailParts.push(gestureMeta ? `${gestureIndexLabel} (${gestureMeta})` : gestureIndexLabel);
+      }
+      if (log.g_type) detailParts.push(GESTURE_ATTEMPT_TYPE_LABELS[log.g_type] ?? log.g_type);
+      if (log.s_id) detailParts.push(`(${log.s_id})`);
+      if (log.a_id) detailParts.push(`[${log.a_id}]`);
+      const details = detailParts.join(" ");
+      return `[${time}] ${typeLabel}${details ? " " + details : ""}`;
+    });
+    lines.push(`共 ${logs.length} 筆記錄`);
 
     const headerLines = this._buildCurrentRecordCopyHeader();
     const outputLines = [...headerLines, ...lines];

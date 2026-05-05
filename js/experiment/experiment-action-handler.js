@@ -143,45 +143,23 @@ class ExperimentActionHandler extends EventEmitter {
   _isFirstActionInNewUnit(action) {
     const actionId = this._getActionId(action);
     if (!actionId) return false;
-
     const currentStepInfo = this.actionToStepMap?.get(actionId) || null;
-    if (!currentStepInfo) {
-      return false;
-    }
-
+    if (!currentStepInfo) return false;
     const previousAction = this.currentActionSequence[this.currentActionIndex - 1];
-    if (!previousAction) {
-      return true;
-    }
-
-    const previousStepInfo =
-      this.actionToStepMap?.get(this._getActionId(previousAction)) || null;
-    return (
-      !previousStepInfo ||
-      previousStepInfo.unit_id !== currentStepInfo.unit_id
-    );
+    if (!previousAction) return true;
+    const previousStepInfo = this.actionToStepMap?.get(this._getActionId(previousAction)) || null;
+    return !previousStepInfo || previousStepInfo.unit_id !== currentStepInfo.unit_id;
   }
 
   _isFirstActionInStep(action) {
     const actionId = this._getActionId(action);
     if (!actionId) return false;
-
     const currentStepInfo = this.actionToStepMap?.get(actionId) || null;
-    if (!currentStepInfo) {
-      return false;
-    }
-
+    if (!currentStepInfo) return false;
     const previousAction = this.currentActionSequence[this.currentActionIndex - 1];
-    if (!previousAction) {
-      return true;
-    }
-
-    const previousStepInfo =
-      this.actionToStepMap?.get(this._getActionId(previousAction)) || null;
-    return (
-      !previousStepInfo ||
-      previousStepInfo.step_id !== currentStepInfo.step_id
-    );
+    if (!previousAction) return true;
+    const previousStepInfo = this.actionToStepMap?.get(this._getActionId(previousAction)) || null;
+    return !previousStepInfo || previousStepInfo.step_id !== currentStepInfo.step_id;
   }
 
   /**
@@ -434,9 +412,7 @@ class ExperimentActionHandler extends EventEmitter {
       isFirstActionInNewUnit,
     });
 
-    // 第一個 action 在完成前先補發 ACTION_ENTERED，讓 panel 端正確進入動作狀態。
-    // 這個補發應該發生在每個單元的第一個 step 的第一個 action，
-    // 以避免 unit 開始時動作直接完成後無法進入新 step 的畫面狀態。
+    // 每個單元第一個 action 完成前補發 ACTION_ENTERED，確保 panel 端進入正確動作狀態
     if (isFirstActionInNewUnit) {
       this.emit(ExperimentActionHandler.EVENT.ACTION_ENTERED, {
         actionId: this._getActionId(currentAction),
@@ -542,17 +518,13 @@ class ExperimentActionHandler extends EventEmitter {
     if (!action) return null;
 
     const currentActionId = this._getActionId(action);
-    const interactionKey =
-      actionData.functionName || actionData.function || actionData.buttonId;
+    const interactionKey = actionData.functionName || actionData.function || actionData.buttonId;
     const nextActionIdFromInteraction = interactionKey
       ? action?.interactions?.[interactionKey]?.next_action_id
       : null;
     const nextAction = this.getNextAction?.();
-    const nextActionId =
-      nextActionIdFromInteraction || this._getActionId(nextAction);
+    const nextActionId = nextActionIdFromInteraction || this._getActionId(nextAction);
 
-    // 始終以「剛完成的 action」作為廣播對象，讓 board 標記正確的 gesture button；
-    // nextActionId 僅用於計算延遲，不作為廣播 target。
     const targetActionId = currentActionId;
     if (!targetActionId) return null;
 
@@ -562,13 +534,11 @@ class ExperimentActionHandler extends EventEmitter {
       : null;
     const currentUnitId = currentStepInfo?.unit_id || null;
     const nextUnitId = nextStepInfo?.unit_id || null;
-    const shouldDelay =
-      currentUnitId && nextUnitId && currentUnitId !== nextUnitId;
+    const shouldDelay = currentUnitId && nextUnitId && currentUnitId !== nextUnitId;
     const delayMs = shouldDelay ? this._resolveCompletionCooldownMs() : 0;
     const isPowerActionTransition =
       nextActionId === ACTION_IDS.POWER_ON ||
       nextActionId === ACTION_IDS.POWER_OFF;
-
     const shouldSuppressEnteredActionId =
       this._isFirstActionInStep(action) &&
       currentStepInfo &&
@@ -589,9 +559,7 @@ class ExperimentActionHandler extends EventEmitter {
   _resolveCompletionCooldownMs() {
     const raw = localStorage.getItem("stepCooldownMs");
     const parsed = Number.parseInt(raw, 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      return parsed;
-    }
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
     return ExperimentActionHandler.COMPLETION_COOLDOWN_MS;
   }
 

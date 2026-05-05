@@ -14,6 +14,7 @@ import {
   ACTION_IDS,
   ACTION_BUTTONS,
   SYNC_DATA_TYPES,
+  SYNC_EVENTS,
 } from "../constants/index.js";
 import { experimentSyncManager } from "./board-experiment-sync.js";
 import { BoardSyncIO } from "./board-sync-io.js";
@@ -220,6 +221,10 @@ class BoardPageManager {
       this._handleSystemCombinationSelected(combination, experimentId);
     });
 
+    window.addEventListener(SYNC_EVENTS.CLIENT_JOINED, () => {
+      this._onClientJoined();
+    });
+
     window.addEventListener("experimentSystem:stopRequested", (event) => {
       if (event.defaultPrevented) return;
       if (!this.experimentSystemManager?.isExperimentRunning?.()) return;
@@ -263,6 +268,26 @@ class BoardPageManager {
         this._handleFlowCompleted(data);
       },
     );
+  }
+
+  /**
+   * 新客戶端加入 session 時，主動推送當前完整狀態。
+   * 確保後加入的客戶端能取得 board 目前選定的組合與實驗 ID。
+   * @private
+   */
+  _onClientJoined() {
+    if (!this.syncManager?.isSyncMode) return;
+
+    Logger.debug("Board: 新客戶端加入，推送當前實驗狀態");
+
+    const type = this.experimentRunning
+      ? SYNC_DATA_TYPES.EXPERIMENT_STARTED
+      : SYNC_DATA_TYPES.EXPERIMENT_STOPPED;
+    experimentSyncManager.registerExperimentStateToHub(
+      this._buildHubExperimentState(type, this.experimentRunning),
+    );
+
+    this.experimentCombinationManager?.broadcastCurrentCombination?.();
   }
 
   /**
@@ -429,12 +454,8 @@ class BoardPageManager {
 
     this.gestureUtils?.resetGestureSequence();
 
-    if (this.timerManager) {
-      this.timerManager.stopExperimentTimer();
-    }
-
-    // EXP_END 由 ExperimentSystemManager._handleFlowStopped 同步寫入（COMPLETED 也映射到該方法）
-    // 此處只負責 flushAll()，確保自然完成路徑（不經 stopExperiment）也能持久化到 JSONL
+    // EXP_END 由 ExperimentSystemManager._handleFlowStopped 同步寫入（COMPLETED 映射到該方法），
+    // 計時器也由同一路徑停止；此處只負責 flushAll()，確保自然完成路徑也能持久化到 JSONL
     if (this.recordManager) {
       try {
         await this.recordManager.flushAll();
@@ -1074,14 +1095,8 @@ class BoardPageManager {
 
     this.logAction("experiment_stopped", experimentData);
 
-    this.gestureUtils?.resetGestureSequence();
-
-    if (this.timerManager) {
-      this.timerManager.stopExperimentTimer();
-    }
-
     // stopExperiment() 同步觸發 STOPPED 事件 →
-    // ExperimentSystemManager._handleFlowStopped 同步寫入 EXP_END，
+    // _handleFlowStopped 重置 gesture 序列；ExperimentSystemManager._handleFlowStopped 停止計時器與寫入 EXP_END，
     // 之後 flushAll() 才能確保 EXP_END 已存在於 records
     systemManager.stopExperiment(options.reason || "manual", options);
 

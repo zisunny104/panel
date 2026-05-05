@@ -379,6 +379,10 @@ export class ExperimentCombinationManager extends EventEmitter {
     return true;
   }
 
+  broadcastCurrentCombination() {
+    return this._broadcastCombinationSelection(this.currentCombination);
+  }
+
   /**
    * 檢查是否在同步工作階段中
    */
