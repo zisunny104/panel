@@ -102,6 +102,18 @@
     margin-right: 0;
 }
 
+/* 實驗控制區作為面板子元件，位於可捲動體之下 */
+#experimentControlsContainer {
+    flex-shrink: 0;
+    border-top: 1px solid #e8e8e8;
+    padding-top: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+#experimentControlsContainer:empty {
+    display: none;
+}
+
 /* 元件樣式統一由 features/experiment/ 下的檔案定義
    .unit-sort, .experiment-units-list, .power-option-card,
    .startup-card/.shutdown-card, .experiment-default-list

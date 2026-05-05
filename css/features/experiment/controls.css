@@ -1,36 +1,9 @@
 /* ===== 實驗控制區域 ===== */
 
 /*
- * Panel 頁面（非 board）：實驗控制區固定於右下角，
- * 移出 .experiment-panel 因此不受面板關閉影響。
- * pointer-events: none 讓容器透明空間不攔截點擊（正確語義），
- * 子元件透過 > * 恢復互動。
+ * #experimentControlsContainer 是 .experiment-panel 的子元件，
+ * 定位與顯示由父面板統一管理，此處不設置獨立的 position/z-index。
  */
-body:not(.board-page) #experimentControlsContainer {
-    position: fixed;
-    right: 4rem;
-    bottom: 4.5rem;
-    width: 23.75rem;
-    max-height: 85vh;
-    overflow-y: auto;
-    z-index: 30;
-    background: rgba(255, 255, 255, 0.97);
-    color: #444;
-    border-radius: 0.875rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
-    padding: 1rem;
-    border: 1px solid #ddd;
-    box-sizing: border-box;
-    pointer-events: none;
-}
-
-body:not(.board-page) #experimentControlsContainer:empty {
-    display: none;
-}
-
-body:not(.board-page) #experimentControlsContainer > * {
-    pointer-events: auto;
-}
 
 /* 實驗ID輸入區域 */
 .experiment-id-group {
