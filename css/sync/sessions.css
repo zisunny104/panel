@@ -23,8 +23,9 @@
 }
 
 /* ===== Modal Body ===== */
-.ssm-body {
-    padding: 0 !important;
+/* 以雙重 class 提高特異性，取代 !important 覆蓋 .modal-body 的 padding */
+.modal-body.ssm-body {
+    padding: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -826,10 +827,6 @@
     border-radius: 6px;
     border: 2px solid #ddd;
     overflow: hidden;
-}
-
-.is-hidden {
-    display: none !important;
 }
 
 /* ===== 詳細資訊底部操作 ===== */

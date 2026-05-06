@@ -174,10 +174,13 @@
 
 /* 同步面板版本號小字 */
 .sync-panel-version {
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
     text-align: center;
     font-size: 0.7rem;
     color: #bbb;
-    padding-top: 0.5rem;
+    padding: 0.5rem 0 0.75rem;
     letter-spacing: 0.03em;
     user-select: none;
 }

@@ -1,10 +1,10 @@
 {
-    "version": "2.6.cdd210e",
+    "version": "2.6.ddda425",
     "description": "虛擬操作面板實驗設定檔",
     "author": "謝祥紫、Github Copilot",
     "created_at": "2024-07-16T10:00:00Z",
-    "updated_at": "2026-05-05 下午08:57:41.000Z",
-    "git_commit_hash": "cdd210e",
+    "updated_at": "2026-05-05 下午11:38:30.000Z",
+    "git_commit_hash": "ddda425",
     "media_base_path": "assets/",
     "settings": {
         "mainScale": 1.29,

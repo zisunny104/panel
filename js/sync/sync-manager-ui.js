@@ -189,8 +189,8 @@ export class SyncManagerUI {
               ${this._renderConnectionSection()}
               ${this._renderConnectedSection()}
               <div id="syncStatusMessage"></div>
+              ${versionLabel ? `<div class="sync-panel-version">${versionLabel}</div>` : ""}
             </div>
-            ${versionLabel ? `<div class="sync-panel-version">${versionLabel}</div>` : ""}
           </div>
         </div>
       </div>
@@ -215,7 +215,7 @@ export class SyncManagerUI {
       <div id="syncConnectionSection" class="sync-connection-section">
         <div class="sync-create-join-container">
           <div class="sync-create-section">
-            <h3>建立工作階段</h3>
+            <h3 class="sync-section-title">建立工作階段</h3>
             <div class="sync-code-input-group">
               <div class="sync-create-input-container">
                 <input type="text"
@@ -237,7 +237,7 @@ export class SyncManagerUI {
 
           <div class="sync-join-section">
             <div class="sync-join-header">
-              <span class="sync-join-title">加入工作階段</span>
+              <span class="sync-section-title sync-join-title">加入工作階段</span>
               <div class="sync-ch-role-group">
                 <button class="sync-ch-role-btn active" data-role="operator">操作者</button>
                 <button class="sync-ch-role-btn" data-role="viewer">檢視者</button>

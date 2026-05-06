@@ -1,7 +1,7 @@
 {
     "type": "module",
     "name": "panel",
-    "version": "2.6.cdd210e",
+    "version": "2.6.ddda425",
     "description": "機台操作面板與實驗設定",
     "main": "index.html",
     "scripts": {

@@ -20,12 +20,6 @@
     border: 1px solid #ddd;
 }
 
-/* ================= 設定面板按鈕 ================= */
-.circle-close-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
 /* .settings-panel.hidden 已移除 — 統一使用 .is-hidden { display: none !important } */
 
 .settings-panel input[type="range"] {
@@ -52,6 +46,7 @@
     align-items: center;
     justify-content: space-between;
     font-weight: bold;
+    flex: 0 0 auto;
 }
 
 /* ================= 控制群組 ================= */
@@ -79,6 +74,7 @@
     border: none;
     border-top: 1px solid #ddd;
     margin: 0.6rem 0;
+    flex: 0 0 auto;
 }
 
 /* 專門針對 settings 面板內的 divider 間距 */
@@ -109,22 +105,12 @@
     text-align: right;
 }
 
-/* ================= 設定面板：固定標題與可捲動內容 ================= */
-.settings-panel-header {
-    flex: 0 0 auto;
-    /* horizontal padding removed so header aligns flush with panel content */
-}
-
 
 /* On tall viewports position the panel bottom to match the corner buttons */
 @media screen and (min-height: 900px) {
     .settings-panel {
         bottom: 1rem;
     }
-}
-
-.panel-divider {
-    flex: 0 0 auto;
 }
 
 .settings-panel-body {

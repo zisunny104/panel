@@ -32,18 +32,18 @@
 
 /* 圖標按鈕 - 正常尺寸 */
 .btn.btn-icon-only {
-    min-width: 40px !important;
-    height: 40px !important;
-    padding: 8px 12px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border-radius: 6px !important;
-    border: none !important;
-    cursor: pointer !important;
-    font-size: 14px !important;
-    transition: all 0.2s !important;
-    white-space: nowrap !important;
+    min-width: 40px;
+    height: 40px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    white-space: nowrap;
 }
 
 /* SVG 圖標樣式 */

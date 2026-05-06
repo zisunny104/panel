@@ -240,21 +240,6 @@
     background: #f8f9fa;
 }
 
-.sync-join-section h3 {
-    margin: 0 0 15px 0;
-    font-size: 18px;
-    color: #495057;
-    font-weight: 600;
-}
-
-/* 分隔線 - 還原「或」 */
-.sync-create-join-container>div[style*="text-align"] {
-    display: block !important;
-    text-align: center;
-    margin: 12px 0;
-    color: #6c757d;
-    font-size: 13px;
-}
 
 /* 已連線狀態 - 工作階段資訊整體卡片包裝 */
 .sync-session-info-container {
@@ -330,6 +315,13 @@
     color: #343a40;
 }
 
+/* 建立／加入區塊共用標題 */
+.sync-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #495057;
+}
+
 /* 建立工作階段區塊 */
 .sync-create-section {
     box-sizing: border-box;
@@ -343,8 +335,6 @@
 
 .sync-create-section h3 {
     margin: 0 0 15px 0;
-    color: #495057;
-    font-size: 18px;
 }
 
 .sync-code-input-group {
@@ -1053,7 +1043,6 @@
 @media (max-width: 359px) {
     .sync-panel-content {
         width: 95%;
-        border-radius: 12px;
     }
 
     .sync-panel-header {
@@ -1142,8 +1131,6 @@
     .sync-panel-content {
         width: 92%;
         max-width: 90vw;
-        max-height: 85vh;
-        border-radius: 12px;
     }
 
     .sync-panel-header {
@@ -1192,10 +1179,12 @@
         flex-shrink: 0;
     }
 
-    /* 建立區塊 */
-    .sync-create-section h3,
-    .sync-join-section h3 {
-        font-size: 15px;
+    /* 建立／加入區塊標題 */
+    .sync-section-title {
+        font-size: 0.9375rem;
+    }
+
+    .sync-create-section h3 {
         margin-bottom: 12px;
     }
 
@@ -1720,9 +1709,6 @@
 }
 
 .sync-join-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #495057;
     white-space: nowrap;
 }
 
