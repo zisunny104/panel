@@ -8,6 +8,45 @@
 import { ACTION_IDS } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 
+function convertColorTags(text) {
+  if (!text) return text;
+  return text
+    .replace(
+      /\[orange\](.*?)\[\/orange\]/g,
+      "<span style=\"color: #ff9800; font-weight: 700;\">$1</span>",
+    )
+    .replace(
+      /\[red\](.*?)\[\/red\]/g,
+      "<span style=\"color: #f44336; font-weight: 700;\">$1</span>",
+    )
+    .replace(
+      /\[green\](.*?)\[\/green\]/g,
+      "<span style=\"color: #4caf50; font-weight: 700;\">$1</span>",
+    )
+    .replace(
+      /\[blue\](.*?)\[\/blue\]/g,
+      "<span style=\"color: #2196f3; font-weight: 700;\">$1</span>",
+    );
+}
+
+function getCardStyle(gesture) {
+  const sid = gesture.step_id || "";
+  const g = gesture.gesture || "";
+  if (sid === "SYSTEM_OPEN" || g === "open")
+    return { borderColor: "#4caf50", bgColor: "#e8f5e9", accentColor: "#4caf50", tagBg: "#4caf50", tagText: "教學系統", isSpecialType: true };
+  if (sid === "SYSTEM_CLOSE" || g === "close")
+    return { borderColor: "#f44336", bgColor: "#ffebee", accentColor: "#f44336", tagBg: "#f44336", tagText: "教學系統", isSpecialType: true };
+  if (sid === "FINAL_CAPTURE" || g === "capture")
+    return { borderColor: "#9c27b0", bgColor: "#f3e5f5", accentColor: "#9c27b0", tagBg: "#9c27b0", tagText: "拍攝記錄", isSpecialType: true };
+  if (sid === "FIRST_UNIT_ZOOM_IN" || g === "zoom_in")
+    return { borderColor: "#00bcd4", bgColor: "#e0f7fa", accentColor: "#00bcd4", tagBg: "#00bcd4", tagText: "放大操作", isSpecialType: true };
+  if (sid === "LAST_UNIT_ZOOM_OUT" || g === "zoom_out")
+    return { borderColor: "#00bcd4", bgColor: "#e0f7fa", accentColor: "#00bcd4", tagBg: "#00bcd4", tagText: "縮小操作", isSpecialType: true };
+  if (sid.startsWith("UNIT_EXIT_") || sid.startsWith("UNIT_NAV_") || sid.startsWith("UNIT_ENTER_"))
+    return { borderColor: "#ff9800", bgColor: "#fff3e0", accentColor: "#ff9800", tagBg: "#ff9800", tagText: "單元切換", isSpecialType: true };
+  return { borderColor: "#e0e0e0", bgColor: "#f0f4ff", accentColor: "#667eea", tagBg: "#667eea", tagText: "", isSpecialType: false };
+}
+
 export const BoardUIManager = class BoardUIManager {
   /**
    * @param {Object} coreManager - BoardPageManager 實例
@@ -54,8 +93,8 @@ export const BoardUIManager = class BoardUIManager {
     const leftPanel = document.querySelector(".left-panel");
     const toggleBtn = document.getElementById("panelToggleBtn");
 
-    leftPanel.classList.toggle("collapsed");
-    toggleBtn.classList.toggle("collapsed");
+    leftPanel?.classList.toggle("collapsed");
+    toggleBtn?.classList.toggle("collapsed");
   }
 
   /**
@@ -133,45 +172,6 @@ export const BoardUIManager = class BoardUIManager {
       combinationName: script.combinationName,
       gestureCount: script.gestures?.length || 0,
     });
-
-    const convertColorTags = (text) => {
-      if (!text) return text;
-      return text
-        .replace(
-          /\[orange\](.*?)\[\/orange\]/g,
-          "<span style=\"color: #ff9800; font-weight: 700;\">$1</span>",
-        )
-        .replace(
-          /\[red\](.*?)\[\/red\]/g,
-          "<span style=\"color: #f44336; font-weight: 700;\">$1</span>",
-        )
-        .replace(
-          /\[green\](.*?)\[\/green\]/g,
-          "<span style=\"color: #4caf50; font-weight: 700;\">$1</span>",
-        )
-        .replace(
-          /\[blue\](.*?)\[\/blue\]/g,
-          "<span style=\"color: #2196f3; font-weight: 700;\">$1</span>",
-        );
-    };
-
-    const getCardStyle = (gesture) => {
-      const sid = gesture.step_id || "";
-      const g = gesture.gesture || "";
-      if (sid === "SYSTEM_OPEN" || g === "open")
-        return { borderColor: "#4caf50", bgColor: "#e8f5e9", accentColor: "#4caf50", tagBg: "#4caf50", tagText: "教學系統", isSpecialType: true };
-      if (sid === "SYSTEM_CLOSE" || g === "close")
-        return { borderColor: "#f44336", bgColor: "#ffebee", accentColor: "#f44336", tagBg: "#f44336", tagText: "教學系統", isSpecialType: true };
-      if (sid === "FINAL_CAPTURE" || g === "capture")
-        return { borderColor: "#9c27b0", bgColor: "#f3e5f5", accentColor: "#9c27b0", tagBg: "#9c27b0", tagText: "拍攝記錄", isSpecialType: true };
-      if (sid === "FIRST_UNIT_ZOOM_IN" || g === "zoom_in")
-        return { borderColor: "#00bcd4", bgColor: "#e0f7fa", accentColor: "#00bcd4", tagBg: "#00bcd4", tagText: "放大操作", isSpecialType: true };
-      if (sid === "LAST_UNIT_ZOOM_OUT" || g === "zoom_out")
-        return { borderColor: "#00bcd4", bgColor: "#e0f7fa", accentColor: "#00bcd4", tagBg: "#00bcd4", tagText: "縮小操作", isSpecialType: true };
-      if (sid.startsWith("UNIT_EXIT_") || sid.startsWith("UNIT_NAV_") || sid.startsWith("UNIT_ENTER_"))
-        return { borderColor: "#ff9800", bgColor: "#fff3e0", accentColor: "#ff9800", tagBg: "#ff9800", tagText: "單元切換", isSpecialType: true };
-      return { borderColor: "#e0e0e0", bgColor: "#f0f4ff", accentColor: "#667eea", tagBg: "#667eea", tagText: "", isSpecialType: false };
-    };
 
     let html = "<div class=\"right-section\"><h2>實驗手勢序列</h2>";
     if (script.gestures) {
@@ -353,8 +353,7 @@ export const BoardUIManager = class BoardUIManager {
       );
     }
 
-    core._bindGestureContentEvents(contentArea);
-    core.updateExperimentStats();
+    core.onUnitRendered(contentArea);
   }
 
   /**

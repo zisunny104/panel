@@ -368,11 +368,11 @@ class BoardPageManager {
 
   /**
    * 處理 FlowManager PAUSED 事件（board 端）
-   * 分發 DOM 事件供 _bindDomEvents 廣播兩端
+   * FlowManager 自動派送的 EXPERIMENT_PAUSED DOM 事件由 ExperimentSyncAdapter._bindDomEvents 負責廣播；
+   * 此方法僅額外將暫停狀態更新至 Hub。
    */
   _handleFlowPaused(data) {
     // EXP_PAUSE 狀態日誌由 ExperimentSystemManager._handleFlowPaused 統一記錄
-    // FlowManager 已自動發出 EXPERIMENT_PAUSED DOM 事件，此處只進行特化 board 操作
     if (data?.broadcast === false) {
       Logger.debug("Board: 遠端套用的暫停事件，略過同步廣播");
       return;
@@ -385,11 +385,11 @@ class BoardPageManager {
 
   /**
    * 處理 FlowManager RESUMED 事件（board 端）
-   * FlowManager 已自動發出 EXPERIMENT_RESUMED DOM 事件
+   * FlowManager 自動派送的 EXPERIMENT_RESUMED DOM 事件由 ExperimentSyncAdapter._bindDomEvents 負責廣播；
+   * 此方法僅額外將繼續狀態更新至 Hub。
    */
   _handleFlowResumed(data) {
     // EXP_RESUME 狀態日誌由 ExperimentSystemManager._handleFlowResumed 統一記錄
-    // FlowManager 已自動發出 EXPERIMENT_RESUMED DOM 事件，此處只進行特化 board 操作
     if (data?.broadcast === false) {
       Logger.debug("Board: 遠端套用的繼續事件，略過同步廣播");
       return;
@@ -404,7 +404,8 @@ class BoardPageManager {
    * 處理 ExperimentFlowManager 的 STOPPED 事件
    * @private
    * 觸發時機：ExperimentFlowManager.stopExperiment() 完成
-   * 目的：儲存日誌、停止同步、處理實驗結束邏輯
+   * 目的：重置 gesture 序列、更新 experimentRunning 旗標，並將停止狀態更新至 Hub。
+   * 日誌寫入（EXP_END + flushAll）由 stopExperiment() 在此事件之後統一負責。
    */
   _handleFlowStopped(data) {
     Logger.info("Board: 實驗已停止，清理資源和儲存日誌", {
@@ -656,6 +657,17 @@ class BoardPageManager {
     this.boardUIManager.updateStats(this.currentCombination);
   }
 
+  /**
+   * BoardUIManager 完成手勢序列渲染後呼叫此鉤子。
+   * 由 PageManager 自行決定後續要做的事（綁定事件、更新統計），
+   * 避免 UIManager 直接存取 PageManager 的私有方法。
+   * @param {HTMLElement} contentArea - 已完成渲染的內容區域元素
+   */
+  onUnitRendered(contentArea) {
+    this._bindGestureContentEvents(contentArea);
+    this.updateExperimentStats();
+  }
+
   _bindGestureContentEvents(contentArea) {
     if (!contentArea) return;
 
@@ -845,13 +857,14 @@ class BoardPageManager {
    *
    * @param {HTMLElement} buttonElement - 對應的手勢動作按鈕
    * @param {string}      actionId      - action ID
-   * @param {number}      gestureIndex  - 所屬的 gesture 索引
+   * @param {number|null} gestureIndex  - 所屬的 gesture 索引
    * @param {boolean}     isRemote      - true 表示由 panel（受試者）端同步觸發，
    *                                      false 表示由實驗者本人點擊觸發
    *
    * 說明：
-   * - isRemote=false（實驗者點擊）：記錄到 recordManager
-   * - isRemote=true（受試者 panel 通知）：僅更新視覺標記，不重複記錄
+   * - 變綠即視為實驗者確認，無論來源均寫入 JSONL。
+   * - isRemote 僅影響 src 欄位（"local" / "remote"）及是否廣播電源 action。
+   * - data-completed 守衛確保同一按鈕不會重複寫入。
    */
   _markActionCompleted(
     buttonElement,
@@ -872,8 +885,10 @@ class BoardPageManager {
 
     this._scrollActionCardIntoView(buttonElement);
 
-    if (!isRemote && this.recordManager) {
-      this.recordManager.logAction(actionId, gestureIndex, stepId);
+    if (this.recordManager) {
+      this.recordManager.logAction(actionId, gestureIndex, stepId, {
+        src: isRemote ? "remote" : "local",
+      });
     }
 
     if (!isRemote && actionId) {

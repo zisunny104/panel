@@ -276,15 +276,18 @@ class PowerControl {
         return;
       }
 
+      // suppressCompletionBroadcast=true：PowerControl 在下方直接 safeBroadcast，
+      // 不需要 experiment-action-handler 的 _scheduleCompletionBroadcast 再派送一次。
       this._dispatchCorrectAction(actionId, {
         source: "power_state",
         powerState: detail?.powerState,
+        suppressCompletionBroadcast: true,
       });
 
       const syncCore = this.experimentSyncCore;
       const syncClient = this.syncClient;
       const combinationManager = this.experimentCombinationManager;
-      const experimentId = systemManager?.getExperimentId?.() || "";
+      const experimentId = this.experimentSystemManager?.getExperimentId?.() || "";
       const currentCombo =
         combinationManager?.getCurrentCombination?.() || null;
       const participantName =

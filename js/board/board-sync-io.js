@@ -121,7 +121,6 @@ class BoardSyncIO {
       source,
       clientId,
       timestamp,
-      gestureIndex,
       experimentId,
     } = syncData;
 
@@ -181,6 +180,8 @@ class BoardSyncIO {
       if (!targetButton) return;
       if (targetButton.getAttribute("data-completed") === "true") return;
 
+      const rawIdx = parseInt(targetButton.dataset.gestureIndex, 10);
+      const gestureIndex = Number.isNaN(rawIdx) ? null : rawIdx;
       page._markActionCompleted(targetButton, targetActionId, gestureIndex, true);
       targetButton.classList.add("sync-action-completed");
       setTimeout(() => {

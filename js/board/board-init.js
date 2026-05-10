@@ -154,7 +154,6 @@ export async function initializeBoardManagers(page) {
         timerManager: page.timerManager,
         syncClient: page.syncManager?.core?.syncClient,
         syncCore: page.experimentSyncCore,
-        logger: Logger,
         recordManager: page.recordManager,
       });
     }

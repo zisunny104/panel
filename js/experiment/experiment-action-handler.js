@@ -536,9 +536,14 @@ class ExperimentActionHandler extends EventEmitter {
     const nextUnitId = nextStepInfo?.unit_id || null;
     const shouldDelay = currentUnitId && nextUnitId && currentUnitId !== nextUnitId;
     const delayMs = shouldDelay ? this._resolveCompletionCooldownMs() : 0;
+    const isCurrentPowerAction =
+      currentActionId === ACTION_IDS.POWER_ON ||
+      currentActionId === ACTION_IDS.POWER_OFF;
     const isPowerActionTransition =
       nextActionId === ACTION_IDS.POWER_ON ||
       nextActionId === ACTION_IDS.POWER_OFF;
+    // "_1" 後綴是 action ID 的命名慣例（每個 step 的第一個 action 以 "_1" 結尾）。
+    // 若此慣例改變，此條件需同步調整。
     const shouldSuppressEnteredActionId =
       this._isFirstActionInStep(action) &&
       currentStepInfo &&
@@ -549,7 +554,7 @@ class ExperimentActionHandler extends EventEmitter {
     return {
       actionId: targetActionId,
       enteredActionId:
-        isPowerActionTransition || shouldSuppressEnteredActionId
+        isCurrentPowerAction || isPowerActionTransition || shouldSuppressEnteredActionId
           ? null
           : nextActionId || null,
       delayMs,
@@ -564,6 +569,7 @@ class ExperimentActionHandler extends EventEmitter {
   }
 
   _scheduleCompletionBroadcast(action, actionData) {
+    if (actionData?.suppressCompletionBroadcast) return;
     const currentActionId = this._getActionId(action);
     const isPowerAction =
       currentActionId === ACTION_IDS.POWER_ON ||
