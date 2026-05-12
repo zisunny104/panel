@@ -4,6 +4,7 @@
  * 負責管理設定的載入、套用、儲存與事件監聽。
  */
 import { Logger } from "./console-manager.js";
+import { SYNC_EVENTS } from "../constants/sync-events-constants.js";
 
 let sharedConfig = {};
 
@@ -92,7 +93,7 @@ class ConfigManager {
       this.saveUserSettings();
       Logger.info("使用者設定已還原為預設值");
       // 通知 UI
-      document.dispatchEvent(new CustomEvent("user_settings_reset", {}));
+      document.dispatchEvent(new CustomEvent(SYNC_EVENTS.USER_SETTINGS_RESET, {}));
     } catch (e) {
       Logger.error("重設設定失敗:", e);
     }
@@ -223,6 +224,8 @@ class ConfigManager {
     const mediaVolume = document.getElementById("mediaVolume");
 
     this.userSettings = {
+      // 保留所有無 UI 元素的 config-only 設定（如 postExperimentResetDelayMs）
+      ...this.userSettings,
       mainScale: scaleRange ? Number(scaleRange.value) : 1.29,
       topSpacerHeight: topSpacerRange ? Number(topSpacerRange.value) : 5,
       bottomSpacerHeight: bottomSpacerRange

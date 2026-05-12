@@ -22,12 +22,9 @@ export const SYNC_EVENTS = {
 
   // 伺服器狀態事件
   SERVER_STATUS_CHANGED: "sync_server_status_changed",
-  SERVER_ONLINE: "sync_server_online",
-  SERVER_OFFLINE: "sync_server_offline",
 
   // 同步面板事件
   SHOW_SYNC_PANEL: "show_sync_panel",
-  PANEL_UPDATED: "sync_panel_updated",
 
   // 狀態同步事件
   STATE_UPDATE: "sync_state_update",
@@ -44,27 +41,12 @@ export const SYNC_EVENTS = {
   // 實驗 ID 事件
   EXPERIMENT_ID_CHANGED: "experiment_id_changed",
 
-  // 步驟生命周期事件
-  STEP_STARTED: "step_started",
-  STEP_COMPLETED: "step_completed",
-  STEP_CANCELLED: "step_cancelled",
-
-  // 動作生命周期事件
-  ACTION_COMPLETED: "action_completed",
-  ACTION_CANCELLED: "action_cancelled",
-
   // 錯誤事件
   DATA_CLEARED: "data_cleared", // WebSocket斷開時清除同步數據
 
   // UI 本機事件（非同步）
   POWER_STATE_CHANGED: "power_state_changed",
   USER_SETTINGS_RESET: "user_settings_reset",
-
-  // 實驗中心事件（非同步）
-  EXPERIMENT_HUB_STATE_UPDATE: "experiment_hub_state_update",
-  EXPERIMENT_HUB_ID_UPDATE: "experiment_hub_id_update",
-  EXPERIMENT_HUB_STATE_CHANGE: "experiment_hub_state_change",
-  EXPERIMENT_HUB_CONNECTION_LOST: "experiment_hub_connection_lost",
 
   // WebSocket 事件（非同步）
   WEBSOCKET_SESSION_INVALID: "websocket_session_invalid",
@@ -121,30 +103,13 @@ export const SYNC_DATA_TYPES = {
 
   // 電源狀態
   POWER_STATE_UPDATE: "power_state_update",
-  POWER_STATE_CHANGED: "power_state_changed",
-
-  // 日誌更新
-  LOG_UPDATE: "log_update",
 
   // 動作廣播類型
-  EXPERIMENT_ACTION: "experiment_action",
   BUTTON_ACTION: "button_action",
 
   // 手勢操作
   GESTURE_MARKED: "gesture_marked",
   GESTURE_STEP_COMPLETED: "gesture_step_completed",
-
-  // 工作階段狀態
-  SESSION_STATE_UPDATE: "session_state_update",
-
-  // 狀態請求
-  REQUEST_EXPERIMENT_STATE: "request_experiment_state",
-
-  // 實驗狀態變化
-  EXPERIMENT_STATE_CHANGE: "experiment_state_change",
-
-  // 內部中繼資料類型（由 ExperimentSyncCore 派發，使用端接收）
-  STATE_BROADCAST: "state_broadcast",
 };
 
 /**

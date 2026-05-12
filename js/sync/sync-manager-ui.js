@@ -531,7 +531,7 @@ export class SyncManagerUI {
 
             this.showStatus(
               "info",
-              `角色已切換為: ${this.getStatusText(newRole)}`,
+              `角色已切換為: ${this.getRoleText(newRole)}`,
             );
           } catch (error) {
             Logger.error("角色切換失敗:", error);
@@ -1066,7 +1066,7 @@ export class SyncManagerUI {
         roleSpan.textContent = this.getRoleText(role);
       }
       if (statusSpan) {
-        statusSpan.textContent = statusTextMap[role] || statusTextMap[status] || status;
+        statusSpan.textContent = statusTextMap[status] || status;
       }
 
       const clientIdEl = document.getElementById("connectedDisplayClientId");

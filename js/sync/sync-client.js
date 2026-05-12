@@ -14,6 +14,7 @@ import {
   SYNC_ROLE_CONFIG,
   SYNC_STATUS_CONFIG,
   getSyncPagePath,
+  getSyncPageName,
   API_ENDPOINTS,
 } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
@@ -322,7 +323,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -370,7 +371,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -420,7 +421,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -487,7 +488,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -536,7 +537,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -569,7 +570,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -663,7 +664,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -694,7 +695,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -719,7 +720,7 @@ class SyncClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      throw new Error((error.message || error.error || `HTTP ${response.status}`).replace(SYNC_PAGE_CONFIG.PANEL, getSyncPageName(SYNC_PAGE_CONFIG.PANEL)).replace(SYNC_PAGE_CONFIG.BOARD, getSyncPageName(SYNC_PAGE_CONFIG.BOARD)));
     }
 
     const data = await response.json();
@@ -914,7 +915,11 @@ class SyncClient {
 
     if (this.wsClient) {
       this.wsClient.disconnect();
+      this.wsClient = null;
     }
+    // 重置初始化旗標，讓下次 createSession/joinSession 建立全新的 wsClient
+    // 確保新 wsClient 帶有 autoReconnect: true，避免後續連線無法自動重連
+    this.initialized = false;
 
     Logger.info("工作階段資料清理完成");
   }

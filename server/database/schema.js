@@ -107,11 +107,17 @@ export function validateSchema() {
   }
 }
 
+const ALLOWED_TABLES = new Set(["sessions", "share_codes", "experiment_ids", "state_updates"]);
+
 /**
  * 取得資料表資訊
  */
 export function getTableInfo(tableName) {
+  if (!ALLOWED_TABLES.has(tableName)) {
+    throw new Error(`不允許的資料表名稱: ${tableName}`);
+  }
   const db = getDatabase();
+  // PRAGMA 不支援參數化查詢，以上方的白名單驗證防止注入
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
   return columns;
 }

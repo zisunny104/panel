@@ -6,13 +6,18 @@ import express from "express";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Logger } from "../utils/logger.js";
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// 全域 express.json 限制為 1MB，record/save 需要更大的 body，單獨覆蓋
+router.use(express.json({ limit: "11mb" }));
+
 // 日誌檔案儲存路徑
 const LOGS_DIR = path.join(__dirname, "../../runtime/experiment-data");
+const MAX_CONTENT_BYTES = 10 * 1024 * 1024; // 10MB
 
 // 確保目錄存在
 async function ensureLogDir() {
@@ -57,7 +62,7 @@ router.get("/list", async (req, res) => {
       count: files.length,
     });
   } catch (error) {
-    console.error("[ExperimentLogs] List error:", error);
+    Logger.error("[ExperimentLogs] List error:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -82,8 +87,18 @@ router.post("/save", async (req, res) => {
 
     await ensureLogDir();
 
-    // 防止路徑遍歷
+    // 防止路徑遍歷，並驗證副檔名
     const safeFilename = path.basename(filename);
+    if (!safeFilename.endsWith(".jsonl")) {
+      return res.status(400).json({ success: false, error: "檔案副檔名必須為 .jsonl" });
+    }
+
+    // 限制內容大小
+    const contentBytes = Buffer.byteLength(content, "utf8");
+    if (contentBytes > MAX_CONTENT_BYTES) {
+      return res.status(400).json({ success: false, error: `內容超過大小限制 (${MAX_CONTENT_BYTES / 1024 / 1024}MB)` });
+    }
+
     const filepath = path.join(LOGS_DIR, safeFilename);
 
     // 寫入檔案
@@ -98,7 +113,7 @@ router.post("/save", async (req, res) => {
       path: `runtime/experiment-data/${safeFilename}`,
     });
   } catch (error) {
-    console.error("[ExperimentLogs] Save error:", error);
+    Logger.error("[ExperimentLogs] Save error:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -121,8 +136,11 @@ router.get("/read/:filename", async (req, res) => {
       });
     }
 
-    // 防止路徑遍歷
+    // 防止路徑遍歷，並驗證副檔名
     const safeFilename = path.basename(filename);
+    if (!safeFilename.endsWith(".jsonl")) {
+      return res.status(400).json({ success: false, error: "檔案副檔名必須為 .jsonl" });
+    }
     const filepath = path.join(LOGS_DIR, safeFilename);
 
     // 檢查檔案是否存在
@@ -145,7 +163,7 @@ router.get("/read/:filename", async (req, res) => {
       size: stats.size,
     });
   } catch (error) {
-    console.error("[ExperimentLogs] Read error:", error);
+    Logger.error("[ExperimentLogs] Read error:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -170,6 +188,9 @@ router.patch("/update-participant/:filename", async (req, res) => {
     }
 
     const safeFilename = path.basename(filename);
+    if (!safeFilename.endsWith(".jsonl")) {
+      return res.status(400).json({ success: false, error: "檔案副檔名必須為 .jsonl" });
+    }
     const filepath = path.join(LOGS_DIR, safeFilename);
 
     try {
@@ -202,7 +223,7 @@ router.patch("/update-participant/:filename", async (req, res) => {
 
     res.json({ success: true, filename: safeFilename, participant });
   } catch (error) {
-    console.error("[ExperimentLogs] UpdateParticipant error:", error);
+    Logger.error("[ExperimentLogs] UpdateParticipant error:", error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -222,8 +243,11 @@ router.delete("/delete/:filename", async (req, res) => {
       });
     }
 
-    // 防止路徑遍歷
+    // 防止路徑遍歷，並驗證副檔名
     const safeFilename = path.basename(filename);
+    if (!safeFilename.endsWith(".jsonl")) {
+      return res.status(400).json({ success: false, error: "檔案副檔名必須為 .jsonl" });
+    }
     const filepath = path.join(LOGS_DIR, safeFilename);
 
     // 檢查檔案是否存在
@@ -244,7 +268,7 @@ router.delete("/delete/:filename", async (req, res) => {
       message: "File deleted successfully",
     });
   } catch (error) {
-    console.error("[ExperimentLogs] Delete error:", error);
+    Logger.error("[ExperimentLogs] Delete error:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,

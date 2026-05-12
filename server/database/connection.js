@@ -88,7 +88,7 @@ export function query(sql, params = []) {
     const results = stmt.all(...params);
     return results;
   } catch (error) {
-    console.error("查詢執行失敗:", error.message, "\nSQL:", sql);
+    Logger.error("查詢執行失敗:", error.message, "\nSQL:", sql);
     throw error;
   }
 }
@@ -106,7 +106,7 @@ export function queryOne(sql, params = []) {
     const result = stmt.get(...params);
     return result || null;
   } catch (error) {
-    console.error("查詢執行失敗:", error.message, "\nSQL:", sql);
+    Logger.error("查詢執行失敗:", error.message, "\nSQL:", sql);
     throw error;
   }
 }
@@ -127,7 +127,7 @@ export function execute(sql, params = []) {
       lastInsertRowid: info.lastInsertRowid,
     };
   } catch (error) {
-    console.error("執行失敗:", error.message, "\nSQL:", sql);
+    Logger.error("執行失敗:", error.message, "\nSQL:", sql);
     throw error;
   }
 }

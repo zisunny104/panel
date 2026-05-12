@@ -109,9 +109,7 @@ export class ConnectionManager {
       // 移除舊的 WebSocket 連線
       const oldConnection = this.connections.get(existingWsConnectionId);
       if (oldConnection) {
-        console.log(
-          `偵測到重新連線: ${clientId} (舊連線: ${existingWsConnectionId})`,
-        );
+        Logger.debug(`偵測到重新連線: ${clientId} (舊連線: ${existingWsConnectionId})`);
 
         // 關閉舊連線
         if (oldConnection.ws.readyState === 1) {

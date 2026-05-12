@@ -23,8 +23,10 @@
     max-height: 90vh;
 }
 
-/* 統一的面板標題容器 - 使用通用模態視窗框架 */
-.sync-panel-header {
+/* 統一面板標題容器（同步面板、確認對話框共用） */
+.sync-panel-header,
+.sync-confirm-header,
+.sync-panel-title-container {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -34,24 +36,13 @@
 }
 
 .sync-panel-header h2,
-.sync-panel-header h3 {
+.sync-panel-header h3,
+.sync-confirm-header h2 {
     margin: 0;
     color: #2c3e50;
     font-size: 20px;
     font-weight: 600;
     flex: 1;
-}
-
-/* 統一的可滾動內容區域 */
-.sync-panel-body::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    min-height: 40px;
-}
-
-.sync-panel-body::-webkit-scrollbar-thumb:hover {
-    background: #999;
-    background-clip: padding-box;
 }
 
 /* 統一的面板控制區域 */
@@ -293,7 +284,8 @@
     box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
-.sync-close-btn {
+.sync-close-btn,
+.modal-close-btn {
     background: none;
     border: none;
     font-size: 28px;
@@ -310,9 +302,10 @@
     padding: 0;
 }
 
-.sync-close-btn:hover {
-    background: #f8f9fa;
-    color: #343a40;
+.sync-close-btn:hover,
+.modal-close-btn:hover {
+    background: #e9ecef;
+    color: #495057;
 }
 
 /* 建立／加入區塊共用標題 */
@@ -685,9 +678,59 @@
     display: none !important;
 }
 
-/* .sync-session-buttons-container / .sync-session-share-row → 已移至 sessions.css */
+/* 已連線按鈕區：分享列 + 操作列的垂直堆疊容器 */
+.sync-session-buttons-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+}
 
-/* 其他按鈕行 */
+/* 分享列：切換按鈕 + 展開區塊 */
+.sync-session-share-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 分享工作階段切換按鈕 */
+.sync-share-toggle-btn {
+    width: 100%;
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.sync-share-toggle-btn:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* 分享展開內容區 */
+.sync-share-content {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.sync-share-content.hidden {
+    display: none;
+}
+
+/* 操作按鈕列（退出、管理、關閉頻道） */
 .sync-session-action-row {
     display: flex;
     gap: 8px;

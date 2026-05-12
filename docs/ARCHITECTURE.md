@@ -217,6 +217,8 @@ interface ExperimentId {
 
 **定義**: 即時同步的狀態變化事件。
 
+**大小限制**: 單一狀態物件 JSON 序列化後不得超過 **512 KB**。超過時伺服器回傳 `STATE_TOO_LARGE` 錯誤，不寫入記憶體或資料庫。（上限由 `server/websocket/MessageHandler.js` `handleStateUpdate()` 強制執行）
+
 **WebSocket 訊息封包**:
 
 ```javascript
@@ -323,6 +325,7 @@ data/
 | **session-restore-events.js** | 匯出函數 | 工作階段快照轉譯並派發前端事件 |
 | **url-utils.js** | 匯出函數 | API 基礎路徑解析（`getApiBasePath()`）|
 | **event-emitter.js** | `EventEmitter` | 輕量事件訂閱基底類別，供各 Manager 繼承 |
+| **app-bootstrap.js** | 匯出函數 | 版本快取破壞（`data-versioned` 資源加版本號）、舊版瀏覽器儲存清理 |
 
 #### js/panel/ - 面板控制模組
 
@@ -418,6 +421,20 @@ js/constants/
 └── power-constants.js          # 電源狀態常數
 ```
 
+#### js/record/ - 日誌模組
+
+| 檔案 | 匯出 | 主要功能 |
+|---|---|---|
+| **index.js** | 統一入口 | 統一匯出所有子模組（RecordManager、recordView 等） |
+| **record-manager.js** | `RecordManager` | 日誌管理主入口；協調寫入、緩衝與 API 上傳 |
+| **record-store.js** | `recordStore` | IndexedDB 日誌持久化（緩衝區） |
+| **record-runtime.js** | `recordRuntime` | 執行期記錄：事件入隊、去重、批次排程 |
+| **record-view.js** | `recordView` | 日誌檢視主模組；協調列表、篩選、Modal、統計 |
+| **record-view-list.js** | `recordViewList` | 日誌列表渲染 |
+| **record-view-filter.js** | `recordViewFilter` | 篩選器（事件類型、時間範圍等） |
+| **record-view-modal.js** | `recordViewModal` | 單筆日誌詳細檢視 Modal |
+| **record-view-stats.js** | `recordViewStats` | 統計資訊顯示（計數、分布等） |
+
 #### js/board/ - 實驗頁面專用模組
 
 ```
@@ -506,8 +523,10 @@ panel/
 └── favicon.ico           # 網站圖標
 
 scripts/
-├── find_duplicate_logs.js  # 重複日誌檢測工具
-└── update-version.js       # 版本更新腳本
+├── find_duplicate_logs.js              # 重複日誌檢測工具
+├── update-version.js                   # 版本更新腳本
+├── verify_experiment_resilience.js     # 實驗韌性驗證腳本
+└── verify_experiment_contracts.js      # 實驗契約驗證腳本
 ```
 
 ### docs/ - 文件目錄
@@ -626,21 +645,31 @@ connect -> auth(clientId, sessionId, role) -> auth_success(isReconnect, serverTi
 
 #### 2. 同步 API
 
-| 方法   | 端點                                      | 說明                         |
-| ------ | ----------------------------------------- | ---------------------------- |
-| POST   | `/api/sync/session`                       | 建立新的工作階段             |
-| POST   | `/api/sync/create_session`                | 建立工作階段（僅建立）       |
-| POST   | `/api/sync/generate_share_code`           | 產生分享代碼                 |
-| POST   | `/api/sync/join`                          | 使用分享代碼加入工作階段     |
-| POST   | `/api/sync/session/:sessionId/share-code` | 為指定工作階段產生分享代碼   |
-| GET    | `/api/sync/session/:sessionId/validate`   | 驗證工作階段是否有效         |
-| GET    | `/api/sync/session/:sessionId/clients`    | 取得工作階段中的所有客戶端   |
-| GET    | `/api/sync/session/:sessionId`            | 取得工作階段資訊             |
-| GET    | `/api/sync/sessions`                      | 取得所有活動中的工作階段列表 |
-| DELETE | `/api/sync/session/:sessionId`            | 刪除指定的工作階段           |
-| POST   | `/api/sync/sessions/clear`                | 清除所有工作階段             |
-| POST   | `/api/sync/heartbeat`                     | 更新工作階段活動時間         |
-| GET    | `/api/sync/share-code/:code`              | 取得分享代碼資訊             |
+> **🔒 標記說明**：標有 🔒 的端點需在 HTTP Header 帶入 `X-Admin-Token`（從 `/api/sync/admin-token` 取得）。
+
+| 方法   | 端點                                          | 說明                               |
+| ------ | --------------------------------------------- | ---------------------------------- |
+| POST   | `/api/sync/session`                           | 建立新的工作階段                   |
+| POST   | `/api/sync/create_session`                    | 建立工作階段（僅建立）             |
+| POST   | `/api/sync/generate_share_code`               | 產生分享代碼                       |
+| POST   | `/api/sync/join`                              | 使用分享代碼加入工作階段           |
+| POST   | `/api/sync/session/:sessionId/share-code`     | 為指定工作階段產生分享代碼         |
+| GET    | `/api/sync/session/:sessionId/validate`       | 驗證工作階段是否有效               |
+| GET    | `/api/sync/session/:sessionId/clients`        | 取得工作階段中的所有客戶端         |
+| GET    | `/api/sync/session/:sessionId`                | 取得工作階段資訊                   |
+| GET    | `/api/sync/sessions` 🔒                       | 取得所有活動中的工作階段列表       |
+| DELETE | `/api/sync/session/:sessionId` 🔒             | 刪除指定的工作階段                 |
+| POST   | `/api/sync/sessions/clear` 🔒                 | 清除所有工作階段                   |
+| POST   | `/api/sync/heartbeat`                         | 更新工作階段活動時間               |
+| GET    | `/api/sync/share-code/:code`                  | 取得分享代碼資訊                   |
+| POST   | `/api/sync/channel`                           | 建立公開頻道工作階段               |
+| GET    | `/api/sync/channels`                          | 取得所有公開頻道                   |
+| POST   | `/api/sync/channel/close` 🔒                  | 關閉指定頻道                       |
+| POST   | `/api/sync/client/:clientId/kick` 🔒          | 強制踢出指定客戶端                 |
+| POST   | `/api/sync/client/:clientId/role` 🔒          | 調整指定客戶端角色                 |
+| POST   | `/api/sync/client/:clientId/request-state` 🔒 | 向指定客戶端請求當前狀態           |
+| POST   | `/api/sync/client/:clientId/refresh` 🔒       | 推送最新同步狀態給指定客戶端       |
+| GET    | `/api/sync/admin-token`                       | 取得管理員 Token（區網無需認證）   |
 
 #### 3. 實驗 API
 

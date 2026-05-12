@@ -42,51 +42,13 @@
     gap: 0.25rem;
 }
 
-/* 日誌面板小型按鈕（複製/關閉）：與 .circle-close-btn 一致的尺寸 */
-.logger-panel-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #e9ecef;
-    color: #444;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-    padding: 0;
-}
-
-.logger-panel-btn:hover {
-    background: #ff8c00;
-    color: #fff;
-}
-
+/* .logger-panel-btn 基礎樣式定義於 components/buttons.css */
 .logger-panel-btn:active {
     background: #e67e00;
     color: #fff;
 }
 
-.logger-panel-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
-.logger-fab-position {
-    /* 左側浮動按鈕容器：與右側 .corner-buttons 規格一致 */
-    position: fixed;
-    left: 1rem;
-    bottom: 1rem;
-    z-index: 30;
-
-    display: grid;
-    grid-template-rows: 1fr;
-    /* 單個按鈕 */
-    gap: 1.2rem;
-    align-items: center;
-}
+/* .logger-fab-position 定義於 components/ui-buttons.css */
 
 /* 複製按鈕狀態樣式 */
 .copy-success {
@@ -156,26 +118,6 @@
     font-size: 0.8rem;
     line-height: 1.5;
     color: #555;
-    scrollbar-width: thin;
-    scrollbar-color: #bbb #f5f5f5;
-}
-
-.logger-output .log-content::-webkit-scrollbar {
-    width: 6px;
-}
-
-.logger-output .log-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.logger-output .log-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 3px;
-}
-
-.logger-output .log-content::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
 
 .logger-output a {
     color: #667eea;

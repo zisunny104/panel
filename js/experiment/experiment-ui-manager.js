@@ -157,16 +157,18 @@ class ExperimentUIManager extends ExperimentUIRenderer {
         }
       };
       idInput.addEventListener("input", (e) => {
+        if (idInput._experimentSystemBound) return;
         const newId = e.target.value.trim();
         if (_debounceTimer) clearTimeout(_debounceTimer);
         _debounceTimer = setTimeout(() => { applyId(newId); _debounceTimer = null; }, DEBOUNCE_MS);
       });
       idInput.addEventListener("change", (e) => {
+        if (idInput._experimentSystemBound) return;
         if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
         applyId(e.target.value.trim());
       });
       if (idInput.value.trim() && !stateManager.experimentId) {
-        stateManager.experimentId = idInput.value.trim();
+        stateManager.setExperimentId(idInput.value.trim(), "input-init");
       }
     }
 
@@ -181,7 +183,7 @@ class ExperimentUIManager extends ExperimentUIRenderer {
       nameInput.addEventListener("input", (e) => applyName(e.target.value.trim()));
       nameInput.addEventListener("change", (e) => applyName(e.target.value.trim()));
       if (nameInput.value.trim() && !stateManager.participantName) {
-        stateManager.participantName = nameInput.value.trim();
+        stateManager.setParticipantName(nameInput.value.trim(), "input-init");
       }
     }
   }

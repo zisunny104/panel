@@ -19,7 +19,6 @@
 @import url('./components/toggle-switch.css');
 
 /* ===== 頁面專用樣式 ===== */
-@import url('./pages/panel-page.css');
 @import url('./pages/board-page.css');
 
 /* ===== 狀態 ===== */

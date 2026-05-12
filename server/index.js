@@ -267,7 +267,10 @@ setInterval(() => {
   }
 }, sessionValidationInterval);
 
-// 提供管理員 Token 給前端管理介面（區網環境，不加額外限制）
+// 提供管理員 Token 給前端管理介面（區網環境）
+// 安全說明：此端點在區網內無需認證即可取得 admin token。
+// 若需限制學員取得管理員權限，請在 .env 設定固定的 ADMIN_TOKEN，
+// 並透過 Nginx/防火牆等方式限制此路徑的存取。
 app.get("/api/sync/admin-token", (req, res) => {
   res.json({ token: ADMIN_TOKEN });
 });
@@ -308,8 +311,9 @@ const server = httpServer.listen(SERVER_CONFIG.port, () => {
   Logger.info(
     `清理任務間隔: <cyan>${SERVER_CONFIG.cleanup.interval / 1000}</cyan> 秒`,
   );
+  const tokenPreview = ADMIN_TOKEN.slice(0, 8) + "...";
   Logger.warn(
-    `管理員 Token: <yellow>${ADMIN_TOKEN}</yellow>  <dim>(設定環境變數 ADMIN_TOKEN 可固定此值)</dim>`,
+    `管理員 Token: <yellow>${tokenPreview}</yellow>  <dim>(完整 Token 請查看 /api/sync/admin-token 或設定環境變數 ADMIN_TOKEN)</dim>`,
   );
   Logger.info("");
 });

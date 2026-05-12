@@ -141,7 +141,6 @@ export async function initializePanelManagers(page) {
     const timerStart = performance.now();
     page.timerManager = new ExperimentTimerManager({
       timeSyncManager: page.syncManager?.core?.timeSyncManager,
-      stateManager: page.experimentStateManager,
       getCurrentCombination: () =>
         page.experimentCombinationManager?.getCurrentCombination?.() || null,
     });
@@ -152,7 +151,6 @@ export async function initializePanelManagers(page) {
   page.experimentFlowManager = new ExperimentFlowManager({
     combinationManager: page.experimentCombinationManager,
     hubManager: page.experimentHubManager,
-    stateManager: page.experimentStateManager,
   });
   logInitDuration("ExperimentFlowManager 已初始化", flowStart);
   page.panelMediaManager.updateDependencies({

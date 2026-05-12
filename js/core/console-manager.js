@@ -264,6 +264,7 @@ class Logger {
   }
 
   static warn(...args) {
+    if (!this.shouldLog("warn")) return;
     if (
       args.length > 1 &&
       typeof args[1] === "object" &&

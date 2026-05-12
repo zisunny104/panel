@@ -78,6 +78,7 @@ export async function initializeBoardManagers(page) {
       experimentSyncCore: page.experimentSyncCore,
       experimentHubManager: page.experimentHubManager,
     });
+    experimentSyncManager.bindBoardBroadcastEvents();
 
     if (!page.experimentCombinationManager) {
       page.experimentCombinationManager = new ExperimentCombinationManager();
@@ -99,6 +100,7 @@ export async function initializeBoardManagers(page) {
         hubManager: page.experimentHubManager,
         actionsMap: page.actionsMap || null,
         unitsData: page.unitsData || null,
+        dispatchDomLifecycleEvents: true,
       });
       logInitDuration("ExperimentFlowManager 已初始化", flowStart);
     }

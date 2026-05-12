@@ -44,7 +44,7 @@ class SessionService {
         created_at,
       };
     } catch (error) {
-      console.error("建立工作階段失敗:", error.message);
+      Logger.error("建立工作階段失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -73,7 +73,7 @@ class SessionService {
 
       return session;
     } catch (error) {
-      console.error("查詢工作階段失敗:", error.message);
+      Logger.error("查詢工作階段失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -94,7 +94,7 @@ class SessionService {
 
       return result.changes > 0;
     } catch (error) {
-      console.error("更新工作階段失敗:", error.message);
+      Logger.error("更新工作階段失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -117,7 +117,7 @@ class SessionService {
 
       return result.changes > 0;
     } catch (error) {
-      console.error("更新工作階段狀態失敗:", error.message);
+      Logger.error("更新工作階段狀態失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -140,7 +140,9 @@ class SessionService {
       let data = {};
       try {
         data = session.data ? JSON.parse(session.data) : {};
-      } catch (e) {}
+      } catch (e) {
+        Logger.warn(`mergeState: session data JSON 解析失敗 (${sessionId}):`, e.message);
+      }
 
       // 持久化實驗相關狀態至子物件，避免被後續更新覆蓋
       const experimentTypes = [
@@ -161,7 +163,7 @@ class SessionService {
       );
       return true;
     } catch (error) {
-      console.error("合併工作階段狀態失敗:", error.message);
+      Logger.error("合併工作階段狀態失敗:", error.message);
       return false;
     }
   }
@@ -184,7 +186,7 @@ class SessionService {
 
       return false;
     } catch (error) {
-      console.error("刪除工作階段失敗:", error.message);
+      Logger.error("刪除工作階段失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -209,30 +211,39 @@ class SessionService {
       }
 
       const sessionIds = expiredSessions.map((s) => s.session_id);
-      const placeholders = sessionIds.map(() => "?").join(",");
+      const BATCH_SIZE = 50;
+      let totalDeleted = 0;
 
-      // 2. 刪除相關的 state_updates（如果有）
-      try {
+      // 分批刪除，避免超長 IN 子句
+      for (let i = 0; i < sessionIds.length; i += BATCH_SIZE) {
+        const batch = sessionIds.slice(i, i + BATCH_SIZE);
+        const placeholders = batch.map(() => "?").join(",");
+
+        // 2. 刪除相關的 state_updates（如果有）
+        try {
+          execute(
+            `DELETE FROM state_updates WHERE session_id IN (${placeholders})`,
+            batch,
+          );
+        } catch (error) {
+          Logger.debug("清理 state_updates 略過:", error.message);
+        }
+
+        // 3. 刪除相關的 share_codes
         execute(
-          `DELETE FROM state_updates WHERE session_id IN (${placeholders})`,
-          sessionIds,
+          `DELETE FROM share_codes WHERE session_id IN (${placeholders})`,
+          batch,
         );
-      } catch (error) {
-        // state_updates 表可能不存在或為空，忽略錯誤
-        console.log("清理 state_updates 略過:", error.message);
+
+        // 4. 最後刪除 sessions
+        const result = execute(
+          `DELETE FROM sessions WHERE session_id IN (${placeholders})`,
+          batch,
+        );
+        totalDeleted += result.changes;
       }
 
-      // 3. 刪除相關的 share_codes
-      execute(
-        `DELETE FROM share_codes WHERE session_id IN (${placeholders})`,
-        sessionIds,
-      );
-
-      // 4. 最後刪除 sessions
-      const result = execute(
-        `DELETE FROM sessions WHERE session_id IN (${placeholders})`,
-        sessionIds,
-      );
+      const result = { changes: totalDeleted };
 
       if (result.changes > 0) {
         Logger.debug(`[清理] 已清除 ${result.changes} 個過期工作階段`);
@@ -240,7 +251,7 @@ class SessionService {
 
       return result.changes;
     } catch (error) {
-      console.error("清理工作階段失敗:", error.message);
+      Logger.error("清理工作階段失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -261,7 +272,7 @@ class SessionService {
 
       return sessions;
     } catch (error) {
-      console.error("查詢活動中工作階段失敗:", error.message);
+      Logger.error("查詢活動中工作階段失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }

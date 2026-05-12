@@ -255,7 +255,7 @@ export class SyncSessionsModal {
   }
 
   _renderSessionLabel(isChannel, channelName) {
-    return isChannel ? `公開頻道 ${channelName}` : "工作階段";
+    return isChannel ? `公開頻道 ${this._escapeHtml(channelName)}` : "工作階段";
   }
 
   _renderClientChips(clientCount, operatorCount, viewerCount) {
@@ -278,29 +278,31 @@ export class SyncSessionsModal {
       : clientId;
     const joinedTime = this.formatDateTime(client.joinedAt * 1000);
     const isOperator = client.role === this.roleConfig.OPERATOR;
+    const safeClientId = this._escapeHtml(clientId);
+    const safeShortId = this._escapeHtml(shortId);
 
     return `
-      <div class="ssm-client sync-session-client ${client.role}" data-client-id="${clientId}">
+      <div class="ssm-client sync-session-client ${client.role}" data-client-id="${safeClientId}">
         <div class="ssm-client-top">
-          <code class="ssm-client-id sync-client-id-text" title="${clientId}">${shortId}</code>
-          ${client.clientType ? `<span class="ssm-type-tag">${client.clientType}</span>` : ""}
+          <code class="ssm-client-id sync-client-id-text" title="${safeClientId}">${safeShortId}</code>
+          ${client.clientType ? `<span class="ssm-type-tag">${this._escapeHtml(client.clientType)}</span>` : ""}
           <div class="sync-ch-role-group ssm-client-role-group">
             <button class="sync-ch-role-btn sync-client-role-btn ${isOperator ? "active" : ""}"
-                    data-client-id="${clientId}" data-role="${this.roleConfig.OPERATOR}">${getSyncRoleText(this.roleConfig.OPERATOR)}</button>
+                    data-client-id="${safeClientId}" data-role="${this.roleConfig.OPERATOR}">${getSyncRoleText(this.roleConfig.OPERATOR)}</button>
             <button class="sync-ch-role-btn sync-client-role-btn ${!isOperator ? "active" : ""}"
-                    data-client-id="${clientId}" data-role="${this.roleConfig.VIEWER}">${getSyncRoleText(this.roleConfig.VIEWER)}</button>
+                    data-client-id="${safeClientId}" data-role="${this.roleConfig.VIEWER}">${getSyncRoleText(this.roleConfig.VIEWER)}</button>
           </div>
         </div>
         <div class="ssm-client-meta">加入 ${joinedTime}</div>
         <div class="ssm-client-btns sync-client-actions">
           <button class="ssm-client-btn ssm-btn-push sync-client-refresh-btn"
-                  data-client-id="${clientId}">↑ 推送狀態</button>
+                  data-client-id="${safeClientId}">↑ 推送狀態</button>
           <button class="ssm-client-btn ssm-btn-info sync-client-request-state-btn"
-                  data-client-id="${clientId}">? 請求狀態</button>
+                  data-client-id="${safeClientId}">? 請求狀態</button>
           <button class="ssm-client-btn ssm-btn-kick sync-client-kick-btn"
-                  data-client-id="${clientId}">✕ 強制退出</button>
+                  data-client-id="${safeClientId}">✕ 強制退出</button>
         </div>
-        <div class="ssm-client-state" data-client-state="${clientId}">
+        <div class="ssm-client-state" data-client-state="${safeClientId}">
           <div class="ssm-client-state-empty">尚未請求</div>
         </div>
       </div>`;
@@ -324,7 +326,7 @@ export class SyncSessionsModal {
       ? Object.keys(parsedState).length : 0;
 
     return `
-      <div class="sync-session-state-toggle" data-session-id="${session.id}">
+      <div class="sync-session-state-toggle" data-session-id="${this._escapeHtml(session.id)}">
         <div class="sync-session-state-header ssm-state-hdr">
           <span>同步狀態</span>
           <span class="ssm-state-count">${fieldCount} 個欄位</span>
@@ -355,11 +357,11 @@ export class SyncSessionsModal {
   _renderSessionActionButton(isChannel, session) {
     if (isChannel) {
       return `<button class="ssm-footer-btn ssm-btn-gray sync-close-channel-btn"
-               data-channel-name="${session.channelName}"
+               data-channel-name="${this._escapeHtml(session.channelName || "")}"
                ${session.clients?.length ? "" : "disabled"}>清除所有連線</button>`;
     }
     return `<button class="ssm-footer-btn ssm-btn-danger-ol sync-delete-session-btn"
-               data-session-id="${session.id}">刪除此工作階段</button>`;
+               data-session-id="${this._escapeHtml(session.id)}">刪除此工作階段</button>`;
   }
 
   initialize() {
@@ -423,7 +425,9 @@ export class SyncSessionsModal {
   async loadSessionsData() {
     try {
       const apiUrl = this.getApiUrl();
-      const response = await fetch(`${apiUrl}${API_ENDPOINTS.SYNC.SESSIONS}`);
+      const response = await fetch(`${apiUrl}${API_ENDPOINTS.SYNC.SESSIONS}`, {
+        headers: await this._adminHeaders(),
+      });
       const data = await response.json();
 
       if (data.success) {
@@ -490,7 +494,7 @@ export class SyncSessionsModal {
 
     const channelBadge = this._renderChannelBadge(isChannel);
     const label = this._renderSessionLabel(isChannel, session.channelName);
-    const displayId = session.id;
+    const safeSessionId = this._escapeHtml(session.id);
     const experimentMetaHtml = this._renderSessionExperimentMeta(session);
 
     const operatorCount = (session.clients || []).filter((c) => c.role === this.roleConfig.OPERATOR).length;
@@ -498,7 +502,7 @@ export class SyncSessionsModal {
     const clientChips = this._renderClientChips(clientCount, operatorCount, viewerCount);
 
     return `
-      <div class="${cardClass}" data-session-id="${session.id}" data-channel="${this._escapeHtml(session.channelName || "")}">
+      <div class="${cardClass}" data-session-id="${safeSessionId}" data-channel="${this._escapeHtml(session.channelName || "")}">
         <div class="sync-session-header ssm-card-header">
           <div class="ssm-card-check ssm-card-check-ph"></div>
           <div class="ssm-card-body">
@@ -506,7 +510,7 @@ export class SyncSessionsModal {
               <span class="ssm-card-name">${label}</span>
               ${channelBadge}
             </div>
-            <code class="ssm-card-id">${displayId}</code>
+            <code class="ssm-card-id">${safeSessionId}</code>
             ${experimentMetaHtml}
             <div class="ssm-card-meta">
               <span class="ssm-meta-item"><span class="ssm-meta-lbl">建立</span> ${createdTime}</span>
@@ -552,9 +556,9 @@ export class SyncSessionsModal {
       if (typeof value === "number") return `<span class="sync-state-number">${value}</span>`;
       if (typeof value === "string") {
         if (value.length > 50) {
-          return `<span class="sync-state-string">"${value.substring(0, 47)}..."</span>`;
+          return `<span class="sync-state-string">"${this._escapeHtml(value.substring(0, 47))}..."</span>`;
         }
-        return `<span class="sync-state-string">"${value}"</span>`;
+        return `<span class="sync-state-string">"${this._escapeHtml(value)}"</span>`;
       }
 
       if (Array.isArray(value)) {
@@ -568,7 +572,7 @@ export class SyncSessionsModal {
         const entries = Object.entries(value);
         if (entries.length === 0) return "<span class=\"sync-state-object\">{}</span>";
         const formattedEntries = entries.slice(0, 10).map(
-          ([key, val]) => `${indentStr}  <span class="sync-state-key">"${key}"</span>: ${formatValue(val, indent + 1)}`,
+          ([key, val]) => `${indentStr}  <span class="sync-state-key">"${this._escapeHtml(key)}"</span>: ${formatValue(val, indent + 1)}`,
         );
         const remaining = entries.length > 10 ? `\n${indentStr}  ... 還有 ${entries.length - 10} 個欄位` : "";
         return `<span class="sync-state-object">{\n${formattedEntries.join(",\n")}${remaining}\n${indentStr}}</span>`;
@@ -661,19 +665,11 @@ export class SyncSessionsModal {
           this.expandedCards.clear();
           await this.refreshSessionsList();
         } else {
-          if (this.indicatorManager) {
-            this.indicatorManager.showStatus("error", "刪除失敗: " + data.message);
-          } else {
-            alert("刪除失敗: " + data.message);
-          }
+          this.indicatorManager?.showStatus("error", "刪除失敗: " + data.message);
         }
       } catch (error) {
         Logger.error("刪除所有工作階段錯誤:", error);
-        if (this.indicatorManager) {
-          this.indicatorManager.showStatus("error", "刪除失敗: " + (error.message || ""));
-        } else {
-          alert("刪除失敗: " + error.message);
-        }
+        this.indicatorManager?.showStatus("error", "刪除失敗: " + (error.message || ""));
       }
 
       clearAllBtn.disabled = false;
@@ -688,11 +684,7 @@ export class SyncSessionsModal {
       });
 
       if (activeSessions.length === 0) {
-        if (this.indicatorManager) {
-          this.indicatorManager.showStatus("info", "目前沒有活動中的工作階段");
-        } else {
-          alert("目前沒有活動中的工作階段");
-        }
+        this.indicatorManager?.showStatus("info", "目前沒有活動中的工作階段");
         return;
       }
 
@@ -727,15 +719,11 @@ export class SyncSessionsModal {
         const msg = failCount === 0
           ? `已結束 ${successCount} 個活動中工作階段`
           : `結束 ${successCount} 個，失敗 ${failCount} 個`;
-        if (this.indicatorManager) {
-          this.indicatorManager.showStatus(failCount === 0 ? "success" : "error", msg);
-        } else {
-          alert(msg);
-        }
+        this.indicatorManager?.showStatus(failCount === 0 ? "success" : "error", msg);
         await this.refreshSessionsList();
       } catch (error) {
         Logger.error("結束活動中工作階段錯誤:", error);
-        alert("操作失敗: " + error.message);
+        this.indicatorManager?.showStatus("error", "操作失敗: " + error.message);
       }
 
       stopAllActiveBtn.disabled = false;
@@ -761,21 +749,15 @@ export class SyncSessionsModal {
               const card = event.target.closest(".sync-session-card");
               if (card) card.remove();
               await this.refreshSessionsList();
-              if (this.indicatorManager) {
-                this.indicatorManager.showStatus("success", `工作階段 ${sessionId} 已刪除`);
-              }
+              this.indicatorManager?.showStatus("success", `工作階段 ${sessionId} 已刪除`);
             } else {
-              if (this.indicatorManager) {
-                this.indicatorManager.showStatus("error", "刪除失敗: " + data.message);
-              } else {
-                alert("刪除失敗: " + data.message);
-              }
+              this.indicatorManager?.showStatus("error", "刪除失敗: " + data.message);
               event.target.disabled = false;
               event.target.textContent = "刪除";
             }
           } catch (error) {
             Logger.error("刪除工作階段錯誤:", error);
-            alert("刪除失敗: " + error.message);
+            this.indicatorManager?.showStatus("error", "刪除失敗: " + error.message);
             event.target.disabled = false;
             event.target.textContent = "刪除";
           }
@@ -807,17 +789,13 @@ export class SyncSessionsModal {
               }
               await this.refreshSessionsList();
             } else {
-              if (this.indicatorManager) {
-                this.indicatorManager.showStatus("error", "清除失敗: " + data.message);
-              } else {
-                alert("清除失敗: " + data.message);
-              }
+              this.indicatorManager?.showStatus("error", "清除失敗: " + data.message);
               event.target.disabled = false;
               event.target.textContent = "清除連線";
             }
           } catch (error) {
             Logger.error("清除頻道連線錯誤:", error);
-            alert("清除失敗: " + error.message);
+            this.indicatorManager?.showStatus("error", "清除失敗: " + error.message);
             event.target.disabled = false;
             event.target.textContent = "清除連線";
           }
@@ -839,12 +817,12 @@ export class SyncSessionsModal {
             if (data.success) {
               await this.refreshSessionsList();
             } else {
-              alert("強制退出失敗: " + data.message);
+              this.indicatorManager?.showStatus("error", "強制退出失敗: " + data.message);
               event.target.disabled = false;
               event.target.textContent = "強制退出";
             }
           } catch (e) {
-            alert("強制退出失敗: " + e.message);
+            this.indicatorManager?.showStatus("error", "強制退出失敗: " + e.message);
             event.target.disabled = false;
             event.target.textContent = "強制退出";
           }
@@ -872,12 +850,12 @@ export class SyncSessionsModal {
             if (data.success) {
               await this.refreshSessionsList();
             } else {
-              alert("調整角色失敗: " + data.message);
+              this.indicatorManager?.showStatus("error", "調整角色失敗: " + data.message);
               event.target.disabled = false;
               event.target.textContent = origText;
             }
           } catch (e) {
-            alert("調整角色失敗: " + e.message);
+            this.indicatorManager?.showStatus("error", "調整角色失敗: " + e.message);
             event.target.disabled = false;
             event.target.textContent = origText;
           }
@@ -897,10 +875,10 @@ export class SyncSessionsModal {
             const res = await fetch(`${this.getApiUrl()}${API_ENDPOINTS.SYNC.CLIENT_REFRESH(clientId)}`, { method: "POST" });
             const data = await res.json();
             if (!data.success) {
-              alert("推送失敗: " + data.message);
+              this.indicatorManager?.showStatus("error", "推送失敗: " + data.message);
             }
           } catch (e) {
-            alert("推送失敗: " + e.message);
+            this.indicatorManager?.showStatus("error", "推送失敗: " + e.message);
           } finally {
             event.target.disabled = false;
             this._restoreOriginalText(event.target);

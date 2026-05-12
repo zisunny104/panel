@@ -4,6 +4,7 @@
 import express from "express";
 import { getDatabase } from "../database/connection.js";
 import { HTTP_STATUS } from "../config/constants.js";
+import { Logger } from "../utils/logger.js";
 
 const router = express.Router();
 
@@ -28,7 +29,7 @@ router.get("/", (req, res) => {
       message: "伺服器執行正常",
     });
   } catch (error) {
-    console.error("心跳檢測失敗:", error.message);
+    Logger.error("心跳檢測失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       status: "error",
       message: "伺服器或資料庫異常",
@@ -54,7 +55,7 @@ router.head("/", (req, res) => {
     // HEAD 請求只返回狀態碼和標頭，不返回主體
     res.status(HTTP_STATUS.OK).end();
   } catch (error) {
-    console.error("輕量級心跳檢測失敗:", error.message);
+    Logger.error("輕量級心跳檢測失敗:", error.message);
     res.status(HTTP_STATUS.INTERNAL_ERROR).end();
   }
 });

@@ -779,7 +779,6 @@ class ExperimentSystemManager {
       reapplyCombination: true,
       skipCombinationBroadcast: true,
     });
-    this._syncExperimentIdToUI();
     return true;
   }
 

@@ -40,13 +40,14 @@ export class ExperimentTimerManager {
 
   _startTimerInterval() {
     if (this.experimentInterval) return;
+    // 快取元素引用，避免每次 tick 重新查詢 DOM
+    const el = this._getTimerElement();
     this.experimentInterval = setInterval(() => {
       if (!this.experimentPaused) {
         this.experimentElapsedMs = Date.now() - this.experimentStartTime;
         if (typeof this.onExperimentTick === "function") {
           this.onExperimentTick(this.experimentElapsedMs);
         }
-        const el = this._getTimerElement();
         if (el) {
           el.textContent = this.timeSyncManager.formatStopwatch(this.experimentElapsedMs);
         }
@@ -176,7 +177,7 @@ export class ExperimentTimerManager {
         if (typeof this.onIndexedTick === "function") {
           this.onIndexedTick(idx, currentElapsed);
         }
-      }, 10);
+      }, 16);
 
       if (this.recordManager && this.getCurrentCombination) {
         const currentCombination = this.getCurrentCombination();
@@ -238,5 +239,36 @@ export class ExperimentTimerManager {
       return Math.floor((state.elapsedTime + (Date.now() - state.startTime)) / 1000);
     }
     return Math.floor((state.elapsedTime || 0) / 1000);
+  }
+
+  destroy() {
+    // 長按計時器（setTimeout）
+    Object.keys(this.longPressTimers).forEach((idx) => {
+      if (this.longPressTimers[idx]) {
+        clearTimeout(this.longPressTimers[idx]);
+        this.longPressTimers[idx] = null;
+      }
+    });
+
+    // 步驟計時器（setInterval）
+    Object.keys(this.timerIntervals).forEach((idx) => {
+      if (this.timerIntervals[idx]) {
+        clearInterval(this.timerIntervals[idx]);
+        this.timerIntervals[idx] = null;
+      }
+    });
+
+    // 主實驗計時器（setInterval）
+    if (this.experimentInterval) {
+      clearInterval(this.experimentInterval);
+      this.experimentInterval = null;
+    }
+
+    this.timerStates = {};
+    this.longPressTimers = {};
+    this.timerIntervals = {};
+    this.experimentStartTime = null;
+    this.experimentElapsedMs = 0;
+    this.currentActiveIndex = null;
   }
 }

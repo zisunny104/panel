@@ -139,33 +139,26 @@
     gap: 6px;
 }
 
-/* 列表操作按鈕 - 統一大小和高度 */
+/* 覆蓋尺寸與對齊；.btn-secondary 其餘屬性由 components/general-buttons.css 定義 */
 .records-list-header .btn-secondary,
 .records-list-header .btn-danger {
     flex-shrink: 0;
     width: 40px;
     height: 40px;
     padding: 8px;
-    background: #f5f5f5;
-    color: #333;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.records-list-header .btn-secondary:hover {
-    background: #e9ecef;
-    border-color: #bbb;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+/* 此情境中 .btn-danger 採用次要按鈕外觀（覆蓋預設紅色） */
+.records-list-header .btn-danger {
+    background: #f5f5f5;
+    color: #333;
+    border: 2px solid #ddd;
 }
 
+.records-list-header .btn-secondary:hover,
 .records-list-header .btn-danger:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -183,29 +176,7 @@
     max-height: 320px;
     overflow-y: auto;
     padding-right: 2px;
-    scrollbar-width: thin;
-    scrollbar-color: #bbb #f5f5f5;
-}
-
-.records-list::-webkit-scrollbar {
-    width: 8px;
-}
-
-.records-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.records-list::-webkit-scrollbar-thumb {
-    background: #bbb;
-    border-radius: 4px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    min-height: 40px;
-}
-
-.records-list::-webkit-scrollbar-thumb:hover {
-    background: #999;
-    background-clip: padding-box;
+    /* 滾動條樣式統一於 base/scrollbar.css */
 }
 
 /* 日誌項目 */
@@ -536,29 +507,7 @@
     border-radius: 4px;
     border: 2px solid #ddd;
     color: #666;
-    scrollbar-width: thin;
-    scrollbar-color: #bbb #f5f5f5;
-}
-
-.record-display::-webkit-scrollbar {
-    width: 8px;
-}
-
-.record-display::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.record-display::-webkit-scrollbar-thumb {
-    background: #bbb;
-    border-radius: 4px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    min-height: 40px;
-}
-
-.record-display::-webkit-scrollbar-thumb:hover {
-    background: #999;
-    background-clip: padding-box;
+    /* 滾動條樣式統一於 base/scrollbar.css */
 }
 
 /* 錯誤和空狀態 */
@@ -774,41 +723,7 @@
     font-weight: 500;
 }
 
-.no-current-records {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: #666;
-    padding: 1rem;
-}
-
-.no-current-records .no-records-icon {
-    margin-bottom: 0.75rem;
-    opacity: 0.5;
-}
-
-.no-current-records .no-records-icon svg {
-    width: 32px;
-    height: 32px;
-    stroke: #999;
-}
-
-.no-current-records .no-records-text {
-    font-size: 0.9rem;
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-    color: #555;
-}
-
-.no-current-records .no-records-hint {
-    font-size: 0.8rem;
-    color: #888;
-    line-height: 1.4;
-}
-
-/* .no-records 容器樣式 */
+.no-current-records,
 .no-records {
     display: flex;
     flex-direction: column;
@@ -819,17 +734,20 @@
     padding: 1rem;
 }
 
+.no-current-records .no-records-icon,
 .no-records .no-records-icon {
     margin-bottom: 0.75rem;
     opacity: 0.5;
 }
 
+.no-current-records .no-records-icon svg,
 .no-records .no-records-icon svg {
     width: 32px;
     height: 32px;
     stroke: #999;
 }
 
+.no-current-records .no-records-text,
 .no-records .no-records-text {
     font-size: 0.9rem;
     font-weight: 500;
@@ -837,6 +755,7 @@
     color: #555;
 }
 
+.no-current-records .no-records-hint,
 .no-records .no-records-hint {
     font-size: 0.8rem;
     color: #888;

@@ -188,28 +188,39 @@
     }
 }
 
-/* 共用：圓形關閉按鈕（實驗面板 / 設定面板等通用） */
-.circle-close-btn {
+/* ================= 圓形操作按鈕（共用元件，唯一定義於此） ================= */
+/* .logger-panel-btn 與此共用，差異見下方 */
+.circle-close-btn,
+.logger-panel-btn {
     width: 32px;
     height: 32px;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: #333;
-    color: #fff;
+    background: #e9ecef;
+    color: #444;
     border: none;
-    font-size: 1rem;
+    font-size: 1.2rem;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background 0.2s;
     padding: 0;
 }
 
-.circle-close-btn:hover {
-    background: #ff8c00;
+/* 關閉按鈕需要與標題文字之間留出間距 */
+.circle-close-btn {
+    margin-left: 8px;
+    flex-shrink: 0;
 }
 
-.circle-close-btn svg {
+.circle-close-btn:hover,
+.logger-panel-btn:hover {
+    background: #ff8c00;
+    color: #fff;
+}
+
+.circle-close-btn svg,
+.logger-panel-btn svg {
     width: 16px;
     height: 16px;
 }
@@ -226,4 +237,11 @@ button.locked {
 button.locked:hover {
     background-color: rgba(255, 140, 0, 0.4);
     transform: none;
+}
+
+/* ================= 檢視者模式（唯讀） ================= */
+.button-overlay.view-only-mode {
+    pointer-events: none;
+    opacity: 0.55;
+    cursor: not-allowed;
 }

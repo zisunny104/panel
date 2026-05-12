@@ -31,6 +31,7 @@ class ExperimentFlowManager extends EventEmitter {
     uiManager = null,
     actionsMap = null,
     unitsData = null,
+    dispatchDomLifecycleEvents = false,
   } = {}) {
     super();
     this.hubManager = hubManager;
@@ -39,6 +40,9 @@ class ExperimentFlowManager extends EventEmitter {
     this.uiManager = uiManager;
     this.actionsMap = actionsMap;
     this.unitsData = unitsData;
+    // 只有 board 端需要發出 document lifecycle 事件（供 experimentSyncManager 捕捉後廣播）
+    // panel 端使用 EventEmitter 路徑，document dispatch 對 panel 是死碼
+    this._dispatchDomLifecycleEvents = dispatchDomLifecycleEvents;
 
     // 流程狀態 — FlowManager 是唯一 owner，不透過外部 store
     this._state = ExperimentFlowManager.STATE.IDLE;
@@ -195,7 +199,7 @@ class ExperimentFlowManager extends EventEmitter {
         newState: this._state,
       });
 
-      if (broadcast) {
+      if (broadcast && this._dispatchDomLifecycleEvents) {
         document.dispatchEvent(new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, { detail: startData }));
       }
 
@@ -240,7 +244,7 @@ class ExperimentFlowManager extends EventEmitter {
       newState: this._state,
     });
 
-    if (broadcast) {
+    if (broadcast && this._dispatchDomLifecycleEvents) {
       document.dispatchEvent(new CustomEvent(SYNC_EVENTS.EXPERIMENT_PAUSED, { detail: pauseData }));
     }
 
@@ -279,7 +283,7 @@ class ExperimentFlowManager extends EventEmitter {
       newState: this._state,
     });
 
-    if (broadcast) {
+    if (broadcast && this._dispatchDomLifecycleEvents) {
       document.dispatchEvent(new CustomEvent(SYNC_EVENTS.EXPERIMENT_RESUMED, { detail: resumeData }));
     }
 
@@ -317,7 +321,7 @@ class ExperimentFlowManager extends EventEmitter {
     this.emit(ExperimentFlowManager.EVENT.STOPPED, stopData);
     this.emit(ExperimentFlowManager.EVENT.STATE_CHANGED, { oldState, newState: this._state });
 
-    if (broadcast) {
+    if (broadcast && this._dispatchDomLifecycleEvents) {
       document.dispatchEvent(new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, { detail: stopData }));
     }
 
@@ -355,7 +359,7 @@ class ExperimentFlowManager extends EventEmitter {
     this.emit(ExperimentFlowManager.EVENT.COMPLETED, completedData);
     this.emit(ExperimentFlowManager.EVENT.STATE_CHANGED, { oldState, newState: this._state });
 
-    if (broadcast) {
+    if (broadcast && this._dispatchDomLifecycleEvents) {
       document.dispatchEvent(new CustomEvent(SYNC_EVENTS.EXPERIMENT_STOPPED, { detail: completedData }));
     }
 

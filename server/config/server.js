@@ -107,15 +107,13 @@ export function loadBusinessConfigSync() {
     const configPath = resolve(__dirname, "../../data/config.json");
     const configData = readFileSync(configPath, "utf-8");
     businessConfig = JSON.parse(configData);
-
-    console.log("業務設定載入成功");
     return businessConfig;
   } catch (error) {
+    // Logger 尚未完全初始化時此函式可能被呼叫，保留 console.error 作後備
     console.error("載入 config.json 失敗:", error.message);
-    // 回傳預設設定
+    // 回傳預設設定（createCode 不可硬編碼，由 .env CREATE_CODE 控制）
     return {
       multiScreenSync: {
-        validCreateCode: "113151006",
         maxClients: 6,
         enableSync: true,
       },
@@ -124,11 +122,14 @@ export function loadBusinessConfigSync() {
 }
 
 /**
- * 取得驗證碼 (從 config.json)
+ * 取得驗證碼 — 優先從環境變數讀取，其次從 config.json
  */
 export function getValidCreateCode() {
+  if (process.env.CREATE_CODE) {
+    return process.env.CREATE_CODE;
+  }
   const config = businessConfig || loadBusinessConfigSync();
-  return config.multiScreenSync?.validCreateCode || "113151006";
+  return config.multiScreenSync?.validCreateCode || "";
 }
 
 export function getSyncEnableFlag() {

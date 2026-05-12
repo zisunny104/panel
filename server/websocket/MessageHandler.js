@@ -66,13 +66,9 @@ export class MessageHandler {
         throw new Error("訊息 data 欄位必須為物件");
       }
 
-      // 防止超大字串欄位（state 更新的 string value 限 8KB）
+      // 防止超大字串欄位及深度嵌套物件（避免遞迴解析耗尽 CPU）
       if (data) {
-        for (const [key, val] of Object.entries(data)) {
-          if (typeof val === "string" && val.length > 8192) {
-            throw new Error(`欄位 ${key} 超過最大長度限制 (8192)`);
-          }
-        }
+        this._validateDataDepth(data, 0, 5);
       }
 
       const handler = this.handlers[type];
@@ -290,6 +286,20 @@ export class MessageHandler {
         return;
       }
 
+      // 限制單一狀態物件大小，防止過大資料佔用記憶體與資料庫
+      const stateJson = JSON.stringify(state);
+      const MAX_STATE_BYTES = 512 * 1024; // 512 KB
+      if (stateJson.length > MAX_STATE_BYTES) {
+        Logger.warn(
+          `拒絕過大狀態更新 | clientId=${clientId} size=${Math.round(stateJson.length / 1024)}KB`,
+        );
+        this.sendResponse(ws, WS_PROTOCOL.S2C.ERROR, {
+          code: "STATE_TOO_LARGE",
+          message: `狀態資料超過大小限制 (${Math.round(stateJson.length / 1024)} KB / 512 KB)`,
+        });
+        return;
+      }
+
       // 電源狀態為即時揮發性資訊，不儲存至 experimentState（避免 session 恢復時意外開機）
       const isEphemeralState = state.type === "power_state_update";
 
@@ -472,7 +482,9 @@ export class MessageHandler {
         typeof session.data === "string"
           ? JSON.parse(session.data)
           : session.data || {};
-    } catch (e) {}
+    } catch (e) {
+      Logger.warn(`_buildSessionState: session.data JSON 解析失敗 (${sessionId}):`, e.message);
+    }
 
     // 優先從記憶體取得 experimentState（準確），必要時改用 DB
     const experimentState =
@@ -569,7 +581,9 @@ export class MessageHandler {
           ...currentExpState,
           registeredExperimentId: experimentId,
         });
-      } catch (e) {}
+      } catch (e) {
+        Logger.warn(`mergeState 失敗，實驗ID僅存於記憶體 (${sessionId}):`, e.message);
+      }
     }
 
     Logger.debug(
@@ -649,6 +663,20 @@ export class MessageHandler {
         ...state,
         sessionId,
       });
+    }
+  }
+
+  _validateDataDepth(obj, depth, maxDepth) {
+    if (depth > maxDepth) {
+      throw new Error(`訊息資料嵌套深度超過上限 (${maxDepth})`);
+    }
+    for (const [key, val] of Object.entries(obj)) {
+      if (typeof val === "string" && val.length > 8192) {
+        throw new Error(`欄位 ${key} 超過最大長度限制 (8192)`);
+      }
+      if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+        this._validateDataDepth(val, depth + 1, maxDepth);
+      }
     }
   }
 

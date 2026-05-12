@@ -7,7 +7,6 @@
 
 import {
   RECORD_SOURCES,
-  SYNC_EVENTS,
   SYNC_DATA_TYPES,
   SYNC_ROLE_CONFIG,
   EXPERIMENT_HUB_CONSTANTS,
@@ -24,11 +23,6 @@ class ExperimentHubManager extends EventEmitter {
     this.config = {
       ...config,
       apiBaseUrl: config.apiBaseUrl || this.getDefaultApiUrl(),
-      autoReconnect:
-        config.autoReconnect ?? EXPERIMENT_HUB_CONSTANTS.DEFAULTS.AUTO_RECONNECT,
-      reconnectInterval:
-        config.reconnectInterval ||
-        EXPERIMENT_HUB_CONSTANTS.DEFAULTS.RECONNECT_INTERVAL_MS,
     };
 
     this.ids = {
@@ -45,7 +39,6 @@ class ExperimentHubManager extends EventEmitter {
     };
 
     this.syncClientReady = false;
-    this.reconnectTimer = null;
     this.syncManager = config.syncManager || null;
     this._pendingExperimentIdRegistration = null;
     this._lastRegisteredExperimentId = null;
@@ -62,6 +55,11 @@ class ExperimentHubManager extends EventEmitter {
 
   updateDependencies(deps = {}) {
     Object.assign(this, deps);
+  }
+
+  /** 動態解析 WebSocketClient，避免快取過期參考造成記憶體洩漏 */
+  get _wsClient() {
+    return (this.syncClient || this.syncManager?.core?.syncClient)?.wsClient ?? null;
   }
 
   /**
@@ -227,7 +225,7 @@ class ExperimentHubManager extends EventEmitter {
 
       Logger.debug("開始註冊實驗 ID 到伺服器", experimentId);
 
-      if (this.connection.wsClient && this.connection.connected) {
+      if (this._wsClient && this.connection.connected) {
         const message = {
           type: EXPERIMENT_HUB_CONSTANTS.MESSAGE_TYPES.EXPERIMENT_ID_REGISTER,
           data: {
@@ -236,7 +234,7 @@ class ExperimentHubManager extends EventEmitter {
           },
         };
 
-        this.connection.wsClient.send(message);
+        this._wsClient.send(message);
         this._lastRegisteredExperimentId = experimentId;
         this._pendingExperimentIdRegistration = null;
         Logger.debug("實驗 ID 註冊訊息已發送", message);
@@ -268,7 +266,7 @@ class ExperimentHubManager extends EventEmitter {
         return false;
       }
 
-      if (!this.connection.wsClient || !this.connection.connected) {
+      if (!this._wsClient || !this.connection.connected) {
         Logger.warn("WebSocket 未連接，無法註冊實驗狀態");
         return false;
       }
@@ -284,7 +282,7 @@ class ExperimentHubManager extends EventEmitter {
         },
       };
 
-      this.connection.wsClient.send(message);
+      this._wsClient.send(message);
       Logger.debug("實驗狀態註冊訊息已發送", message);
       return true;
     } catch (error) {
@@ -556,14 +554,11 @@ class ExperimentHubManager extends EventEmitter {
     const syncClient =
       this.syncClient || this.syncManager?.core?.syncClient;
     this.syncClient = syncClient;
-    this.connection.wsClient = syncClient?.wsClient || null;
 
     if (!syncClient) {
       Logger.warn("SyncClient 尚未就緒，跳過 Hub 註冊");
       return;
     }
-
-    this.setupEventHandlers();
 
     this.hydrateExperimentIdFromSessionState();
 
@@ -637,84 +632,6 @@ class ExperimentHubManager extends EventEmitter {
   }
 
   /**
-   * 設定 WebSocket 事件處理器
-   */
-  setupEventHandlers() {
-    if (!this.connection.wsClient) return;
-
-    const ws = this.connection.wsClient;
-
-    ws.on(EXPERIMENT_HUB_CONSTANTS.WS_CLIENT_EVENTS.AUTHENTICATED, (data) => {
-      this.connection.connected = true;
-      this.connection.role = data.role;
-      this.updateModeFromRole();
-      this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.CONNECTED, data);
-      Logger.debug("[HubManager] WebSocket 已認證", data);
-      this.hydrateExperimentIdFromSessionState();
-      this._flushPendingExperimentIdRegistration();
-    });
-
-    ws.on(EXPERIMENT_HUB_CONSTANTS.WS_CLIENT_EVENTS.DISCONNECTED, () => {
-      this.connection.connected = false;
-      this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.DISCONNECTED);
-      Logger.warn("[HubManager] WebSocket 已斷線");
-
-      if (this.config.autoReconnect) {
-        this.scheduleReconnect();
-      }
-    });
-
-    ws.on(EXPERIMENT_HUB_CONSTANTS.WS_CLIENT_EVENTS.RECONNECTED, (data) => {
-      this.connection.connected = true;
-      this.connection.role = data.role;
-      this.updateModeFromRole();
-      this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.CONNECTED, data);
-      Logger.info("[HubManager] WebSocket 已重新連線", data);
-      this.hydrateExperimentIdFromSessionState();
-      this._flushPendingExperimentIdRegistration();
-    });
-
-    ws.on(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (data) => {
-      Logger.debug("收到實驗 ID 更新", data);
-      if (data.clientId !== this.getClientId()) {
-        this.setExperimentId(data.experimentId, RECORD_SOURCES.SYNC_BROADCAST, { silent: false });
-        this.emit(EXPERIMENT_HUB_CONSTANTS.EVENT.MESSAGE_RECEIVED, {
-          type: SYNC_EVENTS.EXPERIMENT_ID_CHANGED,
-          data,
-        });
-      }
-    });
-
-    ws.on(SYNC_EVENTS.EXPERIMENT_STARTED, (data) => {
-      Logger.debug(`收到 ${SYNC_EVENTS.EXPERIMENT_STARTED}`, data);
-      this.handleExperimentStartedBroadcast(data);
-    });
-  }
-
-  /**
-   * 處理實驗開始事件的廣播轉發
-   * 確保所有連接的客戶端都能收到實驗開始通知
-   * @param {Object} data - 實驗開始事件資料
-   */
-  handleExperimentStartedBroadcast(data) {
-    Logger.debug("處理實驗開始廣播轉發", data);
-
-    window.dispatchEvent(
-      new CustomEvent(SYNC_EVENTS.EXPERIMENT_STARTED, {
-        detail: {
-          ...data,
-          broadcasted: true,
-          timestamp: Date.now(),
-        },
-      }),
-    );
-
-    if (this.connection.role === SYNC_ROLE_CONFIG.OPERATOR) {
-      Logger.debug("操作者收到實驗開始廣播，更新本機狀態");
-    }
-  }
-
-  /**
    * 根據角色更新模式
    */
   updateModeFromRole() {
@@ -750,7 +667,7 @@ class ExperimentHubManager extends EventEmitter {
       return;
     }
 
-    if (!this.connection.wsClient || !this.connection.connected) {
+    if (!this._wsClient || !this.connection.connected) {
       return;
     }
 
@@ -781,13 +698,13 @@ class ExperimentHubManager extends EventEmitter {
       return false;
     }
 
-    if (!this.connection.wsClient) {
+    if (!this._wsClient) {
       Logger.error("WebSocket 客戶端不存在");
       return false;
     }
 
     try {
-      this.connection.wsClient.emit(type, data);
+      this._wsClient.emit(type, data);
       Logger.debug("已發送訊息到 Hub", { type, data });
       return true;
     } catch (error) {
@@ -863,20 +780,6 @@ class ExperimentHubManager extends EventEmitter {
   }
 
   /**
-   * 排程重新連接
-   */
-  scheduleReconnect() {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-    }
-
-    this.reconnectTimer = setTimeout(() => {
-      Logger.info("嘗試重新連接到 Hub...");
-      this.connect();
-    }, this.config.reconnectInterval);
-  }
-
-  /**
    * 取得管理器狀態
    */
   getState() {
@@ -897,9 +800,6 @@ class ExperimentHubManager extends EventEmitter {
   destroy() {
     this.disconnect();
     this.clearListeners();
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-    }
     Logger.debug("ExperimentHubManager 已銷毀");
   }
 }

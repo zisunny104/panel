@@ -50,23 +50,7 @@
   }
 }
 
-/* 標題欄 - 使用統一面板標題樣式 */
-.sync-confirm-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 20px 15px 20px;
-  border-bottom: 2px solid #e9ecef;
-  flex-shrink: 0;
-}
-
-.sync-confirm-header h2 {
-  margin: 0;
-  color: #2c3e50;
-  font-size: 20px;
-  font-weight: 600;
-  flex: 1;
-}
+/* 標題欄 — 樣式統一定義於 sync/indicator.css */
 
 /* 說明文字 */
 .sync-confirm-subtitle {
@@ -421,26 +405,4 @@
   }
 }
 
-/* ============================================
-   同步面板通用樣式 - 供 indicator.css 共用
-   ============================================ */
-
-/* 同步面板標題容器 - 統一標題樣式 */
-.sync-panel-title-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0;
-  padding: 20px 20px 15px 20px;
-  border-bottom: 2px solid #e9ecef;
-  flex-shrink: 0;
-}
-
-/* 同步面板標題 */
-.sync-panel-title {
-  margin: 0;
-  color: #2c3e50;
-  font-size: 20px;
-  font-weight: 600;
-  flex: 1;
-}
+/* .sync-panel-title-container 樣式統一定義於 sync/indicator.css */

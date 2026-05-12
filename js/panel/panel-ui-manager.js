@@ -597,7 +597,6 @@ class PanelUIManager {
     } else {
       try {
         document.documentElement.requestFullscreen().catch((err) => {
-          alert(`無法啟用全螢幕模式: ${err.message}`);
           this.logger?.logAction(`無法啟用全螢幕模式: ${err.message}`);
         });
         this.logger?.logAction("進入全螢幕模式");

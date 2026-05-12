@@ -1,10 +1,10 @@
 {
-    "version": "2.6.7ac8ad2",
+    "version": "2.6.02b2b3f",
     "description": "虛擬操作面板實驗設定檔",
     "author": "謝祥紫、Github Copilot",
     "created_at": "2024-07-16T10:00:00Z",
-    "updated_at": "2026-05-06 下午11:57:20.000Z",
-    "git_commit_hash": "7ac8ad2",
+    "updated_at": "2026-05-11 上午03:03:22.000Z",
+    "git_commit_hash": "02b2b3f",
     "media_base_path": "assets/",
     "settings": {
         "mainScale": 1.29,
@@ -19,13 +19,13 @@
         "stepCooldownMs": 3000,
         "playBeepSound": true,
         "beepVolume": 50,
-        "mediaVolume": 70
+        "mediaVolume": 70,
+        "postExperimentResetDelayMs": 5000
     },
     "multiScreenSync": {
-        "description": "多裝置同步設定（超時時間由後端.env控制）",
+        "description": "多裝置同步設定（超時時間與 validCreateCode 由後端 .env 的 CREATE_CODE 控制）",
         "enableSync": true,
-        "maxClients": 6,
-        "validCreateCode": "113151006"
+        "maxClients": 6
     },
     "experiment": {
         "defaultCombinationId": "random_core",

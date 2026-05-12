@@ -48,7 +48,7 @@ class ShareCodeService {
         expires_at,
       };
     } catch (error) {
-      console.error("產生分享代碼失敗:", error.message);
+      Logger.error("產生分享代碼失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -96,7 +96,7 @@ class ShareCodeService {
         expires_at: codeData.expires_at,
       };
     } catch (error) {
-      console.error("驗證分享代碼失敗:", error.message);
+      Logger.error("驗證分享代碼失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -140,7 +140,7 @@ class ShareCodeService {
         created_at: codeData.created_at,
       };
     } catch (error) {
-      console.error("取得分享代碼資訊失敗:", error.message);
+      Logger.error("取得分享代碼資訊失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -151,12 +151,10 @@ class ShareCodeService {
    * @returns {boolean} 是否標記成功
    */
   markAsUsed(shareCode, usedBy) {
-    const used_at = getCurrentTimestamp();
-
     try {
       const result = execute(
-        `UPDATE share_codes SET used = 1, used_by = ?, used_at = ? WHERE code = ?`,
-        [usedBy, used_at, shareCode],
+        `UPDATE share_codes SET used = 1 WHERE code = ?`,
+        [shareCode],
       );
 
       if (result.changes > 0) {
@@ -166,7 +164,7 @@ class ShareCodeService {
 
       return false;
     } catch (error) {
-      console.error("標記分享代碼失敗:", error.message);
+      Logger.error("標記分享代碼失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -184,7 +182,7 @@ class ShareCodeService {
 
       return result.changes > 0;
     } catch (error) {
-      console.error("刪除分享代碼失敗:", error.message);
+      Logger.error("刪除分享代碼失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -208,7 +206,7 @@ class ShareCodeService {
 
       return result.changes;
     } catch (error) {
-      console.error("清理分享代碼失敗:", error.message);
+      Logger.error("清理分享代碼失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }
@@ -227,7 +225,7 @@ class ShareCodeService {
 
       return codes;
     } catch (error) {
-      console.error("查詢分享代碼失敗:", error.message);
+      Logger.error("查詢分享代碼失敗:", error.message);
       throw new Error(ERROR_CODES.DATABASE_ERROR);
     }
   }

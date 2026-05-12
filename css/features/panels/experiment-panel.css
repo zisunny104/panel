@@ -42,28 +42,7 @@
     flex-shrink: 0;
 }
 
-/* Close button (shared with settings control-panel) */
-.circle-close-btn {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: #e9ecef;
-    color: #444;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: background 0.2s;
-    margin-left: 8px;
-}
-
-.circle-close-btn:hover {
-    background: #ff8c00;
-    color: #fff;
-    transition: background 0.2s ease;
-}
+/* .circle-close-btn 定義於 components/buttons.css */
 
 /* 滾動主體：保持標題與底部操作區固定 */
 .experiment-panel-body {
@@ -158,4 +137,55 @@
 .experiment-tab:hover:not(.active) {
     background: #e0e0e0;
     color: #444;
+}
+
+/* ================= 面板收合按鈕 ================= */
+/* 圓形設計，固定左上角，與右側同步指示器對稱 */
+.panel-toggle-btn {
+    position: fixed;
+    left: 15px;
+    top: 15px;
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    z-index: 100;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.panel-toggle-btn:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #4757c3 100%);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.panel-toggle-btn span {
+    width: 16px;
+    height: 2px;
+    background: white;
+    border-radius: 1px;
+    transition: all 0.3s ease;
+    display: block;
+}
+
+/* 展開狀態：漢堡包圖示（預設） */
+.panel-toggle-btn span:nth-child(1),
+.panel-toggle-btn span:nth-child(2),
+.panel-toggle-btn span:nth-child(3) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* 收起狀態：僅顯示中間橫槓 */
+.panel-toggle-btn.collapsed span:nth-child(1),
+.panel-toggle-btn.collapsed span:nth-child(3) {
+    opacity: 0;
 }

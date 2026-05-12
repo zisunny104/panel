@@ -362,13 +362,13 @@ class BoardPageManager {
       experimentControls.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    // 廣播由 startExperiment() 在呼叫 FlowManager 前先 dispatchEvent("experiment_started")
-    // → _bindDomEvents 捕獲後廣播，此處不重複 dispatch
+    // 廣播由 FlowManager 派發 document: experiment_started
+    // → bindBoardBroadcastEvents 捕獲後廣播，此處不重複 dispatch
   }
 
   /**
    * 處理 FlowManager PAUSED 事件（board 端）
-   * FlowManager 自動派送的 EXPERIMENT_PAUSED DOM 事件由 ExperimentSyncAdapter._bindDomEvents 負責廣播；
+   * FlowManager 自動派送的 EXPERIMENT_PAUSED DOM 事件由 bindBoardBroadcastEvents 負責廣播；
    * 此方法僅額外將暫停狀態更新至 Hub。
    */
   _handleFlowPaused(data) {
@@ -385,7 +385,7 @@ class BoardPageManager {
 
   /**
    * 處理 FlowManager RESUMED 事件（board 端）
-   * FlowManager 自動派送的 EXPERIMENT_RESUMED DOM 事件由 ExperimentSyncAdapter._bindDomEvents 負責廣播；
+   * FlowManager 自動派送的 EXPERIMENT_RESUMED DOM 事件由 bindBoardBroadcastEvents 負責廣播；
    * 此方法僅額外將繼續狀態更新至 Hub。
    */
   _handleFlowResumed(data) {
@@ -404,11 +404,12 @@ class BoardPageManager {
    * 處理 ExperimentFlowManager 的 STOPPED 事件
    * @private
    * 觸發時機：ExperimentFlowManager.stopExperiment() 完成
-   * 目的：重置 gesture 序列、更新 experimentRunning 旗標，並將停止狀態更新至 Hub。
+   * 目的：更新 experimentRunning 旗標、將停止狀態推送至 Hub，
+   *        並在 postExperimentResetDelayMs 後重置手勢序列。
    * 日誌寫入（EXP_END + flushAll）由 stopExperiment() 在此事件之後統一負責。
    */
   _handleFlowStopped(data) {
-    Logger.info("Board: 實驗已停止，清理資源和儲存日誌", {
+    Logger.info("Board: 實驗已停止，重置狀態", {
       reason: data.reason,
       completedUnits: data.completedUnits,
     });
@@ -425,7 +426,8 @@ class BoardPageManager {
     this.experimentRunning = false;
     this.experimentStartedAt = 0;
 
-    this.gestureUtils?.resetGestureSequence();
+    const resetDelay = this.configManager?.userSettings?.postExperimentResetDelayMs ?? 5000;
+    setTimeout(() => this.gestureUtils?.resetGestureSequence(), resetDelay);
 
     // EXP_END 狀態日誌由 ExperimentSystemManager._handleFlowStopped 統一記錄（同步執行）
     // flushAll() 由 stopExperiment() 在 stopFlowExperiment() 之後負責呼叫（確保 EXP_END 先寫入）
@@ -453,7 +455,8 @@ class BoardPageManager {
     this.experimentRunning = false;
     this.experimentStartedAt = 0;
 
-    this.gestureUtils?.resetGestureSequence();
+    const resetDelay = this.configManager?.userSettings?.postExperimentResetDelayMs ?? 5000;
+    setTimeout(() => this.gestureUtils?.resetGestureSequence(), resetDelay);
 
     // EXP_END 由 ExperimentSystemManager._handleFlowStopped 同步寫入（COMPLETED 映射到該方法），
     // 計時器也由同一路徑停止；此處只負責 flushAll()，確保自然完成路徑也能持久化到 JSONL
@@ -1111,7 +1114,7 @@ class BoardPageManager {
     this.logAction("experiment_stopped", experimentData);
 
     // stopExperiment() 同步觸發 STOPPED 事件 →
-    // _handleFlowStopped 重置 gesture 序列；ExperimentSystemManager._handleFlowStopped 停止計時器與寫入 EXP_END，
+    // _handleFlowStopped 延遲重置手勢序列；ExperimentSystemManager._handleFlowStopped 停止計時器與寫入 EXP_END，
     // 之後 flushAll() 才能確保 EXP_END 已存在於 records
     systemManager.stopExperiment(options.reason || "manual", options);
 
@@ -1202,13 +1205,13 @@ class BoardPageManager {
   exportGestureSequence() {
     try {
       if (!this.currentCombination) {
-        alert("請先選擇一個組合");
+        this._showToast("請先選擇一個組合");
         return;
       }
 
       const gestures = this.currentCombination.gestures || [];
       if (gestures.length === 0) {
-        alert("沒有手勢序列資料");
+        this._showToast("沒有手勢序列資料");
         return;
       }
 
@@ -1241,12 +1244,28 @@ class BoardPageManager {
         })
         .catch((err) => {
           Logger.error("複製到剪貼簿失敗:", err);
-          alert("複製失敗，請查看控制台");
+          this._showToast("複製失敗，請查看控制台");
         });
     } catch (error) {
       Logger.error("匯出手勢序列失敗:", error);
-      alert("匯出失敗，請查看控制台");
+      this._showToast("匯出失敗，請查看控制台");
     }
+  }
+
+  _showToast(message, type = "error") {
+    const toast = document.createElement("div");
+    toast.textContent = message;
+    const colors = { error: "#f44336", success: "#4caf50", info: "#667eea" };
+    Object.assign(toast.style, {
+      position: "fixed", top: "20px", right: "20px", zIndex: "9999",
+      padding: "12px 20px", borderRadius: "8px", fontFamily: "sans-serif",
+      fontSize: "14px", color: "white", maxWidth: "320px",
+      background: colors[type] || colors.error,
+      boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+      transition: "opacity 0.3s",
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = "0"; setTimeout(() => toast.remove(), 300); }, 3000);
   }
 }
 

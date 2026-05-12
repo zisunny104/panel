@@ -8,6 +8,10 @@
 import { UIModal } from "../ui/modal.js";
 import { Logger } from "../core/console-manager.js";
 
+function escAttr(str) {
+  return String(str ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 class SyncConfirmDialogManager {
   static syncManager = null;
   static syncClientProvider = null;
@@ -70,7 +74,7 @@ class SyncConfirmDialogManager {
                     </div>
                   </div>
                   <div class="sync-confirm-code-container">
-                    <input type="text" class="sync-confirm-code-input" value="${code}" maxlength="10" />
+                    <input type="text" class="sync-confirm-code-input" value="${escAttr(code)}" maxlength="10" />
                     <button class="sync-confirm-code-reset btn-secondary" title="還原分享代碼">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
@@ -84,8 +88,8 @@ class SyncConfirmDialogManager {
                 <div class="sync-confirm-item">
                   <span class="sync-confirm-label">模式</span>
                   <div class="sync-confirm-mode-selector">
-                    <button class="sync-confirm-mode-btn" data-role="${roleConfig.VIEWER}">${viewerModeText}</button>
-                    <button class="sync-confirm-mode-btn" data-role="${roleConfig.OPERATOR}">${operatorModeText}</button>
+                    <button class="sync-confirm-mode-btn" data-role="${escAttr(roleConfig.VIEWER)}">${escAttr(viewerModeText)}</button>
+                    <button class="sync-confirm-mode-btn" data-role="${escAttr(roleConfig.OPERATOR)}">${escAttr(operatorModeText)}</button>
                   </div>
                 </div>
               </div>

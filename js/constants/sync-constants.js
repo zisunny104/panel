@@ -13,10 +13,10 @@ export const SYNC_ROLE_TEXTS = {
   local: "本機",
 };
 
-// 模式顯示文字（依角色顯示）
+// 模式顯示文字（依角色顯示）— 用於加入工作階段確認對話框
 export const SYNC_MODE_TEXTS = {
-  viewer: "檢視模式",
-  operator: "同步操作",
+  viewer: SYNC_ROLE_TEXTS.viewer,
+  operator: SYNC_ROLE_TEXTS.operator,
 };
 
 // 讀取：角色顯示文字

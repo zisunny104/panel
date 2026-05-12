@@ -11,6 +11,7 @@
 import { getDatabase } from "../database/connection.js";
 import { getValidCreateCode } from "../config/server.js";
 import { generateExperimentId } from "../utils/idGenerator.js";
+import { Logger } from "../utils/logger.js";
 
 export class ExperimentService {
   /**
@@ -90,7 +91,7 @@ export class ExperimentService {
         message: "實驗 ID 建立成功",
       };
     } catch (error) {
-      console.error("[ExperimentService] 建立實驗 ID 失敗:", error);
+      Logger.error("[ExperimentService] 建立實驗 ID 失敗:", error.message);
       return {
         success: false,
         message: "資料庫錯誤：" + error.message,
@@ -127,7 +128,7 @@ export class ExperimentService {
         data: JSON.parse(row.data),
       };
     } catch (error) {
-      console.error("[ExperimentService] 查詢實驗 ID 失敗:", error);
+      Logger.error("[ExperimentService] 查詢實驗 ID 失敗:", error.message);
       return null;
     }
   }
@@ -160,7 +161,7 @@ export class ExperimentService {
         data: JSON.parse(row.data),
       }));
     } catch (error) {
-      console.error("[ExperimentService] 查詢工作階段實驗失敗:", error);
+      Logger.error("[ExperimentService] 查詢工作階段實驗失敗:", error.message);
       return [];
     }
   }
@@ -190,7 +191,7 @@ export class ExperimentService {
         message: "實驗 ID 已刪除",
       };
     } catch (error) {
-      console.error("[ExperimentService] 刪除實驗 ID 失敗:", error);
+      Logger.error("[ExperimentService] 刪除實驗 ID 失敗:", error.message);
       return {
         success: false,
         message: "資料庫錯誤：" + error.message,
@@ -213,7 +214,7 @@ export class ExperimentService {
 
       return row !== undefined;
     } catch (error) {
-      console.error("[ExperimentService] 驗證實驗 ID 失敗:", error);
+      Logger.error("[ExperimentService] 驗證實驗 ID 失敗:", error.message);
       return false;
     }
   }
@@ -259,7 +260,7 @@ export class ExperimentService {
         data: updatedData,
       };
     } catch (error) {
-      console.error("[ExperimentService] 更新實驗資料失敗:", error);
+      Logger.error("[ExperimentService] 更新實驗資料失敗:", error.message);
       return {
         success: false,
         message: "資料庫錯誤：" + error.message,
@@ -311,7 +312,7 @@ export class ExperimentService {
         totalPages: Math.ceil(total / pageSize),
       };
     } catch (error) {
-      console.error("[ExperimentService] 列出實驗失敗:", error);
+      Logger.error("[ExperimentService] 列出實驗失敗:", error.message);
       return {
         experiments: [],
         total: 0,

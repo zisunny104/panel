@@ -173,7 +173,7 @@ export const BoardUIManager = class BoardUIManager {
       gestureCount: script.gestures?.length || 0,
     });
 
-    let html = "<div class=\"right-section\"><h2>實驗手勢序列</h2>";
+    let html = "<div class=\"gesture-sequence-section\"><h2>實驗手勢序列</h2>";
     if (script.gestures) {
       html +=
         "<div style=\"display: grid; grid-template-columns: 1fr; gap: 12px;\">";

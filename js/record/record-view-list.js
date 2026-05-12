@@ -77,35 +77,38 @@ export const recordViewList = {
     const filename = record.filename ||
       `${record.experimentId}_${record.participantName}_experiment_record.jsonl`;
     const recordDate = record.startTime ? this.timeSyncManager?.formatDate(record.startTime) : "";
+    const safeFilename = this.escapeHtml(filename);
+    const safeRecordFile = this.escapeHtml(record.filename || "");
+    const safeExpId = this.escapeHtml(record.actualExperimentId || record.experimentId || "");
 
     return `
-      <div class="record-item" data-record-id="${record.actualExperimentId || record.experimentId}">
+      <div class="record-item" data-record-id="${safeExpId}">
         <div class="record-checkbox">
-          <input type="checkbox" id="record-${record.filename}" data-record-id="${record.filename}">
-          <label for="record-${record.filename}"></label>
+          <input type="checkbox" id="record-${safeRecordFile}" data-record-id="${safeRecordFile}">
+          <label for="record-${safeRecordFile}"></label>
         </div>
         <div class="record-details">
-          <div class="record-filename">${filename}</div>
+          <div class="record-filename">${safeFilename}</div>
           <div class="record-meta">
             <span class="record-size">${record.logCount} 條記錄</span>
             ${recordDate ? `<span class="record-date">${recordDate}</span>` : ""}
           </div>
         </div>
         <div class="record-actions">
-          <button class="btn btn-info btn-icon-only" data-action="view-record" data-record-id="${record.filename}" title="檢視">
+          <button class="btn btn-info btn-icon-only" data-action="view-record" data-record-id="${safeRecordFile}" title="檢視">
             <svg class="icon-view" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
           </button>
-          <button class="btn btn-primary btn-icon-only" data-action="download-record" data-record-id="${record.filename}" title="下載">
+          <button class="btn btn-primary btn-icon-only" data-action="download-record" data-record-id="${safeRecordFile}" title="下載">
             <svg class="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 17V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V17"></path>
               <path d="M8 12L12 16L16 12"></path>
               <path d="M12 3V16"></path>
             </svg>
           </button>
-          <button class="btn btn-danger btn-icon-only" data-action="delete-record" data-record-id="${record.filename}" title="刪除">
+          <button class="btn btn-danger btn-icon-only" data-action="delete-record" data-record-id="${safeRecordFile}" title="刪除">
             <svg class="icon-delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3,6 5,6 21,6"></polyline>
               <path d="m19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"></path>

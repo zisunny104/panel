@@ -1,5 +1,17 @@
 /* ========== 卡片容器樣式 ========== */
-.section-card {
+/* .experiment-ui-card 遷移自 components/forms.css */
+.experiment-ui-card {
+    padding: 12px;
+    background: #f9f9f9;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+
+.section-card,
+.gesture-sequence-section,
+.gesture-reference {
     background: #f5f5f5;
     border: 2px solid #ddd;
     border-radius: 6px;
@@ -16,35 +28,20 @@
     font-weight: 700;
 }
 
-.right-section {
-    background: #f5f5f5;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    padding: 15px;
-    margin-bottom: 20px;
-}
-
-.right-section h2 {
+.gesture-sequence-section h2,
+.gesture-reference h2 {
     font-size: 18px;
     color: #2c3e50;
     margin-top: 0;
-    margin-bottom: 12px;
     font-weight: 700;
 }
 
-.gesture-reference {
-    background: #f5f5f5;
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 20px;
-    border: 2px solid #ddd;
+.gesture-sequence-section h2 {
+    margin-bottom: 12px;
 }
 
 .gesture-reference h2 {
-    font-size: 18px;
-    margin: 0;
-    color: #2c3e50;
-    font-weight: 700;
+    margin-bottom: 0;
 }
 
 /* ========== 手勢序列卡片作用中效果 ========== */

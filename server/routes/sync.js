@@ -483,11 +483,11 @@ router.get("/session/:sessionId", (req, res) => {
 
 /**
  * GET /api/sync/sessions
- * 取得所有活動中的工作階段列表（含公開頻道）
+ * 取得所有活動中的工作階段列表（含公開頻道）— 僅限管理員
  *
  * Response: { sessions: [...] }
  */
-router.get("/sessions", (req, res) => {
+router.get("/sessions", requireAdminToken, (req, res) => {
   try {
     const sessions = SessionService.getActiveSessions();
 
@@ -517,6 +517,32 @@ router.get("/sessions", (req, res) => {
       };
     });
 
+    // 批次查詢所有 session 的 share_codes，避免 N+1 DB 查詢
+    let allShareCodes = [];
+    if (sessions.length > 0) {
+      try {
+        const sessionIds = sessions.map((s) => s.session_id);
+        const placeholders = sessionIds.map(() => "?").join(",");
+        allShareCodes = query(
+          `SELECT code, session_id, expires_at, used FROM share_codes WHERE session_id IN (${placeholders})`,
+          sessionIds,
+        );
+      } catch (e) {
+        Logger.warn("批次查詢 share_codes 失敗，略過:", e.message);
+      }
+    }
+    const shareCodesBySession = new Map();
+    for (const c of allShareCodes) {
+      if (!shareCodesBySession.has(c.session_id)) {
+        shareCodesBySession.set(c.session_id, []);
+      }
+      shareCodesBySession.get(c.session_id).push({
+        code: c.code,
+        expiresAt: c.expires_at,
+        used: c.used === 1,
+      });
+    }
+
     const normalizedSessions = sessions.map((s) => {
       const clients = sessionManager
         ? sessionManager.getClients(s.session_id).map((c) => ({
@@ -526,16 +552,11 @@ router.get("/sessions", (req, res) => {
             joinedAt: Math.floor((c.joinedAt || Date.now()) / 1000),
           }))
         : [];
-      let shareCodes = [];
-      try {
-        shareCodes = ShareCodeService.getCodesBySession(s.session_id).map((c) => ({
-          code: c.code,
-          expiresAt: c.expires_at,
-          used: c.used === 1,
-        }));
-      } catch {}
+      const shareCodes = shareCodesBySession.get(s.session_id) || [];
       let state = null;
-      try { state = s.data ? JSON.parse(s.data) : null; } catch {}
+      try { state = s.data ? JSON.parse(s.data) : null; } catch (e) {
+        Logger.debug(`session ${s.session_id} data JSON 解析失敗:`, e.message);
+      }
       return {
         id: s.session_id,
         created: s.created_at,
@@ -823,7 +844,7 @@ router.get("/channels", (req, res) => {
  * Request body: { channelName?: "A"|"B"|"C", sessionId?: string }
  * Response: { sessionId, closedCount }
  */
-router.post("/channel/close", (req, res) => {
+router.post("/channel/close", requireAdminToken, (req, res) => {
   const { channelName, sessionId } = req.body || {};
 
   let resolvedSessionId = sessionId;
@@ -969,18 +990,6 @@ router.post("/client/:clientId/role", requireAdminToken, (req, res) => {
   }
 });
 
-/**
- * GET /api/sync/admin-token
- * 提供管理員 Token 給前端管理介面
- */
-router.get("/admin-token", (req, res) => {
-  try {
-    res.json({ token: ADMIN_TOKEN });
-  } catch (error) {
-    Logger.error("取得管理員 Token 失敗:", error.message);
-    res.status(HTTP_STATUS.INTERNAL_ERROR).json({ success: false, message: "取得管理員 Token 失敗" });
-  }
-});
 
 /**
  * POST /api/sync/client/:clientId/request-state
@@ -1036,7 +1045,7 @@ router.post("/client/:clientId/request-state", requireAdminToken, async (req, re
  * POST /api/sync/client/:clientId/refresh
  * 推送最新同步狀態給指定客戶端
  */
-router.post("/client/:clientId/refresh", (req, res) => {
+router.post("/client/:clientId/refresh", requireAdminToken, (req, res) => {
   const { clientId } = req.params;
   const sessionManager = req.app?.locals?.sessionManager;
   const broadcastManager = req.app?.locals?.broadcastManager;

@@ -40,7 +40,7 @@ export class BroadcastManager {
 
       if (!ws || ws.readyState !== 1) {
         // 1 = OPEN
-        console.warn(`無法發送訊息: 客戶端 ${clientId} 未連線`);
+        Logger.warn(`無法發送訊息: 客戶端 ${clientId} 未連線`);
         return false;
       }
 
@@ -53,7 +53,7 @@ export class BroadcastManager {
       ws.send(JSON.stringify(messageWithTimestamp));
       return true;
     } catch (error) {
-      console.error(`發送訊息失敗 [${clientId}]:`, error.message);
+      Logger.error(`發送訊息失敗 [${clientId}]:`, error.message);
       return false;
     }
   }
@@ -73,7 +73,7 @@ export class BroadcastManager {
       const members = this.sessionManager.getClients(sessionId);
 
       if (members.length === 0) {
-        console.warn(`無法廣播: 工作階段 ${sessionId} 無成員`);
+        Logger.debug(`無法廣播: 工作階段 ${sessionId} 無成員`);
         return { sent: 0, failed: 0, total: 0 };
       }
 
@@ -140,7 +140,7 @@ export class BroadcastManager {
         total: targetMembers.length,
       };
     } catch (error) {
-      console.error(`廣播失敗 [${sessionId}]:`, error.message);
+      Logger.error(`廣播失敗 [${sessionId}]:`, error.message);
       return { sent: 0, failed: 0, total: 0 };
     }
   }

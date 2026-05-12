@@ -7,6 +7,7 @@ import {
   ACTION_IDS,
   POWER_BUTTON_STATES,
   SYNC_DATA_TYPES,
+  SYNC_EVENTS,
 } from "../constants/index.js";
 import { Logger } from "../core/console-manager.js";
 
@@ -48,7 +49,7 @@ class PowerControl {
     this._debounceTimers = {};
     this.setupEventListeners();
     // 監聽電源狀態變化，用於電源動作完成回報
-    document.addEventListener("power_state_changed", (event) => {
+    document.addEventListener(SYNC_EVENTS.POWER_STATE_CHANGED, (event) => {
       this._handlePowerActionCompletion(event.detail);
     });
     this.updatePowerUIWithoutSync();
@@ -764,7 +765,7 @@ class PowerControl {
       timestamp: Date.now(),
     };
 
-    const event = new CustomEvent("power_state_changed", { detail });
+    const event = new CustomEvent(SYNC_EVENTS.POWER_STATE_CHANGED, { detail });
     document.dispatchEvent(event);
     if (logger?.logAction) {
       logger.logAction(

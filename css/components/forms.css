@@ -75,19 +75,4 @@
     font-weight: 700;
 }
 
-/* ===== 實驗UI卡片容器樣式（通用） ===== */
-.experiment-ui-card {
-    padding: 12px;
-    background: #f9f9f9;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    box-sizing: border-box;
-}
-
-/* ===== 共同卡片容器樣式（保留向後相容） ===== */
-.experiment-card-section {
-    padding: 12px;
-    background: #f9f9f9;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-}
+/* .experiment-ui-card 定義於 features/experiment/cards.css */

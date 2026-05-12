@@ -38,23 +38,18 @@ export class SessionManager {
 
     const session = this.activeSessions.get(sessionId);
 
-    // 新增客戶端到工作階段
+    // 若同一 clientId 重連或切換角色，先扣除舊角色計數再加入新角色
+    const prevMeta = session.clients.get(clientId);
     session.clients.set(clientId, {
       ...metadata,
       joinedAt: Date.now(),
     });
 
-    // 統計角色
-    let operatorCount = 0;
-    let viewerCount = 0;
-    for (const [id, client] of session.clients.entries()) {
-      if (client.role === ROLE.OPERATOR) {
-        operatorCount++;
-      } else if (client.role === ROLE.VIEWER) {
-        viewerCount++;
-      }
-    }
-    const totalCount = session.clients.size;
+    // 更新角色計數器
+    if (prevMeta?.role === ROLE.OPERATOR) session.operatorCount = Math.max(0, (session.operatorCount || 0) - 1);
+    else if (prevMeta?.role === ROLE.VIEWER) session.viewerCount = Math.max(0, (session.viewerCount || 0) - 1);
+    if (metadata.role === ROLE.OPERATOR) session.operatorCount = (session.operatorCount || 0) + 1;
+    else if (metadata.role === ROLE.VIEWER) session.viewerCount = (session.viewerCount || 0) + 1;
 
     Logger.event("blue", "o", `客戶端加入 | ${clientId}`);
 
@@ -63,9 +58,9 @@ export class SessionManager {
       clientId,
       clientCount: session.clients.size,
       roleStats: {
-        operatorCount,
-        viewerCount,
-        totalCount,
+        operatorCount: session.operatorCount || 0,
+        viewerCount: session.viewerCount || 0,
+        totalCount: session.clients.size,
       },
     };
   }
@@ -82,20 +77,17 @@ export class SessionManager {
       return false;
     }
 
-    // 移除客戶端
+    // 先取得角色再刪除：delete 後 Map.get 回傳 undefined，計數器無法遞減
+    const removedMeta = session.clients.get(clientId);
     const removed = session.clients.delete(clientId);
 
     if (removed) {
-      // 統計角色
-      let operatorCount = 0;
-      let viewerCount = 0;
-      for (const [id, client] of session.clients.entries()) {
-        if (client.role === ROLE.OPERATOR) {
-          operatorCount++;
-        } else if (client.role === ROLE.VIEWER) {
-          viewerCount++;
-        }
-      }
+      // 更新角色計數器
+      if (removedMeta?.role === ROLE.OPERATOR) session.operatorCount = Math.max(0, (session.operatorCount || 0) - 1);
+      else if (removedMeta?.role === ROLE.VIEWER) session.viewerCount = Math.max(0, (session.viewerCount || 0) - 1);
+
+      const operatorCount = session.operatorCount || 0;
+      const viewerCount = session.viewerCount || 0;
       const totalCount = session.clients.size;
 
       Logger.event(

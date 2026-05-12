@@ -506,17 +506,6 @@
 .sync-session-card.expanded .ssm-card-details {
     max-height: 900px;
     overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #bbb #f5f5f5;
-}
-
-.sync-session-card.expanded .ssm-card-details::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sync-session-card.expanded .ssm-card-details::-webkit-scrollbar-thumb {
-    background: #bbb;
-    border-radius: 3px;
 }
 
 .ssm-details-inner {
@@ -989,4 +978,115 @@
     .ssm-details-inner {
         padding: 12px;
     }
+}
+
+/* ===== 工作階段卡片活躍/非活躍狀態 ===== */
+.sync-session-card.ssm-card-active {
+    border-color: #28a745;
+}
+
+.sync-session-card.ssm-card-inactive {
+    opacity: 0.72;
+    border-color: #ccc;
+}
+
+/* ===== 分享代碼（_renderShareCodesHtml 生成的結構） ===== */
+.ssm-share-code {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+    background: #f5f5f5;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.ssm-share-code.ssm-code-active {
+    border-color: #28a745;
+    background: #f8fff9;
+}
+
+.ssm-share-code.ssm-code-used {
+    opacity: 0.65;
+}
+
+.ssm-code-value {
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: #667eea;
+    letter-spacing: 2px;
+    flex: 1;
+}
+
+.ssm-code-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    background: #e9ecef;
+    color: #495057;
+    flex-shrink: 0;
+}
+
+.ssm-share-code.ssm-code-active .ssm-code-status {
+    background: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.ssm-code-expires {
+    font-size: 12px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+/* ===== 客戶端狀態區塊 ===== */
+.ssm-client-state {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    font-size: 13px;
+}
+
+.ssm-client-state-empty {
+    color: #999;
+    font-style: italic;
+}
+
+.ssm-client-state-loading {
+    color: #666;
+}
+
+.ssm-client-state-error {
+    color: #dc3545;
+}
+
+.ssm-client-state-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ssm-client-state-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.ssm-client-state-row span {
+    color: #666;
+    font-size: 12px;
+}
+
+.ssm-client-state-row strong {
+    font-weight: 600;
+    color: #333;
+    text-align: right;
+    word-break: break-word;
 }

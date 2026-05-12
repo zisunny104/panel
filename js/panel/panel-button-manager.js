@@ -1344,9 +1344,9 @@ class ButtonManager {
       `.button-overlay[data-label="${buttonId}"]`,
     );
     if (button) {
-      button.classList.add("sync-pressed");
+      button.classList.add("touch-active");
       setTimeout(() => {
-        button.classList.remove("sync-pressed");
+        button.classList.remove("touch-active");
       }, 200);
     }
   }

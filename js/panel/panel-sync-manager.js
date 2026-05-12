@@ -120,6 +120,17 @@ class PanelSyncManager {
       dispatchSessionRestoreEvents(event.detail, { includePowerState: false });
     });
 
+    // 伺服器廣播 experiment_id_changed（來自 registerExperimentId 路徑）時，
+    // SyncClient 將其 dispatch 到 window，此處接收並轉交 SystemManager 更新 DOM。
+    window.addEventListener(SYNC_EVENTS.EXPERIMENT_ID_CHANGED, (event) => {
+      const data = event.detail;
+      if (!data?.experimentId) return;
+      if (!this._isInSession()) return;
+      const myId = this.syncClient?.clientId;
+      if (myId && data.clientId === myId) return;
+      this.handleSyncExperimentIdUpdate(data);
+    });
+
     // 監聽同步狀態更新事件
     window.addEventListener(SYNC_EVENTS.STATE_UPDATE, (event) => {
       const state = event.detail;
@@ -195,14 +206,6 @@ class PanelSyncManager {
    * 處理同步的實驗停止狀態
    */
   handleSyncExperimentStopped(syncData) {
-    const myId = this.syncClient?.clientId;
-    if (myId && syncData?.clientId === myId) {
-      Logger.debug("[PanelSync] EXPERIMENT_STOPPED 來自本機，忽略", {
-        clientId: syncData?.clientId,
-        timestamp: syncData?.timestamp,
-      });
-      return;
-    }
     this._remoteExperimentActive = false;
     this._setDeferCompletion(false);
     return this.experimentSystemManager?.handleSyncExperimentStopped?.(syncData);

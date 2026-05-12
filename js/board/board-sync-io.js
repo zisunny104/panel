@@ -49,9 +49,7 @@ class BoardSyncIO {
           case SYNC_DATA_TYPES.EXPERIMENT_ID_UPDATE:
             this.receiveExperimentIdUpdate(data);
             break;
-          case SYNC_DATA_TYPES.PARTICIPANT_NAME_UPDATE:
-            break;
-          default:
+            default:
             Logger.warn("未知的遠端事件類型:", data.type);
         }
       },
@@ -250,9 +248,6 @@ class BoardSyncIO {
       );
     }
 
-    if (experimentId === currentExperimentId && page.experimentRunning) {
-      // action 完成標記由 ACTION_COMPLETED 事件驅動
-    }
   }
 
   async receiveExperimentInit(data) {
@@ -462,7 +457,7 @@ class BoardSyncIO {
       clientId: detail.clientId,
     });
 
-    Logger.warn("收到遠端停止訊號，依策略保留手動結束（Board 不自動 stopExperiment）", {
+    Logger.debug("Board: 收到遠端停止訊號，Board 端由實驗者手動結束，不自動 stop", {
       clientId: detail.clientId,
     });
   }

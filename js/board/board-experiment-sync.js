@@ -44,8 +44,8 @@ class ExperimentSyncAdapter {
     this.experimentHubManager = experimentHubManager;
     this._core = experimentSyncCore; // 懶加載 experimentSyncCore
     this.clientId = null;
+    this._domEventsBound = false;
     this._bindCoreEvents();
-    this._bindDomEvents();
     Logger.debug("ExperimentSyncAdapter 已建立");
   }
 
@@ -84,8 +84,10 @@ class ExperimentSyncAdapter {
     });
   }
 
-  _bindDomEvents() {
-    // 監聽本機實驗 DOM 事件並轉送至 ExperimentSyncCore 廣播
+  bindBoardBroadcastEvents() {
+    if (this._domEventsBound) return;
+    this._domEventsBound = true;
+    // Board 端：監聽 FlowManager 派發的 DOM 生命週期事件，廣播至同步系統
     document.addEventListener(SYNC_EVENTS.EXPERIMENT_STARTED, (e) => {
       this.core.broadcastExperimentStart(e.detail);
     });
