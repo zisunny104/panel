@@ -195,15 +195,7 @@ export const createBoardGestureUtils = function (deps) {
   };
 
   const resetGestureSequence = function () {
-    document.querySelectorAll("[id^='gesture-card-']").forEach((card) => {
-      card.classList.remove("gesture-card-active", "gesture-card-current");
-      card.classList.add("gesture-card-inactive");
-    });
-
-    const rightPanel = document.querySelector(".right-panel");
-    if (rightPanel) {
-      rightPanel.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    pageManager?.resetCurrentCombinationRender?.();
   };
 
   return {

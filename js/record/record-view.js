@@ -317,7 +317,8 @@ class RecordView {
 
     this.updateSyncButtonState("hide");
 
-    setTimeout(() => this.resetLiveDisplayToIdle(), 3000);
+    const resetDelay = this.config?.userSettings?.postExperimentResetDelayMs ?? 3000;
+    setTimeout(() => this.resetLiveDisplayToIdle(), resetDelay);
   }
 
   /**
@@ -405,6 +406,7 @@ class RecordView {
     if (this._syncNowInProgress) return;
 
     const btn = document.getElementById("syncRecordsNowBtn");
+    const indicator = document.querySelector("#recordContainer .record-status-indicator");
     this._syncNowInProgress = true;
 
     if (btn) {
@@ -412,7 +414,10 @@ class RecordView {
       btn.dataset.syncing = "true";
       btn.title = "同步中...";
     }
+    indicator?.classList.add("syncing");
 
+    const syncStart = Date.now();
+    const minSyncDisplayMs = 600;
     try {
       if (this.syncLogsNow) {
         await this.syncLogsNow();
@@ -420,7 +425,12 @@ class RecordView {
         await this.recordManager?.flushAll?.();
       }
     } finally {
+      const elapsed = Date.now() - syncStart;
+      if (elapsed < minSyncDisplayMs) {
+        await new Promise((resolve) => setTimeout(resolve, minSyncDisplayMs - elapsed));
+      }
       this._syncNowInProgress = false;
+      indicator?.classList.remove("syncing");
       if (btn) {
         btn.dataset.syncing = "false";
         this.updateSyncButtonState("enabled", this.recordManager?.records?.length || 0);

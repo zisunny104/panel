@@ -765,13 +765,20 @@ class ExperimentSystemManager {
   }
 
   async handleSyncExperimentIdUpdate(syncData = {}) {
-    const { experimentId } = syncData;
+    const { experimentId, _sessionRestore } = syncData;
     if (!experimentId) return false;
 
     const currentId = this.getExperimentId();
-    if (currentId === experimentId) return false;
 
-    Logger.debug("【<blue>SYNC</blue>】同步實驗 ID 更新", { currentId, experimentId });
+    // session restore 時以同步端優先，無條件套用（即使 ID 相同也要確保 stateManager 正確）。
+    // 非 restore 情況才做去重判斷，避免重複廣播。
+    if (!_sessionRestore && currentId === experimentId) return false;
+
+    Logger.debug("【<blue>SYNC</blue>】同步實驗 ID 更新", {
+      currentId,
+      experimentId,
+      _sessionRestore: !!_sessionRestore,
+    });
 
     await this.setExperimentId(experimentId, RECORD_SOURCES.SYNC_BROADCAST, {
       registerToHub: false,
@@ -779,6 +786,13 @@ class ExperimentSystemManager {
       reapplyCombination: true,
       skipCombinationBroadcast: true,
     });
+
+    // session restore 後將 ID 持久化至 localStorage，
+    // 避免舊值殘留造成下次頁面載入時的落差。
+    if (_sessionRestore) {
+      this.hubManager?.saveIds?.();
+    }
+
     return true;
   }
 

@@ -311,9 +311,7 @@ class BoardSyncIO {
     const { experimentId } = data;
     Logger.debug(`套用遠端實驗ID更新: ${experimentId}`);
 
-    page.experimentSystemManager?.handleSyncExperimentIdUpdate?.({
-      experimentId,
-    });
+    page.experimentSystemManager?.handleSyncExperimentIdUpdate?.(data);
     Logger.info(`實驗ID已同步並儲存: ${experimentId}`);
   }
 

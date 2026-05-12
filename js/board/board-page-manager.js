@@ -1127,17 +1127,23 @@ class BoardPageManager {
     }
   }
 
+  resetCurrentCombinationRender() {
+    this.timerManager?.destroy?.();
+    this._lastCombinationRenderSignature = null;
+    this._syncCombinationDetailRender();
+    setTimeout(() => {
+      document.querySelector(".right-panel")?.scrollTo({ top: 0, behavior: "smooth" });
+    }, 50);
+  }
+
   resetGestureSequenceForRecordSync() {
     // 實驗進行中/暫停中仍會持續 flush 記錄，不能在此重置 UI。
     if (this.experimentFlowManager?.isRunning) {
-      Logger.debug(
-        "RecordView 刷新略過重置：實驗仍在進行中",
-      );
+      Logger.debug("RecordView 刷新略過重置：實驗仍在進行中");
       return;
     }
 
-    this.gestureUtils?.resetGestureSequence();
-    this.timerManager?.stopExperimentTimer?.();
+    this.resetCurrentCombinationRender();
 
     // 同步右面板實驗控制按鈕至已停止狀態（顯示開始列，隱藏控制按鈕）
     this.experimentSystemManager?.resetControlsToStopped?.();

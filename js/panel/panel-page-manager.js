@@ -466,9 +466,16 @@ class PanelPageManager {
     this.panelMediaManager?.playSound?.("experimentEnd");
     Logger.debug("Panel: 已播放實驗結束音效");
 
-    if (data?.reason === "power_off" && this.panelLogger?.exportLog) {
+    const powerOptions = this._getPowerOptionsForCurrentCombination();
+    const powerIsOff = this.powerControl?.isPowerOn === false;
+    const shouldExportLog =
+      data?.reason === "power_off" ||
+      (data?.reason === "completed" && powerOptions.includeShutdown) ||
+      (data?.reason === "completed" && powerIsOff);
+
+    if (shouldExportLog && this.panelLogger?.exportLog) {
       this.panelLogger.exportLog();
-      Logger.debug("Panel: 關機結束實驗，已自動匯出日誌");
+      Logger.debug("Panel: 實驗結束時已自動匯出日誌");
     }
     Logger.debug("Panel: 實驗系統停止後續邏輯已完成");
   }

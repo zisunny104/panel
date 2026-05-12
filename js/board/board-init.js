@@ -176,6 +176,7 @@ export async function initializeBoardManagers(page) {
       if (!recordView._initialized) {
         recordView.initialize();
       }
+      page.recordManager.updateDependencies?.({ view: recordView });
       logInitDuration("RecordView 已初始化", uiLogStart);
     }
 
