@@ -93,6 +93,14 @@ router.post("/session", (req, res) => {
   }
 
   const validCreateCode = getValidCreateCode();
+  if (!validCreateCode) {
+    Logger.error("CREATE_CODE 未設定，拒絕建立工作階段");
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      error: ERROR_CODES.INVALID_CREATE_CODE,
+      message: "伺服器尚未設定建立代碼，請在 server/.env 設定 CREATE_CODE",
+    });
+  }
   if (createCode !== validCreateCode) {
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
       success: false,

@@ -8,7 +8,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
-import { SERVER_CONFIG, ADMIN_TOKEN } from "./config/server.js";
+import { SERVER_CONFIG, ADMIN_TOKEN, getValidCreateCode } from "./config/server.js";
 import { CHANNEL_CONSTANTS } from "./config/constants.js";
 import { getDatabase, closeDatabase } from "./database/connection.js";
 import { validateSchema } from "./database/schema.js";
@@ -315,6 +315,15 @@ const server = httpServer.listen(SERVER_CONFIG.port, () => {
   Logger.warn(
     `管理員 Token: <yellow>${tokenPreview}</yellow>  <dim>(完整 Token 請查看 /api/sync/admin-token 或設定環境變數 ADMIN_TOKEN)</dim>`,
   );
+  const createCode = getValidCreateCode();
+  if (!createCode) {
+    Logger.error(
+      `⚠️  CREATE_CODE 未設定！無法建立工作階段。請在 server/.env 加入：<yellow>CREATE_CODE=your_code_here</yellow>`,
+    );
+  } else {
+    const codePreview = createCode.slice(0, 2) + "*".repeat(Math.max(0, createCode.length - 2));
+    Logger.info(`建立代碼已設定: <cyan>${codePreview}</cyan> <dim>(${createCode.length} 位)</dim>`);
+  }
   Logger.info("");
 });
 

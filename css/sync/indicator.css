@@ -691,6 +691,8 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #dfe3e8;
 }
 
 /* 分享工作階段切換按鈕 */

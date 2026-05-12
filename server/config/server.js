@@ -2,11 +2,15 @@
  * 伺服器設定
  */
 import dotenv from "dotenv";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import os from "os";
 import crypto from "crypto";
 
-// 載入環境變數
-dotenv.config();
+// 載入環境變數（明確指定 server/.env 路徑，避免從根目錄啟動時找不到）
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: resolve(__dirname, "../.env") });
 
 // 管理員 Token：從環境變數讀取，否則每次啟動隨機產生
 // 用於保護高危管理端點（清除、踢人、改角色）
@@ -92,11 +96,6 @@ export const SERVER_CONFIG = {
  * 從 config.json 讀取業務設定
  */
 import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 let businessConfig = null;
 
